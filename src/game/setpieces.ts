@@ -3,6 +3,7 @@
 //
 // Goal coordinates, seen from the taker: x runs from the left post (-1) to the
 // right post (1), y from the ground (0) to the crossbar (1). Outside that is a miss.
+import type {Point} from "./pitch";
 import {clamp, type Rng} from "./rng";
 import type {Player, Side} from "./types";
 
@@ -10,8 +11,13 @@ import type {Player, Side} from "./types";
 export const PENALTY_RATE = 0.0028;
 /** About 0.7 dangerous free kicks a match. */
 export const FREEKICK_RATE = 0.0075;
+/** About 2.5 corners per team and match. */
+export const CORNER_RATE = 0.052;
 
-export type SetPieceKind = "penalty" | "freekick";
+export type SetPieceKind = "penalty" | "freekick" | "corner";
+
+export const CORNER_TARGETS = ["near", "penalty", "far", "short"] as const;
+export type CornerTarget = (typeof CORNER_TARGETS)[number];
 
 export interface Aim {
   x: number;
@@ -22,6 +28,7 @@ export interface Aim {
 export interface SetPieceInput {
   aim?: Aim;
   dive?: number;
+  target?: CornerTarget;
 }
 
 export interface SetPiece {
@@ -32,11 +39,13 @@ export interface SetPiece {
   side: Side;
   takerId: string;
   keeperId?: string;
-  /** Which side of the goal the wall covers on free kicks: -1 left, 1 right. */
+  /** Free kicks: the side of the goal the wall covers. Corners: which flag. -1 left, 1 right. */
   wallSide: -1 | 1;
+  /** Where the ball is placed, 0..100 from the home side's view. */
+  spot: Point;
 }
 
-export type SetPieceResult = "goal" | "saved" | "missed" | "blocked";
+export type SetPieceResult = "goal" | "saved" | "missed" | "blocked" | "cleared";
 
 export interface SetPieceOutcome {
   result: SetPieceResult;
@@ -44,6 +53,75 @@ export interface SetPieceOutcome {
   shot: Aim;
   /** Where the keeper went. */
   dive: number;
+  /** Corners: where the cross went, who attacked it and who defended. */
+  target?: CornerTarget;
+  headerId?: string;
+  defenderId?: string;
+}
+
+/** Heading and jumping. */
+export function aerial(p: Player): number {
+  return p.attrs.physical * 0.55 + p.attrs.finishing * 0.25 + p.attrs.technique * 0.2;
+}
+
+/** Getting to the near post first. */
+function quickness(p: Player): number {
+  return p.attrs.pace * 0.4 + p.attrs.technique * 0.3 + p.attrs.finishing * 0.3;
+}
+
+function delivery(p: Player): number {
+  return p.attrs.passing * 0.5 + p.attrs.technique * 0.3 + p.attrs.vision * 0.2;
+}
+
+/** The attacker who goes for a corner aimed at this zone. */
+export function cornerAttacker(attackers: Player[], target: CornerTarget, takerId: string): Player | undefined {
+  const score = target === "near" || target === "short" ? quickness : aerial;
+  return attackers
+    .filter((p) => p.id !== takerId && p.position !== "GK")
+    .sort((a, b) => score(b) - score(a))[0];
+}
+
+/**
+ * Resolves a corner. The cross quality comes from the taker; then the best
+ * attacker for that zone goes up against the best defender. Far-post balls
+ * give the keeper a chance to come and claim. Short corners rarely lose the
+ * ball but rarely score.
+ */
+export function resolveCorner(
+  rng: Rng,
+  input: SetPieceInput | null,
+  taker: Player,
+  attackers: Player[],
+  defenders: Player[],
+  keeper: Player | undefined
+): SetPieceOutcome {
+  const u = Array.from({length: 7}, () => rng.next());
+  const autoTarget: CornerTarget = u[0] < 0.3 ? "near" : u[0] < 0.65 ? "penalty" : u[0] < 0.9 ? "far" : "short";
+  const target = input?.target ?? autoTarget;
+  const shot: Aim = {x: (u[5] - 0.5) * 1.6, y: 0.2 + u[6] * 0.6};
+  const gk = keeper?.attrs.goalkeeping ?? 20;
+  const header = cornerAttacker(attackers, target, taker.id);
+  const marking = (p: Player) => p.attrs.defending * 0.5 + (target === "near" ? p.attrs.pace : p.attrs.physical) * 0.5;
+  const defender = defenders.filter((p) => p.position !== "GK").sort((a, b) => marking(b) - marking(a))[0];
+  if (!header) return {result: "cleared", shot, dive: 0, target, defenderId: defender?.id};
+
+  if (target === "short") {
+    const pGoal = 0.04 + (delivery(taker) - 60) / 1200;
+    const result = u[1] < pGoal ? "goal" : u[1] < pGoal + 0.22 ? "saved" : u[1] < 0.62 ? "missed" : "cleared";
+    return {result, shot, dive: shot.x, target, headerId: header.id, defenderId: defender?.id};
+  }
+
+  // Far-post crosses hang longer, so a good keeper can come and claim them.
+  if (target === "far" && u[2] < 0.1 + gk / 500) {
+    return {result: "saved", shot, dive: shot.x, target, headerId: header.id};
+  }
+  const attack = (target === "near" ? quickness(header) : aerial(header)) + (delivery(taker) - 60) * 0.4;
+  const defend = defender ? marking(defender) : 30;
+  const pWin = 0.5 / (1 + Math.exp(-(attack - defend) / 10));
+  if (u[1] >= pWin) return {result: "cleared", shot, dive: 0, target, headerId: header.id, defenderId: defender?.id};
+  if (u[3] >= 0.5) return {result: "missed", shot: {x: shot.x > 0 ? 1.2 : -1.2, y: shot.y}, dive: 0, target, headerId: header.id};
+  const pGoal = clamp(0.4 - (gk - 60) / 250 + (aerial(header) - 60) / 300, 0.15, 0.65);
+  return {result: u[4] < pGoal ? "goal" : "saved", shot, dive: shot.x * 0.8, target, headerId: header.id};
 }
 
 /** The part of the goal mouth the wall covers, on the wall side. */
@@ -52,6 +130,7 @@ export const WALL = {inner: 0.1, outer: 0.85, height: 0.6};
 /** Composite shooting skill for a kind of set piece, 1..100. */
 export function takerSkill(p: Player, kind: SetPieceKind): number {
   const a = p.attrs;
+  if (kind === "corner") return delivery(p);
   return kind === "penalty"
     ? a.finishing * 0.6 + a.technique * 0.2 + a.vision * 0.2
     : a.technique * 0.5 + a.finishing * 0.3 + a.passing * 0.2;

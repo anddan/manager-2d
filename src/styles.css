@@ -379,6 +379,76 @@ button.pick { grid-template-columns: auto 1fr auto auto 60px; }
 .rating.good { color: var(--good); }
 .rating.bad { color: var(--bad); }
 
+/* Live match overlays */
+.pitch-wrap { position: relative; overflow: hidden; border-radius: 8px; }
+.pitch-line .spot { fill: rgb(255 255 255 / 0.7); stroke: none; }
+.dot.mine { cursor: pointer; }
+.dot .hit { fill: transparent; }
+.shout-ring { fill: none; stroke: #fde047; stroke-width: 0.5; animation: pulse 0.9s ease-out infinite; }
+.selected-ring { fill: none; stroke: #fff; stroke-width: 0.5; stroke-dasharray: 1 0.6; }
+.booked { fill: #facc15; stroke: #111; stroke-width: 0.15; }
+@keyframes pulse { from { opacity: 1; } to { opacity: 0.2; } }
+
+.goal-banner {
+  position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%); text-align: center; pointer-events: none;
+  color: #fff; text-shadow: 0 3px 12px rgb(0 0 0 / 0.6); animation: pop 0.5s cubic-bezier(.2, 1.6, .5, 1);
+}
+.goal-banner strong { display: block; font-size: clamp(2rem, 8vw, 3.6rem); font-weight: 900; letter-spacing: 0.04em; }
+.goal-banner span { font-size: 1.1rem; font-weight: 700; }
+@keyframes pop { from { transform: translate(-50%, -50%) scale(0.3); opacity: 0; } to { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
+.setup-banner {
+  position: absolute; left: 50%; top: 8px; transform: translateX(-50%); background: rgb(0 0 0 / 0.65); color: #fff;
+  padding: 4px 12px; border-radius: 999px; font-weight: 700; font-size: 0.85rem; white-space: nowrap; pointer-events: none;
+}
+.confetti { position: absolute; inset: 0; pointer-events: none; }
+.confetti .piece {
+  position: absolute; top: -10px; width: 7px; height: 11px; border-radius: 1px; opacity: 0.95;
+  animation-name: confetti-fall; animation-timing-function: cubic-bezier(.25, .6, .4, 1); animation-fill-mode: forwards;
+}
+.confetti .piece.round { width: 8px; height: 8px; border-radius: 50%; }
+@keyframes confetti-fall {
+  0% { translate: 0 0; rotate: 0deg; }
+  100% { translate: var(--drift) 110vh; rotate: 720deg; opacity: 0.8; }
+}
+@media (prefers-reduced-motion: reduce) { .confetti { display: none; } }
+
+/* The manager shouting from the touchline (bottom edge, by their own half) */
+.shout { position: absolute; bottom: 4px; display: flex; align-items: flex-end; gap: 4px; pointer-events: none; max-width: 70%; animation: pop-in 0.25s ease-out; }
+.shout.home { left: 22%; }
+.shout.away { right: 22%; flex-direction: row-reverse; }
+.shout-manager { font-size: 1.6rem; filter: drop-shadow(0 2px 2px rgb(0 0 0 / 0.5)); }
+.shout-bubble {
+  background: #fff; color: #111; border-radius: 12px; padding: 6px 10px; font-weight: 700; font-size: 0.85rem;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.35); margin-bottom: 18px;
+}
+@keyframes pop-in { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* Instructions and substitutions */
+.orders { border: 1px solid var(--border); background: var(--surface-2); border-radius: 10px; padding: 10px 12px; margin-top: 10px; }
+.orders-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.orders-head .btn { margin-left: auto; }
+.orders-fitness { width: 90px; }
+.booked-tag { font-size: 0.8rem; font-weight: 700; }
+.orders-grid { display: grid; gap: 8px; }
+.order-row { display: grid; grid-template-columns: 130px 1fr; gap: 8px; align-items: center; }
+.order-label { font-weight: 600; font-size: 0.9rem; }
+.order-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+.order-chips .chip { font-size: 0.82rem; padding: 4px 9px; }
+@media (max-width: 599px) { .order-row { grid-template-columns: 1fr; gap: 4px; } }
+
+/* Corner zones */
+.setpiece-goal.corner { cursor: default; }
+.sp-goal-top { fill: #fff; opacity: 0.85; }
+.sp-flag-pole { stroke: #fff; stroke-width: 0.5; }
+.zone { cursor: pointer; }
+.zone circle { fill: rgb(253 224 71 / 0.18); stroke: #fde047; stroke-width: 0.5; transition: fill 0.15s; }
+.zone:hover circle, .zone:focus circle { fill: rgb(253 224 71 / 0.4); outline: none; }
+.zone.active circle { fill: rgb(253 224 71 / 0.55); stroke-width: 0.9; }
+.zone.locked { cursor: default; }
+.zone-label { font-size: 2.6px; fill: #fff; text-anchor: middle; font-weight: 800; paint-order: stroke; stroke: rgb(0 0 0 / 0.5); stroke-width: 0.4px; }
+.zone-player { font-size: 2.3px; fill: #fde047; text-anchor: middle; font-weight: 700; paint-order: stroke; stroke: rgb(0 0 0 / 0.5); stroke-width: 0.35px; }
+.sp-cross { stroke-width: 0.6; stroke-dasharray: 1.5 1; fill: none; }
+
 .live-badge { background: var(--bad); color: #fff; font-size: 0.7rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; letter-spacing: 0.06em; }
 
 /* Set pieces: goal seen from behind the ball */

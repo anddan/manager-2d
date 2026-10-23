@@ -59,7 +59,7 @@ describe("UI smoke test", () => {
     const taker = Object.values(g.players).find((p) => p.position === "ST")!;
     const keeper = Object.values(g.players).find((p) => p.position === "GK")!;
     const clubs = Object.values(g.clubs);
-    const sp = {index: 0, kind: "freekick" as const, minute: 30, side: "home" as const, takerId: taker.id, keeperId: keeper.id, wallSide: 1 as const};
+    const sp = {index: 0, kind: "freekick" as const, minute: 30, side: "home" as const, takerId: taker.id, keeperId: keeper.id, wallSide: 1 as const, spot: {x: 76, y: 60}};
     for (const role of ["shooter", "keeper"] as const) {
       const html = renderToString(
         <SetPieceView sp={sp} role={role} taker={taker} keeper={keeper} shooters={clubs[0]} keepers={clubs[1]} onAnswer={() => {}} onDone={() => {}} />

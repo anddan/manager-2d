@@ -168,7 +168,10 @@ export type MatchEventType =
   | "missed"
   | "penalty"
   | "freekick"
+  | "corner"
   | "blocked"
+  | "cleared"
+  | "instruction"
   | "yellow"
   | "red"
   | "injury"
@@ -183,7 +186,21 @@ export interface MatchEvent {
   playerId?: string;
   /** Assist for goals, incoming player for subs. */
   otherId?: string;
+  /** Instructions: which one and which way, e.g. "shooting+". */
+  note?: string;
 }
+
+/** Instructions the manager can shout to a player during a match. */
+export const INSTRUCTIONS = ["passing", "dribbling", "shooting", "tackling", "position"] as const;
+export type InstructionKey = (typeof INSTRUCTIONS)[number];
+/** -1 less, 0 as normal, 1 more. */
+export type InstructionLevel = -1 | 0 | 1;
+export type Instructions = Partial<Record<InstructionKey, InstructionLevel>>;
+
+/** Something the manager did during a live match, applied from `minute` on. */
+export type MatchCommand =
+  | {minute: number; type: "sub"; outId: string; inId: string}
+  | {minute: number; type: "instruct"; playerId: string; key: InstructionKey; level: InstructionLevel};
 
 export type TouchKind = "kickoff" | "pass" | "dribble" | "tackle" | "setpiece" | "save" | "goal" | "out";
 
@@ -225,6 +242,8 @@ export interface LiveMatchState {
   seed: number;
   /** The user's choices at set pieces, by set-piece index. */
   inputs: Record<number, SetPieceInput>;
+  /** Substitutions and instructions, in order. Missing in older saves. */
+  commands?: MatchCommand[];
 }
 
 export interface PlayingTimePromise {

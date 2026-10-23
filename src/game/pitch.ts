@@ -26,7 +26,7 @@ export function fromSide(side: Side, depth: number, width: number): Point {
  * The spot a slot holds right now. The team moves up with the ball, spreads
  * wide when it has it and squeezes towards the ball when defending.
  */
-export function teamSpot(slot: Slot, side: Side, ball: Point, inPossession: boolean): Point {
+export function teamSpot(slot: Slot, side: Side, ball: Point, inPossession: boolean, push = 0): Point {
   const progress = progressFor(side, ball.x);
   const ballWidth = side === "home" ? ball.y : 100 - ball.y;
   let depth: number;
@@ -41,7 +41,15 @@ export function teamSpot(slot: Slot, side: Side, ball: Point, inPossession: bool
     depth = 6 + slot.x * 0.62 + (progress - 50) * 0.32;
     width = 50 + (slot.y - 50) * 0.78 + (ballWidth - 50) * 0.25;
   }
+  // "Go forward" / "stay back" instructions shift the player up or down the pitch.
+  if (slot.pos !== "GK") depth += push * 6;
   return fromSide(side, clamp(depth, 2, 96), clamp(width, 4, 96));
+}
+
+/** Kick-off shape: everyone in their own half. */
+export function kickoffSpot(slot: Slot, side: Side): Point {
+  const depth = slot.pos === "GK" ? 4 : clamp(4 + slot.x * 0.6, 6, 47);
+  return fromSide(side, depth, slot.y);
 }
 
 export function distance(a: Point, b: Point): number {

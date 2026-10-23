@@ -56,7 +56,7 @@ export function startWeek(state: GameState, rng: Rng, now: number, opts = {useEn
   for (const f of fixtures) {
     if (f.homeId === state.userClubId || f.awayId === state.userClubId) {
       // Fixed seed: reloading mid-match replays the same match, not a new one.
-      state.liveMatch = {fixtureId: f.id, seed: rng.int(1, 2 ** 31 - 1), inputs: {}};
+      state.liveMatch = {fixtureId: f.id, seed: rng.int(1, 2 ** 31 - 1), inputs: {}, commands: []};
       live = true;
     } else {
       applyMatch(state, simulateMatch(state, rng, f, false));
@@ -75,7 +75,7 @@ export function finishWeek(state: GameState, rng: Rng): MatchReport | undefined 
   if (live) {
     const f = state.fixtures.find((x) => x.id === live.fixtureId)!;
     const user = state.clubs[state.userClubId];
-    const report = simulateMatch(state, new Rng(live.seed), f, true, live.inputs);
+    const report = simulateMatch(state, new Rng(live.seed), f, true, live.inputs, live.commands ?? []);
     applyMatch(state, report);
     state.liveMatch = null;
     userReport = report;

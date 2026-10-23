@@ -1,8 +1,20 @@
-// The close-up for a penalty or free kick. The goal is seen from behind the
-// ball. Shooting: drag from the ball to where the shot should go; the circle
-// shows how accurate the taker is. Keeping: drag the way the keeper should dive.
+// The close-up for a set piece.
+// Penalties and free kicks: the goal is seen from behind the ball. Shooting:
+// drag from the ball to where the shot should go; the circle shows how
+// accurate the taker is. Keeping: drag the way the keeper should dive.
+// Corners: tap the zone the cross should go to; each zone shows who goes up.
 import {useEffect, useRef, useState, type PointerEvent} from "react";
-import {WALL, keeperReach, shotSpread, type SetPiece, type SetPieceInput, type SetPieceOutcome} from "../game/setpieces";
+import {
+  CORNER_TARGETS,
+  WALL,
+  cornerAttacker,
+  keeperReach,
+  shotSpread,
+  type CornerTarget,
+  type SetPiece,
+  type SetPieceInput,
+  type SetPieceOutcome,
+} from "../game/setpieces";
 import type {SetPieceRole} from "../game/live";
 import type {Club, Player} from "../game/types";
 import {useT} from "../i18n";
@@ -27,35 +39,51 @@ interface Props {
   keeper?: Player;
   shooters: Club;
   keepers: Club;
+  /** The attacking side's players on the pitch (for corners). */
+  attackers?: Player[];
   /** Set once answered: where the ball and keeper went. */
   outcome?: SetPieceOutcome;
   onAnswer: (input: SetPieceInput | null) => void;
   onDone: () => void;
 }
 
-export function SetPieceView({sp, role, taker, keeper, shooters, keepers, outcome, onAnswer, onDone}: Props) {
-  const {t} = useT();
-  const svgRef = useRef<SVGSVGElement>(null);
-  const [drag, setDrag] = useState<{x: number; y: number} | null>(null);
-  const [left, setLeft] = useState(SECONDS);
+export function SetPieceView(props: Props) {
+  return props.sp.kind === "corner" ? <CornerView {...props} /> : <ShotView {...props} />;
+}
 
-  // Countdown; at zero the computer decides.
+/**
+ * Seconds left to choose; at zero the computer decides. Once answered, the
+ * result shows for a moment before play goes on. Callbacks go through refs so
+ * re-renders don't restart the timers.
+ */
+function useCountdown(outcome: SetPieceOutcome | undefined, onAnswer: Props["onAnswer"], onDone: Props["onDone"]): number {
+  const [left, setLeft] = useState(SECONDS);
+  const answerRef = useRef(onAnswer);
+  const doneRef = useRef(onDone);
+  answerRef.current = onAnswer;
+  doneRef.current = onDone;
   useEffect(() => {
     if (outcome) return;
     if (left <= 0) {
-      onAnswer(null);
+      answerRef.current(null);
       return;
     }
     const id = setTimeout(() => setLeft(left - 1), 1000);
     return () => clearTimeout(id);
-  }, [left, outcome, onAnswer]);
-
-  // Show the result for a moment, then carry on.
+  }, [left, outcome]);
   useEffect(() => {
     if (!outcome) return;
-    const id = setTimeout(onDone, 2400);
+    const id = setTimeout(() => doneRef.current(), 2400);
     return () => clearTimeout(id);
-  }, [outcome, onDone]);
+  }, [outcome]);
+  return left;
+}
+
+function ShotView({sp, role, taker, keeper, shooters, keepers, outcome, onAnswer, onDone}: Props) {
+  const {t} = useT();
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [drag, setDrag] = useState<{x: number; y: number} | null>(null);
+  const left = useCountdown(outcome, onAnswer, onDone);
 
   const toGoal = (e: PointerEvent<SVGSVGElement>) => {
     const rect = svgRef.current!.getBoundingClientRect();
@@ -177,6 +205,85 @@ export function SetPieceView({sp, role, taker, keeper, shooters, keepers, outcom
 
       {outcome ? (
         <p className={`sp-result sp-${outcome.result}`}>{t(`sp.result.${outcome.result}`)}</p>
+      ) : (
+        <div className="btn-row">
+          <button className="btn" onClick={() => onAnswer(null)}>{t("sp.auto")}</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Corner view: the box from above, goal at the top.
+const ZONE_SPOTS: Record<CornerTarget, (flag: number) => {x: number; y: number}> = {
+  near: (flag) => ({x: 50 + flag * 9, y: 13}),
+  penalty: () => ({x: 50, y: 30}),
+  far: (flag) => ({x: 50 - flag * 11, y: 15}),
+  short: (flag) => ({x: 50 + flag * 37, y: 16}),
+};
+
+function CornerView({sp, taker, attackers = [], shooters, outcome, onAnswer, onDone}: Props) {
+  const {t} = useT();
+  const left = useCountdown(outcome, onAnswer, onDone);
+  const flag = sp.wallSide;
+  const flagX = flag < 0 ? 3 : 97;
+  const chosen = outcome?.target;
+  const header = outcome?.headerId ? attackers.find((p) => p.id === outcome.headerId) : undefined;
+  return (
+    <div className="setpiece">
+      <div className="setpiece-head">
+        <strong>{t("sp.cornerUs")}</strong>
+        {!outcome && <span className="clock">{t("sp.seconds", {s: left})}</span>}
+      </div>
+      <p className="muted small">{t("sp.cornerHint", {name: taker.lastName})}</p>
+      <svg className="setpiece-goal corner" viewBox="0 0 100 62" role="img" aria-label={t("sp.cornerUs")}>
+        <rect x={0} y={0} width={100} height={62} className="sp-grass" />
+        <g className="pitch-line">
+          <line x1={0} y1={6} x2={100} y2={6} />
+          <rect x={20} y={6} width={60} height={34} fill="none" />
+          <rect x={37} y={6} width={26} height={10} fill="none" />
+          <path d="M40 40 A12 12 0 0 0 60 40" fill="none" />
+          <circle cx={50} cy={28} r={0.6} className="spot" />
+        </g>
+        <rect x={44} y={2} width={12} height={4} className="sp-goal-top" />
+        <line x1={flagX} y1={6} x2={flagX} y2={1} className="sp-flag-pole" />
+        <path d={`M${flagX} 1 l${flag < 0 ? 4 : -4} 1.5 l${flag < 0 ? -4 : 4} 1.5z`} fill="#fde047" />
+        <circle cx={flagX + (flag < 0 ? 1 : -1)} cy={7} r={1.4} className="sp-ball" />
+        {CORNER_TARGETS.map((zone) => {
+          const at = ZONE_SPOTS[zone](flag);
+          const who = cornerAttacker(attackers, zone, taker.id);
+          const active = chosen === zone;
+          return (
+            <g
+              key={zone}
+              className={`zone ${active ? "active" : ""} ${outcome ? "locked" : ""}`}
+              onClick={outcome ? undefined : () => onAnswer({target: zone})}
+              role="button"
+              tabIndex={outcome ? -1 : 0}
+              aria-label={t(`sp.zone.${zone}`)}
+              onKeyDown={(e) => !outcome && (e.key === "Enter" || e.key === " ") && onAnswer({target: zone})}
+            >
+              <circle cx={at.x} cy={at.y} r={6.5} />
+              <text x={at.x} y={at.y - 0.5} className="zone-label">{t(`sp.zone.${zone}`)}</text>
+              <text x={at.x} y={at.y + 3} className="zone-player">{who?.lastName ?? "?"}</text>
+            </g>
+          );
+        })}
+        {outcome && chosen && (
+          <line
+            x1={flagX}
+            y1={7}
+            x2={ZONE_SPOTS[chosen](flag).x}
+            y2={ZONE_SPOTS[chosen](flag).y}
+            className="sp-cross"
+            stroke={shooters.color2}
+          />
+        )}
+      </svg>
+      {outcome ? (
+        <p className={`sp-result sp-${outcome.result}`}>
+          {t(`sp.result.${outcome.result}`)} {header && outcome.result !== "cleared" && <small className="muted">({header.lastName})</small>}
+        </p>
       ) : (
         <div className="btn-row">
           <button className="btn" onClick={() => onAnswer(null)}>{t("sp.auto")}</button>
