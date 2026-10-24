@@ -6,7 +6,7 @@ import type {Negotiation} from "./game/contracts";
 import {newGame} from "./game/generate";
 import {Rng} from "./game/rng";
 import {deleteSave, loadGame, saveGame} from "./game/save";
-import type {GameState} from "./game/types";
+import type {GameState, ManagerLook, PlayersGender} from "./game/types";
 import type {Lang, Params} from "./i18n";
 
 export const VIEWS = [
@@ -46,7 +46,7 @@ interface Store {
   setNegotiation: (neg: Negotiation | null) => void;
   notify: (key: string, params?: Params, tone?: Toast["tone"]) => void;
   act: <R>(fn: (game: GameState, rng: Rng) => R) => R;
-  start: (managerName: string, clubIndex: number) => void;
+  start: (managerName: string, clubIndex: number, look?: ManagerLook, playersGender?: PlayersGender, leagueId?: string) => void;
   replace: (game: GameState) => void;
   quit: () => void;
 }
@@ -97,8 +97,8 @@ export const useGame = create<Store>((set, get) => ({
     set({game: draft});
     return result;
   },
-  start: (managerName, clubIndex) => {
-    const game = newGame(managerName, clubIndex, (Math.random() * 2 ** 32) >>> 0);
+  start: (managerName, clubIndex, look, playersGender, leagueId) => {
+    const game = newGame(managerName, clubIndex, (Math.random() * 2 ** 32) >>> 0, look, playersGender, leagueId);
     saveGame(game);
     set({game, view: "overview"});
   },

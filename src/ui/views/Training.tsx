@@ -1,5 +1,5 @@
 import {ENERGY_COST_EXTRA_TRAINING, MAX_EXTRA_TRAININGS} from "../../game/constants";
-import {userClub} from "../../game/helpers";
+import {listName, userClub} from "../../game/helpers";
 import {spendEnergy} from "../../game/monetization";
 import {clubPlayers, overall} from "../../game/ratings";
 import {extraTraining, FOCUS_ATTRIBUTES} from "../../game/training";
@@ -74,7 +74,7 @@ export function Training() {
           <table className="table">
             <thead>
               <tr>
-                <th>{t("col.pos")}</th><th>{t("col.name")}</th><th>{t("col.age")}</th><th>{t("col.ovr")}</th><th>{t("col.pot")}</th>
+                <th>{t("col.pos")}</th><th>{t("col.name")}</th><th>{t("col.age")}</th><th title={t("col.ovrHint")}>{t("col.ovr")}</th>
                 <th>{t("col.fitness")}</th><th>{t("train.change")}</th><th>{t("train.biggest")}</th><th>{t("pl.individualFocus")}</th>
               </tr>
             </thead>
@@ -84,10 +84,9 @@ export function Training() {
                 return (
                   <tr key={p.id}>
                     <td><PosBadge pos={p.position} /></td>
-                    <td><button className="link" onClick={() => openPlayer(p.id)}>{p.firstName.charAt(0)}. {p.lastName}</button>{p.injuryWeeks > 0 && " 🩹"}</td>
+                    <td><button className="link" onClick={() => openPlayer(p.id)}>{listName(p)}</button>{p.injuryWeeks > 0 && " 🩹"}</td>
                     <td>{p.age}</td>
                     <td className="num strong">{overall(p)}</td>
-                    <td className="num">{p.potential}</td>
                     <td><Bar value={p.fitness} small /></td>
                     <td><Delta value={totalChange(p)} digits={2} /></td>
                     <td className="small">

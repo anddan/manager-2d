@@ -1,13 +1,59 @@
 // Lineup and tactics. Tap a slot on the pitch, then a player to put there.
 import {useState} from "react";
-import {BENCH_SIZE, FORMATIONS} from "../../game/constants";
-import {userClub} from "../../game/helpers";
+import {BENCH_SIZE, FORMATIONS, type Slot} from "../../game/constants";
+import {listName, shortName, userClub} from "../../game/helpers";
 import {isAvailable, pickBestLineup} from "../../game/lineup";
-import {clubPlayers, effectiveRating, familiarity} from "../../game/ratings";
+import {clubPlayers, effectiveRating, familiarity, teamOvr} from "../../game/ratings";
 import {FORMATION_IDS, MENTALITIES} from "../../game/types";
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
-import {Bar, Card, PosBadge, StatusIcons} from "../common";
+import {Bar, Card, Flag, PosBadge, StatusIcons} from "../common";
+import {Jersey} from "../Jersey";
+
+/**
+ * Where a slot sits on the lineup board. Formations only use depth 5 (keeper)
+ * to about 76 (strikers), so that range is stretched over the whole board,
+ * keeper at the bottom and strikers at the top, to give every row room for
+ * its shirt and name plate. Sideways it keeps clear of the touchlines.
+ */
+function boardSpots(slots: Slot[]): {left: string; top: string}[] {
+  // Work in percent of the board; a shirt with its plate is about 18% wide and 14% tall.
+  const W = 18;
+  const H = 14;
+  const spots = slots.map((s) => ({
+    x: 50 + (s.y - 50) * 0.95,
+    y: 2 + (1 - Math.max(0, Math.min(1, (s.x - 5) / 71))) * 79,
+  }));
+  // Nudge overlapping pairs apart: sideways when they're on about the same line, else up and down.
+  for (let round = 0; round < 40; round++) {
+    let moved = false;
+    for (let a = 0; a < spots.length; a++) {
+      for (let b = a + 1; b < spots.length; b++) {
+        const p = spots[a];
+        const q = spots[b];
+        const ox = W - Math.abs(p.x - q.x);
+        const oy = H - Math.abs(p.y - q.y);
+        if (ox <= 0 || oy <= 0) continue;
+        moved = true;
+        if (Math.abs(p.y - q.y) < H / 2) {
+          const dir = p.x <= q.x ? -1 : 1;
+          p.x += (dir * ox) / 2;
+          q.x -= (dir * ox) / 2;
+        } else {
+          const dir = p.y <= q.y ? -1 : 1;
+          p.y += (dir * oy) / 2;
+          q.y -= (dir * oy) / 2;
+        }
+      }
+    }
+    for (const s of spots) {
+      s.x = Math.max(W / 2 - 1, Math.min(101 - W / 2, s.x));
+      s.y = Math.max(0, Math.min(84, s.y));
+    }
+    if (!moved) break;
+  }
+  return spots.map((s) => ({left: `${s.x}%`, top: `${s.y}%`}));
+}
 
 export function Tactics() {
   const {t} = useT();
@@ -16,6 +62,7 @@ export function Tactics() {
   const openPlayer = useGame((s) => s.openPlayer);
   const club = userClub(game);
   const slots = FORMATIONS[club.formation];
+  const spots = boardSpots(slots);
   const [selected, setSelected] = useState<number | null>(null);
   const squad = clubPlayers(game, club.id);
 
@@ -60,7 +107,7 @@ export function Tactics() {
   return (
     <div className="grid tactics">
       <Card
-        title={t("nav.tactics")}
+        title={<>{t("nav.tactics")} <span className="team-ovr" title={t("tac.teamOvrHint")}>{t("tac.teamOvr")} <strong>{teamOvr(game, club.id)}</strong></span></>}
         actions={<button className="btn small" onClick={auto}>✨ {t("tac.auto")}</button>}
       >
         <div className="btn-row wrap">
@@ -86,12 +133,23 @@ export function Tactics() {
               <button
                 key={i}
                 className={`slot ${selected === i ? "selected" : ""} ${bad ? "empty" : ""}`}
-                style={{left: `${slot.y}%`, top: `${100 - slot.x - 4}%`}}
+                style={spots[i]}
                 onClick={() => setSelected(selected === i ? null : i)}
               >
-                <span className="slot-pos">{t(`pos.${slot.pos}`)}</span>
-                <span className="slot-name">{p && !bad ? p.lastName : "—"}</span>
-                {p && !bad && <span className="slot-rating">{Math.round(effectiveRating(p, slot.pos))}</span>}
+                {p && !bad && club.roles?.captain === p.id && <span className="armband" title={t("roles.captain")}>C</span>}
+                {bad ? (
+                  <span className="slot-empty">+</span>
+                ) : (
+                  <Jersey color={club.color} trim={club.color2} keeper={slot.pos === "GK"} number={i + 1} />
+                )}
+                <span className="plate">
+                  <span className="plate-name">{p && !bad ? shortName(p) : t(`pos.${slot.pos}`)}</span>
+                  <span className="plate-info">
+                    {p && !bad && <Flag code={p.nationality} size={13} />}
+                    <span>{t(`pos.${slot.pos}`)}</span>
+                    {p && !bad && <strong>{Math.round(effectiveRating(p, slot.pos))}</strong>}
+                  </span>
+                </span>
               </button>
             );
           })}
@@ -105,7 +163,7 @@ export function Tactics() {
               <li key={p.id}>
                 <button className="pick" disabled={!isAvailable(p)} onClick={() => assign(p.id)}>
                   <PosBadge pos={p.position} />
-                  <span className="pick-name">{p.firstName.charAt(0)}. {p.lastName} <StatusIcons player={p} /></span>
+                  <span className="pick-name"><Flag code={p.nationality} size={15} /> {listName(p)} <StatusIcons player={p} /></span>
                   <span className="muted small">{club.lineup.includes(p.id) ? t("tac.starting") : club.bench.includes(p.id) ? t("tac.onBench") : ""}</span>
                   <span className={familiarity(p, pos) < 1 ? "num warn" : "num strong"}>{Math.round(effectiveRating(p, pos))}</span>
                   <Bar value={p.fitness} small />
@@ -125,7 +183,7 @@ export function Tactics() {
                     <div className="pick">
                       <input type="checkbox" aria-label={t("tac.toBench")} checked={club.bench.includes(p.id)} disabled={!isAvailable(p)} onChange={() => toggleBench(p.id)} />
                       <PosBadge pos={p.position} />
-                      <button className="link pick-name" onClick={() => openPlayer(p.id)}>{p.firstName.charAt(0)}. {p.lastName} <StatusIcons player={p} /></button>
+                      <button className="link pick-name" onClick={() => openPlayer(p.id)}><Flag code={p.nationality} size={15} /> {listName(p)} <StatusIcons player={p} /></button>
                       <span className="num">{Math.round(effectiveRating(p, p.position))}</span>
                       <Bar value={p.fitness} small />
                     </div>

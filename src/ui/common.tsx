@@ -1,11 +1,12 @@
 // Small building blocks shared by the screens.
 import {useEffect, type ReactNode} from "react";
-import {flag} from "../game/names";
+import {listName} from "../game/helpers";
 import {overall} from "../game/ratings";
 import {estimatedOverall, isKnown} from "../game/transfers";
 import type {GameState, Player, Position} from "../game/types";
 import {useT} from "../i18n";
 import {useGame} from "../store";
+import {FlagIcon} from "./Flag";
 
 export function Card({title, actions, children, className = ""}: {title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string}) {
   return (
@@ -21,7 +22,8 @@ export function Card({title, actions, children, className = ""}: {title?: ReactN
   );
 }
 
-export function Modal({title, onClose, children, wide}: {title: ReactNode; onClose: () => void; children: ReactNode; wide?: boolean}) {
+/** A dialog. `backdropCloses` false keeps a click beside it from closing it (✕ and Escape still do). */
+export function Modal({title, onClose, children, wide, backdropCloses = true}: {title: ReactNode; onClose: () => void; children: ReactNode; wide?: boolean; backdropCloses?: boolean}) {
   const {t} = useT();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -29,7 +31,7 @@ export function Modal({title, onClose, children, wide}: {title: ReactNode; onClo
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <div className="modal-backdrop" onClick={backdropCloses ? onClose : undefined}>
       <div className={`modal ${wide ? "modal-wide" : ""}`} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
         <header className="modal-head">
           <h2>{title}</h2>
@@ -61,26 +63,36 @@ export function PosBadge({pos}: {pos: Position}) {
   return <span className={`pos pos-${pos}`}>{t(`pos.${pos}`)}</span>;
 }
 
-export function Flag({code}: {code: string}) {
-  return <span className="flag" title={code}>{flag(code)}</span>;
+/** Flag with the country's name as tooltip; `named` also writes the name out. */
+export function Flag({code, named, size}: {code: string; named?: boolean; size?: number}) {
+  const {tx} = useT();
+  const name = tx(`nat.${code}`);
+  if (!named) return <FlagIcon code={code} title={name} size={size} />;
+  return (
+    <span className="nation">
+      <FlagIcon code={code} title={name} size={size} /> {name}
+    </span>
+  );
 }
 
-/** Overall as a number, or a range for players the user hasn't scouted. */
+/** Overall as a number; for players the user hasn't scouted, an estimate (shown fainter). */
 export function Ovr({game, player}: {game: GameState; player: Player}) {
+  const {t} = useT();
   if (isKnown(game, player)) return <span className="ovr">{overall(player)}</span>;
-  const {low, high} = estimatedOverall(game, player);
-  return <span className="ovr ovr-est">{low}–{high}</span>;
+  return <span className="ovr ovr-est" title={t("pl.estimated")}>{estimatedOvr(game, player)}</span>;
 }
 
-export function Pot({game, player}: {game: GameState; player: Player}) {
-  return <span className="pot">{isKnown(game, player) ? player.potential : "?"}</span>;
+/** The middle of the scouting estimate. */
+export function estimatedOvr(game: GameState, player: Player): number {
+  const {low, high} = estimatedOverall(game, player);
+  return Math.round((low + high) / 2);
 }
 
 export function PlayerLink({player}: {player: Player}) {
   const openPlayer = useGame((s) => s.openPlayer);
   return (
     <button className="link" onClick={() => openPlayer(player.id)}>
-      {player.firstName.charAt(0)}. {player.lastName}
+      {listName(player)}
     </button>
   );
 }

@@ -1,4 +1,5 @@
 import {useState} from "react";
+import {shortName} from "../../game/helpers";
 import {answerTransferRequest} from "../../game/morale";
 import {startNegotiation} from "../../game/contracts";
 import type {Message, MessageKind} from "../../game/types";
@@ -94,7 +95,7 @@ function MessageAction({message: m}: {message: Message}) {
             className="btn"
             onClick={() => {
               const neg = startNegotiation(game, a.playerId, game.userClubId, "renewal");
-              if ("refused" in neg) notify(neg.refused, {name: game.players[a.playerId]?.lastName ?? ""}, "error");
+              if ("refused" in neg) notify(neg.refused, {name: (game.players[a.playerId] ? shortName(game.players[a.playerId]) : undefined) ?? ""}, "error");
               else setNegotiation(neg);
             }}
           >

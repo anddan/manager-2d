@@ -72,7 +72,11 @@ export interface Player {
   id: string;
   firstName: string;
   lastName: string;
+  /** What the manager calls them; shown instead of their name everywhere but their profile. */
+  nickname?: string;
   age: number;
+  /** "f" for women; missing means a man (older saves only had men). */
+  gender?: "f";
   nationality: string;
   position: Position;
   attrs: Attributes;
@@ -144,7 +148,13 @@ export interface Club {
   lineup: string[];
   bench: string[];
   installments: Installment[];
+  /** Captain and set-piece takers; the best on the pitch steps in when they're off. Missing in old saves. */
+  roles?: TeamRoles;
 }
+
+export const TEAM_ROLES = ["captain", "penalties", "freekicks", "corners"] as const;
+export type TeamRole = (typeof TEAM_ROLES)[number];
+export type TeamRoles = Partial<Record<TeamRole, string>>;
 
 export const FORMATION_IDS = ["4-4-2", "4-3-3", "4-2-3-1", "3-5-2", "5-3-2", "4-5-1"] as const;
 export type FormationId = (typeof FORMATION_IDS)[number];
@@ -177,6 +187,7 @@ export type MatchEventType =
   | "injury"
   | "sub"
   | "halftime"
+  | "disallowed"
   | "fulltime";
 
 export interface MatchEvent {
@@ -200,9 +211,11 @@ export type Instructions = Partial<Record<InstructionKey, InstructionLevel>>;
 /** Something the manager did during a live match, applied from `minute` on. */
 export type MatchCommand =
   | {minute: number; type: "sub"; outId: string; inId: string}
-  | {minute: number; type: "instruct"; playerId: string; key: InstructionKey; level: InstructionLevel};
+  | {minute: number; type: "instruct"; playerId: string; key: InstructionKey; level: InstructionLevel}
+  /** The same instruction for everyone on the pitch, overriding their own. */
+  | {minute: number; type: "instructTeam"; key: InstructionKey; level: InstructionLevel};
 
-export type TouchKind = "kickoff" | "pass" | "dribble" | "tackle" | "setpiece" | "save" | "goal" | "out";
+export type TouchKind = "kickoff" | "pass" | "dribble" | "tackle" | "setpiece" | "save" | "goal" | "nogoal" | "out" | "goalkick" | "throwin";
 
 /**
  * One touch of the ball for the replay: where the ball goes and who plays it.
@@ -216,6 +229,8 @@ export interface Frame {
   possession: Side;
   playerId?: string;
   kind?: TouchKind;
+  /** How a pass travels: into space (through), a long ball or a cross (both in the air). Plain passes go to feet. */
+  flight?: "through" | "long" | "cross";
 }
 
 export interface MatchReport {
@@ -234,6 +249,12 @@ export interface MatchReport {
   formations: {home: FormationId; away: FormationId};
   /** Penalties and free kicks, with where the ball went. Missing in old saves. */
   setPieces?: (SetPiece & SetPieceOutcome)[];
+  /**
+   * Added time at the end of each half, in minutes. Match minutes in events and
+   * frames run on without a break (the second half starts at 46 + first half's
+   * added time); see clock.ts. Missing in old saves, which had none.
+   */
+  added?: [number, number];
 }
 
 /** The user's match while it's being played live. */
@@ -327,12 +348,33 @@ export interface SeasonHistory {
   userPosition: number;
 }
 
+export const PLAYERS_GENDERS = ["men", "women", "mix"] as const;
+export type PlayersGender = (typeof PLAYERS_GENDERS)[number];
+
+/** How the manager looks. Same shape as a player's look, plus the suit. */
+export interface ManagerLook {
+  skin: string;
+  hair: string;
+  style: string;
+  beard: string;
+  glasses: boolean;
+  suit: string;
+  /** Eyelashes and softer brows. Missing in older saves. */
+  lashes?: boolean;
+}
+
 export interface GameState {
   version: number;
   rngState: number;
   managerName: string;
+  /** Missing in older saves; a default look is used then. */
+  managerLook?: ManagerLook;
+  /** Who plays in the league: men, women or mixed teams. Missing in older saves (men). */
+  playersGender?: PlayersGender;
   userClubId: string;
   leagueName: string;
+  /** Which league (see leagues.ts); missing in older saves, which are Nordligan. */
+  leagueId?: string;
   season: number;
   /** Week within the season, 1-based. */
   week: number;

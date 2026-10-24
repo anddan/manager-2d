@@ -1,6 +1,7 @@
 // Player details. Own players: condition, mood, talks, focus, listing.
 // Others: scouting, bids, loans and free-agent offers.
 import {useState} from "react";
+import {profileName, shortName} from "../game/helpers";
 import {DIAMONDS_SCOUT_COST, SCOUT_COST} from "../game/constants";
 import {startNegotiation} from "../game/contracts";
 import {happinessFactors, answerTransferRequest, talkToPlayer, TALKS} from "../game/morale";
@@ -16,7 +17,7 @@ import {
 import {ATTRIBUTES, type Player} from "../game/types";
 import {useT} from "../i18n";
 import {useGame, useGameState} from "../store";
-import {Bar, Delta, Face, Flag, Modal, Ovr, Pot, PosBadge, StatusIcons} from "./common";
+import {Bar, Delta, Face, Flag, Modal, Ovr, PosBadge, StatusIcons} from "./common";
 import {PlayerCard} from "./PlayerCard";
 
 export function PlayerModal({playerId}: {playerId: string}) {
@@ -30,15 +31,16 @@ export function PlayerModal({playerId}: {playerId: string}) {
   const club = p.clubId ? game.clubs[p.clubId] : null;
 
   return (
-    <Modal wide onClose={() => openPlayer(null)} title={<><Flag code={p.nationality} /> {p.firstName} {p.lastName} <StatusIcons player={p} /></>}>
+    <Modal wide onClose={() => openPlayer(null)} title={<><Flag code={p.nationality} /> {profileName(p)} <StatusIcons player={p} /></>}>
       <div className="player-top">
         <PlayerCard game={game} player={p} />
         <div className="player-head">
           <PosBadge pos={p.position} />
+          <Flag code={p.nationality} named size={22} />
           <span>{t("pl.age", {age: p.age})}</span>
           <span>{club ? club.name : t("pl.freeAgent")}</span>
-          <span className="rating-pill">{t("col.ovr")} <Ovr game={game} player={p} /></span>
-          <span className="rating-pill">{t("col.pot")} <Pot game={game} player={p} /></span>
+          <span className="rating-pill" title={t("col.ovrHint")}>{t("col.ovr")} <Ovr game={game} player={p} /></span>
+          {own && <Nickname key={p.id} player={p} />}
         </div>
       </div>
 
@@ -78,6 +80,36 @@ export function PlayerModal({playerId}: {playerId: string}) {
 
       {own ? <OwnActions player={p} /> : <MarketActions player={p} />}
     </Modal>
+  );
+}
+
+/** What the manager calls the player. Shown instead of their name everywhere but here. */
+function Nickname({player: p}: {player: Player}) {
+  const {t} = useT();
+  const act = useGame((s) => s.act);
+  const [value, setValue] = useState(p.nickname ?? "");
+  const save = (nickname: string) =>
+    act((g) => {
+      const name = nickname.trim().slice(0, 20);
+      if (name) g.players[p.id].nickname = name;
+      else delete g.players[p.id].nickname;
+    });
+  return (
+    <form
+      className="nickname"
+      onSubmit={(e) => {
+        e.preventDefault();
+        save(value);
+      }}
+    >
+      <label>
+        <span>✏️ {t("pl.nickname")}</span>
+        <input value={value} maxLength={20} placeholder={p.lastName} onChange={(e) => setValue(e.target.value)} onBlur={() => save(value)} />
+      </label>
+      {p.nickname && (
+        <button type="button" className="btn small" onClick={() => { setValue(""); save(""); }}>{t("pl.nicknameClear")}</button>
+      )}
+    </form>
   );
 }
 
@@ -140,12 +172,12 @@ function OwnActions({player: p}: {player: Player}) {
 
   const talk = (kind: (typeof TALKS)[number]) => {
     const key = act((g, rng) => talkToPlayer(g, rng, p.id, kind));
-    notify(key, {name: p.lastName}, key.endsWith("good") || key.endsWith("works") || key.endsWith("made") ? "good" : "info");
+    notify(key, {name: shortName(p)}, key.endsWith("good") || key.endsWith("works") || key.endsWith("made") ? "good" : "info");
   };
 
   const negotiate = () => {
     const neg = startNegotiation(game, p.id, game.userClubId, "renewal");
-    if ("refused" in neg) notify(neg.refused, {name: p.lastName}, "error");
+    if ("refused" in neg) notify(neg.refused, {name: shortName(p)}, "error");
     else setNegotiation(neg);
   };
 
@@ -153,7 +185,7 @@ function OwnActions({player: p}: {player: Player}) {
     <div className="actions-panel">
       {p.wantsToLeave && !p.transferListed && (
         <div className="callout warn">
-          <p>{t("pl.wantsOut", {name: p.lastName})}</p>
+          <p>{t("pl.wantsOut", {name: shortName(p)})}</p>
           <button className="btn" onClick={() => act((g) => answerTransferRequest(g, p.id, true))}>{t("pl.acceptRequest")}</button>
           <button className="btn" onClick={() => act((g) => answerTransferRequest(g, p.id, false))}>{t("pl.rejectRequest")}</button>
         </div>
@@ -221,13 +253,13 @@ function MarketActions({player: p}: {player: Player}) {
   const scout = (instant: boolean) => {
     const err = act((g) => scoutPlayer(g, p.id, instant));
     if (err) notify(err, undefined, "error");
-    else notify(instant ? "toast.scouted" : "toast.scoutOrdered", {name: p.lastName}, "good");
+    else notify(instant ? "toast.scouted" : "toast.scoutOrdered", {name: shortName(p)}, "good");
   };
 
   const toContract = (agreedFee: number) => {
     const neg = startNegotiation(game, p.id, game.userClubId, p.clubId ? "transfer" : "freeAgent", agreedFee);
     if ("refused" in neg) {
-      notify(neg.refused, {name: p.lastName}, "error");
+      notify(neg.refused, {name: shortName(p)}, "error");
       return;
     }
     neg.upfrontShare = upfront;
@@ -244,11 +276,11 @@ function MarketActions({player: p}: {player: Player}) {
 
   const loan = () => {
     if (!evaluateLoanRequest(game, p.id, wageShare)) {
-      notify("tr.loanRefused", {name: p.lastName}, "error");
+      notify("tr.loanRefused", {name: shortName(p)}, "error");
       return;
     }
     act((g) => completeLoan(g, p.id, g.userClubId, wageShare));
-    notify("tr.loanDone", {name: p.lastName}, "good");
+    notify("tr.loanDone", {name: shortName(p)}, "good");
   };
 
   return (

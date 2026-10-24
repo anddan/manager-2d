@@ -1,6 +1,6 @@
 import {nextUserFixture, userClub} from "../../game/helpers";
 import {leaguePosition, standings} from "../../game/league";
-import {clubPlayers, clubStrength, wageBill} from "../../game/ratings";
+import {clubPlayers, teamOvr, wageBill} from "../../game/ratings";
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
 import {Card, Empty, Face, PlayerLink} from "../common";
@@ -30,7 +30,7 @@ export function Overview() {
             <span className="vs">{t("ov.round", {round: next.round})}</span>
             <Team id={next.awayId} />
             <p className="muted">
-              {next.homeId === club.id ? t("ov.home") : t("ov.away")} · {t("ov.strength")}: {Math.round(clubStrength(game, club.id))} – {Math.round(clubStrength(game, next.homeId === club.id ? next.awayId : next.homeId))}
+              {next.homeId === club.id ? t("ov.home") : t("ov.away")} · {t(matchup(teamOvr(game, club.id) - teamOvr(game, next.homeId === club.id ? next.awayId : next.homeId)))}
             </p>
             <button className="btn" onClick={() => setView("tactics")}>📋 {t("nav.tactics")}</button>
           </div>
@@ -93,13 +93,20 @@ export function Overview() {
   );
 }
 
+/** How the two teams compare, by team OVR. */
+function matchup(diff: number): "ov.even" | "ov.favourite" | "ov.underdog" {
+  return Math.abs(diff) <= 2 ? "ov.even" : diff > 0 ? "ov.favourite" : "ov.underdog";
+}
+
 function Team({id}: {id: string}) {
+  const {t} = useT();
   const game = useGameState();
   const c = game.clubs[id];
   return (
     <div className="team">
       <span className="crest big" style={{background: c.color, color: c.color2}}>{c.short}</span>
       <span>{c.name}</span>
+      <span className="team-ovr">{t("tac.teamOvr")} <strong>{teamOvr(game, id)}</strong></span>
     </div>
   );
 }

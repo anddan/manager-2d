@@ -35,7 +35,8 @@ src/
     generate.ts    New world: clubs, squads, free agents
     match.ts       Match simulation + replay touches; createMatch can pause at set pieces
     setpieces.ts   Penalties and free kicks: aim, accuracy, keeper reach
-    live.ts        Drives the user's match live in the viewer
+    live.ts        Drives the user's match live in the viewer; stops at set pieces, injuries and half-time
+    clock.ts       Added time: running match minutes to "45+2'" on the scoreboard
     week.ts        The weekly loop: startWeek -> live match -> finishWeek
     training.ts    Development and decline
     morale.ts      Happiness, talks, promises, transfer requests

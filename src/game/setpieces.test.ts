@@ -3,10 +3,11 @@
 import {describe, expect, it} from "vitest";
 import {newGame} from "./generate";
 import {LiveMatch} from "./live";
+import {createMatch} from "./match";
 import {Rng} from "./rng";
 import {resolveSetPiece, type SetPiece, type SetPieceInput} from "./setpieces";
 import {finishWeek, startWeek} from "./week";
-import type {Player} from "./types";
+import type {MatchCommand, Player} from "./types";
 
 const game = newGame("SetPieces", 5, 31);
 const players = Object.values(game.players);
@@ -64,6 +65,67 @@ describe("set pieces", () => {
   });
 });
 
+describe("set piece build-up", () => {
+  it("is in the replay before the set piece is taken", () => {
+    let checked = 0;
+    for (let seed = 1; seed < 6; seed++) {
+      const g = structuredClone(game);
+      const {run, report} = createMatch(g, new Rng(seed), g.fixtures[0], true);
+      let step = run.next();
+      while (!step.done) {
+        if (step.value.type === "setpiece") {
+          const sp = step.value.sp;
+          const last = report.frames[report.frames.length - 1];
+          const depth = (x: number) => (sp.side === "home" ? x : 100 - x);
+          if (sp.kind === "corner") {
+            // Out over the goal line on the corner's side.
+            expect(last.kind).toBe("out");
+            expect(depth(last.x)).toBeGreaterThan(99);
+          } else {
+            // The foul: in the box for a penalty, by the spot for a free kick.
+            expect(last.kind).toBe("dribble");
+            expect(Math.hypot(last.x - sp.spot.x, last.y - sp.spot.y)).toBeLessThan(sp.kind === "penalty" ? 14 : 6);
+          }
+          // In the first part of the set piece's minute.
+          expect(last.minute).toBeGreaterThan(sp.minute - 1);
+          expect(last.minute).toBeLessThan(sp.minute - 0.3);
+          checked++;
+        }
+        step = run.next(step.value.type === "setpiece" ? null : undefined);
+      }
+    }
+    expect(checked).toBeGreaterThan(10);
+  });
+});
+
+describe("injuries in a managed team", () => {
+  it("wait for the manager's substitute and bring them on the next minute", () => {
+    for (let seed = 1; seed < 400; seed++) {
+      const g = structuredClone(game);
+      const commands: MatchCommand[] = [];
+      const {run, teams} = createMatch(g, new Rng(seed), g.fixtures[0], false, commands, "home");
+      let step = run.next();
+      let injury: {minute: number; playerId: string; inId: string} | null = null;
+      while (!step.done) {
+        if (step.value.type === "injury" && !injury) {
+          const inId = teams.home.bench[teams.home.bench.length - 1];
+          injury = {minute: step.value.minute, playerId: step.value.playerId, inId};
+          commands.push({minute: step.value.minute + 1, type: "sub", outId: step.value.playerId, inId});
+          // Off for treatment until the substitute comes on.
+          expect(teams.home.onPitch.some((o) => o.id === injury!.playerId)).toBe(false);
+        }
+        step = run.next(step.value.type === "setpiece" ? null : undefined);
+      }
+      if (!injury) continue;
+      const sub = step.value.events.find((e) => e.type === "sub" && e.playerId === injury!.playerId);
+      expect(sub?.otherId).toBe(injury.inId);
+      expect(sub?.minute).toBe(injury.minute + 1);
+      return;
+    }
+    throw new Error("No injury in 400 matches");
+  });
+});
+
 describe("live match", () => {
   it("counts the same result as it showed, with the user's choices", () => {
     // Play weeks until a live match with a user set piece shows up.
@@ -78,32 +140,54 @@ describe("live match", () => {
       }
       const live = new LiveMatch(g);
       let answered = 0;
+      let halftimes = 0;
       const playTo = (minute: number) => {
         live.advanceTo(minute);
-        while (live.pending) {
-          const input: SetPieceInput = live.role(live.pending) === "shooter" ? {aim: {x: -0.7, y: 0.5}, target: "far"} : {dive: 0.6};
-          g.liveMatch!.inputs[live.pending.index] = input;
-          live.answer(input);
-          answered++;
+        while (live.pending || live.stop) {
+          if (live.stop) {
+            if (live.stop.type === "halftime") halftimes++;
+            else {
+              // An injured player: the manager picks the first fit sub on the bench.
+              const taken = new Set(live.pendingSubs().map((c) => (c.type === "sub" ? c.inId : "")));
+              const inId = live.team().bench.find((id) => !taken.has(id));
+              if (inId) live.command({type: "sub", outId: live.stop.playerId, inId});
+            }
+            live.continue();
+          } else if (live.pending) {
+            const input: SetPieceInput = live.role(live.pending) === "shooter" ? {aim: {x: -0.7, y: 0.5}, target: "far"} : {dive: 0.6};
+            g.liveMatch!.inputs[live.pending.index] = input;
+            live.answer(input);
+            answered++;
+          }
           live.advanceTo(minute);
         }
       };
       playTo(55);
-      // The manager makes a change and gives an instruction just before the hour.
+      // The manager makes a change and gives instructions just before the hour.
       const team = live.team();
       const out = team.onPitch.find((o) => team.slots[o.slot].pos !== "GK")!;
-      const inId = team.bench[0];
-      const sub = live.command({type: "sub", outId: out.id, inId});
-      const instruct = live.command({type: "instruct", playerId: team.onPitch[3].id, key: "shooting", level: 1});
-      g.liveMatch!.commands = [sub, instruct];
-      playTo(90);
+      const taken = new Set(live.pendingSubs().map((c) => (c.type === "sub" ? c.inId : "")));
+      const inId = team.bench.find((id) => !taken.has(id))!;
+      live.command({type: "sub", outId: out.id, inId});
+      live.command({type: "instruct", playerId: team.onPitch[3].id, key: "shooting", level: 1});
+      live.command({type: "instructTeam", key: "tackling", level: -1});
+      playTo(Infinity);
+      g.liveMatch!.commands = live.allCommands();
       expect(live.done).toBe(true);
+      expect(halftimes).toBe(1);
+      expect(live.report.added![0]).toBeGreaterThanOrEqual(1);
+      expect(live.report.added![1]).toBeGreaterThanOrEqual(2);
       expect(live.report.events.some((e) => e.type === "sub" && e.otherId === inId)).toBe(true);
       expect(live.report.events.some((e) => e.type === "instruction" && e.note === "shooting+")).toBe(true);
+      expect(live.report.events.some((e) => e.type === "instruction" && !e.playerId && e.note === "tackling-")).toBe(true);
 
       // A reload mid-match must replay the same match from the saved choices.
       const resumed = new LiveMatch(g);
-      resumed.advanceTo(90);
+      resumed.advanceTo(Infinity);
+      while (resumed.stop) {
+        resumed.continue();
+        resumed.advanceTo(Infinity);
+      }
       expect(resumed.done).toBe(true);
       expect([resumed.report.homeGoals, resumed.report.awayGoals]).toEqual([live.report.homeGoals, live.report.awayGoals]);
 

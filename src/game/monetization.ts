@@ -18,6 +18,7 @@ import {
   ENERGY_MAX,
   ENERGY_REGEN_MS,
   EXCHANGE,
+  MONEY_PACKS,
 } from "./constants";
 import {book} from "./helpers";
 import type {GameState, Monetization} from "./types";
@@ -79,10 +80,11 @@ export function exchangeDiamonds(state: GameState): string | null {
 }
 
 export type PackId = (typeof DIAMOND_PACKS)[number]["id"];
+export type MoneyPackId = (typeof MONEY_PACKS)[number]["id"];
 
 /** Where a real checkout would go. The mock approves everything instantly. */
 export interface PaymentProvider {
-  purchase(packId: PackId, priceEur: number): Promise<{ok: boolean}>;
+  purchase(packId: PackId | MoneyPackId, priceEur: number): Promise<{ok: boolean}>;
 }
 
 export const mockPaymentProvider: PaymentProvider = {
@@ -90,6 +92,16 @@ export const mockPaymentProvider: PaymentProvider = {
     return {ok: true};
   },
 };
+
+/** Club money bought with real money: into the cash and the transfer budget. Returns the amount. */
+export function grantMoneyPack(state: GameState, packId: MoneyPackId): number {
+  const pack = MONEY_PACKS.find((p) => p.id === packId);
+  if (!pack) return 0;
+  const total = pack.money + pack.bonus;
+  book(state, state.userClubId, "premium", total);
+  state.clubs[state.userClubId].transferBudget += total;
+  return total;
+}
 
 export function grantPack(m: Monetization, packId: PackId): number {
   const pack = DIAMOND_PACKS.find((p) => p.id === packId);

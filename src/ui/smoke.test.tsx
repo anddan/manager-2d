@@ -39,6 +39,18 @@ describe("UI smoke test", () => {
     });
   }
 
+  it("shows a nickname everywhere, and both names on the player's profile", () => {
+    const g = structuredClone(game);
+    const p = Object.values(g.players).find((x) => x.clubId === g.userClubId)!;
+    p.nickname = "Ronaldo";
+    setStore({game: g, lang: "sv", view: "squad", playerId: null, matchFixtureId: null, negotiation: null});
+    const squad = renderToString(<App />);
+    expect(squad).toContain("Ronaldo");
+    expect(squad).not.toContain(`${p.firstName.charAt(0)}. ${p.lastName}`);
+    expect(renderToString(<PlayerModal playerId={p.id} />)).toContain(`${p.firstName} ${p.lastName} (Ronaldo)`);
+    setStore({game});
+  });
+
   it("renders player cards for own, other and free players", () => {
     setStore({game, lang: "sv"});
     const own = Object.values(game.players).find((p) => p.clubId === game.userClubId)!;

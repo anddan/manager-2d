@@ -51,6 +51,12 @@ export const DIAMOND_PACKS = [
   {id: "medium", diamonds: 500, bonus: 50, priceEur: 4.99},
   {id: "large", diamonds: 1200, bonus: 200, priceEur: 9.99},
 ] as const;
+/** Real-money packs of club money; it goes to the cash and the transfer budget. Same mock checkout. */
+export const MONEY_PACKS = [
+  {id: "cash-small", money: 500_000, bonus: 0, priceEur: 0.99},
+  {id: "cash-medium", money: 3_000_000, bonus: 300_000, priceEur: 4.99},
+  {id: "cash-large", money: 7_500_000, bonus: 1_500_000, priceEur: 9.99},
+] as const;
 
 // Formations: slot positions and where they stand (x along pitch 0..100 own goal -> opponent, y 0..100).
 export interface Slot {

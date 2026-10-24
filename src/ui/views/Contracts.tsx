@@ -1,5 +1,5 @@
 import {startNegotiation} from "../../game/contracts";
-import {userClub} from "../../game/helpers";
+import {listName, shortName, userClub} from "../../game/helpers";
 import {clubPlayers, expectedWage, overall, wageBill} from "../../game/ratings";
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
@@ -19,7 +19,7 @@ export function Contracts() {
 
   const negotiate = (id: string) => {
     const neg = startNegotiation(game, id, club.id, "renewal");
-    if ("refused" in neg) notify(neg.refused, {name: game.players[id].lastName}, "error");
+    if ("refused" in neg) notify(neg.refused, {name: shortName(game.players[id])}, "error");
     else setNegotiation(neg);
   };
 
@@ -36,7 +36,7 @@ export function Contracts() {
           <table className="table">
             <thead>
               <tr>
-                <th>{t("col.pos")}</th><th>{t("col.name")}</th><th>{t("col.age")}</th><th>{t("col.ovr")}</th>
+                <th>{t("col.pos")}</th><th>{t("col.name")}</th><th>{t("col.age")}</th><th title={t("col.ovrHint")}>{t("col.ovr")}</th>
                 <th>{t("col.wage")}</th><th>{t("con.market")}</th><th>{t("col.contract")}</th><th>{t("col.role")}</th><th>{t("col.happiness")}</th><th />
               </tr>
             </thead>
@@ -46,7 +46,7 @@ export function Contracts() {
                 return (
                   <tr key={p.id} className={expiring ? "warn-row" : ""}>
                     <td><PosBadge pos={p.position} /></td>
-                    <td><button className="link" onClick={() => openPlayer(p.id)}>{p.firstName.charAt(0)}. {p.lastName}</button></td>
+                    <td><button className="link" onClick={() => openPlayer(p.id)}>{listName(p)}</button></td>
                     <td>{p.age}</td>
                     <td className="num strong">{overall(p)}</td>
                     <td className="num">{money(p.contract.wage)}</td>

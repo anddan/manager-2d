@@ -1,10 +1,10 @@
 import {useState} from "react";
-import {userClub} from "../../game/helpers";
+import {fullName, listName, shortName, userClub} from "../../game/helpers";
 import {askingPrice, estimatedOverall, respondToBid} from "../../game/transfers";
 import {POSITIONS, type Position} from "../../game/types";
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
-import {Card, Empty, Flag, Ovr, Pot, PosBadge, StatusIcons, Tabs} from "../common";
+import {Card, Empty, Flag, Ovr, PosBadge, StatusIcons, Tabs} from "../common";
 
 type Tab = "search" | "bids" | "listed" | "scouting";
 
@@ -88,7 +88,7 @@ function Search() {
         <table className="table">
           <thead>
             <tr>
-              <th>{t("col.pos")}</th><th>{t("col.name")}</th><th>{t("col.age")}</th><th>{t("col.ovr")}</th><th>{t("col.pot")}</th>
+              <th>{t("col.pos")}</th><th>{t("col.name")}</th><th>{t("col.age")}</th><th title={t("col.ovrHint")}>{t("col.ovr")}</th>
               <th>{t("tbl.club")}</th><th>{t("tr.asking")}</th><th>{t("col.contract")}</th>
             </tr>
           </thead>
@@ -96,10 +96,9 @@ function Search() {
             {results.map(({p, price}) => (
               <tr key={p.id} className="clickable" onClick={() => openPlayer(p.id)}>
                 <td><PosBadge pos={p.position} /></td>
-                <td className="name-cell"><Flag code={p.nationality} /> {p.firstName.charAt(0)}. {p.lastName} <StatusIcons player={p} /></td>
+                <td className="name-cell"><Flag code={p.nationality} /> {listName(p)} <StatusIcons player={p} /></td>
                 <td>{p.age}</td>
                 <td className="num"><Ovr game={game} player={p} /></td>
-                <td className="num"><Pot game={game} player={p} /></td>
                 <td>{p.clubId ? game.clubs[p.clubId].short : t("tr.free")}</td>
                 <td className="num">{p.clubId ? money(price) : "–"}</td>
                 <td className="num">{p.clubId ? p.contract.expiresSeason : "–"}</td>
@@ -127,12 +126,12 @@ export function BidCard({bidId}: {bidId: string}) {
   const club = game.clubs[bid.fromClubId];
   const respond = (action: "accept" | "reject" | "counter") => {
     const key = act((g, rng) => respondToBid(g, rng, bidId, action, counter));
-    notify(key, {name: p.lastName, club: club.name}, key === "tr.sold" || key === "tr.loanDone" ? "good" : "info");
+    notify(key, {name: shortName(p), club: club.name}, key === "tr.sold" || key === "tr.loanDone" ? "good" : "info");
   };
   return (
     <div className="bid-card">
       <p>
-        <strong>{club.name}</strong> → <button className="link" onClick={() => openPlayer(p.id)}>{p.firstName} {p.lastName}</button>
+        <strong>{club.name}</strong> → <button className="link" onClick={() => openPlayer(p.id)}>{fullName(p)}</button>
         {" · "}
         {bid.loan ? t("tr.loanTerms", {pct: Math.round(bid.wageShare * 100)}) : <strong>{money(bid.fee)}</strong>}
         {!bid.loan && <span className="muted"> ({t("col.value")} {money(p.value)})</span>}
@@ -169,7 +168,7 @@ function Listed() {
     <ul className="plain-list">
       {listed.map((p) => (
         <li key={p.id}>
-          <button className="link" onClick={() => openPlayer(p.id)}>{p.firstName} {p.lastName}</button>{" "}
+          <button className="link" onClick={() => openPlayer(p.id)}>{fullName(p)}</button>{" "}
           <span className="muted">{p.transferListed ? `🏷️ ${money(askingPrice(game, p))}` : ""} {p.loanListed ? `🔁 ${t("status.loanListed")}` : ""}</span>
         </li>
       ))}
@@ -190,7 +189,7 @@ function Scouting() {
       <h3>{t("tr.inProgress")}</h3>
       {game.scoutQueue.length === 0 ? <Empty>{t("tr.noScouting")}</Empty> : (
         <ul className="plain-list">
-          {game.scoutQueue.map((id) => game.players[id] && <li key={id}>🔭 {game.players[id].firstName} {game.players[id].lastName}</li>)}
+          {game.scoutQueue.map((id) => game.players[id] && <li key={id}>🔭 {fullName(game.players[id])}</li>)}
         </ul>
       )}
       <h3>{t("tr.reports")}</h3>
@@ -198,8 +197,8 @@ function Scouting() {
         <ul className="plain-list">
           {scouted.map(({p}) => (
             <li key={p.id}>
-              <PosBadge pos={p.position} /> <button className="link" onClick={() => openPlayer(p.id)}>{p.firstName} {p.lastName}</button>{" "}
-              <span className="muted">{t("col.ovr")} <Ovr game={game} player={p} /> · {t("col.pot")} {p.potential} · {p.clubId ? game.clubs[p.clubId].short : t("tr.free")}</span>
+              <PosBadge pos={p.position} /> <button className="link" onClick={() => openPlayer(p.id)}>{fullName(p)}</button>{" "}
+              <span className="muted">{t("col.ovr")} <Ovr game={game} player={p} /> · {p.clubId ? game.clubs[p.clubId].short : t("tr.free")}</span>
             </li>
           ))}
         </ul>

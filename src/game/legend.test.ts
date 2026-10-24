@@ -1,0 +1,32 @@
+// Léon Dani: only for diamonds, 99 overall, once per game.
+import {describe, expect, it} from "vitest";
+import {newGame} from "./generate";
+import {LEGEND_ID, LEGEND_PRICE_DIAMONDS, buyLegend, legendOwned} from "./legend";
+import {overall} from "./ratings";
+
+describe("the legend card", () => {
+  it("isn't in the world until bought", () => {
+    const g = newGame("L", 3, 1);
+    expect(legendOwned(g)).toBe(false);
+    expect(g.players[LEGEND_ID]).toBeUndefined();
+  });
+
+  it("needs enough diamonds", () => {
+    const g = newGame("L", 3, 1);
+    g.monetization.diamonds = LEGEND_PRICE_DIAMONDS - 1;
+    expect(buyLegend(g)).toBe("shop.notEnoughDiamonds");
+    expect(legendOwned(g)).toBe(false);
+  });
+
+  it("joins the user's club as a 99 for the diamonds, and only once", () => {
+    const g = newGame("L", 3, 1);
+    g.monetization.diamonds = LEGEND_PRICE_DIAMONDS + 20;
+    expect(buyLegend(g)).toBeNull();
+    const leon = g.players[LEGEND_ID];
+    expect(`${leon.firstName} ${leon.lastName}`).toBe("Léon Dani");
+    expect(leon.clubId).toBe(g.userClubId);
+    expect(overall(leon)).toBe(99);
+    expect(g.monetization.diamonds).toBe(20);
+    expect(buyLegend(g)).toBe("shop.legendOwned");
+  });
+});

@@ -6,7 +6,7 @@
 import {DIAMONDS_SEASON, ENERGY_COST_MATCH, FORMATIONS, SEASON_WEEKS} from "./constants";
 import {payPrizeMoney, setSeasonBudgets, weeklyFinances} from "./finance";
 import {assignRoles, createFreeAgents, createPlayer} from "./generate";
-import {addMessage, currentRound, fixturesInRound, playerName} from "./helpers";
+import {addMessage, currentRound, fixturesInRound, fullName, playerName} from "./helpers";
 import {makeFixtures, standings} from "./league";
 import {pickBestLineup, repairLineup} from "./lineup";
 import {applyMatch, simulateMatch} from "./match";
@@ -75,7 +75,8 @@ export function finishWeek(state: GameState, rng: Rng): MatchReport | undefined 
   if (live) {
     const f = state.fixtures.find((x) => x.id === live.fixtureId)!;
     const user = state.clubs[state.userClubId];
-    const report = simulateMatch(state, new Rng(live.seed), f, true, live.inputs, live.commands ?? []);
+    const managed = f.homeId === user.id ? "home" : "away";
+    const report = simulateMatch(state, new Rng(live.seed), f, true, live.inputs, live.commands ?? [], managed);
     applyMatch(state, report);
     state.liveMatch = null;
     userReport = report;
@@ -158,7 +159,7 @@ function endSeason(state: GameState, rng: Rng): void {
   const leaving: string[] = [];
   for (const p of Object.values(state.players)) {
     if (p.clubId && p.contract.expiresSeason <= state.season) {
-      if (p.clubId === state.userClubId) leaving.push(`${p.firstName} ${p.lastName}`);
+      if (p.clubId === state.userClubId) leaving.push(`${fullName(p)}`);
       p.clubId = null;
       p.transferListed = false;
       p.wantsToLeave = false;
@@ -171,7 +172,7 @@ function endSeason(state: GameState, rng: Rng): void {
   for (const p of Object.values(state.players)) {
     p.age++;
     if (p.age >= 34 && rng.chance(clamp(0.35 * (p.age - 33), 0, 0.95))) {
-      if (p.clubId === state.userClubId) retired.push(`${p.firstName} ${p.lastName}`);
+      if (p.clubId === state.userClubId) retired.push(`${fullName(p)}`);
       delete state.players[p.id];
     }
   }
@@ -202,7 +203,7 @@ function endSeason(state: GameState, rng: Rng): void {
       p.contract.expiresSeason = state.season + 2;
       p.contract.role = "youth";
       if (club.id === state.userClubId) {
-        names.push(`${p.firstName} ${p.lastName}`);
+        names.push(`${fullName(p)}`);
         state.scouted[p.id] = state.absWeek;
       }
     }

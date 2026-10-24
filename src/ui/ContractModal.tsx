@@ -1,6 +1,7 @@
 // Contract negotiation with a player's agent: renewals, transfers and free
 // agents. Offers above the wage budget need an explicit confirmation.
 import {useState} from "react";
+import {fullName, shortName} from "../game/helpers";
 import {evaluateOffer, signContract, wageBudgetCheck, type ContractOffer} from "../game/contracts";
 import {completeTransfer} from "../game/transfers";
 import {SQUAD_ROLES, type SquadRole} from "../game/types";
@@ -36,7 +37,7 @@ export function ContractModal() {
       return {result, draft};
     });
     if (outcome.result.status === "accepted") {
-      notify("toast.contractSigned", {name: p.lastName}, "good");
+      notify("toast.contractSigned", {name: shortName(p)}, "good");
       close();
       openPlayer(p.id);
     } else if (outcome.result.status === "counter") {
@@ -44,7 +45,7 @@ export function ContractModal() {
       setReply(t("neg.counter", {wage: outcome.result.demand.wage}));
     } else {
       // A failed transfer negotiation kills the whole deal.
-      notify(neg.kind === "renewal" ? outcome.result.reason : "neg.dealCollapsed", {name: p.lastName}, "error");
+      notify(neg.kind === "renewal" ? outcome.result.reason : "neg.dealCollapsed", {name: shortName(p)}, "error");
       close();
     }
   };
@@ -57,7 +58,7 @@ export function ContractModal() {
   );
 
   return (
-    <Modal title={`✍️ ${t(`neg.title.${neg.kind}`)}: ${p.firstName} ${p.lastName}`} onClose={close}>
+    <Modal title={`✍️ ${t(`neg.title.${neg.kind}`)}: ${fullName(p)}`} onClose={close}>
       {neg.fee > 0 && <p className="muted">{t("neg.agreedFee", {fee: neg.fee})}</p>}
       <p className="muted">{t("neg.intro", {round: neg.round + 1})}</p>
       {reply && <p className="callout">{reply}</p>}

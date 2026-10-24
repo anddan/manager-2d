@@ -1,5 +1,6 @@
 // Overall rating, market value and wage levels. Everything that turns
 // attributes into a single number lives here.
+import {FORMATIONS} from "./constants";
 import {clamp} from "./rng";
 import type {Attribute, Club, GameState, Player, Position, SquadRole} from "./types";
 
@@ -128,6 +129,24 @@ export function clubStrength(state: GameState, clubId: string): number {
     .slice(0, 11);
   if (best.length === 0) return 0;
   return best.reduce((s, n) => s + n, 0) / best.length;
+}
+
+/**
+ * The team's overall: the starting eleven's rating in the slots they play,
+ * like a player's OVR for the whole side. Falls back to the best eleven when
+ * the lineup isn't complete.
+ */
+export function teamOvr(state: GameState, clubId: string): number {
+  const club = state.clubs[clubId];
+  const slots = FORMATIONS[club.formation];
+  const ratings = club.lineup
+    .map((id, i) => {
+      const p = state.players[id];
+      return p && p.clubId === clubId && slots[i] ? ratingAt(p, slots[i].pos) * familiarity(p, slots[i].pos) : null;
+    })
+    .filter((r): r is number => r !== null);
+  if (ratings.length < slots.length) return Math.round(clubStrength(state, clubId));
+  return Math.round(ratings.reduce((s, n) => s + n, 0) / ratings.length);
 }
 
 /** Club standing compared to the rest, used for attendance and transfer pull. */

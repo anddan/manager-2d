@@ -7,10 +7,10 @@ import type {Point} from "./pitch";
 import {clamp, type Rng} from "./rng";
 import type {Player, Side} from "./types";
 
-/** Per minute, scaled by how much the attack dominates. About 0.25 penalties a match. */
-export const PENALTY_RATE = 0.0028;
-/** About 0.7 dangerous free kicks a match. */
-export const FREEKICK_RATE = 0.0075;
+/** Per minute, scaled by how much the attack dominates. About 0.45 penalties a match. */
+export const PENALTY_RATE = 0.005;
+/** About 1.5 dangerous free kicks a match. */
+export const FREEKICK_RATE = 0.016;
 /** About 2.5 corners per team and match. */
 export const CORNER_RATE = 0.052;
 
@@ -148,8 +148,10 @@ export function keeperReach(keeper: Player | undefined, kind: SetPieceKind): num
   return (kind === "penalty" ? 0.2 : 0.3) + (gk / 100) * 0.3;
 }
 
-/** The best taker on the pitch for this kind of set piece. */
-export function pickTaker(players: Player[], kind: SetPieceKind): Player | undefined {
+/** The club's chosen taker if they're on the pitch, else the best taker there for this kind of set piece. */
+export function pickTaker(players: Player[], kind: SetPieceKind, chosen?: string): Player | undefined {
+  const designated = chosen ? players.find((p) => p.id === chosen) : undefined;
+  if (designated) return designated;
   return players
     .filter((p) => p.position !== "GK")
     .sort((a, b) => takerSkill(b, kind) - takerSkill(a, kind))[0];

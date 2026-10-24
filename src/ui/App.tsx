@@ -5,6 +5,7 @@ import {claimDailyBonus, msToNextEnergy, regenerateEnergy} from "../game/monetiz
 import {finishWeek, startWeek} from "../game/week";
 import {useT, type TKey} from "../i18n";
 import {useGame, useGameState, VIEWS, type View} from "../store";
+import {ManagerAvatar, defaultManagerLook} from "./Avatar";
 import {ContractModal} from "./ContractModal";
 import {LiveMatchViewer, MatchViewer} from "./MatchViewer";
 import {NewGame} from "./NewGame";
@@ -166,6 +167,10 @@ function TopBar() {
           <small>{t("top.seasonWeek", {season: game.season, week: game.week})}</small>
         </div>
       </div>
+      <button className="topbar-manager" onClick={() => setView("settings")} title={game.managerName}>
+        <ManagerAvatar look={game.managerLook ?? defaultManagerLook(game.managerName)} size={34} tie={club.color} />
+        <span>{game.managerName}</span>
+      </button>
       <div className="topbar-stats">
         <span className="chip" title={t("fin.cash")}>💰 {money(club.cash)}</span>
         <button className="chip" onClick={() => setView("shop")} title={t("shop.energy")}>

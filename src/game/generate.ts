@@ -7,7 +7,8 @@ import {
   SAVE_VERSION,
   SQUAD_TEMPLATE,
 } from "./constants";
-import {CLUB_TEMPLATES, LEAGUE_NAME, NATIONALITIES} from "./names";
+import {leagueById} from "./leagues";
+import {NATIONALITIES} from "./names";
 import {POSITION_WEIGHTS, expectedWage, marketValue, overall, wageBill} from "./ratings";
 import {Rng, clamp} from "./rng";
 import {pickBestLineup} from "./lineup";
@@ -20,10 +21,16 @@ import {
   type Attributes,
   type Club,
   type GameState,
+  type ManagerLook,
   type Player,
+  type PlayersGender,
   type Position,
   type SquadRole,
 } from "./types";
+
+/** Stars per club, strongest club first: 2, 1, 1, 1, 1, then none. */
+const STARS_PER_CLUB = [2, 1, 1, 1, 1];
+const STAR_POSITIONS: Position[] = ["ST", "ST", "AM", "W", "W", "CM", "CB", "GK"];
 
 interface PlayerSpec {
   position: Position;
@@ -35,9 +42,12 @@ interface PlayerSpec {
   potential?: number;
 }
 
-function pickNationality(rng: Rng): string {
+/** A nationality; in a league with a home country, about 60% are from there. */
+function pickNationality(state: GameState, rng: Rng): string {
   const codes = Object.keys(NATIONALITIES);
-  return rng.weighted(codes, (c) => NATIONALITIES[c].weight);
+  const home = leagueById(state.leagueId).home;
+  const others = codes.reduce((s, c) => s + (c === home ? 0 : NATIONALITIES[c].weight), 0);
+  return rng.weighted(codes, (c) => (c === home ? others * 1.5 : NATIONALITIES[c].weight));
 }
 
 /** Attributes shaped by the position, scaled so the overall lands on `level`. */
@@ -52,28 +62,38 @@ function makeAttributes(rng: Rng, pos: Position, level: number): Attributes {
     if (pos === "GK" && (attr === "finishing" || attr === "defending")) value = rng.range(10, 30);
     attrs[attr] = value;
   }
-  // Two passes of shifting the weighted attributes onto the target.
-  for (let i = 0; i < 2; i++) {
+  // Shift the weighted attributes onto the target. Attributes stop at 99, so
+  // for the very best players the rest of the gap goes to those with room left.
+  for (const attr of ATTRIBUTES) attrs[attr] = clamp(attrs[attr], 1, 99);
+  for (let i = 0; i < 8; i++) {
     let rating = 0;
     for (const [a, w] of Object.entries(weights)) rating += attrs[a as keyof Attributes] * (w ?? 0);
     const diff = level - rating;
-    for (const a of Object.keys(weights) as (keyof Attributes)[]) attrs[a] += diff;
+    if (Math.abs(diff) < 0.05) break;
+    const open = (Object.keys(weights) as (keyof Attributes)[]).filter((a) => (diff > 0 ? attrs[a] < 99 : attrs[a] > 1));
+    const openWeight = open.reduce((s, a) => s + (weights[a] ?? 0), 0);
+    if (openWeight <= 0) break;
+    for (const a of open) attrs[a] = clamp(attrs[a] + diff / openWeight, 1, 99);
   }
   for (const attr of ATTRIBUTES) attrs[attr] = clamp(Math.round(attrs[attr] * 10) / 10, 1, 99);
   return attrs;
 }
 
 export function createPlayer(state: GameState, rng: Rng, spec: PlayerSpec): Player {
-  const nationality = pickNationality(rng);
+  const nationality = pickNationality(state, rng);
   const names = NATIONALITIES[nationality];
   const attrs = makeAttributes(rng, spec.position, spec.level);
   const youngRoom = Math.max(0, 24 - spec.age) * rng.range(0.8, 3.2);
-  const potential = Math.round(clamp(spec.potential ?? spec.level + youngRoom + rng.range(0, 3), spec.level, 96));
+  const potential = Math.round(clamp(spec.potential ?? spec.level + youngRoom + rng.range(0, 3), spec.level, 99));
+  // Mixed leagues draw a coin per player; the others draw nothing, so men's leagues come out as before.
+  const mode = state.playersGender ?? "men";
+  const female = mode === "women" || (mode === "mix" && rng.chance(0.5));
   const player: Player = {
     id: newId(state, "p"),
-    firstName: rng.pick(names.first),
+    firstName: rng.pick(female ? names.female : names.first),
     lastName: rng.pick(names.last),
     age: spec.age,
+    ...(female ? {gender: "f" as const} : {}),
     nationality,
     position: spec.position,
     attrs,
@@ -173,14 +193,25 @@ export function createFreeAgents(state: GameState, rng: Rng, count: number): voi
   }
 }
 
-export function newGame(managerName: string, clubIndex: number, seed: number): GameState {
+export function newGame(
+  managerName: string,
+  clubIndex: number,
+  seed: number,
+  managerLook?: ManagerLook,
+  playersGender: PlayersGender = "men",
+  leagueId = "nordic"
+): GameState {
+  const league = leagueById(leagueId);
   const rng = new Rng(seed);
   const state: GameState = {
     version: SAVE_VERSION,
     rngState: 0,
     managerName,
+    managerLook,
+    playersGender,
     userClubId: "",
-    leagueName: LEAGUE_NAME,
+    leagueName: league.name,
+    leagueId: league.id,
     season: FIRST_SEASON,
     week: 1,
     absWeek: 1,
@@ -207,9 +238,9 @@ export function newGame(managerName: string, clubIndex: number, seed: number): G
     nextId: 0,
   };
 
-  CLUB_TEMPLATES.forEach((t, i) => {
+  league.clubs.forEach((t, i) => {
     // Reputation from about 88 down to 40.
-    const reputation = Math.round(88 - i * (48 / (CLUB_TEMPLATES.length - 1)));
+    const reputation = Math.round(88 - i * (48 / (league.clubs.length - 1)));
     const club: Club = {
       id: newId(state, "c"),
       ...t,
@@ -229,6 +260,18 @@ export function newGame(managerName: string, clubIndex: number, seed: number): G
     };
     state.clubs[club.id] = club;
     createSquad(state, rng, club, Math.round(50 + reputation * 0.28));
+    // The biggest clubs have stars: the very biggest a world-class player (90+).
+    const stars = STARS_PER_CLUB[i] ?? 0;
+    for (let s = 0; s < stars; s++) {
+      createPlayer(state, rng, {
+        position: rng.pick(STAR_POSITIONS),
+        level: Math.round(i === 0 && s === 0 ? rng.range(92, 95) : rng.range(85, 90)),
+        age: rng.int(24, 30),
+        clubId: club.id,
+        season: state.season,
+      });
+    }
+    if (stars > 0) assignRoles(state, club.id);
     club.transferBudget = Math.round((club.cash * 0.45) / 50_000) * 50_000;
     club.wageBudget = Math.round((wageBill(state, club.id) * 1.08) / 1_000) * 1_000;
     const {lineup, bench} = pickBestLineup(state, club, FORMATIONS[club.formation]);
@@ -237,6 +280,23 @@ export function newGame(managerName: string, clubIndex: number, seed: number): G
   });
 
   createFreeAgents(state, rng, 45);
+
+  // Wonderkids: teenagers who can become the best in the league, spread over random clubs.
+  const allClubs = Object.values(state.clubs);
+  for (let k = 0; k < 3; k++) {
+    const club = rng.pick(allClubs);
+    createPlayer(state, rng, {
+      position: rng.pick(STAR_POSITIONS),
+      level: Math.round(rng.range(60, 67)),
+      age: rng.int(17, 18),
+      clubId: club.id,
+      season: state.season,
+      potential: Math.round(rng.range(91, 97)),
+    });
+    assignRoles(state, club.id);
+  }
+  // And one experienced star without a club, for whoever can afford the wages.
+  createPlayer(state, rng, {position: rng.pick(STAR_POSITIONS), level: Math.round(rng.range(85, 88)), age: rng.int(31, 33), clubId: null, season: state.season});
 
   const clubIds = Object.keys(state.clubs);
   state.userClubId = clubIds[clamp(clubIndex, 0, clubIds.length - 1)];
@@ -248,7 +308,7 @@ export function newGame(managerName: string, clubIndex: number, seed: number): G
   addMessage(state, {
     kind: "news",
     key: "msg.welcome",
-    params: {manager: managerName, club: state.clubs[state.userClubId].name, league: LEAGUE_NAME},
+    params: {manager: managerName, club: state.clubs[state.userClubId].name, league: league.name},
   });
   state.rngState = rng.state;
   return state;
