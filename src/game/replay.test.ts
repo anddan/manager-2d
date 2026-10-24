@@ -92,15 +92,21 @@ describe("match replay", () => {
 
   it("has wingers going down the line and crossing into the box", () => {
     let crosses = 0;
+    let cutOut = 0;
     for (const r of reports) {
       r.frames.forEach((f, i) => {
         const next = r.frames[i + 1];
         const depth = (x: number, side: string) => (side === "home" ? x : 100 - x);
         const atByline = f.kind === "dribble" && depth(f.x, f.possession) > 88 && (f.y < 12 || f.y > 88);
-        if (atByline && next?.kind === "pass" && next.possession === f.possession && depth(next.x, next.possession) > 83 && next.y > 30 && next.y < 70) crosses++;
+        if (!atByline || !next || depth(next.x, f.possession) < 83 || next.y < 30 || next.y > 70) return;
+        // Met by an attacker, or headed away / claimed by the keeper.
+        if (next.kind === "pass" && next.possession === f.possession) crosses++;
+        else if ((next.kind === "tackle" || next.kind === "save") && next.possession !== f.possession) cutOut++;
       });
     }
-    expect(crosses).toBeGreaterThan(5);
+    expect(crosses).toBeGreaterThan(1);
+    expect(cutOut).toBeGreaterThan(3);
+    expect(crosses + cutOut).toBeGreaterThan(10);
   });
 
   it("sometimes rules a goal out, and then it doesn't count", () => {
@@ -121,6 +127,69 @@ describe("match replay", () => {
     const share = ruledOut / (goals + ruledOut);
     expect(share).toBeGreaterThan(0.02);
     expect(share).toBeLessThan(0.15);
+  });
+
+  it("plays every kick-off back to a teammate", () => {
+    for (const r of reports) {
+      r.frames.forEach((f, i) => {
+        if (f.kind !== "kickoff") return;
+        const next = r.frames[i + 1];
+        if (!next) return;
+        expect(next.kind).toBe("pass");
+        expect(next.possession).toBe(f.possession);
+        expect(next.playerId).not.toBe(f.playerId);
+        // Backwards, into their own half, and kept: the other side doesn't win it straight back.
+        expect(f.possession === "home" ? next.x : 100 - next.x).toBeLessThan(50);
+        if (r.frames[i + 2]) expect(r.frames[i + 2].possession).toBe(f.possession);
+      });
+    }
+  });
+
+  it("never leaves an attacker free in front of goal without a shot", () => {
+    // A touch by the attacking side in the box is followed by a shot, or the
+    // defence (or keeper) getting it, or a cross / ball out, never a pass back out.
+    let inBox = 0;
+    for (const r of reports) {
+      r.frames.forEach((f, i) => {
+        const next = r.frames[i + 1];
+        if (!f.playerId || !next || ["save", "tackle", "goalkick", "throwin", "setpiece", "kickoff"].includes(f.kind ?? "")) return;
+        const depth = (x: number) => (f.possession === "home" ? x : 100 - x);
+        if (depth(f.x) < 84 || f.y < 20 || f.y > 80) return;
+        inBox++;
+        const backOut = next.possession === f.possession && next.kind === "pass" && depth(next.x) < 70;
+        expect(backOut).toBe(false);
+      });
+    }
+    expect(inBox).toBeGreaterThan(30);
+  });
+
+  it("lets the keeper keep the ball after a save and play it out", () => {
+    let saves = 0;
+    for (const r of reports) {
+      r.frames.forEach((f, i) => {
+        const next = r.frames[i + 1];
+        if (f.kind !== "save" || !next || next.kind === "kickoff") return; // Half-time can come first.
+        // Walks it to the edge of the box, then plays it to a teammate who keeps it.
+        expect(next.kind).toBe("dribble");
+        expect(next.playerId).toBe(f.playerId);
+        const out = r.frames[i + 2];
+        if (!out) return;
+        expect(out.kind).toBe("pass");
+        expect(out.possession).toBe(f.possession);
+        // Not dropped at their feet: well away from the keeper.
+        expect(Math.hypot(out.x - next.x, out.y - next.y)).toBeGreaterThan(8);
+        if (r.frames[i + 3]) expect(r.frames[i + 3].possession).toBe(f.possession);
+        saves++;
+      });
+    }
+    expect(saves).toBeGreaterThan(5);
+  });
+
+  it("mixes in through balls, long balls and crosses", () => {
+    const count = (flight: string) => reports.reduce((n, r) => n + r.frames.filter((f) => f.flight === flight).length, 0);
+    expect(count("through")).toBeGreaterThan(10);
+    expect(count("long")).toBeGreaterThan(10);
+    expect(count("cross")).toBeGreaterThan(5);
   });
 
   it("shows every goal", () => {

@@ -3,10 +3,11 @@
 //   (the user watches and plays the match: penalties, free kicks)
 //   finishWeek: the user's match counts -> training -> moods -> market -> money -> season end
 // advanceWeek does both at once, with the computer deciding every set piece.
-import {DIAMONDS_SEASON, ENERGY_COST_MATCH, FORMATIONS, SEASON_WEEKS} from "./constants";
+import {CUP_WEEKS, DIAMONDS_SEASON, ENERGY_COST_MATCH, FORMATIONS, SEASON_WEEKS} from "./constants";
 import {payPrizeMoney, setSeasonBudgets, weeklyFinances} from "./finance";
 import {assignRoles, createFreeAgents, createPlayer} from "./generate";
-import {addMessage, currentRound, fixturesInRound, fullName, playerName} from "./helpers";
+import {finishCupStage, setupCup} from "./cup";
+import {addMessage, cupFixturesInStage, currentCupStage, currentRound, findFixture, fixturesInRound, fullName, leagueClubs, playerName} from "./helpers";
 import {makeFixtures, standings} from "./league";
 import {pickBestLineup, repairLineup} from "./lineup";
 import {applyMatch, simulateMatch} from "./match";
@@ -16,7 +17,7 @@ import {clubStrength, marketValue} from "./ratings";
 import {Rng, clamp} from "./rng";
 import {weeklyTraining} from "./training";
 import {weeklyTransfers} from "./transfers";
-import {POSITIONS, type GameState, type MatchReport} from "./types";
+import {POSITIONS, type Fixture, type GameState, type MatchReport} from "./types";
 
 export type StartResult = {ok: true; live: boolean} | {ok: false; reason: string};
 export type AdvanceResult = {ok: true; report?: MatchReport} | {ok: false; reason: string};
@@ -27,8 +28,13 @@ export type AdvanceResult = {ok: true; report?: MatchReport} | {ok: false; reaso
  */
 export function startWeek(state: GameState, rng: Rng, now: number, opts = {useEnergy: true}): StartResult {
   if (state.liveMatch) return {ok: true, live: true};
+  // Old saves have no cup yet: set one up if this season's hasn't started, else wait for the next.
+  if ((!state.cup || state.cup.season !== state.season) && state.week <= CUP_WEEKS[0]) setupCup(state, rng);
   const round = currentRound(state);
-  if (round !== null && opts.useEnergy && !spendEnergy(state.monetization, ENERGY_COST_MATCH, now)) {
+  const stage = currentCupStage(state);
+  const fixtures: Fixture[] = round !== null ? fixturesInRound(state, round) : stage !== null ? cupFixturesInStage(state, stage) : [];
+  const userPlays = fixtures.some((f) => f.homeId === state.userClubId || f.awayId === state.userClubId);
+  if (userPlays && opts.useEnergy && !spendEnergy(state.monetization, ENERGY_COST_MATCH, now)) {
     return {ok: false, reason: "err.noEnergy"};
   }
 
@@ -42,8 +48,7 @@ export function startWeek(state: GameState, rng: Rng, now: number, opts = {useEn
     }
   }
 
-  if (round === null) return {ok: true, live: false};
-  const fixtures = fixturesInRound(state, round);
+  if (fixtures.length === 0) return {ok: true, live: false};
   for (const f of fixtures) {
     prepareAiTeam(state, f.homeId, f.awayId);
     prepareAiTeam(state, f.awayId, f.homeId);
@@ -73,7 +78,7 @@ export function finishWeek(state: GameState, rng: Rng): MatchReport | undefined 
   let userReport: MatchReport | undefined;
   const live = state.liveMatch;
   if (live) {
-    const f = state.fixtures.find((x) => x.id === live.fixtureId)!;
+    const f = findFixture(state, live.fixtureId)!;
     const user = state.clubs[state.userClubId];
     const managed = f.homeId === user.id ? "home" : "away";
     const report = simulateMatch(state, new Rng(live.seed), f, true, live.inputs, live.commands ?? [], managed);
@@ -103,7 +108,10 @@ export function finishWeek(state: GameState, rng: Rng): MatchReport | undefined 
   }
 
   const round = currentRound(state);
-  const homeClubs = new Set(round === null ? [] : fixturesInRound(state, round).map((f) => f.homeId));
+  const stage = currentCupStage(state);
+  const played: Fixture[] = round !== null ? fixturesInRound(state, round) : stage !== null ? cupFixturesInStage(state, stage) : [];
+  const homeClubs = new Set(played.map((f) => f.homeId));
+  if (stage !== null) finishCupStage(state, rng, stage);
   weeklyTraining(state, rng);
   weeklyMorale(state, rng);
   weeklyTransfers(state, rng);
@@ -158,7 +166,7 @@ function endSeason(state: GameState, rng: Rng): void {
   }
   const leaving: string[] = [];
   for (const p of Object.values(state.players)) {
-    if (p.clubId && p.contract.expiresSeason <= state.season) {
+    if (p.clubId && !state.clubs[p.clubId]?.guest && p.contract.expiresSeason <= state.season) {
       if (p.clubId === state.userClubId) leaving.push(`${fullName(p)}`);
       p.clubId = null;
       p.transferListed = false;
@@ -187,7 +195,7 @@ function endSeason(state: GameState, rng: Rng): void {
   state.week = 1;
 
   // Academy intake: two or three hopefuls per club.
-  for (const club of Object.values(state.clubs)) {
+  for (const club of leagueClubs(state)) {
     const level = clubStrength(state, club.id);
     const count = rng.int(2, 3);
     const names: string[] = [];
@@ -221,13 +229,14 @@ function endSeason(state: GameState, rng: Rng): void {
     p.value = marketValue(p, state.season);
   }
 
-  state.fixtures = makeFixtures(state, rng, Object.keys(state.clubs));
+  state.fixtures = makeFixtures(state, rng, leagueClubs(state).map((c) => c.id));
   state.finance.season = {};
   state.monetization.exchangesThisSeason = 0;
   setSeasonBudgets(state);
-  for (const club of Object.values(state.clubs)) {
+  for (const club of leagueClubs(state)) {
     if (club.id !== state.userClubId) assignRoles(state, club.id);
     repairLineup(state, club);
   }
+  setupCup(state, rng, order);
   addMessage(state, {kind: "news", key: "msg.newSeason", params: {season: state.season}});
 }

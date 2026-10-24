@@ -11,7 +11,7 @@ import {
 } from "./constants";
 import {interest} from "./contracts";
 import {assignRoles} from "./generate";
-import {addMessage, book, newId, playerName} from "./helpers";
+import {addMessage, book, leagueClubs, newId, playerName} from "./helpers";
 import {clubPlayers, clubStrength, expectedWage, overall, wageBill} from "./ratings";
 import {Rng, clamp} from "./rng";
 import {POSITIONS, type Club, type GameState, type IncomingBid, type Player, type Position} from "./types";
@@ -316,7 +316,7 @@ export function weeklyTransfers(state: GameState, rng: Rng): void {
   state.incomingBids = state.incomingBids.filter((b) => b.expiresWeek > state.absWeek);
 
   const players = Object.values(state.players);
-  for (const club of Object.values(state.clubs)) {
+  for (const club of leagueClubs(state)) {
     if (club.id === state.userClubId) continue;
     const squad = clubPlayers(state, club.id);
 
@@ -338,6 +338,7 @@ export function weeklyTransfers(state: GameState, rng: Rng): void {
       const targets = players.filter(
         (p) =>
           p.clubId !== club.id &&
+          !(p.clubId && state.clubs[p.clubId].guest) &&
           !p.loan &&
           p.position === need &&
           p.age <= 32 &&
@@ -389,7 +390,7 @@ export function weeklyTransfers(state: GameState, rng: Rng): void {
       }
     }
   }
-  for (const club of Object.values(state.clubs)) if (club.id !== state.userClubId) assignRoles(state, club.id);
+  for (const club of leagueClubs(state)) if (club.id !== state.userClubId) assignRoles(state, club.id);
 }
 
 export function createIncomingBid(

@@ -1,4 +1,5 @@
-import {nextUserFixture, userClub} from "../../game/helpers";
+import {CUP_STAGES} from "../../game/cup";
+import {isCupFixture, nextUserFixture, userClub} from "../../game/helpers";
 import {leaguePosition, standings} from "../../game/league";
 import {clubPlayers, teamOvr, wageBill} from "../../game/ratings";
 import {useT} from "../../i18n";
@@ -27,7 +28,7 @@ export function Overview() {
         {next ? (
           <div className="next-match">
             <Team id={next.homeId} />
-            <span className="vs">{t("ov.round", {round: next.round})}</span>
+            <span className="vs">{isCupFixture(next) ? `🏆 ${t("cup.name")} · ${t(CUP_STAGES[next.stage])}` : t("ov.round", {round: next.round})}</span>
             <Team id={next.awayId} />
             <p className="muted">
               {next.homeId === club.id ? t("ov.home") : t("ov.away")} · {t(matchup(teamOvr(game, club.id) - teamOvr(game, next.homeId === club.id ? next.awayId : next.homeId)))}

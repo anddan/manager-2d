@@ -7,12 +7,13 @@ import {
   SAVE_VERSION,
   SQUAD_TEMPLATE,
 } from "./constants";
-import {leagueById} from "./leagues";
+import {leagueById, type ClubTemplate} from "./leagues";
 import {NATIONALITIES} from "./names";
 import {POSITION_WEIGHTS, expectedWage, marketValue, overall, wageBill} from "./ratings";
 import {Rng, clamp} from "./rng";
 import {pickBestLineup} from "./lineup";
 import {makeFixtures} from "./league";
+import {setupCup} from "./cup";
 import {addMessage, newId} from "./helpers";
 import {
   ATTRIBUTES,
@@ -40,12 +41,14 @@ interface PlayerSpec {
   clubId: string | null;
   season: number;
   potential?: number;
+  /** Where most come from; defaults to the user's league's country. Null means the usual Nordic mix. */
+  home?: string | null;
 }
 
 /** A nationality; in a league with a home country, about 60% are from there. */
-function pickNationality(state: GameState, rng: Rng): string {
+function pickNationality(state: GameState, rng: Rng, from?: string | null): string {
   const codes = Object.keys(NATIONALITIES);
-  const home = leagueById(state.leagueId).home;
+  const home = from === undefined ? leagueById(state.leagueId).home : (from ?? undefined);
   const others = codes.reduce((s, c) => s + (c === home ? 0 : NATIONALITIES[c].weight), 0);
   return rng.weighted(codes, (c) => (c === home ? others * 1.5 : NATIONALITIES[c].weight));
 }
@@ -80,7 +83,7 @@ function makeAttributes(rng: Rng, pos: Position, level: number): Attributes {
 }
 
 export function createPlayer(state: GameState, rng: Rng, spec: PlayerSpec): Player {
-  const nationality = pickNationality(state, rng);
+  const nationality = pickNationality(state, rng, spec.home);
   const names = NATIONALITIES[nationality];
   const attrs = makeAttributes(rng, spec.position, spec.level);
   const youngRoom = Math.max(0, 24 - spec.age) * rng.range(0.8, 3.2);
@@ -158,13 +161,13 @@ export function assignRoles(state: GameState, clubId: string): void {
   });
 }
 
-function createSquad(state: GameState, rng: Rng, club: Club, avg: number): void {
+export function createSquad(state: GameState, rng: Rng, club: Club, avg: number, home?: string | null): void {
   for (const pos of POSITIONS) {
     for (let i = 0; i < SQUAD_TEMPLATE[pos]; i++) {
       // The first two at each position are near starter level, the rest backups.
       const starterish = i < Math.ceil(SQUAD_TEMPLATE[pos] / 2);
       const level = Math.round(avg + (starterish ? rng.range(0, 6) : rng.range(-10, -2)));
-      createPlayer(state, rng, {position: pos, level, age: randomAge(rng), clubId: club.id, season: state.season});
+      createPlayer(state, rng, {position: pos, level, age: randomAge(rng), clubId: club.id, season: state.season, home});
     }
   }
   // Two academy talents per club.
@@ -175,6 +178,7 @@ function createSquad(state: GameState, rng: Rng, club: Club, avg: number): void 
       age: rng.int(17, 19),
       clubId: club.id,
       season: state.season,
+      home,
     });
   }
   assignRoles(state, club.id);
@@ -190,6 +194,72 @@ export function createFreeAgents(state: GameState, rng: Rng, count: number): voi
       clubId: null,
       season: state.season,
     });
+  }
+}
+
+/**
+ * A club with its squad, the `rank`-th strongest of `leagueSize`: reputation
+ * from about 88 down to 40, and stars at the biggest clubs. `home` is where
+ * most of the players come from (see PlayerSpec.home).
+ */
+export function buildClub(state: GameState, rng: Rng, t: ClubTemplate, rank: number, leagueSize: number, home?: string | null, extra: Partial<Club> = {}): Club {
+  const reputation = Math.round(88 - rank * (48 / (leagueSize - 1)));
+  const club: Club = {
+    id: newId(state, "c"),
+    ...t,
+    reputation,
+    capacity: Math.round((8_000 + reputation * 380) / 500) * 500,
+    ticketPrice: Math.round(10 + reputation * 0.12),
+    facilities: clamp(Math.round(reputation / 20), 1, 5),
+    cash: Math.round((1_500_000 + reputation * 110_000) / 50_000) * 50_000,
+    transferBudget: 0,
+    wageBudget: 0,
+    sponsorWeekly: Math.round((15_000 + reputation * 1_600) / 1_000) * 1_000,
+    formation: rng.pick(FORMATION_IDS),
+    mentality: "balanced",
+    lineup: [],
+    bench: [],
+    installments: [],
+    ...extra,
+  };
+  state.clubs[club.id] = club;
+  createSquad(state, rng, club, Math.round(50 + reputation * 0.28), home);
+  // The biggest clubs have stars: the very biggest a world-class player (90+).
+  const stars = STARS_PER_CLUB[rank] ?? 0;
+  for (let s = 0; s < stars; s++) {
+    createPlayer(state, rng, {
+      position: rng.pick(STAR_POSITIONS),
+      level: Math.round(rank === 0 && s === 0 ? rng.range(92, 95) : rng.range(85, 90)),
+      age: rng.int(24, 30),
+      clubId: club.id,
+      season: state.season,
+      home,
+    });
+  }
+  if (stars > 0) assignRoles(state, club.id);
+  club.transferBudget = Math.round((club.cash * 0.45) / 50_000) * 50_000;
+  club.wageBudget = Math.round((wageBill(state, club.id) * 1.08) / 1_000) * 1_000;
+  const {lineup, bench} = pickBestLineup(state, club, FORMATIONS[club.formation]);
+  club.lineup = lineup;
+  club.bench = bench;
+  return club;
+}
+
+/** World-class free agents (97–99) on the market, per position. */
+export const WORLD_CLASS_PER_POSITION = 2;
+// Their own random stream, so the rest of the world comes out as before.
+const WORLD_CLASS_SALT = 0x5eed97;
+const CUP_SALT = 0xc0b;
+
+/**
+ * The best players in the world, without a club: a couple at every position,
+ * rated 97–99. No transfer fee, but they want wages to match.
+ */
+function createWorldClass(state: GameState, rng: Rng): void {
+  for (const position of POSITIONS) {
+    for (let i = 0; i < WORLD_CLASS_PER_POSITION; i++) {
+      createPlayer(state, rng, {position, level: rng.int(97, 99), age: rng.int(26, 31), clubId: null, season: state.season});
+    }
   }
 }
 
@@ -238,46 +308,7 @@ export function newGame(
     nextId: 0,
   };
 
-  league.clubs.forEach((t, i) => {
-    // Reputation from about 88 down to 40.
-    const reputation = Math.round(88 - i * (48 / (league.clubs.length - 1)));
-    const club: Club = {
-      id: newId(state, "c"),
-      ...t,
-      reputation,
-      capacity: Math.round((8_000 + reputation * 380) / 500) * 500,
-      ticketPrice: Math.round(10 + reputation * 0.12),
-      facilities: clamp(Math.round(reputation / 20), 1, 5),
-      cash: Math.round((1_500_000 + reputation * 110_000) / 50_000) * 50_000,
-      transferBudget: 0,
-      wageBudget: 0,
-      sponsorWeekly: Math.round((15_000 + reputation * 1_600) / 1_000) * 1_000,
-      formation: rng.pick(FORMATION_IDS),
-      mentality: "balanced",
-      lineup: [],
-      bench: [],
-      installments: [],
-    };
-    state.clubs[club.id] = club;
-    createSquad(state, rng, club, Math.round(50 + reputation * 0.28));
-    // The biggest clubs have stars: the very biggest a world-class player (90+).
-    const stars = STARS_PER_CLUB[i] ?? 0;
-    for (let s = 0; s < stars; s++) {
-      createPlayer(state, rng, {
-        position: rng.pick(STAR_POSITIONS),
-        level: Math.round(i === 0 && s === 0 ? rng.range(92, 95) : rng.range(85, 90)),
-        age: rng.int(24, 30),
-        clubId: club.id,
-        season: state.season,
-      });
-    }
-    if (stars > 0) assignRoles(state, club.id);
-    club.transferBudget = Math.round((club.cash * 0.45) / 50_000) * 50_000;
-    club.wageBudget = Math.round((wageBill(state, club.id) * 1.08) / 1_000) * 1_000;
-    const {lineup, bench} = pickBestLineup(state, club, FORMATIONS[club.formation]);
-    club.lineup = lineup;
-    club.bench = bench;
-  });
+  league.clubs.forEach((t, i) => buildClub(state, rng, t, i, league.clubs.length));
 
   createFreeAgents(state, rng, 45);
 
@@ -301,6 +332,8 @@ export function newGame(
   const clubIds = Object.keys(state.clubs);
   state.userClubId = clubIds[clamp(clubIndex, 0, clubIds.length - 1)];
   state.fixtures = makeFixtures(state, rng, clubIds);
+  createWorldClass(state, new Rng(seed ^ WORLD_CLASS_SALT));
+  setupCup(state, new Rng(seed ^ CUP_SALT));
   for (const id of Object.keys(state.players)) {
     if (state.players[id].clubId === state.userClubId) state.scouted[id] = 0;
   }

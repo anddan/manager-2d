@@ -1,8 +1,11 @@
 // New worlds: men's, women's and mixed leagues get the right players.
 import {describe, expect, it} from "vitest";
-import {newGame} from "./generate";
+import {WORLD_CLASS_PER_POSITION, newGame} from "./generate";
+import {leagueClubs} from "./helpers";
 import {LEAGUES} from "./leagues";
 import {NATIONALITIES} from "./names";
+import {overall} from "./ratings";
+import {POSITIONS} from "./types";
 
 describe("leagues", () => {
   for (const league of LEAGUES) {
@@ -10,10 +13,10 @@ describe("leagues", () => {
       const g = newGame("L", 3, 5, undefined, "men", league.id);
       expect(g.leagueId).toBe(league.id);
       expect(g.leagueName).toBe(league.name);
-      expect(Object.values(g.clubs).map((c) => c.name)).toEqual(league.clubs.map((c) => c.name));
+      expect(leagueClubs(g).map((c) => c.name)).toEqual(league.clubs.map((c) => c.name));
       expect(g.fixtures.length).toBeGreaterThan(0);
       if (league.home) {
-        const players = Object.values(g.players);
+        const players = Object.values(g.players).filter((p) => !p.clubId || !g.clubs[p.clubId].guest);
         const share = players.filter((p) => p.nationality === league.home).length / players.length;
         expect(share).toBeGreaterThan(0.5);
       }
@@ -41,5 +44,18 @@ describe("players' gender", () => {
     const share = players.filter((p) => p.gender === "f").length / players.length;
     expect(share).toBeGreaterThan(0.4);
     expect(share).toBeLessThan(0.6);
+  });
+});
+
+describe("world-class players", () => {
+  it("are on the market at every position, rated 97–99, and only there", () => {
+    const g = newGame("W", 3, 5);
+    const best = Object.values(g.players).filter((p) => overall(p) >= 97);
+    for (const p of best) expect(p.clubId).toBeNull();
+    for (const pos of POSITIONS) {
+      const here = best.filter((p) => p.position === pos);
+      expect(here.length).toBe(WORLD_CLASS_PER_POSITION);
+      for (const p of here) expect(overall(p)).toBeLessThanOrEqual(99);
+    }
   });
 });

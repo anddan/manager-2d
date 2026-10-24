@@ -1,6 +1,6 @@
 // Small helpers shared by the systems.
-import {PRESEASON_WEEKS} from "./constants";
-import type {Club, Fixture, FinanceCategory, GameState, Message, Player} from "./types";
+import {CUP_WEEKS, PRESEASON_WEEKS, SEASON_WEEKS} from "./constants";
+import type {Club, CupFixture, Fixture, FinanceCategory, GameState, Message, Player} from "./types";
 
 export function newId(state: GameState, prefix: string): string {
   state.nextId += 1;
@@ -11,21 +11,58 @@ export function userClub(state: GameState): Club {
   return state.clubs[state.userClubId];
 }
 
-/** League round played this week, or null in preseason. */
-export function currentRound(state: GameState): number | null {
-  const round = state.week - PRESEASON_WEEKS;
+/** League round played in a week of the season, or null (preseason, or a Champions Cup week). */
+export function roundInWeek(week: number): number | null {
+  if (CUP_WEEKS.includes(week)) return null;
+  const round = week - PRESEASON_WEEKS - CUP_WEEKS.filter((w) => w < week).length;
   return round >= 1 ? round : null;
+}
+
+/** League round played this week, or null in preseason and Champions Cup weeks. */
+export function currentRound(state: GameState): number | null {
+  return roundInWeek(state.week);
+}
+
+/** Champions Cup stage played this week (0 = round of 16 … 3 = final), or null. */
+export function currentCupStage(state: GameState): number | null {
+  const stage = CUP_WEEKS.indexOf(state.week);
+  return stage >= 0 ? stage : null;
+}
+
+export function isCupFixture(f: Fixture): f is CupFixture {
+  return "stage" in f;
+}
+
+/** The week of the season a fixture is played in. */
+export function fixtureWeek(f: Fixture): number {
+  if (isCupFixture(f)) return CUP_WEEKS[f.stage];
+  for (let week = 1; week <= SEASON_WEEKS; week++) if (roundInWeek(week) === f.round) return week;
+  return SEASON_WEEKS;
 }
 
 export function fixturesInRound(state: GameState, round: number): Fixture[] {
   return state.fixtures.filter((f) => f.round === round);
 }
 
-/** The user's next unplayed fixture. */
+export function cupFixturesInStage(state: GameState, stage: number): CupFixture[] {
+  return state.cup?.fixtures.filter((f) => f.stage === stage) ?? [];
+}
+
+/** A league or Champions Cup fixture by id. */
+export function findFixture(state: GameState, id: string): Fixture | undefined {
+  return state.fixtures.find((f) => f.id === id) ?? state.cup?.fixtures.find((f) => f.id === id);
+}
+
+/** The user's next unplayed fixture, league or cup. */
 export function nextUserFixture(state: GameState): Fixture | undefined {
-  return state.fixtures.find(
-    (f) => !f.played && (f.homeId === state.userClubId || f.awayId === state.userClubId)
-  );
+  const mine = (f: Fixture) => !f.played && (f.homeId === state.userClubId || f.awayId === state.userClubId);
+  const all: Fixture[] = [...state.fixtures.filter(mine), ...(state.cup?.fixtures.filter(mine) ?? [])];
+  return all.sort((a, b) => fixtureWeek(a) - fixtureWeek(b))[0];
+}
+
+/** The clubs in the user's league (not Champions Cup guests). */
+export function leagueClubs(state: GameState): Club[] {
+  return Object.values(state.clubs).filter((c) => !c.guest);
 }
 
 export function addMessage(

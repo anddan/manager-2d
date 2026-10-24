@@ -1,6 +1,7 @@
 // Weekly training: attributes grow with focus, age, potential, minutes,
 // intensity, facilities, form and morale. Older players decline.
 import {NATURAL_GAIN_SHARE, TRAINING_BASE_GAIN, TRAINING_INJURY_CHANCE} from "./constants";
+import {leagueClubs} from "./helpers";
 import {overall} from "./ratings";
 import {Rng, clamp} from "./rng";
 import {
@@ -120,7 +121,7 @@ function pick(focus: Partial<Record<Attribute, number>>, scale: number): Partial
 const AI_ROTATION: TrainingFocus[] = ["technique", "attack", "defense", "passing", "physical", "conditioning", "recovery"];
 
 export function weeklyTraining(state: GameState, rng: Rng): void {
-  for (const club of Object.values(state.clubs)) {
+  for (const club of leagueClubs(state)) {
     const isUser = club.id === state.userClubId;
     const opts: TrainOptions = isUser
       ? state.training

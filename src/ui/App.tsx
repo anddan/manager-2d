@@ -1,6 +1,6 @@
 import {useEffect, useState} from "react";
 import {ENERGY_MAX} from "../game/constants";
-import {currentRound, nextUserFixture, userClub} from "../game/helpers";
+import {fixtureWeek, nextUserFixture, userClub} from "../game/helpers";
 import {claimDailyBonus, msToNextEnergy, regenerateEnergy} from "../game/monetization";
 import {finishWeek, startWeek} from "../game/week";
 import {useT, type TKey} from "../i18n";
@@ -141,9 +141,8 @@ function TopBar() {
   const m = {...game.monetization};
   regenerateEnergy(m, now);
   const wait = msToNextEnergy(m, now);
-  const round = currentRound(game);
   const next = nextUserFixture(game);
-  const isMatchWeek = round !== null && next?.round === round;
+  const isMatchWeek = !!next && fixtureWeek(next) === game.week;
 
   // Match weeks open the live match; finishing it moves the week on.
   const advance = () => {

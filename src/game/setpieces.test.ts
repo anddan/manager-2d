@@ -117,6 +117,8 @@ describe("injuries in a managed team", () => {
         step = run.next(step.value.type === "setpiece" ? null : undefined);
       }
       if (!injury) continue;
+      // Hurt in the very last minute: the match is over before anyone can come on.
+      if (injury.minute >= (step.value.events.find((e) => e.type === "fulltime")?.minute ?? 90)) continue;
       const sub = step.value.events.find((e) => e.type === "sub" && e.playerId === injury!.playerId);
       expect(sub?.otherId).toBe(injury.inId);
       expect(sub?.minute).toBe(injury.minute + 1);

@@ -1,5 +1,5 @@
 // Tiny i18n: flat dictionaries per language with {param} placeholders.
-// "{fee:money}" formats as currency, "{n:num}" as a number.
+// "{fee:money}" formats as currency, "{n:num}" as a number, "{stage:key}" translates the value.
 import {useGame} from "../store";
 import {en} from "./en";
 import {es} from "./es";
@@ -36,6 +36,8 @@ export function translate(lang: Lang, key: string, params?: Params): string {
     if (value === undefined) return "";
     if (type === "money") return formatMoney(lang, Number(value));
     if (type === "num") return formatNumber(lang, Number(value));
+    // A key itself, e.g. the cup round: "{stage:key}".
+    if (type === "key") return translate(lang, String(value));
     return String(value);
   });
 }

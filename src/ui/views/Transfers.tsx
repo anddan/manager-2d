@@ -44,7 +44,7 @@ function Search() {
   const [source, setSource] = useState<"all" | "free" | "listed">("all");
 
   const results = Object.values(game.players)
-    .filter((p) => p.clubId !== game.userClubId && p.loan?.parentClubId !== game.userClubId)
+    .filter((p) => p.clubId !== game.userClubId && p.loan?.parentClubId !== game.userClubId && !(p.clubId && game.clubs[p.clubId]?.guest))
     .filter((p) => (!pos || p.position === pos) && p.age <= maxAge)
     .filter((p) => (source === "free" ? !p.clubId : source === "listed" ? p.transferListed || p.loanListed : true))
     .map((p) => ({p, est: estimatedOverall(game, p), price: askingPrice(game, p)}))

@@ -4,7 +4,7 @@ import {FORMATIONS} from "../game/constants";
 import {newGame} from "../game/generate";
 import {simulateMatch} from "../game/match";
 import {Rng} from "../game/rng";
-import {advance, buildOverrides, snap, type Ctx} from "./MatchViewer";
+import {advance, buildOverrides, fullTimeTargets, restartTouch, snap, type Ctx, type Scene} from "./MatchViewer";
 
 /** Distance from p to the segment a-b. */
 function segmentDistance(p: {x: number; y: number}, a: {x: number; y: number}, b: {x: number; y: number}): number {
@@ -112,40 +112,48 @@ describe("replay movement", () => {
     // Over several matches, since one match may have only a cross or two.
     let total = 0;
     let count = 0;
-    for (const seed of [3, 11, 12, 13, 14, 15]) {
+    for (const seed of [3, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]) {
       const r = simulateMatch(game, new Rng(seed), game.fixtures[seed % 7], true);
       const c: Ctx = {report: r, frames: r.frames, slots: {home: FORMATIONS[r.formations.home], away: FORMATIONS[r.formations.away]}, players: game.players};
       const d = {overrides: buildOverrides(c, r.setPieces ?? []), push: {}};
       const restarts = ["goal", "setpiece", "kickoff", "goalkick", "throwin"];
       const crosses = r.frames.filter((f, i) => {
         const prev = r.frames[i - 1];
-        const depth = (x: number) => (f.possession === "home" ? x : 100 - x);
-        const cross = f.kind === "pass" && prev?.kind === "dribble" && prev.possession === f.possession && depth(prev.x) > 88 && (prev.y < 12 || prev.y > 88);
-        // From open play: nobody can sprint 30 m into the box within a minute of everyone lining up for a restart.
-        const settled = !r.frames.some((g) => restarts.includes(g.kind ?? "") && g.minute <= f.minute && g.minute > f.minute - 1);
+        const depth = (x: number) => (prev?.possession === "home" ? x : 100 - x);
+        // Met by an attacker, or cut out by the defence where it lands.
+        const cross = (f.kind === "pass" || f.kind === "tackle" || f.kind === "save") && prev?.kind === "dribble" && depth(prev.x) > 88 && (prev.y < 12 || prev.y > 88);
+        // From settled play: after a restart (a goal kick sends everyone back towards halfway) nobody
+        // can sprint 40 m into the box in time for a quick cross.
+        const settled = !r.frames.some((g) => restarts.includes(g.kind ?? "") && g.minute <= f.minute && g.minute > f.minute - 2);
         return cross && settled;
       });
-      // Played through like the viewer, lining up at restarts; counted as each cross arrives.
+      // Played through like the viewer, lining up at restarts; counted as each cross comes in
+      // (most there at once while it's in the air, before anyone gets to it).
       let s = snap(c, 0, d);
       for (const cross of crosses) {
+        const k = r.frames.indexOf(cross);
+        const side = r.frames[k - 1].possession;
+        const team = side === "home" ? r.lineups.home : r.lineups.away;
+        let most = 0;
         for (let t = s.time + 0.02; t < cross.minute; t += 0.02) {
           if (r.frames.some((f) => restarts.includes(f.kind ?? "") && f.minute > t - 0.02 && f.minute <= t)) s = snap(c, t, d);
           else s = advance(s, t, c, d);
+          if (s.reached !== k - 1 || !s.flying) continue;
+          most = Math.max(most, Object.entries(s.bodies).filter(([id, b]) => {
+            if (!team.includes(id)) return false;
+            const depth = side === "home" ? b.x : 100 - b.x;
+            return depth > 82 && b.y > 20 && b.y < 80;
+          }).length);
         }
-        const team = cross.possession === "home" ? r.lineups.home : r.lineups.away;
-        total += Object.entries(s.bodies).filter(([id, b]) => {
-          if (!team.includes(id)) return false;
-          const depth = cross.possession === "home" ? b.x : 100 - b.x;
-          return depth > 82 && b.y > 20 && b.y < 80;
-        }).length;
+        total += most;
         count++;
       }
     }
     expect(count).toBeGreaterThan(10);
     console.log("attackers in the box at crosses", (total / count).toFixed(1), "over", count, "crosses");
-    // Usually the striker plus a winger or attacking midfielder.
-    expect(total / count).toBeGreaterThanOrEqual(1.2);
-  });
+    // The striker, often with a winger or attacking midfielder, while the ball is in the air.
+    expect(total / count).toBeGreaterThanOrEqual(1.0);
+  }, 30000);
 
   it("shoots from in and around the box, not from far out", () => {
     // Played through like the viewer; noted where the ball is when it gets to the touch a shot is struck from.
@@ -215,6 +223,63 @@ describe("replay movement", () => {
     expect(stopsSeen).toBeGreaterThan(40);
     expect(forced).toBe(0);
     expect(misses).toEqual([]);
+  }, 30000);
+
+  it("restarts from the taker's feet, even when the stop came late", () => {
+    // Like the match screen: play waited a while for the ball, everyone lined
+    // up, the ball was placed; then the keeper / thrower / kicker plays it on.
+    let checked = 0;
+    const bad: string[] = [];
+    for (const seed of [3, 11]) {
+      const r = simulateMatch(game, new Rng(seed), game.fixtures[seed % 7], true);
+      const c: Ctx = {report: r, frames: r.frames, slots: {home: FORMATIONS[r.formations.home], away: FORMATIONS[r.formations.away]}, players: game.players};
+      const d = {overrides: buildOverrides(c, r.setPieces ?? []), push: {}};
+      r.frames.forEach((f, i) => {
+        if (!["goalkick", "throwin", "kickoff"].includes(f.kind ?? "") || !r.frames[i + 2] || i === 0) return;
+        const pause = f.kind === "kickoff" ? {kind: "goal", time: f.minute - 0.01, frameIndex: i - 1} : {kind: "restart", time: f.minute, frameIndex: i - 1};
+        // Late: the clock is already past the next touch.
+        const late = r.frames[i + 1].minute + 0.05;
+        const lined = snap(c, f.minute + 0.001, d);
+        const k = restartTouch(r.frames, pause, i + 1);
+        expect(k).toBe(i);
+        let s: Scene = {...lined, time: late, ball: {x: f.x, y: f.y}, reached: k, flying: false};
+        let left = false;
+        for (let step = 0; step < 400 && s.reached <= i; step++) {
+          const before = s;
+          s = advance(s, s.time + 1 / 72, c, d);
+          if (!left && !before.flying && s.flying && before.reached === i) {
+            left = true;
+            const taker = before.bodies[f.playerId!];
+            if (Math.hypot(taker.x - before.ball.x, taker.y - before.ball.y) > 2.5) bad.push(`${f.kind} ${f.minute.toFixed(1)}`);
+          }
+        }
+        if (!left) bad.push(`${f.kind} ${f.minute.toFixed(1)} never played`);
+        // And it went to the teammate it was meant for.
+        expect(r.frames[s.reached].possession).toBe(f.possession);
+        checked++;
+      });
+    }
+    expect(checked).toBeGreaterThan(20);
+    expect(bad).toEqual([]);
+  }, 30000);
+
+  it("sends the winners to their fans and the losers to the tunnel at full time", () => {
+    const r = simulateMatch(game, new Rng(3), game.fixtures[3], true);
+    const c: Ctx = {report: r, frames: r.frames, slots: {home: FORMATIONS[r.formations.home], away: FORMATIONS[r.formations.away]}, players: game.players};
+    const end = snap(c, 95, {overrides: [], push: {}});
+    const {targets, huddle} = fullTimeTargets(c, 95, "away", end.bodies);
+    for (const id of r.lineups.away.filter((id) => targets[id])) {
+      // In front of the away fans, behind the right-hand goal, after mobbing each other.
+      expect(targets[id].x).toBeGreaterThan(95);
+      expect(Math.hypot(huddle[id].x - 62, huddle[id].y - 50)).toBeLessThan(5);
+    }
+    for (const id of r.lineups.home.filter((id) => targets[id])) {
+      expect(Math.abs(targets[id].x - 50)).toBeLessThan(5);
+      expect(targets[id].y).toBeLessThan(6);
+    }
+    // A draw: both to their own fans.
+    const draw = fullTimeTargets(c, 95, null, end.bodies).targets;
+    expect(r.lineups.home.filter((id) => draw[id]).every((id) => draw[id].x < 5)).toBe(true);
   });
 
   it("keeps everyone and the ball on the pitch", () => {

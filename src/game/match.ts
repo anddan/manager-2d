@@ -8,7 +8,7 @@
 // substitutions and instructions can come in) and at every set piece (so the
 // user can take it). simulateMatch runs one straight through.
 import {DIAMONDS_PER_WIN, FORMATIONS, MAX_SUBS, type Slot} from "./constants";
-import {book} from "./helpers";
+import {book, findFixture} from "./helpers";
 import {isAvailable} from "./lineup";
 import {distance, fromSide, progressFor, teamSpot, type Point} from "./pitch";
 import {effectiveRating} from "./ratings";
@@ -67,7 +67,7 @@ const MENTALITY: Record<Mentality, {def: number; att: number}> = {
 
 const HOME_ADVANTAGE = 1.02;
 // Lower than it would be without added time and the frequent set pieces, which add goals of their own.
-const CHANCE_BASE = 0.27;
+const CHANCE_BASE = 0.25;
 /**
  * How sharply strength differences turn into possession and chances. Kept
  * moderate so teams at about the same level get even matches where both
@@ -279,18 +279,22 @@ const DISALLOWED_CHANCE = 0.07;
 /** How often a pass goes back to the player who just passed and ran on (in the replay only). */
 const ONE_TWO_CHANCE = 0.22;
 /** Share of a minute the build-up to a set piece takes; the kick and what follows get the rest. */
-const LEAD_UP_SHARE = 0.6;
+const LEAD_UP_SHARE = 0.68;
 export const DISALLOW_REASONS = ["offside", "offside", "foul", "handball"] as const;
 export type DisallowReason = (typeof DISALLOW_REASONS)[number];
 
 /** Share of minutes without a shot where the ball goes out for a throw-in (in the replay only). */
 const THROW_IN_CHANCE = 0.22;
+/** How far up (0–100) a move that creates nothing may get before the defence cuts it out. */
+const DANGER_DEPTH = 74;
+/** A cross or through ball into the box that comes to nothing: how often the keeper claims it. */
+const KEEPER_CLAIM_CHANCE = 0.45;
 
 /** Half the goal's width in pitch units (7.32 m of a 68 m wide pitch, scaled to 100). */
 const GOAL_HALF_WIDTH = 5.4;
 
 /** Where a corner aimed at a zone lands, in the attacking side's own view. */
-function cornerZone(target: CornerTarget, flag: -1 | 1): {depth: number; width: number} {
+export function cornerZone(target: CornerTarget, flag: -1 | 1): {depth: number; width: number} {
   switch (target) {
     case "near": return {depth: 95, width: 50 + flag * 6};
     case "penalty": return {depth: 89, width: 50};
@@ -367,9 +371,13 @@ class Replay {
     const outfield = team.onPitch.filter((o) => team.slots[o.slot].pos !== "GK");
     if (outfield.length === 0) return;
     if (this.rng.chance(clamp(0.25 + passing / 250 + style * 0.35, 0.05, 0.95))) {
+      // Short: to a centre-back split wide by the box, or a full-back out on the flank.
       const backs = outfield.filter((o) => ["CB", "FB"].includes(team.slots[o.slot].pos));
-      const to = this.rng.pick(backs.length ? backs : outfield).id;
-      add("pass", to, this.jitter(this.spot(team, to, true), 3), team.side);
+      const o = this.rng.pick(backs.length ? backs : outfield);
+      const slot = team.slots[o.slot];
+      const left = slot.y < 50;
+      const at = slot.pos === "FB" ? fromSide(team.side, this.rng.range(20, 28), left ? 8 : 92) : fromSide(team.side, this.rng.range(13, 18), left ? 20 : 80);
+      add("pass", o.id, this.jitter(at, 2), team.side);
     } else {
       const landing = fromSide(team.side, this.rng.range(45, 62), this.rng.range(20, 80));
       const ahead = outfield.filter((o) => !["CB", "FB"].includes(team.slots[o.slot].pos));
@@ -439,6 +447,12 @@ class Replay {
     return {to, at: this.jitter(this.spot(team, to, true), 3), flight: "long"};
   }
 
+  /** The ball near the attacking side's goal and central: a shooting chance if anything is on. */
+  private inFrontOfGoal(side: Side): boolean {
+    const width = side === "home" ? this.ball.y : 100 - this.ball.y;
+    return progressFor(side, this.ball.x) > DANGER_DEPTH && width > 22 && width < 78;
+  }
+
   /** A winger or full-back with the ball out wide in the final third. */
   private wideAndHigh(team: Team, id: string): boolean {
     const pos = this.posOf(team, id);
@@ -501,7 +515,8 @@ class Replay {
     const vision = this.state.players[from].attrs.vision;
     const style = level(team, from, "passing");
     // How far back a pass may go before it gets unlikely, by the passer's role.
-    const backTolerance = fromPos === "ST" || fromPos === "W" || fromPos === "AM" ? 7 : deep ? 18 : 11;
+    // In the final third, everyone looks forward.
+    const backTolerance = progress > 66 ? 5 : fromPos === "ST" || fromPos === "W" || fromPos === "AM" ? 7 : deep ? 18 : 11;
     const options = team.onPitch.filter((o) => {
       if (o.id === from) return false;
       if (team.slots[o.slot].pos !== "GK") return true;
@@ -559,7 +574,8 @@ class Replay {
           add("pass", to, fromSide(team.side, clamp(progressFor(team.side, spot.x), 25, 42), team.side === "home" ? spot.y : 100 - spot.y), team.side);
         }
       } else if (this.restart.kind === "keeper") {
-        // The keeper kept hold after a save, and plays it out.
+        // The keeper kept hold after a save: walks it to the edge of the box, then plays it out.
+        add("dribble", this.keeper(team), fromSide(team.side, this.rng.range(11, 15), this.rng.range(38, 62)), team.side);
         this.distribute(team, add);
       } else if (this.restart.kind === "goalKick") {
         this.goalKick(team, add);
@@ -567,6 +583,14 @@ class Replay {
         this.throwIn(team, this.restart.at ?? this.ball, add);
       }
       this.restart = null;
+      // The side that restarted keeps it for a pass before it can be won off them.
+      if (this.carrier && this.carrier.side !== side) {
+        const next = this.receiver(team, this.carrier.id);
+        if (next) add("pass", next, this.jitter(this.spot(team, next, true), 4), team.side);
+      }
+    } else if (this.carrier && this.carrier.side !== side && progressFor(side, this.ball.x) > DANGER_DEPTH) {
+      // Won off them near goal last minute: the defenders get it away before it can be won back.
+      this.clear(defending, add);
     }
     // The side that has it now won the ball back: their nearest player.
     if (this.carrier && this.carrier.side !== side) {
@@ -591,15 +615,15 @@ class Replay {
       sp.kind === "corner" ? fromSide(side, this.rng.range(82, 90), spotWidth < 50 ? this.rng.range(10, 24) : this.rng.range(76, 90))
       : sp.kind === "penalty" ? fromSide(side, this.rng.range(86, 92), this.rng.range(38, 62))
       : fromSide(side, progressFor(side, sp.spot.x) + 1.5, clamp(spotWidth + this.rng.range(-4, 4), 5, 95));
-    // From far away, it's passed up there first: no dribble runs half the pitch.
-    for (let hop = 0; hop < 3 && carrier && distance(this.ball, runTo) > 22; hop++) {
-      const k = Math.min(1, 20 / distance(this.ball, runTo));
-      const via = {x: this.ball.x + (runTo.x - this.ball.x) * k, y: this.ball.y + (runTo.y - this.ball.y) * k};
-      const mates = attacking.onPitch.filter((o) => o.id !== carrier && attacking.slots[o.slot].pos !== "GK");
-      if (mates.length === 0) break;
+    // From far away, it's played up to whoever is already up there (long if it
+    // has to be): no dribble runs half the pitch, and nobody has to sprint 40 m to get it.
+    const mates = attacking.onPitch.filter((o) => o.id !== carrier && attacking.slots[o.slot].pos !== "GK");
+    if (carrier && mates.length > 0 && distance(this.ball, runTo) > 22) {
       let to = mates[0].id;
-      for (const o of mates) if (distance(this.spot(attacking, o.id, true), via) < distance(this.spot(attacking, to, true), via)) to = o.id;
-      add("pass", to, this.jitter(via, 2));
+      for (const o of mates) if (distance(this.spot(attacking, o.id, true), runTo) < distance(this.spot(attacking, to, true), runTo)) to = o.id;
+      const spot = this.spot(attacking, to, true);
+      const at = this.jitter({x: spot.x + (runTo.x - spot.x) * 0.4, y: spot.y + (runTo.y - spot.y) * 0.4}, 2);
+      add("pass", to, at, side, distance(this.ball, at) > 35 ? "long" : undefined);
       carrier = to;
     }
     add("dribble", carrier, runTo);
@@ -621,10 +645,14 @@ class Replay {
     const flush = () => (ledUp ? this.flush(minute, touches, LEAD_UP_SHARE, 1) : this.flush(minute, touches));
 
     const passes = outcome.type === "none" ? this.rng.int(1, 3) : outcome.setPiece ? 0 : this.rng.int(0, 2);
+    // Already camped in their half (not just won it or restarted): the box has filled up for a cross.
+    const settled = touches.length === 0 && progressFor(side, this.ball.x) > 45;
     let lastPasser: string | undefined;
     for (let i = 0; i < passes; i++) {
+      // Near goal with nothing on: it ends here (cut out below), not played back out.
+      if (outcome.type === "none" && this.inFrontOfGoal(side)) break;
       // Wide in the final third: take it down the line and cross it into the box.
-      if (this.wideAndHigh(attacking, carrier) && this.rng.chance(0.5)) {
+      if (settled && this.wideAndHigh(attacking, carrier) && this.rng.chance(0.5)) {
         carrier = this.crossIn(attacking, carrier, add) ?? carrier;
         break;
       }
@@ -658,6 +686,13 @@ class Replay {
       add("pass", next, this.jitter(this.spot(attacking, next, true), 4));
       lastPasser = carrier;
       carrier = next;
+    }
+
+    // Nothing came of it: near goal the defence (or the keeper) cuts it out, so
+    // no attacker is left free in front of goal without a shot.
+    if (outcome.type === "none" && this.inFrontOfGoal(side)) {
+      this.cutOut(attacking, defending, touches, add);
+      return flush();
     }
 
     // Now and then the move ends with the ball over the touchline: a throw-in to the other side.
@@ -703,8 +738,12 @@ class Replay {
       }
     } else if (outcome.type !== "none") {
       const onPitch = (id?: string) => !!id && attacking.onPitch.some((o) => o.id === id);
-      if (outcome.type === "goal" && onPitch(outcome.assistId) && outcome.assistId !== carrier) {
-        add("pass", outcome.assistId, this.jitter(this.spot(attacking, outcome.assistId!, true), 4));
+      // Already in front of goal: they go straight for it (or square it to the shooter), no ball back out first.
+      if (outcome.type === "goal" && onPitch(outcome.assistId) && outcome.assistId !== carrier && !this.inFrontOfGoal(side)) {
+        // To the provider, in the final third and never further back than the ball.
+        const spot = this.spot(attacking, outcome.assistId!, true);
+        const depth = Math.max(progressFor(side, this.ball.x), progressFor(side, spot.x), this.rng.range(66, 78));
+        add("pass", outcome.assistId, this.jitter(fromSide(side, Math.min(depth, 86), side === "home" ? spot.y : 100 - spot.y), 3));
         carrier = outcome.assistId!;
         // Wingers and full-backs mostly set goals up from the byline.
         const pos = this.posOf(attacking, carrier);
@@ -735,10 +774,64 @@ class Replay {
     flush();
   }
 
+  /**
+   * An attack that came to nothing, stopped near goal. A ball played in is cut
+   * out where it lands: claimed by the keeper if it's a cross or through ball
+   * into the box, otherwise intercepted by the nearest defender. A run is
+   * stopped with a tackle. The defenders then clear it or play it out.
+   */
+  private cutOut(attacking: Team, defending: Team, touches: Frame[], add: AddTouch): void {
+    const last = touches[touches.length - 1];
+    const keeper = this.keeper(defending);
+    const inBox = progressFor(attacking.side, this.ball.x) > 84;
+    // (It still flies in as a cross or through ball; it's just someone else who gets there.)
+    const won = (kind: TouchKind, id: string | undefined) => {
+      Object.assign(last, {kind, playerId: id, possession: defending.side});
+      if (id) this.carrier = {id, side: defending.side};
+    };
+    if (last?.kind === "pass" && inBox && keeper && (last.flight === "cross" || last.flight === "through") && this.rng.chance(KEEPER_CLAIM_CHANCE)) {
+      won("save", keeper);
+      this.restart = {side: defending.side, kind: "keeper"};
+      return;
+    }
+    const by = this.nearest(defending, this.ball, false);
+    // A throw-in or goal kick still reaches the teammate; it's won off them after.
+    const fromRestart = ["throwin", "goalkick", "kickoff"].includes(touches[touches.length - 2]?.kind ?? "");
+    if (last?.kind === "pass" && !fromRestart) won("tackle", by);
+    else add("tackle", by, this.jitter(this.ball, 2), defending.side);
+  }
+
+  /** Won deep in their own third: cleared long towards a forward, or played out short. */
+  private clear(team: Team, add: AddTouch): void {
+    if (!this.carrier) return;
+    if (this.rng.chance(0.55)) {
+      const landing = fromSide(team.side, this.rng.range(42, 60), this.rng.range(20, 80));
+      const ahead = team.onPitch.filter((o) => o.id !== this.carrier!.id && ["ST", "W", "AM", "CM"].includes(team.slots[o.slot].pos));
+      if (ahead.length === 0) return;
+      let to = ahead[0].id;
+      for (const o of ahead) if (distance(this.spot(team, o.id, true), landing) < distance(this.spot(team, to, true), landing)) to = o.id;
+      add("pass", to, landing, team.side, "long");
+    } else {
+      const next = this.receiver(team, this.carrier.id);
+      if (next) add("pass", next, this.jitter(this.spot(team, next, true), 4), team.side);
+    }
+  }
+
   /** Spreads touches over the part of the minute from `from` to `to` (shares of it). */
   private flush(minute: number, touches: Frame[], from = 0, to = 1): void {
+    // Each touch gets time for how far the ball goes to it: a carried ball
+    // (dribble) needs much longer than a pass over the same distance.
+    let prev: Point | undefined = this.frames[this.frames.length - 1];
+    const weights = touches.map((t) => {
+      const d = prev ? distance(prev, t) : 0;
+      prev = t;
+      return 0.5 + d / (t.kind === "dribble" ? 10 : 25);
+    });
+    const total = weights.reduce((s, w) => s + w, 0);
+    let done = 0;
     touches.forEach((t, k) => {
-      t.minute = minute - 1 + from + ((to - from) * (k + 0.5)) / touches.length;
+      done += weights[k];
+      t.minute = minute - 1 + from + ((to - from) * (done - weights[k] / 2)) / total;
       this.frames.push(t);
     });
   }
@@ -1126,7 +1219,7 @@ export function simulateMatch(
 
 /** Writes a finished match into the season: table, stats, form, cards, bonuses. */
 export function applyMatch(state: GameState, report: MatchReport): void {
-  const fixture = state.fixtures.find((f) => f.id === report.fixtureId)!;
+  const fixture = findFixture(state, report.fixtureId)!;
   fixture.played = true;
   fixture.homeGoals = report.homeGoals;
   fixture.awayGoals = report.awayGoals;

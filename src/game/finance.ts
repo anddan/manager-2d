@@ -1,7 +1,7 @@
 // Weekly club finances: gate money, sponsors, wages, instalments and running
 // costs. The user's club gets an itemised report each week.
 import {PRIZE_MONEY} from "./constants";
-import {addMessage, book} from "./helpers";
+import {addMessage, book, leagueClubs} from "./helpers";
 import {leaguePosition, recentPointsPerGame} from "./league";
 import {wageBill} from "./ratings";
 import {clamp} from "./rng";
@@ -10,7 +10,7 @@ import type {Club, FinanceLines, GameState} from "./types";
 /** Share of seats sold: reputation, current form and table position. */
 export function attendanceRate(state: GameState, club: Club): number {
   const position = leaguePosition(state, club.id);
-  const tableBoost = (Object.keys(state.clubs).length / 2 - position) * 0.012;
+  const tableBoost = (leagueClubs(state).length / 2 - position) * 0.012;
   const formBoost = (recentPointsPerGame(state, club.id) - 1.4) * 0.05;
   return clamp(0.45 + club.reputation / 220 + tableBoost + formBoost, 0.3, 1);
 }
@@ -25,7 +25,7 @@ export function operatingCost(club: Club): number {
 
 /** Runs one week of money for every club. `homeClubs` played at home. */
 export function weeklyFinances(state: GameState, homeClubs: Set<string>): void {
-  for (const club of Object.values(state.clubs)) {
+  for (const club of leagueClubs(state)) {
     if (homeClubs.has(club.id)) book(state, club.id, "tickets", ticketIncome(state, club));
     book(state, club.id, "sponsor", club.sponsorWeekly);
     book(state, club.id, "wages", -wageBill(state, club.id));
@@ -77,7 +77,7 @@ export function payPrizeMoney(state: GameState, order: string[]): void {
 
 /** New season budgets: part of the cash for transfers, wages from expected income. */
 export function setSeasonBudgets(state: GameState): void {
-  for (const club of Object.values(state.clubs)) {
+  for (const club of leagueClubs(state)) {
     club.transferBudget = Math.max(0, Math.round((club.cash * 0.4) / 50_000) * 50_000);
     const income = club.sponsorWeekly + ticketIncome(state, club) / 2;
     const target = Math.round((income * 0.62) / 1_000) * 1_000;

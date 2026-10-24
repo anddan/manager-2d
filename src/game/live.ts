@@ -6,6 +6,7 @@
 // counted later by finishWeek, which replays the same seed with the same
 // choices and commands.
 import {matchLength} from "./clock";
+import {findFixture} from "./helpers";
 import {bestSub, createMatch, ordersFor, type MatchRun, type Team} from "./match";
 import {Rng} from "./rng";
 import type {SetPiece, SetPieceInput} from "./setpieces";
@@ -50,7 +51,7 @@ export class LiveMatch {
     if (!live) throw new Error("No live match");
     // A copy, so fitness and injuries during playback don't touch the save.
     this.copy = structuredClone(state);
-    const fixture = this.copy.fixtures.find((f) => f.id === live.fixtureId)!;
+    const fixture = findFixture(this.copy, live.fixtureId)!;
     this.userSide = fixture.homeId === state.userClubId ? "home" : "away";
     // Shared with the generator, which reads it before every minute.
     this.commands = [...(live.commands ?? [])];

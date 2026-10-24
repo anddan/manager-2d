@@ -488,8 +488,8 @@ button.pick { grid-template-columns: auto 1fr auto auto 60px; }
 .sp-flag-pole { stroke: #fff; stroke-width: 0.5; }
 .zone { cursor: pointer; }
 .zone circle { fill: rgb(253 224 71 / 0.18); stroke: #fde047; stroke-width: 0.5; transition: fill 0.15s; }
-.zone:hover circle, .zone:focus circle { fill: rgb(253 224 71 / 0.4); outline: none; }
-.zone.active circle { fill: rgb(253 224 71 / 0.55); stroke-width: 0.9; }
+.zone:hover circle, .zone:focus-visible circle { fill: rgb(253 224 71 / 0.4); }
+.zone.active circle { fill: rgb(202 138 4 / 0.5); stroke: none; }
 .zone.locked { cursor: default; }
 .zone-label { font-size: 2.6px; fill: #fff; text-anchor: middle; font-weight: 800; paint-order: stroke; stroke: rgb(0 0 0 / 0.5); stroke-width: 0.4px; }
 .zone-player { font-size: 2.3px; fill: #fde047; text-anchor: middle; font-weight: 700; paint-order: stroke; stroke: rgb(0 0 0 / 0.5); stroke-width: 0.35px; }
@@ -719,8 +719,10 @@ button.pick { grid-template-columns: auto 1fr auto auto 60px; }
 
 /* Corner zones in the 3D view */
 .zone ellipse { fill: rgb(253 224 71 / 0.22); stroke: #fde047; stroke-width: 0.45; transition: fill 0.15s; }
-.zone:hover ellipse, .zone:focus ellipse { fill: rgb(253 224 71 / 0.45); outline: none; }
-.zone.active ellipse { fill: rgb(253 224 71 / 0.6); stroke-width: 0.8; }
+/* No browser focus ring on a clicked zone; the keyboard still gets a lighter fill. */
+.zone, .zone:focus, .zone-tag, .zone-tag:focus { outline: none; }
+.zone:hover ellipse, .zone:focus-visible ellipse { fill: rgb(253 224 71 / 0.4); }
+.zone.active ellipse { fill: rgb(202 138 4 / 0.5); stroke: none; }
 .zone-tag { cursor: pointer; }
 .zone-tag rect { fill: rgb(11 20 48 / 0.82); stroke: #fde047; stroke-width: 0.3; }
 .zone-tag:hover rect { fill: rgb(11 20 48 / 0.95); }
@@ -766,3 +768,8 @@ button.pick { grid-template-columns: auto 1fr auto auto 60px; }
 .ev-disallowed { background: color-mix(in srgb, var(--mid) 22%, var(--surface-2)); text-decoration: none; }
 .fut-ovr.estimated { opacity: 0.75; font-style: italic; }
 .ovr-est { font-style: italic; }
+.fx-pens { display: block; font-size: 0.7rem; opacity: 0.8; }
+.cup-winner { font-weight: 700; margin: 4px 0 8px; }
+/* After the final whistle the winners jump for joy. */
+.dot.celebrate .body { animation: jump-joy 0.45s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: center; }
+@keyframes jump-joy { from { transform: translateY(0) scale(1); } to { transform: translateY(-0.9px) scale(1.12); } }

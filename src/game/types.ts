@@ -150,6 +150,10 @@ export interface Club {
   installments: Installment[];
   /** Captain and set-piece takers; the best on the pitch steps in when they're off. Missing in old saves. */
   roles?: TeamRoles;
+  /** A club from another league, here only for the Champions Cup: not in the table, the market or the money. */
+  guest?: true;
+  /** For a guest club: the league it's from (flag). */
+  country?: string;
 }
 
 export const TEAM_ROLES = ["captain", "penalties", "freekicks", "corners"] as const;
@@ -167,6 +171,23 @@ export interface Fixture {
   played: boolean;
   homeGoals: number;
   awayGoals: number;
+}
+
+/** A Champions Cup tie: one match, penalties if it's level. */
+export interface CupFixture extends Fixture {
+  /** 0 round of 16, 1 quarter-final, 2 semi-final, 3 final. */
+  stage: number;
+  /** Shoot-out score, when it was level after the match. */
+  penalties?: [number, number];
+  winnerId?: string;
+}
+
+export interface CupState {
+  season: number;
+  /** Who's in it this season, user's league first. */
+  clubIds: string[];
+  fixtures: CupFixture[];
+  winnerId?: string;
 }
 
 export type Side = "home" | "away";
@@ -401,4 +422,6 @@ export interface GameState {
   nextId: number;
   /** Set between starting a match week and finishing it. Missing in old saves. */
   liveMatch?: LiveMatchState | null;
+  /** This season's Champions Cup. Missing in old saves until it's set up. */
+  cup?: CupState;
 }

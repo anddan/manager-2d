@@ -23,7 +23,8 @@ import {FORMATIONS, type Slot} from "../game/constants";
 import {LiveMatch} from "../game/live";
 import {distance, fromSide, kickoffSpot, progressFor, teamSpot, type Point} from "../game/pitch";
 import {effectiveRating, overall, teamOvr} from "../game/ratings";
-import {aerial, type SetPiece, type SetPieceInput, type SetPieceOutcome} from "../game/setpieces";
+import {aerial, cornerAttacker, type SetPiece, type SetPieceInput, type SetPieceOutcome} from "../game/setpieces";
+import {cornerZone} from "../game/match";
 import {
   INSTRUCTIONS,
   type Club,
@@ -55,8 +56,7 @@ const NET_DEPTH = 101.8;
 /** How far ahead of a dribbling player's feet the ball runs. */
 const BALL_LEAD = 1.1;
 /** How much faster a player runs when the ball is waiting on them. */
-const CATCH_UP = 1.7;
-/** How fast the ball is brought to the spot for a set piece or restart. */
+const CATCH_UP = 1.7;/** How fast the ball is brought to the spot for a set piece or restart. */
 const BALL_PLACE_SPEED = 90;
 /** Fastest the ball moves (a hard pass or shot), in pitch units per match minute. */
 const BALL_TOP_SPEED = 550;
@@ -105,6 +105,15 @@ interface Override {
   targets: Record<string, Point>;
   /** Only once the ball has got to this touch (after a goal: once it is in the net). */
   afterTouch?: number;
+  /** Held past `to` until the ball has been played on from this touch (a kick-off, goal kick or throw-in). */
+  untilPlayed?: number;
+}
+
+/** Whether a stretch of fixed positions applies at time t, with the ball at touch `reached`. */
+function overrideOn(o: Override, t: number, reached: number, flying: boolean): boolean {
+  if (t < o.from || (o.afterTouch !== undefined && reached < o.afterTouch)) return false;
+  if (o.untilPlayed !== undefined && (reached < o.untilPlayed || (reached === o.untilPlayed && !flying))) return t < o.to + 1;
+  return t < o.to;
 }
 
 /** Things that change during playback and steer movement. */
@@ -214,9 +223,12 @@ function setupTargets(ctx: Ctx, sp: SetPiece, t: number): Record<string, Point> 
     return targets;
   }
 
-  // Defenders stay goal side of the attacker they mark.
-  const mark = (pairs: {depth: number; width: number}[], extraAttackers: number) => {
-    const runners = byAir(attackers).slice(0, pairs.length);
+  // Defenders stay goal side of the attacker they mark: the best defenders
+  // first, the same ones the set-piece view shows.
+  const p = (id: string) => ctx.players[id];
+  defenders.sort((a, b) => p(b).attrs.defending + p(b).attrs.physical - (p(a).attrs.defending + p(a).attrs.physical));
+  const mark = (pairs: {depth: number; width: number}[], extraAttackers: number, chosen: string[] = []) => {
+    const runners = [...chosen, ...byAir(attackers.filter((id) => !chosen.includes(id)))].slice(0, pairs.length);
     runners.forEach((id, i) => (targets[id] = at(pairs[i].depth, pairs[i].width)));
     const markers = defenders.filter((id) => !targets[id]).slice(0, runners.length);
     markers.forEach((id, i) => (targets[id] = at(pairs[i].depth + 1.6, pairs[i].width + 1)));
@@ -226,33 +238,35 @@ function setupTargets(ctx: Ctx, sp: SetPiece, t: number): Record<string, Point> 
   };
 
   if (sp.kind === "freekick") {
-    // The wall: four defenders 9 m towards goal, side by side.
+    // The wall: four defenders 9 m towards goal, side by side (the strongest, as the set-piece view shows them).
     const dx = 100 - spotDepth;
     const dy = 50 - spotWidth;
     const len = Math.hypot(dx, dy) || 1;
-    const wall = defenders.slice(0, 4);
+    const wall = defenders.slice().sort((a, b) => p(b).attrs.physical - p(a).attrs.physical).slice(0, 4);
+    for (const id of wall) defenders.splice(defenders.indexOf(id), 1);
     wall.forEach((id, i) => {
       const along = 9.15 / len;
       const offset = (i - 1.5) * 1.7;
       targets[id] = at(spotDepth + dx * along - (dy / len) * offset, spotWidth + dy * along + (dx / len) * offset);
     });
-    defenders.splice(0, wall.length);
     mark([{depth: 90, width: 42}, {depth: 91, width: 52}, {depth: 88, width: 60}, {depth: 92, width: 47}], 2);
     return targets;
   }
 
-  // Corner: the best in the air go to the near post, penalty spot and far post.
+  // Corner: whoever the set-piece view puts in each zone stands there (near
+  // post, penalty spot, far post, short), then the best of the rest in the air.
   const flag = sp.wallSide;
-  mark(
-    [
-      {depth: 95, width: 50 + flag * 6},
-      {depth: 89, width: 50},
-      {depth: 94, width: 50 - flag * 7},
-      {depth: 92, width: 46},
-      {depth: 81, width: 50},
-    ],
-    1
-  );
+  const used = new Set([sp.takerId]);
+  const chosen: string[] = [];
+  const zones: {depth: number; width: number}[] = [];
+  for (const zone of ["near", "penalty", "far", "short"] as const) {
+    const who = cornerAttacker(attackers.filter((id) => !used.has(id)).map(p), zone, sp.takerId);
+    if (!who) continue;
+    used.add(who.id);
+    chosen.push(who.id);
+    zones.push(cornerZone(zone, flag));
+  }
+  mark([...zones, {depth: 92, width: 46}, {depth: 81, width: 50}], 1, chosen);
   // Two more defenders guard the posts.
   defenders.filter((id) => !targets[id] || progressFor(att, targets[id].x) > 83).slice(-2).forEach((id, i) => {
     targets[id] = at(98.6, i === 0 ? 46 : 54);
@@ -275,7 +289,7 @@ function isShotSetup(frames: Frame[], k: number): boolean {
   const next = frames[k + 1];
   if (!f || !next || (f.kind !== "pass" && f.kind !== "dribble")) return false;
   if (next.kind === "goal" || next.kind === "nogoal" || next.kind === "save") return true;
-  // Wide of the goal: out over the goal line.
+  // Wide of the goal: out over the goal line (or played into the corner and run out for a corner).
   return next.kind === "out" && progressFor(next.possession, next.x) >= 99.5;
 }
 
@@ -323,12 +337,13 @@ function restartTargets(ctx: Ctx, f: Frame, t: number): Record<string, Point> {
 
 export function buildOverrides(ctx: Ctx, setPieces: SetPiece[]): Override[] {
   const frames = ctx.frames;
-  const out: Override[] = [{from: 0, to: frames[0]?.minute ?? 0.4, targets: kickoffTargets(ctx, 0, frames[0]?.playerId)}];
+  // Everyone stays in their half until the kick-off has been played.
+  const out: Override[] = [{from: 0, to: frames[0]?.minute ?? 0.4, targets: kickoffTargets(ctx, 0, frames[0]?.playerId), untilPlayed: 0}];
   frames.forEach((f, i) => {
     const next = frames[i + 1];
     if (f.kind === "goal") {
       const kicker = next?.kind === "kickoff" ? next.playerId : undefined;
-      out.push({from: f.minute, to: next?.minute ?? f.minute + 1, targets: kickoffTargets(ctx, f.minute, kicker), afterTouch: i});
+      out.push({from: f.minute, to: next?.minute ?? f.minute + 1, targets: kickoffTargets(ctx, f.minute, kicker), afterTouch: i, ...(kicker ? {untilPlayed: i + 1} : {})});
     } else if (f.kind === "setpiece") {
       const sp = setPieces.find((s) => s.minute === Math.ceil(f.minute) && s.side === f.possession);
       // Lined up once the ball has gone out for the corner, or the foul has happened.
@@ -336,14 +351,16 @@ export function buildOverrides(ctx: Ctx, setPieces: SetPiece[]): Override[] {
     } else if (isRestart(f)) {
       // From the ball going out until it's played again.
       // Once the ball has actually gone out.
-      out.push({from: frames[i - 1]?.minute ?? f.minute - 0.2, to: next?.minute ?? f.minute + 0.3, targets: restartTargets(ctx, f, f.minute), afterTouch: i - 1});
+      out.push({from: frames[i - 1]?.minute ?? f.minute - 0.2, to: next?.minute ?? f.minute + 0.3, targets: restartTargets(ctx, f, f.minute), afterTouch: i - 1, untilPlayed: i});
     }
   });
   // Half-time: both teams line up for the second-half kick-off.
   const ht = ctx.report.events.find((e) => e.type === "halftime");
   if (ht) {
-    const kickoff = frames.find((f) => f.minute > ht.minute);
-    out.push({from: ht.minute, to: kickoff?.minute ?? ht.minute + 0.5, targets: kickoffTargets(ctx, ht.minute, kickoff?.kind === "kickoff" ? kickoff.playerId : undefined)});
+    const k = frames.findIndex((f) => f.minute > ht.minute);
+    const kickoff = frames[k];
+    const kicker = kickoff?.kind === "kickoff" ? kickoff.playerId : undefined;
+    out.push({from: ht.minute, to: kickoff?.minute ?? ht.minute + 0.5, targets: kickoffTargets(ctx, ht.minute, kicker), ...(kicker ? {untilPlayed: k} : {})});
   }
   return out;
 }
@@ -419,7 +436,7 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
     const i = touchIndex(ctx.frames, t);
     const cur = i >= 0 ? ctx.frames[i] : undefined;
     const possession: Side = cur?.possession ?? "home";
-    const override = dyn.overrides.find((o) => t >= o.from && t < o.to && (o.afterTouch === undefined || reached >= o.afterTouch));
+    const override = dyn.overrides.find((o) => overrideOn(o, t, reached, flying));
 
     // Ball: it plays the touches strictly in order and only turns once it has
     // reached the touch: the player's feet for passes, dribbles and tackles
@@ -475,7 +492,10 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
       const move = Math.min(gap, speed * dt);
       if (gap > 0) ball = {x: ball.x + ((to.x - ball.x) / gap) * move, y: ball.y + ((to.y - ball.y) / gap) * move};
       // A dribble is done when the run is (the ball rides along at their feet until then).
-      const runDone = ctx.frames[k].kind !== "dribble" || t >= ctx.frames[k].minute - 0.02;
+      // The run to a foul or out for a corner goes all the way there (play stops there, and waits for it).
+      const f = ctx.frames[k];
+      const beforeStop = ctx.frames[k + 1]?.kind === "setpiece" || (ctx.frames[k + 1]?.kind === "out" && ctx.frames[k + 2]?.kind === "setpiece");
+      const runDone = f.kind !== "dribble" || (t >= f.minute - 0.02 && (!beforeStop || distance(ball, f) < 3));
       if (gap - move < 0.8 && runDone) {
         reached = k;
         flying = false;
@@ -508,6 +528,9 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
     const late = reached < i;
     // Whoever just played it on, while it is on its way to a teammate.
     const justPassed = travelling && held?.playerId && heading.possession === held.possession && heading.playerId !== held.playerId ? held.playerId : undefined;
+    // A keeper with the ball in their hands (or walking it out) isn't closed down.
+    const onBall = carrierId ?? (travelling && heading.kind === "dribble" && heading.playerId === held?.playerId ? heading.playerId : undefined);
+    const keeperHolds = !!onBall && (["home", "away"] as const).some((s) => [...sides[s]].some(([slot, id]) => id === onBall && ctx.slots[s][slot].pos === "GK"));
 
     for (const side of ["home", "away"] as const) {
       const other: Side = side === "home" ? "away" : "home";
@@ -523,7 +546,7 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
       // Without the ball: the nearest presses, the next covers.
       let presser: string | undefined;
       let cover: string | undefined;
-      if (!inPossession && !override) {
+      if (!inPossession && !override && !keeperHolds) {
         presser = nearestTo(bodies, outfield, ball);
         cover = nearestTo(bodies, outfield, ball, new Set(presser ? [presser] : []));
       }
@@ -565,7 +588,8 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
       const wide = ballWidth < 25 || ballWidth > 75;
       let crossComing = false;
       for (let k = reached + 1; k < ctx.frames.length && ctx.frames[k].minute - t < 1.6; k++) {
-        if (isCross(ctx.frames, k) && ctx.frames[k].possession === possession) crossComing = true;
+        // Whose cross it is: the side crossing it, even if a defender gets to it first.
+        if (isCross(ctx.frames, k) && (ctx.frames[k - 1]?.possession ?? ctx.frames[k].possession) === possession) crossComing = true;
       }
       const crossing = inPossession && !override && ((ballDepth > 55 && wide) || crossComing);
       const underCross = !inPossession && !override && ((ballDepth < 45 && wide) || crossComing);
@@ -945,7 +969,7 @@ interface ScreenProps {
 
 interface Pause {
   key: string;
-  kind: "goal" | "nogoal" | "setup" | "halftime" | "injury" | "restart";
+  kind: "goal" | "nogoal" | "setup" | "halftime" | "injury" | "restart" | "fulltime";
   time: number;
   side: Side;
   sp?: SetPiece;
@@ -973,10 +997,56 @@ interface Shout {
 
 const setPieceKey = (sp: {minute: number; side: Side}) => `s${sp.minute}-${sp.side}`;
 
+/** How long the players celebrate and thank the fans after the final whistle. */
+const FULLTIME_MS = 9000;
+
+/**
+ * After the final whistle. Each side's fans are behind their own goal (home
+ * on the left, as the stands are drawn). Winners first mob each other in a
+ * ring, then line up in front of their fans and applaud them; losers stop
+ * where they are, then walk off to the tunnel at the halfway line. A draw:
+ * both sides go and thank their own fans.
+ */
+export function fullTimeTargets(ctx: Ctx, t: number, winner: Side | null, bodies: Record<string, Point>): {targets: Record<string, Point>; huddle: Record<string, Point>} {
+  const targets: Record<string, Point> = {};
+  const huddle: Record<string, Point> = {};
+  for (const side of ["home", "away"] as const) {
+    const ids = [...onPitchAt(ctx.report, side, t).values()];
+    const happy = winner === null || winner === side;
+    const fansX = side === "home" ? 3 : 97;
+    const ring = {x: side === "home" ? 38 : 62, y: 50};
+    ids.forEach((id, k) => {
+      const at = bodies[id] ?? {x: 50, y: 50};
+      if (happy) {
+        targets[id] = {x: fansX, y: 22 + (k * 56) / Math.max(1, ids.length - 1)};
+        // A draw is no reason to celebrate: they just walk over to the fans.
+        const angle = (k / ids.length) * Math.PI * 2;
+        huddle[id] = winner ? {x: ring.x + Math.cos(angle) * 3, y: ring.y + Math.sin(angle) * 4} : targets[id];
+      } else {
+        // Heads down where they stood, then off to the tunnel in single file.
+        huddle[id] = at;
+        targets[id] = {x: 47 + (k % 3) * 3, y: 1 + Math.floor(k / 3) * 1.5};
+      }
+    });
+  }
+  return {targets, huddle};
+}
+
 /** Match minutes play may run on past a stop while the ball is still getting there (the clock slows meanwhile). */
 const STOP_GRACE = 2;
 /** The latest a pause can start. */
-const pauseUntil = (p: {time: number; frameIndex?: number}) => (p.frameIndex === undefined ? p.time : p.time + STOP_GRACE);
+/** The touch play restarts from after a stop: the kick-off, goal kick, throw-in or set piece. */
+export function restartTouch(frames: Frame[], p: {kind: string; time: number; frameIndex?: number}, reached: number): number {
+  if (p.kind === "goal" || p.kind === "halftime") {
+    const k = frames.findIndex((f) => f.kind === "kickoff" && f.minute > p.time);
+    return k >= 0 ? k : (p.frameIndex ?? reached);
+  }
+  if (p.frameIndex === undefined || (p.kind !== "restart" && p.kind !== "setup")) return reached;
+  const next = frames[p.frameIndex + 1];
+  return next && (isRestart(next) || next.kind === "setpiece") ? p.frameIndex + 1 : p.frameIndex;
+}
+
+const pauseUntil =(p: {time: number; frameIndex?: number}) => (p.frameIndex === undefined ? p.time : p.time + STOP_GRACE);
 
 /** A goal being shown again, slowed down. */
 interface GoalReplay {
@@ -1094,7 +1164,9 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   timeRef.current = time;
   const freezeRef = useRef(freeze);
   freezeRef.current = freeze;
-  const running = playing && !selected && !shown && !replay && !confirmClose;
+  // The pending set piece shows once its players are lined up; play waits while the manager chooses.
+  const pendingReady = live?.pending && done.current.has(setPieceKey(live.pending)) ? live.pending : null;
+  const running = playing && !selected && !shown && !pendingReady && !replay && !confirmClose;
 
   // Keep what was shown during play (not freezes), for replays.
   useEffect(() => {
@@ -1258,8 +1330,11 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
         if (bodies[pid]) bodies[pid] = {...target, vx: 0, vy: 0, sprint: false};
       }
       const ball = fz.kind === "goal" || fz.kind === "halftime" ? {x: 50, y: 50} : fz.sp ? fz.sp.spot : fz.restart ? {x: fz.restart.x, y: fz.restart.y} : prev.ball;
-      // The ball is placed for the restart: it has caught up with every touch so far.
-      return {...prev, bodies, ball, reached: touchIndex(ctx.frames, prev.time), flying: false};
+      // The ball is placed for the restart, and it's the restart's touch: with the
+      // keeper, thrower, taker or kicker, who plays it from there. (Not a later
+      // touch the clock has got to while play waited: then the ball would lie
+      // there for whoever that was, the taker would walk off, and anyone could take it.)
+      return {...prev, bodies, ball, reached: restartTouch(ctx.frames, fz, prev.reached), flying: false};
     });
     setFreeze(null);
   }, [ctx]);
@@ -1274,8 +1349,14 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
     if (finished) setPlaying(false);
   }, [finished]);
 
-  // The pending set piece shows once its players are lined up.
-  const pendingReady = live?.pending && done.current.has(setPieceKey(live.pending)) ? live.pending : null;
+  // The final whistle: the winners celebrate and go to thank their fans; the
+  // losers trudge off to the tunnel. After a draw both go to their own fans.
+  useEffect(() => {
+    if (!finished || freeze || replay || done.current.has("ft")) return;
+    const winner: Side | null = report.homeGoals > report.awayGoals ? "home" : report.awayGoals > report.homeGoals ? "away" : null;
+    setFreeze({key: "ft", kind: "fulltime", time, side: winner ?? "home", started: performance.now(), duration: FULLTIME_MS, ...fullTimeTargets(ctx, time, winner, scene.bodies)});
+  }, [finished, freeze, replay, report, ctx, time, scene.bodies]);
+
   const current = shown ?? (pendingReady ? {sp: pendingReady} : null);
 
   const answer = useCallback(
@@ -1380,6 +1461,8 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
 
   const userSide = live?.userSide;
   const managerLook = game.managerLook ?? defaultManagerLook(game.managerName);
+  // Winners jump for joy after the final whistle.
+  const celebrating = freeze?.kind === "fulltime" && report.homeGoals !== report.awayGoals ? freeze.side : null;
   const dots = (side: Side) => {
     const club = side === "home" ? home : away;
     const mine = side === userSide;
@@ -1391,7 +1474,7 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
       // Trail length follows actual speed, so fast sprinters leave longer trails.
       const trail = b.sprint ? 0.12 : 0;
       return (
-        <g key={id} className={mine ? "dot mine" : "dot"} onClick={mine && !freeze ? () => setSelected(id) : undefined}>
+        <g key={id} className={`dot${mine ? " mine" : ""}${celebrating === side ? " celebrate" : ""}`} onClick={mine && !freeze ? () => setSelected(id) : undefined}>
           {trail > 0 && (
             <line x1={(b.x - b.vx * trail) * 1.05} y1={(b.y - b.vy * trail) * 0.68} x2={cx} y2={cy} className="trail" stroke={club.color} />
           )}
@@ -1400,7 +1483,7 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
             {shoutedAt.has(id) && <circle r={3.2} className="shout-ring" />}
             {id === carrierId && <circle r={2.4} className="carrier-ring" />}
             {id === selected && <circle r={2.8} className="selected-ring" />}
-            <circle r={1.6} fill={club.color} stroke={club.color2} strokeWidth={0.4} />
+            <circle r={1.6} fill={club.color} stroke={club.color2} strokeWidth={0.4} className="body" />
             {booked.has(id) && <rect x={0.9} y={-2.6} width={1.1} height={1.5} rx={0.2} className="booked" />}
             {hurt.has(id) && <text x={-2.6} y={0.6} className="dot-hurt">✚</text>}
             <text y={-2.4} className="dot-label">{name(id)}</text>
@@ -1503,7 +1586,7 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
       ) : (
         <div className="pitch-wrap">
           <svg className="pitch" viewBox={viewBox} role="img" aria-label={t("match.pitch")}>
-            <Stands home={home} away={away} cheering={freeze?.kind === "goal" && !replay ? freeze.side : null} boards={(userSide === "away" ? away : home).color} />
+            <Stands home={home} away={away} cheering={(freeze?.kind === "goal" || (freeze?.kind === "fulltime" && report.homeGoals !== report.awayGoals)) && !replay ? freeze.side : null} boards={(userSide === "away" ? away : home).color} />
             {PITCH}
             {(!freeze || replay) && cones}
             {dots("home")}
@@ -1544,6 +1627,11 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
             <div className="setup-banner">{tx(`ev.${freeze.sp.kind}`, {team: (freeze.side === "home" ? home : away).short, player: name(freeze.sp.takerId)})}</div>
           )}
           {atHalftime && !live && <div className="setup-banner">{t("ev.halftime")}</div>}
+          {freeze?.kind === "fulltime" && (
+            <div className="setup-banner">
+              🏁 {report.homeGoals === report.awayGoals ? t("match.ftDraw") : t("match.ftWin", {team: (freeze.side === "home" ? home : away).name})}
+            </div>
+          )}
           {shouts.length > 0 && userSide && (
             <div className={`shout ${userSide}`} role="status">
               <span className="shout-manager" aria-hidden><ManagerAvatar look={managerLook} size={40} tie={(userSide === "home" ? home : away).color} /></span>
@@ -1726,29 +1814,32 @@ const INSTRUCTION_ICONS: Record<InstructionKey, string> = {passing: "🔁", drib
 const levelName = (lvl: InstructionLevel) => (lvl === -1 ? "low" : lvl === 1 ? "high" : "normal");
 
 /** One row per instruction: less, normal, more, with what the current choice does. */
-function InstructionGrid({value, disabled, onPick}: {value: (key: InstructionKey) => InstructionLevel; disabled?: boolean; onPick: (key: InstructionKey, level: InstructionLevel) => void}) {
+function InstructionGrid({value, disabled, onPick, keeper}: {value: (key: InstructionKey) => InstructionLevel; disabled?: boolean; onPick: (key: InstructionKey, level: InstructionLevel) => void; keeper?: boolean}) {
   const {t, tx} = useT();
+  // A keeper only has one order: how to play it out (passing: "more" is short, "direct" is long).
+  const keys = keeper ? (["passing"] as const) : INSTRUCTIONS;
+  const base = (key: InstructionKey) => (keeper ? "orders.gk" : `orders.${key}`);
   return (
     <div className="orders-grid">
-      {INSTRUCTIONS.map((key) => {
+      {keys.map((key) => {
         const current = value(key);
         return (
           <div key={key} className={current === 0 ? "order-row" : "order-row changed"}>
-            <span className="order-label">{INSTRUCTION_ICONS[key]} {t(`orders.${key}`)}</span>
+            <span className="order-label">{keeper ? "🧤" : INSTRUCTION_ICONS[key]} {tx(base(key))}</span>
             <div className="order-chips">
               {([-1, 0, 1] as const).map((lvl) => (
                 <button
                   key={lvl}
                   className={lvl === current ? "chip active" : "chip"}
                   disabled={disabled}
-                  title={tx(`orders.${key}.${levelName(lvl)}.desc`)}
+                  title={tx(`${base(key)}.${levelName(lvl)}.desc`)}
                   onClick={() => lvl !== current && onPick(key, lvl)}
                 >
-                  {lvl === -1 ? t(`orders.${key}.low`) : lvl === 1 ? t(`orders.${key}.high`) : t("orders.normal")}
+                  {lvl === -1 ? tx(`${base(key)}.low`) : lvl === 1 ? tx(`${base(key)}.high`) : t("orders.normal")}
                 </button>
               ))}
             </div>
-            <p className="order-desc">{tx(`orders.${key}.${levelName(current)}.desc`)}</p>
+            <p className="order-desc">{tx(`${base(key)}.${levelName(current)}.desc`)}</p>
           </div>
         );
       })}
@@ -1927,7 +2018,7 @@ function PlayerOrders({
       ) : (
         <>
           <p className="orders-intro">{t("orders.playerHint", {name: shortName(p)})}</p>
-          <InstructionGrid value={(key) => live.level(playerId, key)} disabled={!onPitch} onPick={(key, lvl) => onInstruct(playerId, key, lvl)} />
+          <InstructionGrid keeper={(slot ? team.slots[slot.slot].pos : p.position) === "GK"} value={(key) => live.level(playerId, key)} disabled={!onPitch} onPick={(key, lvl) => onInstruct(playerId, key, lvl)} />
           <div className="btn-row">
             {comingOff ? (
               <span className="muted small">🔁 {t("orders.subPending")}</span>

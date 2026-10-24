@@ -1,5 +1,5 @@
 // Fixtures and the league table.
-import {newId} from "./helpers";
+import {leagueClubs, newId} from "./helpers";
 import type {Rng} from "./rng";
 import type {Club, Fixture, GameState} from "./types";
 
@@ -50,7 +50,7 @@ export interface TableRow {
 
 export function standings(state: GameState): TableRow[] {
   const rows: Record<string, TableRow> = {};
-  for (const club of Object.values(state.clubs)) {
+  for (const club of leagueClubs(state)) {
     rows[club.id] = {club, played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, points: 0, form: []};
   }
   const played = state.fixtures.filter((f) => f.played).sort((a, b) => a.round - b.round);
