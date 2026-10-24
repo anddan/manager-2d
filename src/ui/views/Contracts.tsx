@@ -3,7 +3,24 @@ import {listName, shortName, userClub} from "../../game/helpers";
 import {clubPlayers, expectedWage, overall, wageBill} from "../../game/ratings";
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
-import {Bar, Card, Face, PosBadge} from "../common";
+import {Bar, Card, Face, PosBadge, SortTh, sortRows, useSort} from "../common";
+import {POSITIONS, SQUAD_ROLES, type Player} from "../../game/types";
+
+type ContractSort = "pos" | "name" | "age" | "ovr" | "wage" | "market" | "contract" | "role" | "happiness";
+
+function contractValue(p: Player, key: ContractSort): number | string {
+  switch (key) {
+    case "pos": return POSITIONS.indexOf(p.position);
+    case "name": return listName(p);
+    case "age": return p.age;
+    case "ovr": return overall(p);
+    case "wage": return p.contract.wage;
+    case "market": return expectedWage(p);
+    case "contract": return p.contract.expiresSeason;
+    case "role": return SQUAD_ROLES.indexOf(p.contract.role);
+    case "happiness": return p.happiness;
+  }
+}
 
 export function Contracts() {
   const {t, money} = useT();
@@ -13,8 +30,12 @@ export function Contracts() {
   const notify = useGame((s) => s.notify);
   const club = userClub(game);
   const bill = wageBill(game, club.id);
-  const players = clubPlayers(game, club.id).sort(
-    (a, b) => a.contract.expiresSeason - b.contract.expiresSeason || overall(b) - overall(a)
+  // Soonest-expiring first to start with, best first among them; any column sorts.
+  const sort = useSort<ContractSort>("contract");
+  const base = clubPlayers(game, club.id).sort((a, b) => a.contract.expiresSeason - b.contract.expiresSeason || overall(b) - overall(a));
+  const players = sortRows(base, (p) => contractValue(p, sort.key), sort.desc);
+  const th = (key: ContractSort, label: string, descFirst = true, title?: string) => (
+    <SortTh label={label} title={title} active={sort.key === key} desc={sort.desc} onClick={() => sort.onSort(key, descFirst)} />
   );
 
   const negotiate = (id: string) => {
@@ -36,8 +57,8 @@ export function Contracts() {
           <table className="table">
             <thead>
               <tr>
-                <th>{t("col.pos")}</th><th>{t("col.name")}</th><th>{t("col.age")}</th><th title={t("col.ovrHint")}>{t("col.ovr")}</th>
-                <th>{t("col.wage")}</th><th>{t("con.market")}</th><th>{t("col.contract")}</th><th>{t("col.role")}</th><th>{t("col.happiness")}</th><th />
+                {th("pos", t("col.pos"), false)}{th("name", t("col.name"), false)}{th("age", t("col.age"), false)}{th("ovr", t("col.ovr"), true, t("col.ovrHint"))}
+                {th("wage", t("col.wage"))}{th("market", t("con.market"))}{th("contract", t("col.contract"), false)}{th("role", t("col.role"), false)}{th("happiness", t("col.happiness"))}<th />
               </tr>
             </thead>
             <tbody>

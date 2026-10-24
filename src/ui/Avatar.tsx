@@ -3,6 +3,7 @@
 // the club colours. The manager's look is picked when starting a new game.
 // The face follows the mood: a big grin when happy, a frown when unhappy and
 // angry brows when they're furious.
+import {LEGEND_ID} from "../game/legend";
 import {Rng} from "../game/rng";
 import type {ManagerLook, Player} from "../game/types";
 
@@ -44,8 +45,16 @@ function seedOf(id: string): number {
   return h >>> 0;
 }
 
+/** Hand-made players with a look of their own rather than one drawn from their id. */
+const FIXED_LOOKS: Record<string, Look> = {
+  // Léon Dani: short brown hair, clean-shaven.
+  [LEGEND_ID]: {skin: SKIN[1], hair: HAIR[2], style: "short", beard: "none", brows: 0, eyeGap: 8},
+};
+
 /** The player's fixed look. */
 export function lookFor(p: Player): Look {
+  const fixed = FIXED_LOOKS[p.id];
+  if (fixed) return fixed;
   const rng = new Rng(seedOf(p.id));
   const weights = SKIN_WEIGHTS[REGION[p.nationality] ?? "south"];
   const skinIndex = rng.weighted(SKIN.map((_, i) => i), (i) => weights[i]);

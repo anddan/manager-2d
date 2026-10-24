@@ -1,6 +1,7 @@
 import {useEffect, useState} from "react";
 import {ENERGY_MAX} from "../game/constants";
 import {fixtureWeek, nextUserFixture, userClub} from "../game/helpers";
+import {ensureDaily} from "../game/daily";
 import {claimDailyBonus, msToNextEnergy, regenerateEnergy} from "../game/monetization";
 import {finishWeek, startWeek} from "../game/week";
 import {useT, type TKey} from "../i18n";
@@ -8,6 +9,9 @@ import {useGame, useGameState, VIEWS, type View} from "../store";
 import {ManagerAvatar, defaultManagerLook} from "./Avatar";
 import {ContractModal} from "./ContractModal";
 import {LiveMatchViewer, MatchViewer} from "./MatchViewer";
+import {GameOver} from "./GameOver";
+import {ManagerProfile} from "./ManagerProfile";
+import {TrophyCelebration} from "./TrophyCelebration";
 import {NewGame} from "./NewGame";
 import {PlayerModal} from "./PlayerModal";
 import {Contracts} from "./views/Contracts";
@@ -60,6 +64,7 @@ export function App() {
     document.documentElement.lang = lang;
   }, [lang]);
   if (!game) return <NewGame />;
+  if (game.gameOver) return <GameOver />;
   return <Game />;
 }
 
@@ -77,6 +82,8 @@ function Game() {
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
     const given = act((g) => claimDailyBonus(g.monetization, today));
+    // Today's tasks.
+    act((g) => ensureDaily(g, today));
     if (given > 0) notify("toast.dailyBonus", {n: given}, "good");
   }, [act, notify]);
 
@@ -95,6 +102,7 @@ function Game() {
       {liveFixture && <LiveMatchViewer key={liveFixture} />}
       {playerId && <PlayerModal key={playerId} playerId={playerId} />}
       {negotiation && <ContractModal />}
+      <TrophyCelebration />
       <ToastView />
     </div>
   );
@@ -108,7 +116,7 @@ function Nav() {
   const unread = game.inbox.filter((m) => !m.read).length;
   return (
     <nav className="nav" aria-label={t("nav.label")}>
-      <div className="brand">⚽ <span>Manager 2D</span></div>
+      <div className="brand">⚽ <span>Forza Manager</span></div>
       {VIEWS.map((v) => (
         <button key={v} className={v === view ? "nav-item active" : "nav-item"} onClick={() => setView(v)} aria-current={v === view ? "page" : undefined}>
           <span className="nav-icon" aria-hidden>{ICONS[v]}</span>
@@ -136,6 +144,7 @@ function TopBar() {
   const notify = useGame((s) => s.notify);
   const setView = useGame((s) => s.setView);
   const now = useNow(1000);
+  const [profile, setProfile] = useState(false);
   const club = userClub(game);
   // Show regenerated energy without writing the save every second.
   const m = {...game.monetization};
@@ -159,25 +168,29 @@ function TopBar() {
 
   return (
     <header className="topbar">
-      <div className="topbar-club">
-        <span className="crest" style={{background: club.color, color: club.color2}}>{club.short}</span>
-        <div>
-          <strong>{club.name}</strong>
-          <small>{t("top.seasonWeek", {season: game.season, week: game.week})}</small>
-        </div>
+      {profile && <ManagerProfile onClose={() => setProfile(false)} />}
+      {/* The club (to its tactics) and, right after it, the manager (to their profile). */}
+      <div className="topbar-id">
+        <button className="topbar-club" onClick={() => setView("tactics")} title={t("nav.tactics")}>
+          <span className="crest" style={{background: club.color, color: club.color2}}>{club.short}</span>
+          <span className="topbar-club-text">
+            <strong>{club.name}</strong>
+            <small>{t("top.seasonWeek", {season: game.season, week: game.week})}</small>
+          </span>
+        </button>
+        <button className="topbar-manager" onClick={() => setProfile(true)} title={game.managerName}>
+          <ManagerAvatar look={game.managerLook ?? defaultManagerLook(game.managerName)} size={34} tie={club.color} />
+          <span>{game.managerName}</span>
+        </button>
       </div>
-      <button className="topbar-manager" onClick={() => setView("settings")} title={game.managerName}>
-        <ManagerAvatar look={game.managerLook ?? defaultManagerLook(game.managerName)} size={34} tie={club.color} />
-        <span>{game.managerName}</span>
-      </button>
       <div className="topbar-stats">
         <span className="chip" title={t("fin.cash")}>💰 {money(club.cash)}</span>
         <button className="chip" onClick={() => setView("shop")} title={t("shop.energy")}>
           ⚡ {m.energy}/{ENERGY_MAX}
           {wait > 0 && <small className="timer">{formatWait(wait)}</small>}
         </button>
-        <button className="chip" onClick={() => setView("shop")} title={t("shop.diamonds")}>💎 {m.diamonds}</button>
       </div>
+      <button className="chip topbar-diamonds" onClick={() => setView("shop")} title={t("shop.diamonds")}>💎 {m.diamonds}</button>
       <button className="btn primary continue" onClick={advance}>
         {isMatchWeek ? `${t("top.playMatch")} ⚡${1}` : t("top.nextWeek")} ▶
       </button>

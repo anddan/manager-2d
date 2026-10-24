@@ -4,7 +4,7 @@ import {FORMATIONS} from "../game/constants";
 import {newGame} from "../game/generate";
 import {simulateMatch} from "../game/match";
 import {Rng} from "../game/rng";
-import {advance, buildOverrides, fullTimeTargets, restartTouch, snap, type Ctx, type Scene} from "./MatchViewer";
+import {advance, buildOverrides, fullTimeStages, restartTouch, snap, type Ctx, type Scene} from "./MatchViewer";
 
 /** Distance from p to the segment a-b. */
 function segmentDistance(p: {x: number; y: number}, a: {x: number; y: number}, b: {x: number; y: number}): number {
@@ -263,23 +263,26 @@ describe("replay movement", () => {
     expect(bad).toEqual([]);
   }, 30000);
 
-  it("sends the winners to their fans and the losers to the tunnel at full time", () => {
+  it("at full time sends the winners to their fans, then everyone off down the tunnel", () => {
     const r = simulateMatch(game, new Rng(3), game.fixtures[3], true);
     const c: Ctx = {report: r, frames: r.frames, slots: {home: FORMATIONS[r.formations.home], away: FORMATIONS[r.formations.away]}, players: game.players};
     const end = snap(c, 95, {overrides: [], push: {}});
-    const {targets, huddle} = fullTimeTargets(c, 95, "away", end.bodies);
-    for (const id of r.lineups.away.filter((id) => targets[id])) {
-      // In front of the away fans, behind the right-hand goal, after mobbing each other.
-      expect(targets[id].x).toBeGreaterThan(95);
-      expect(Math.hypot(huddle[id].x - 62, huddle[id].y - 50)).toBeLessThan(5);
+    const [mob, thank, off] = fullTimeStages(c, 95, "away", end.bodies);
+    const inTunnel = (p: {x: number; y: number}) => Math.abs(p.x - 50) < 2 && p.y > 100;
+    for (const id of r.lineups.away.filter((id) => off.targets[id])) {
+      // Mob each other, then in front of the away fans behind the right-hand goal, then off.
+      expect(Math.hypot(mob.targets[id].x - 62, mob.targets[id].y - 50)).toBeLessThan(5);
+      expect(thank.targets[id].x).toBeGreaterThan(95);
+      expect(inTunnel(off.targets[id])).toBe(true);
     }
-    for (const id of r.lineups.home.filter((id) => targets[id])) {
-      expect(Math.abs(targets[id].x - 50)).toBeLessThan(5);
-      expect(targets[id].y).toBeLessThan(6);
-    }
-    // A draw: both to their own fans.
-    const draw = fullTimeTargets(c, 95, null, end.bodies).targets;
-    expect(r.lineups.home.filter((id) => draw[id]).every((id) => draw[id].x < 5)).toBe(true);
+    // The losers go off while the winners thank their fans.
+    for (const id of r.lineups.home.filter((id) => off.targets[id])) expect(inTunnel(thank.targets[id])).toBe(true);
+    // A few seconds with the fans.
+    expect(thank.until - mob.until).toBeGreaterThanOrEqual(3000);
+    // A draw: both just walk off down the tunnel, without the stop at the fans.
+    const draw = fullTimeStages(c, 95, null, end.bodies);
+    expect(draw[1].until).toBe(draw[0].until);
+    expect([...r.lineups.home, ...r.lineups.away].filter((id) => draw[2].targets[id]).every((id) => inTunnel(draw[2].targets[id]))).toBe(true);
   });
 
   it("keeps everyone and the ball on the pitch", () => {

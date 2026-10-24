@@ -266,6 +266,37 @@ export function respondToBid(
   return "tr.newOffer";
 }
 
+/** Selling straight away instead of waiting for bids: the buyer only pays this share of the value. */
+export const QUICK_SALE_SHARE = 0.75;
+
+/**
+ * The best offer for one of the user's players right now: the league club
+ * that would pay most, up to its transfer budget. Null if nobody can make a
+ * fair offer (at least half the quick price) or the player can't be sold.
+ */
+export function quickSaleOffer(state: GameState, playerId: string): {clubId: string; fee: number} | null {
+  const p = state.players[playerId];
+  if (!p || p.clubId !== state.userClubId || p.loan) return null;
+  const price = Math.max(10_000, Math.round((p.value * QUICK_SALE_SHARE) / 10_000) * 10_000);
+  let best: {clubId: string; fee: number} | null = null;
+  for (const club of leagueClubs(state)) {
+    if (club.id === state.userClubId || clubPlayers(state, club.id).length >= SQUAD_MAX) continue;
+    const fee = Math.min(price, Math.floor(club.transferBudget / 10_000) * 10_000);
+    if (fee < price / 2) continue;
+    if (!best || fee > best.fee) best = {clubId: club.id, fee};
+  }
+  return best;
+}
+
+/** Sells one of the user's players at once to the best offer; an error key if nobody will buy. */
+export function quickSell(state: GameState, playerId: string): string | null {
+  const offer = quickSaleOffer(state, playerId);
+  if (!offer) return "pl.noBuyer";
+  aiSignTerms(state, state.players[playerId]);
+  completeTransfer(state, playerId, offer.clubId, offer.fee);
+  return null;
+}
+
 /** AI-to-AI and free agent signings get a straightforward contract. */
 function aiSignTerms(state: GameState, p: Player): void {
   const wage = expectedWage(p) * (1 + interest(p) * 0.2);
@@ -339,6 +370,7 @@ export function weeklyTransfers(state: GameState, rng: Rng): void {
         (p) =>
           p.clubId !== club.id &&
           !(p.clubId && state.clubs[p.clubId].guest) &&
+          !state.packChoice?.includes(p.id) &&
           !p.loan &&
           p.position === need &&
           p.age <= 32 &&

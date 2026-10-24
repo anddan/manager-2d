@@ -147,7 +147,8 @@ function ShotView({sp, role, taker, keeper, defenders, shooters, keepers, outcom
   const {t} = useT();
   const svgRef = useRef<SVGSVGElement>(null);
   const [drag, setDrag] = useState<{x: number; y: number} | null>(null);
-  const left = useCountdown(outcome, onAnswer, onDone, 2500);
+  // A penalty is over quickly: a shorter look at the result.
+  const left = useCountdown(outcome, onAnswer, onDone, sp.kind === "penalty" ? 1900 : 2200);
   const now = useFrameTime();
   // When the answer arrived, on the same clock.
   const [struck, setStruck] = useState<number | null>(null);
@@ -324,7 +325,7 @@ function ShotView({sp, role, taker, keeper, defenders, shooters, keepers, outcom
         <Crowd colors={[shooters.color, shooters.color2, keepers.color, keepers.color2, "#e2e8f0", "#475569"]} />
         <rect x={0} y={32} width={120} height={5} className="sp-boards" />
         {[8, 38, 68, 98].map((x) => (
-          <text key={x} x={x} y={35.6} className="sp-board-text">MANAGER 2D</text>
+          <text key={x} x={x} y={35.6} className="sp-board-text">FORZA MANAGER</text>
         ))}
 
         {/* Grass, striped and getting wider towards us */}
@@ -436,7 +437,7 @@ interface Placed {
 
 function CornerView({sp, taker, attackers = [], defenders = [], keeper, shooters, keepers, outcome, onAnswer, onDone}: Props) {
   const {t} = useT();
-  const left = useCountdown(outcome, onAnswer, onDone, 3000);
+  const left = useCountdown(outcome, onAnswer, onDone, 2700);
   const now = useFrameTime();
   const [struck, setStruck] = useState<number | null>(null);
   const nowRef = useRef(now);
@@ -598,7 +599,7 @@ function CornerView({sp, taker, attackers = [], defenders = [], keeper, shooters
         <Crowd colors={[shooters.color, shooters.color2, keepers.color, keepers.color2, "#e2e8f0", "#475569"]} />
         <rect x={0} y={30} width={120} height={4.5} className="sp-boards" />
         {[6, 36, 66, 96].map((x) => (
-          <text key={x} x={x} y={33.4} className="sp-board-text">MANAGER 2D</text>
+          <text key={x} x={x} y={33.4} className="sp-board-text">FORZA MANAGER</text>
         ))}
         <rect x={0} y={34.5} width={120} height={40.5} className="sp-grass" />
         {[34.5, 39, 44, 50, 57, 65].map((y, i, all) => i % 2 === 0 && (

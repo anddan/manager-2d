@@ -1,24 +1,68 @@
 import {useState} from "react";
-import {CUP_FROM_LEAGUE, CUP_WEEKS, ROUNDS} from "../../game/constants";
-import {CUP_STAGES} from "../../game/cup";
-import {currentCupStage, currentRound, isCupFixture} from "../../game/helpers";
+import {CUP_FROM_LEAGUE, CUP_WEEKS, SEASON_WEEKS} from "../../game/constants";
+import {CUP_STAGES, cupAlive} from "../../game/cup";
+import {cupFixturesInStage, currentCupStage, isCupFixture, roundInWeek} from "../../game/helpers";
 import type {Fixture} from "../../game/types";
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
 import {Card} from "../common";
 import {FlagIcon} from "../Flag";
 
+/** One week in the calendar: a league round or a Champions Cup round. */
+interface Matchday {
+  week: number;
+  title: string;
+  fixtures: Fixture[];
+  /** A cup round not drawn yet, that the user is still in. */
+  toBeDrawn?: boolean;
+}
+
+/**
+ * The season as a calendar, league rounds and cup weeks together. What's
+ * coming is on top, the next match first; below it what's been played,
+ * newest first.
+ */
 export function Fixtures() {
   const {t} = useT();
   const game = useGameState();
   const [onlyMine, setOnlyMine] = useState(true);
-  const now = currentRound(game) ?? 0;
-  const rounds = Array.from({length: ROUNDS}, (_, i) => i + 1);
   const mine = (f: Fixture) => f.homeId === game.userClubId || f.awayId === game.userClubId;
+  const inCup = cupAlive(game).includes(game.userClubId);
+
+  const days: Matchday[] = [];
+  for (let week = 1; week <= SEASON_WEEKS; week++) {
+    const round = roundInWeek(week);
+    const stage = CUP_WEEKS.indexOf(week);
+    if (round !== null) {
+      days.push({week, title: t("ov.round", {round}), fixtures: game.fixtures.filter((f) => f.round === round && (!onlyMine || mine(f)))});
+    } else if (stage >= 0) {
+      const all = cupFixturesInStage(game, stage);
+      days.push({
+        week,
+        title: `🏆 ${t("cup.name")} · ${t(CUP_STAGES[stage])}`,
+        fixtures: all.filter((f) => !onlyMine || mine(f)),
+        toBeDrawn: all.length === 0 && inCup,
+      });
+    }
+  }
+  const shown = days.filter((d) => d.fixtures.length > 0 || d.toBeDrawn);
+  const upcoming = shown.filter((d) => d.week >= game.week);
+  const played = shown.filter((d) => d.week < game.week).reverse();
+  const next = upcoming.find((d) => d.fixtures.some(mine) || d.toBeDrawn);
+
+  const day = (d: Matchday) => (
+    <div key={d.week} className={d === next ? "round current" : "round"}>
+      <h3>
+        {d.title} <small className="muted">· {t("cup.week", {week: d.week})}</small>
+        {d === next && <span className="next-tag">{d.week === game.week ? t("fx.thisWeek") : t("fx.next")}</span>}
+      </h3>
+      {d.toBeDrawn && d.fixtures.length === 0 && <p className="muted small">{t("fx.toBeDrawn")}</p>}
+      {d.fixtures.map((f) => <FixtureRow key={f.id} f={f} />)}
+    </div>
+  );
 
   return (
     <>
-      <CupCard />
       <Card
         title={t("nav.fixtures")}
         actions={
@@ -28,14 +72,13 @@ export function Fixtures() {
         }
       >
         <div className="fixture-list">
-          {rounds.map((round) => (
-            <div key={round} className={round === now ? "round current" : "round"}>
-              <h3>{t("ov.round", {round})}</h3>
-              {game.fixtures.filter((f) => f.round === round && (!onlyMine || mine(f))).map((f) => <FixtureRow key={f.id} f={f} />)}
-            </div>
-          ))}
+          {upcoming.length === 0 && <p className="muted">{t("fx.seasonDone")}</p>}
+          {upcoming.map(day)}
+          {played.length > 0 && <h4 className="fx-divider">{t("fx.played")}</h4>}
+          {played.map(day)}
         </div>
       </Card>
+      <CupCard />
     </>
   );
 }

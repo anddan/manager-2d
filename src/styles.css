@@ -1,4 +1,4 @@
-/* Manager 2D. A fantasy-league look: deep navy chrome, signal-yellow
+/* Forza Manager. A fantasy-league look: deep navy chrome, signal-yellow
    highlights, bold condensed headings and shirts with name plates on the
    pitch. Dark by default, light when the system asks for it.
    Layout: sidebar on desktop, bottom nav on mobile. */
@@ -11,6 +11,12 @@
   --muted: #95a1bd;
   --accent: #ffd400;
   --accent-ink: #111827;
+  /* The top bar's pills: its navy with a touch of white. */
+  --btn-navy: #1e2741;
+  --btn-navy-hover: #283352;
+  --btn-edge: #3a4560;
+  --btn-gold: #d4a017;
+  --btn-gold-ink: #fcd34d;
   /* Accent used as text or a thin line, readable on the surface. */
   --accent-text: #ffd400;
   --chrome: #0b1430;
@@ -74,15 +80,16 @@ h3 { font-size: 1rem; margin-top: 1rem; color: var(--muted); text-transform: upp
   display: flex; flex-direction: column; padding: 12px 8px; gap: 2px; position: sticky; top: 0; height: 100vh; overflow-y: auto;
 }
 .brand {
-  font-family: var(--display); font-weight: 800; font-size: 1.5rem; padding: 8px 10px 16px; text-transform: uppercase;
-  letter-spacing: 0.02em; color: var(--accent);
+  font-family: var(--display); font-weight: 800; font-size: 1.3rem; padding: 8px 10px 16px; text-transform: uppercase;
+  letter-spacing: 0.02em; color: var(--accent); white-space: nowrap;
 }
 .nav-item {
   display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: 0; background: none; color: inherit;
   border-radius: 8px; cursor: pointer; text-align: left; position: relative; font-weight: 600;
 }
 .nav-item:hover { background: rgb(255 255 255 / 0.07); }
-.nav-item.active { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+/* The chosen page: the same pill look as the buttons. */
+.nav-item.active { background: var(--btn-navy); color: #fff; box-shadow: inset 0 0 0 1px var(--btn-edge); font-weight: 700; }
 .nav-icon { width: 22px; text-align: center; }
 .badge {
   margin-left: auto; background: var(--bad); color: #fff; border-radius: 999px; font-size: 0.72rem;
@@ -91,9 +98,14 @@ h3 { font-size: 1rem; margin-top: 1rem; color: var(--muted); text-transform: upp
 
 .topbar {
   display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: var(--chrome); color: var(--chrome-ink);
-  border-bottom: 3px solid var(--accent); position: sticky; top: 0; z-index: 10; flex-wrap: wrap;
+  border-bottom: 3px solid var(--accent); position: sticky; top: 0; z-index: 10; flex-wrap: nowrap;
 }
-.topbar-club { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.topbar-id { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 0 1 auto; }
+.topbar-club { display: flex; align-items: center; gap: 10px; min-width: 0; border: 0; background: none; color: inherit; padding: 0; cursor: pointer; text-align: left; font: inherit; }
+.topbar-club-text { min-width: 0; }
+.topbar-club strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topbar-stats .chip, .topbar-diamonds { white-space: nowrap; }
+.topbar-manager { flex-shrink: 0; }
 .topbar-club strong { font-family: var(--display); font-size: 1.2rem; text-transform: uppercase; letter-spacing: 0.02em; }
 .topbar-club small { display: block; color: rgb(255 255 255 / 0.65); }
 .topbar .chip { background: rgb(255 255 255 / 0.08); border-color: rgb(255 255 255 / 0.15); color: #fff; }
@@ -117,11 +129,15 @@ h3 { font-size: 1rem; margin-top: 1rem; color: var(--muted); text-transform: upp
   .nav-item { flex-direction: column; gap: 2px; font-size: 0.68rem; padding: 6px 8px; min-width: 64px; align-items: center; }
   .nav-icon { font-size: 1.15rem; }
   .badge { position: absolute; top: 2px; right: 6px; margin: 0; }
-  .topbar { padding: 8px 12px; gap: 8px; }
-  .topbar-manager span { display: none; }
+  .topbar { gap: 8px; padding: 8px 12px; }
+  .topbar-club strong { font-size: 1rem; }
   .topbar-manager { padding: 2px; }
-  .topbar-stats { margin-left: 0; order: 3; width: 100%; }
-  .continue { margin-left: auto; }
+  .topbar-manager span { display: none; }
+  .topbar .chip { padding: 4px 8px; font-size: 0.8rem; }
+  .topbar .timer { margin-left: 3px; font-size: 0.72rem; }
+  .continue { padding: 7px 10px; font-size: 0.85rem; }
+  .table { font-size: 0.82rem; }
+  .table th, .table td { padding: 6px 5px; }
   .content { padding: 12px; padding-bottom: 110px; }
 }
 
@@ -148,7 +164,9 @@ h3 { font-size: 1rem; margin-top: 1rem; color: var(--muted); text-transform: upp
 }
 .btn:hover:not(:disabled) { border-color: var(--accent); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+/* Main buttons: like the money pill in the top bar (plain navy, white text). */
+.btn.primary { background: var(--btn-navy); color: #fff; border: 1px solid var(--btn-edge); font-weight: 800; }
+.btn.primary:hover:not(:disabled) { background: var(--btn-navy-hover); border-color: var(--btn-gold); }
 .btn.danger { background: var(--bad); color: #fff; border-color: var(--bad); }
 .btn.small { padding: 4px 10px; font-size: 0.85rem; }
 .btn.big { padding: 12px 20px; font-size: 1.05rem; width: 100%; }
@@ -158,7 +176,7 @@ h3 { font-size: 1rem; margin-top: 1rem; color: var(--muted); text-transform: upp
   border: 1px solid var(--border); background: var(--surface-2); padding: 5px 11px; border-radius: 999px;
   cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center;
 }
-.chip.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.chip.active { background: var(--btn-navy); color: #fff; border-color: var(--btn-edge); font-weight: 700; }
 .icon-btn { border: 0; background: none; font-size: 1.1rem; cursor: pointer; padding: 4px 8px; }
 .link { border: 0; background: none; padding: 0; color: inherit; cursor: pointer; text-decoration: underline; text-decoration-color: var(--border); text-underline-offset: 3px; text-align: left; }
 .link:hover { text-decoration-color: var(--accent); }
@@ -192,7 +210,10 @@ input[type="number"], input:not([type]), input[type="text"], select {
 .table tr.me td { font-weight: 700; }
 .table tr.warn-row td { background: color-mix(in srgb, var(--mid) 10%, transparent); }
 .th-btn { border: 0; background: none; padding: 0; cursor: pointer; color: inherit; font-weight: inherit; }
-.name-cell { display: flex; align-items: center; gap: 6px; }
+/* A table cell must stay a table cell (as flex it shifts the row's border): line things up inline instead. */
+.name-cell { white-space: nowrap; }
+.name-cell > * { vertical-align: middle; }
+.name-cell > * + * { margin-left: 6px; }
 
 /* Small pieces */
 .crest {
@@ -250,19 +271,25 @@ input[type="number"], input:not([type]), input[type="text"], select {
 
 /* Modal */
 .modal-backdrop {
-  position: fixed; inset: 0; background: rgb(0 0 0 / 0.55); display: grid; place-items: center; z-index: 50; padding: 16px;
+  /* Dialogs open at the top and grow downwards, rather than re-centring as they fill. */
+  position: fixed; inset: 0; background: rgb(0 0 0 / 0.55); display: grid; place-items: start center; z-index: 50; padding: 16px;
+  overflow-y: auto;
 }
 .modal {
-  background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow);
-  width: min(560px, 100%); max-height: calc(100vh - 32px); display: flex; flex-direction: column;
+  background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow);
+  width: min(560px, 100%); max-height: calc(100vh - 32px); display: flex; flex-direction: column; min-width: 0; max-width: 100%;
 }
 .modal-wide { width: min(920px, 100%); }
 .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); gap: 8px; }
 .modal-head h2 { margin: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .modal-body { padding: 14px 16px; overflow-y: auto; }
 @media (max-width: 599px) {
-  .modal-backdrop { padding: 0; align-items: end; }
-  .modal { border-radius: 14px 14px 0 0; max-height: 92vh; }
+  /* Full screen on phones, never wider than it. */
+  .modal-backdrop { padding: 0; place-items: stretch; }
+  .modal, .modal-wide { width: 100%; border-radius: 0; height: 100dvh; max-height: 100dvh; border: 0; }
+  .modal-body { padding: 12px; }
+  .scoreboard { gap: 6px; flex-wrap: wrap; }
+  .score { font-size: 1.6rem; }
 }
 
 /* Player card */
@@ -460,8 +487,8 @@ button.pick { grid-template-columns: auto 1fr auto auto 60px; }
 
 /* The manager shouting from the touchline (bottom edge, by their own half) */
 .shout { position: absolute; bottom: 4px; display: flex; align-items: flex-end; gap: 4px; pointer-events: none; max-width: 70%; animation: pop-in 0.25s ease-out; }
-.shout.home { left: 22%; }
-.shout.away { right: 22%; flex-direction: row-reverse; }
+.shout.home { right: 52%; flex-direction: row-reverse; }
+.shout.away { left: 52%; }
 .shout-manager { font-size: 1.6rem; filter: drop-shadow(0 2px 2px rgb(0 0 0 / 0.5)); }
 .shout-bubble {
   background: #fff; color: #111; border-radius: 12px; padding: 6px 10px; font-weight: 700; font-size: 0.85rem;
@@ -773,3 +800,202 @@ button.pick { grid-template-columns: auto 1fr auto auto 60px; }
 /* After the final whistle the winners jump for joy. */
 .dot.celebrate .body { animation: jump-joy 0.45s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: center; }
 @keyframes jump-joy { from { transform: translateY(0) scale(1); } to { transform: translateY(-0.9px) scale(1.12); } }
+
+/* Team talk after the match */
+.tt-verdict { font-weight: 700; margin: 0 0 10px; }
+.tt-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
+.tt-option { display: grid; gap: 3px; text-align: left; padding: 10px; border-radius: 10px; border: 2px solid var(--border); background: var(--surface-2); color: inherit; cursor: pointer; font: inherit; }
+.tt-option small { opacity: 0.8; line-height: 1.3; }
+.tt-option.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, var(--surface-2)); }
+.tt-players { display: grid; gap: 4px; max-height: 220px; overflow-y: auto; margin-bottom: 10px; }
+.tt-player { display: flex; align-items: center; gap: 6px; padding: 3px 6px; border-radius: 8px; }
+.tt-player.active { background: var(--surface-2); }
+.tt-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Game over: the manager walks off down the tunnel. */
+.game-over { position: fixed; inset: 0; z-index: 100; display: grid; grid-template-rows: minmax(0, 1fr) auto; background: #020617; color: #f8fafc; }
+.game-over-scene { width: 100%; height: 100%; max-height: 70vh; }
+.go-text { font-size: 18px; font-weight: 900; fill: #ef4444; text-anchor: middle; letter-spacing: 3px; font-family: inherit; animation: fade-in 1.2s ease-out both; }
+.go-walker { animation: walk-away 7s ease-in forwards; transform-origin: 100px 120px; transform-box: view-box; }
+@keyframes walk-away { from { transform: translateY(0) scale(1); opacity: 1; } to { transform: translateY(-38px) scale(0.35); opacity: 0.15; } }
+.go-leg { animation: step 0.6s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: top; }
+.go-leg.right { animation-delay: 0.3s; }
+@keyframes step { from { transform: scaleY(1); } to { transform: scaleY(0.85); } }
+.game-over-body { padding: 16px; text-align: center; display: grid; gap: 8px; justify-items: center; }
+.game-over-body h1 { margin: 0; font-size: 1.5rem; }
+.game-over-body p { margin: 0; max-width: 520px; }
+
+/* Trophy lift */
+.trophy-overlay { position: fixed; inset: 0; z-index: 90; display: grid; align-content: center; justify-items: center; gap: 10px; padding: 16px; background: rgb(2 6 23 / 0.92); color: #f8fafc; text-align: center; overflow: hidden; }
+.trophy-title { margin: 0; font-size: clamp(1.3rem, 5vw, 2.2rem); color: #fde047; animation: pop-in 0.6s ease-out both; }
+.trophy-scene { width: min(100%, 760px); border-radius: 12px; }
+.trophy-podium { font-size: 4px; font-weight: 900; text-anchor: middle; fill: #0b1324; }
+.trophy-jump { animation: trophy-jump 0.7s ease-in-out infinite alternate; }
+.trophy-captain { animation: trophy-lift 1.4s ease-in-out infinite alternate; }
+@keyframes trophy-jump { from { transform: translateY(0); } to { transform: translateY(-3px); } }
+@keyframes trophy-lift { from { transform: translateY(0); } to { transform: translateY(-5px); } }
+.trophy-cup { filter: drop-shadow(0 0 3px rgb(253 224 71 / 0.9)); }
+.trophy-text { margin: 0; max-width: 520px; }
+
+/* Manager profile */
+.mgr-head { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+.mgr-head h3 { margin: 0; }
+.mgr-head p { margin: 2px 0 0; }
+.mgr-trophies, .mgr-career { list-style: none; padding: 0; margin: 0 0 12px; display: grid; gap: 4px; }
+.mgr-trophies li { font-weight: 700; }
+
+/* A played result: the win / draw / loss colour, with white text on it (after .fx-score, so it wins). */
+.fx-score.form-W { background: var(--good); color: #fff; }
+.fx-score.form-D { background: #6b7280; color: #fff; }
+.fx-score.form-L { background: var(--bad); color: #fff; }
+
+/* Phones: the player card centred, the details full width below it, and lists that fit. */
+@media (max-width: 599px) {
+  .player-top { flex-direction: column; align-items: center; }
+  .player-top .player-head { width: 100%; min-width: 0; justify-content: center; text-align: center; }
+  .player-top .player-head .nickname { justify-content: center; }
+  .player-grid { grid-template-columns: 1fr; }
+}
+
+/* Top bar: everything on one row whenever it fits; the diamonds give way first.
+   Phones get two rows: club, manager top right; then money, energy and play (no diamonds). */
+@media (min-width: 900px) and (max-width: 1039px), (min-width: 600px) and (max-width: 779px) {
+  .topbar-diamonds { display: none; }
+}
+@media (max-width: 599px) {
+  /* Phones: club on the left with the manager top right; money, energy and play below. No diamonds. */
+  .topbar {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "club manager" "stats play";
+  }
+  .topbar-id { display: contents; }
+  .topbar-club { grid-area: club; }
+  .topbar-manager { grid-area: manager; justify-self: end; }
+  .topbar-diamonds { display: none; }
+  .topbar-stats { grid-area: stats; margin-left: 0; flex-wrap: nowrap; min-width: 0; }
+  .continue { grid-area: play; }
+}
+
+/* Tactics: dropdowns, and dragging players */
+.tac-pickers { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 6px; }
+.tac-pickers select { width: 100%; }
+.pitch-board .slot { touch-action: none; }
+.slot.drop .plate { outline: 2px dashed var(--accent); outline-offset: 2px; }
+.drag-ghost { position: fixed; z-index: 200; transform: translate(-50%, -130%); pointer-events: none; background: var(--accent); color: #0b1430; font-weight: 800; padding: 4px 10px; border-radius: 999px; box-shadow: var(--shadow); }
+
+/* Match controls: drawn icons, all alike */
+.ctl-icon { width: 14px; height: 14px; fill: currentColor; vertical-align: -2px; }
+
+/* The tunnel and dugouts on the near touchline */
+.dugout { fill: rgb(15 23 42 / 0.85); stroke: rgb(255 255 255 / 0.35); stroke-width: 0.15; }
+.dugout-roof { fill: rgb(148 163 184 / 0.55); }
+.tunnel { fill: #020617; stroke: rgb(255 255 255 / 0.3); stroke-width: 0.15; }
+.tunnel-light { fill: rgb(254 243 199 / 0.18); }
+
+/* Fixtures calendar */
+.next-tag { margin-left: 8px; padding: 2px 8px; border-radius: 999px; background: var(--accent); color: #0b1430; font-size: 0.72rem; vertical-align: middle; }
+.fx-divider { margin: 14px 0 0; padding-top: 10px; border-top: 2px solid var(--border); color: var(--muted); }
+
+/* Penalty shoot-out */
+.shootout { display: grid; gap: 8px; }
+.shootout-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 1.1rem; }
+.shootout-score { font-weight: 800; font-variant-numeric: tabular-nums; }
+.shootout-row { display: flex; align-items: center; gap: 6px; }
+.shootout-row strong { min-width: 40px; }
+.pen { width: 22px; height: 22px; display: inline-grid; place-items: center; border-radius: 50%; background: var(--surface-2); font-weight: 800; font-size: 0.8rem; }
+.pen.scored { background: var(--good); color: #fff; }
+.pen.missed { background: var(--bad); color: #fff; }
+.shootout-result { font-size: 1.2rem; font-weight: 800; text-align: center; margin: 12px 0; }
+.score-pens { font-weight: 700; color: var(--muted); }
+.tt-actions { justify-content: flex-end; margin-top: 8px; }
+
+/* Player packs */
+.ppacks { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.ppack { display: grid; gap: 6px; justify-items: center; align-content: start; text-align: center; padding: 14px 10px; border-radius: 12px; color: #1f1306; box-shadow: inset 0 0 0 2px rgb(255 255 255 / 0.35); }
+.ppack strong { font-family: var(--display); font-size: 1.3rem; text-transform: uppercase; }
+.ppack-range { font-weight: 700; opacity: 0.85; }
+.ppack-note { font-size: 0.78rem; opacity: 0.85; }
+.ppack-bronze { background: linear-gradient(160deg, #e2a46b, #9a5b2c); }
+.ppack-silver { background: linear-gradient(160deg, #f1f5f9, #94a3b8); }
+.ppack-gold { background: linear-gradient(160deg, #fde68a, #d4a017); }
+.ppack-special { background: linear-gradient(160deg, #a78bfa, #4c1d95); color: #fff; }
+.ppack-diamond { background: linear-gradient(160deg, #a5f3fc, #0e7490 60%, #164e63); color: #fff; }
+/* Glass buttons on the packs. */
+.ppack-btn {
+  margin-top: auto; padding: 7px 14px; border-radius: 999px; font: inherit; font-weight: 800; color: inherit; cursor: pointer;
+  background: rgb(255 255 255 / 0.22); border: 1px solid rgb(255 255 255 / 0.6); backdrop-filter: blur(6px);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.5), 0 2px 8px rgb(0 0 0 / 0.15); transition: background 0.15s, transform 0.15s;
+}
+.ppack-btn:hover:not(:disabled) { background: rgb(255 255 255 / 0.38); transform: translateY(-1px); }
+.ppack-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.pack-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; justify-items: center; }
+.pack-choice { display: grid; gap: 8px; justify-items: center; }
+.pack-reveal { display: grid; justify-items: center; gap: 10px; text-align: center; }
+.pack-flip { animation: pack-flip 0.9s ease-out both; perspective: 600px; }
+@keyframes pack-flip { from { transform: rotateY(90deg) scale(0.6); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .pack-flip { animation: none; } }
+.quick-sale { margin-top: 10px; display: grid; gap: 6px; justify-items: start; }
+
+/* A pack's card, revealed step by step: a dark card that glows, then each part pops in. */
+.fut-card.tier-hidden { --card-1: #1e293b; --card-2: #020617; --card-ink: #e2e8f0; animation: card-glow 1.2s ease-in-out infinite alternate; }
+@keyframes card-glow { from { filter: drop-shadow(0 0 2px rgb(253 224 71 / 0.3)); } to { filter: drop-shadow(0 0 14px rgb(253 224 71 / 0.85)); } }
+.fut-card.staged .step { opacity: 0; transform: scale(0.3); }
+.fut-card.staged .step.shown { animation: step-pop 0.55s cubic-bezier(0.2, 1.6, 0.4, 1) both; }
+@keyframes step-pop {
+  0% { opacity: 0; transform: scale(0.3); filter: brightness(2.5) drop-shadow(0 0 8px #fff); }
+  60% { opacity: 1; transform: scale(1.25); }
+  100% { opacity: 1; transform: none; filter: none; }
+}
+.fut-card.staged:not(.tier-hidden) { animation: card-flash 0.6s ease-out; }
+@keyframes card-flash { from { filter: brightness(2) drop-shadow(0 0 18px #fde047); } to { filter: none; } }
+.fut-flag { display: inline-flex; }
+.pack-got { animation: pop-in 0.4s ease-out both; }
+@media (prefers-reduced-motion: reduce) { .fut-card.staged .step.shown, .fut-card.tier-hidden, .fut-card.staged:not(.tier-hidden) { animation: none; opacity: 1; transform: none; } }
+
+/* Daily tasks */
+.daily-tasks { list-style: none; padding: 0; margin: 0 0 10px; display: grid; gap: 8px; }
+.daily-task { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); }
+.daily-task.claimed { opacity: 0.6; }
+.daily-icon { font-size: 1.4rem; }
+.daily-text { flex: 1; min-width: 0; display: grid; gap: 3px; font-weight: 600; }
+.daily-bar { height: 6px; border-radius: 999px; background: var(--border); overflow: hidden; }
+.daily-bar span { display: block; height: 100%; background: var(--good); transition: width 0.3s; }
+.daily-done { font-weight: 900; color: var(--good); font-size: 1.2rem; }
+.daily-reward { font-weight: 700; white-space: nowrap; }
+.daily-bonus { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 8px 10px; border-radius: 10px; border: 2px dashed var(--accent); font-weight: 700; margin-bottom: 6px; }
+
+/* The (pretend) advert */
+.video-ad { position: fixed; inset: 0; z-index: 150; display: grid; grid-template-rows: auto 1fr auto; background: #020617; color: #f8fafc; padding: 14px; gap: 12px; }
+.video-top { display: flex; justify-content: space-between; align-items: center; }
+.video-label { background: #fde047; color: #0b1430; font-weight: 900; padding: 3px 10px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+.video-timer { font-variant-numeric: tabular-nums; opacity: 0.85; }
+.video-screen { display: grid; place-content: center; justify-items: center; gap: 14px; text-align: center; border-radius: 14px; background: radial-gradient(circle at 50% 40%, #1e3a8a, #020617 70%); padding: 20px; }
+.video-ball { font-size: 4rem; animation: video-spin 1.6s linear infinite; }
+@keyframes video-spin { to { transform: rotate(360deg); } }
+.video-mock { max-width: 420px; margin: 0; }
+.video-progress { width: min(420px, 80vw); height: 6px; border-radius: 999px; background: rgb(255 255 255 / 0.2); overflow: hidden; }
+.video-progress span { display: block; height: 100%; background: #fde047; transition: width 1s linear; }
+.video-actions { display: flex; justify-content: center; }
+@media (prefers-reduced-motion: reduce) { .video-ball { animation: none; } }
+.daily-tick { display: inline-grid; place-items: center; width: 1.4em; height: 1.4em; margin-left: 6px; border-radius: 50%; background: var(--good); color: #fff; font-size: 0.85em; vertical-align: middle; }
+.daily-folded .muted { margin: 0; }
+/* "Till slutet": just the icon when the controls row is too narrow for the text. */
+.match-controls { container-type: inline-size; }
+@container (max-width: 520px) { .skip-label { display: none; } }
+/* The diamond balance at the top of the shop. */
+.shop-balance {
+  justify-self: start; display: inline-flex; align-items: center; gap: 10px; padding: 5px 14px; border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 55%, transparent); border: 1px solid var(--border); backdrop-filter: blur(6px);
+}
+.shop-balance-label { font-weight: 600; color: var(--muted); font-size: 0.9rem; }
+.shop-balance strong { font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+
+/* League table: number columns right-aligned with their headers. */
+.table.league th:not(:nth-child(2)):not(:last-child) { text-align: right; }
+.table.leaders td:first-child { width: 2em; color: var(--muted); }
+/* The play / next week button: a touch lighter than the pills, like the manager's avatar. */
+.btn.primary.continue { background: rgb(255 255 255 / 0.12); border-color: rgb(255 255 255 / 0.2); color: #fff; }
+.btn.primary.continue:hover:not(:disabled) { background: rgb(255 255 255 / 0.18); }
+/* Every control in the match row as tall as the tallest (play / pause / fast-forward included). */
+.match-controls { align-items: stretch; }
+.match-controls .speed-group .chip { padding: 6px 12px; }

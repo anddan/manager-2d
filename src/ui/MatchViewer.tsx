@@ -17,13 +17,17 @@
 // Goals stop play for a celebration and a kick-off from the centre spot;
 // penalties, free kicks and corners stop play while the players line up.
 import {memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode} from "react";
-import {fullName, listName, shortName} from "../game/helpers";
+import {addMessage, findFixture, fullName, isCupFixture, listName, playerName, shortName} from "../game/helpers";
+import {shootoutOver} from "../game/cup";
+import {WIN_VIDEO_DIAMONDS, taskProgress, videoAfterWin} from "../game/daily";
+import {Rng} from "../game/rng";
+import {matchVerdict, PLAYER_TALKS, TEAM_TALKS, teamTalk, type PlayerTalk, type TeamTalk} from "../game/morale";
 import {boardAt, clockLabel, matchLength} from "../game/clock";
 import {FORMATIONS, type Slot} from "../game/constants";
 import {LiveMatch} from "../game/live";
 import {distance, fromSide, kickoffSpot, progressFor, teamSpot, type Point} from "../game/pitch";
 import {effectiveRating, overall, teamOvr} from "../game/ratings";
-import {aerial, cornerAttacker, type SetPiece, type SetPieceInput, type SetPieceOutcome} from "../game/setpieces";
+import {aerial, cornerAttacker, resolveSetPiece, type SetPiece, type SetPieceInput, type SetPieceOutcome} from "../game/setpieces";
 import {cornerZone} from "../game/match";
 import {
   INSTRUCTIONS,
@@ -34,6 +38,7 @@ import {
   type InstructionLevel,
   type MatchEvent,
   type MatchReport,
+  type Player,
   type Side,
 } from "../game/types";
 import {finishWeek} from "../game/week";
@@ -43,8 +48,10 @@ import {Avatar, ManagerAvatar, defaultManagerLook} from "./Avatar";
 import {Football} from "./Ball";
 import {Bar, Flag, Modal, PosBadge} from "./common";
 import {SetPieceView} from "./SetPieceView";
+import {VideoAd} from "./VideoAd";
 
-const SPEEDS = [1, 2, 8];
+/** Fast-forward goes up one step per press, to this. */
+const MAX_SPEED = 5;
 /** Real milliseconds per match minute at 1x. */
 const MS_PER_MINUTE = 1200;
 /** Physics step in match minutes. */
@@ -887,6 +894,128 @@ function useZoom(zoomedIn: boolean): string {
  * their club colours. Drawn once per match (it's hundreds of shapes, so it
  * mustn't redraw with every frame of play); only the cheering class changes.
  */
+/** Penalty takers in order: the designated taker first, then the best finishers. */
+function shootoutTakers(players: Player[], designated?: string): Player[] {
+  const outfield = players.filter((p) => p.position !== "GK").sort((a, b) => b.attrs.finishing + b.attrs.technique / 2 - (a.attrs.finishing + a.attrs.technique / 2));
+  const first = outfield.find((p) => p.id === designated);
+  return first ? [first, ...outfield.filter((p) => p !== first)] : outfield;
+}
+
+/**
+ * The shoot-out after a level cup tie, kick by kick, home first: the user
+ * aims their side's kicks and dives for the other side's, in the same view as
+ * penalties in the match. Five each, then sudden death; it stops as soon as
+ * it's decided.
+ */
+function Shootout({report, seed, userSide, onDone}: {report: MatchReport; seed: number; userSide: Side; onDone: (score: [number, number]) => void}) {
+  const {t} = useT();
+  const game = useGameState();
+  const home = game.clubs[report.homeId];
+  const away = game.clubs[report.awayId];
+  const end = matchLength(report);
+  const onPitch = (side: Side) => [...onPitchAt(report, side, end).values()].map((id) => game.players[id]).filter(Boolean);
+  const takers = {home: shootoutTakers(onPitch("home"), home.roles?.penalties), away: shootoutTakers(onPitch("away"), away.roles?.penalties)};
+  const keepers = {home: onPitch("home").find((p) => p.position === "GK"), away: onPitch("away").find((p) => p.position === "GK")};
+  // Scored or not, kick by kick (home, away, home, ...).
+  const [kicks, setKicks] = useState<boolean[]>([]);
+  const [outcome, setOutcome] = useState<SetPieceOutcome | undefined>();
+  const scoreOf = (list: boolean[]): [number, number] => [list.filter((g, i) => g && i % 2 === 0).length, list.filter((g, i) => g && i % 2 === 1).length];
+  const score = scoreOf(kicks);
+  const over = shootoutOver(score, [Math.ceil(kicks.length / 2), Math.floor(kicks.length / 2)]);
+  const k = kicks.length;
+  const side: Side = k % 2 === 0 ? "home" : "away";
+  const other: Side = side === "home" ? "away" : "home";
+  const taker = takers[side][Math.floor(k / 2) % Math.max(1, takers[side].length)];
+  const keeper = keepers[other];
+  const sp: SetPiece = {index: 1000 + k, kind: "penalty", minute: Math.ceil(end) + 1, side, takerId: taker?.id ?? "", keeperId: keeper?.id, wallSide: 1, spot: side === "home" ? {x: 89.5, y: 50} : {x: 10.5, y: 50}};
+
+  // Decided: show the final score a moment, then back to the pitch.
+  useEffect(() => {
+    if (!over) return;
+    const id = setTimeout(() => onDone(score), 1800);
+    return () => clearTimeout(id);
+  }, [over]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const dots = (s: Side) => {
+    const mine = kicks.filter((_, i) => i % 2 === (s === "home" ? 0 : 1));
+    const pending = Math.max(0, 5 - mine.length);
+    return (
+      <div className="shootout-row">
+        <span className="crest tiny" style={{background: (s === "home" ? home : away).color}} /> <strong>{(s === "home" ? home : away).short}</strong>
+        {mine.map((g, i) => <span key={i} className={g ? "pen scored" : "pen missed"}>{g ? "✓" : "✗"}</span>)}
+        {Array.from({length: pending}, (_, i) => <span key={"p" + i} className="pen">○</span>)}
+      </div>
+    );
+  };
+
+  return (
+    <div className="shootout">
+      <div className="shootout-head">
+        <strong>⚽ {t("so.title")}</strong>
+        <span className="shootout-score">{home.short} {score[0]} – {score[1]} {away.short}</span>
+      </div>
+      {dots("home")}
+      {dots("away")}
+      {over ? (
+        <p className="shootout-result">{t((score[0] > score[1]) === (userSide === "home") ? "so.won" : "so.lost", {h: score[0], a: score[1]})}</p>
+      ) : taker ? (
+        <SetPieceView
+          key={k}
+          sp={sp}
+          role={side === userSide ? "shooter" : "keeper"}
+          taker={taker}
+          keeper={keeper}
+          shooters={side === "home" ? home : away}
+          keepers={side === "home" ? away : home}
+          outcome={outcome}
+          onAnswer={(input) => setOutcome(resolveSetPiece(new Rng(seed + 7919 * (k + 1)), sp, input, taker, keeper))}
+          onDone={() => {
+            setKicks((list) => [...list, outcome?.result === "goal"]);
+            setOutcome(undefined);
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/** Pause, play and fast-forward, drawn alike (emoji differ between systems). */
+function ControlIcon({kind}: {kind: "pause" | "play" | "forward"}) {
+  return (
+    <svg className="ctl-icon" viewBox="0 0 16 16" aria-hidden>
+      {kind === "pause" && <path d="M4 3h3v10H4zM9 3h3v10H9z" />}
+      {kind === "play" && <path d="M4 2.5l9 5.5-9 5.5z" />}
+      {kind === "forward" && <path d="M1.5 3l6.5 5-6.5 5zM8 3l6.5 5L8 13z" />}
+    </svg>
+  );
+}
+
+/**
+ * The players' tunnel in the middle of the near touchline, with a dugout on
+ * each side of it: home on the left, away on the right. Players walk off
+ * down the tunnel; the managers shout from the dugouts.
+ */
+const Dugouts = memo(function Dugouts({home, away}: {home: Club; away: Club}) {
+  const dugout = (x: number, club: Club) => (
+    <g>
+      <rect x={x} y={69.2} width={10} height={3.6} rx={0.8} className="dugout" />
+      {Array.from({length: 7}, (_, i) => (
+        <rect key={i} x={x + 0.8 + i * 1.25} y={70.9} width={0.95} height={1.1} rx={0.25} fill={club.color} stroke={club.color2} strokeWidth={0.12} />
+      ))}
+      <rect x={x} y={69.2} width={10} height={1.1} rx={0.5} className="dugout-roof" />
+    </g>
+  );
+  return (
+    <g aria-hidden>
+      {dugout(39.5, home)}
+      {dugout(55.5, away)}
+      {/* The tunnel: a dark mouth into the stand, lit from inside. */}
+      <path d="M50 74 L50.4 69 Q52.5 67.9 54.6 69 L55 74 Z" className="tunnel" />
+      <path d="M51.1 74 L51.3 69.6 Q52.5 69 53.7 69.6 L53.9 74 Z" className="tunnel-light" />
+    </g>
+  );
+});
+
 const Stands = memo(function Stands({home, away, cheering, boards}: {home: Club; away: Club; cheering: Side | null; boards: string}) {
   const fans = useMemo(() => {
     const spots: {x: number; y: number; side: Side}[] = [];
@@ -948,23 +1077,91 @@ export function LiveMatchViewer() {
     }
     return m;
   });
+  const notify = useGame((s) => s.notify);
   // Closing early lets the computer decide the rest; either way the week goes on.
-  const finish = () => {
+  // The team talk comes after the match is counted (it changes their mood, not the result).
+  const finish = (words?: Words) => {
     live.playOut();
-    act((g, rng) => {
+    const said = act((g, rng) => {
       // Includes substitutions the assistant made for injuries while skipping.
       if (g.liveMatch) g.liveMatch.commands = live.allCommands();
-      finishWeek(g, rng);
+      const report = finishWeek(g, rng);
+      if (!words || !report) return null;
+      const res = teamTalk(g, rng, report, words.talk, words.single);
+      taskProgress(g, "talk");
+      if (res.player) {
+        addMessage(g, {kind: "player", key: res.player.key, params: {name: playerName(g, res.player.id)}, action: {type: "player", playerId: res.player.id}});
+      }
+      return res;
     });
+    if (said) notify(said.worn ? "tt.worn" : said.key, {}, said.fit > 0 ? "good" : said.fit < 0 ? "error" : "info");
   };
-  return <MatchScreen report={live.report} live={live} onClose={finish} onFinish={finish} />;
+  return <MatchScreen report={live.report} live={live} onClose={() => finish()} onFinish={finish} />;
+}
+
+/** What the manager says after the match. */
+interface Words {
+  talk: TeamTalk;
+  single?: {playerId: string; talk: PlayerTalk};
 }
 
 interface ScreenProps {
   report: MatchReport;
   live?: LiveMatch;
   onClose: () => void;
-  onFinish?: () => void;
+  onFinish?: (words?: Words) => void;
+}
+
+/**
+ * The dressing room after the match: one thing to say to the team, and
+ * (if you like) a word with one player. Shows how the match went against
+ * what was expected, so the right words can be picked.
+ */
+function TeamTalkDialog({report, onDone}: {report: MatchReport; onDone: (words?: Words) => void}) {
+  const {t, tx} = useT();
+  const game = useGameState();
+  const [talk, setTalk] = useState<TeamTalk | null>(null);
+  const [single, setSingle] = useState<{playerId: string; talk: PlayerTalk} | null>(null);
+  const verdict = matchVerdict(game, report);
+  const side = report.homeId === game.userClubId ? "home" : "away";
+  const played = Object.entries(report.ratings)
+    .filter(([id]) => game.players[id]?.clubId === game.userClubId && (report.lineups[side].includes(id) || report.events.some((e) => e.type === "sub" && e.otherId === id)))
+    .sort((a, b) => b[1] - a[1]);
+  const icons: Record<TeamTalk, string> = {praise: "👏", calm: "🧘", demand: "💪", disappointed: "😠"};
+  return (
+    <MatchDialog title={`🗣️ ${t("tt.title")}`} onClose={() => onDone()}>
+      <p className="tt-verdict">{tx(`tt.verdict.${verdict.result}.${verdict.how}`)}</p>
+      <div className="tt-options">
+        {TEAM_TALKS.map((k) => (
+          <button key={k} className={`tt-option ${talk === k ? "active" : ""}`} onClick={() => setTalk(k)}>
+            <strong>{icons[k]} {tx(`tt.talk.${k}`)}</strong>
+            <small>{tx(`tt.talk.${k}.desc`)}</small>
+          </button>
+        ))}
+      </div>
+      <h4>{t("tt.onePlayer")}</h4>
+      <div className="tt-players">
+        {played.map(([id, rating]) => {
+          const p = game.players[id];
+          const mine = single?.playerId === id;
+          return (
+            <div key={id} className={`tt-player ${mine ? "active" : ""}`}>
+              <span className="tt-name">{shortName(p)} <span className={`rating-pill ${rating >= 7 ? "good" : rating < 6 ? "bad" : ""}`}>{rating.toFixed(1)}</span></span>
+              {PLAYER_TALKS.map((pt) => (
+                <button key={pt} className={`btn small ${mine && single?.talk === pt ? "primary" : ""}`} onClick={() => setSingle(mine && single?.talk === pt ? null : {playerId: id, talk: pt})} title={tx(`tt.player.${pt}`)}>
+                  {pt === "praise" ? "👍" : "👎"}
+                </button>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+      <div className="btn-row tt-actions">
+        <button className="btn" onClick={() => onDone()}>{t("tt.skip")}</button>
+        <button className="btn primary" disabled={!talk} onClick={() => talk && onDone({talk, ...(single ? {single} : {})})}>{t("tt.say")} ▶</button>
+      </div>
+    </MatchDialog>
+  );
 }
 
 interface Pause {
@@ -986,6 +1183,8 @@ interface Freeze extends Pause {
   targets: Record<string, Point>;
   /** Goals: the scorers' teammates mob the scorer first. */
   huddle?: Record<string, Point>;
+  /** Full time: where everyone heads, stage by stage (until ms after the whistle). */
+  stages?: FullTimeStage[];
   scorerId?: string;
 }
 
@@ -997,39 +1196,53 @@ interface Shout {
 
 const setPieceKey = (sp: {minute: number; side: Side}) => `s${sp.minute}-${sp.side}`;
 
-/** How long the players celebrate and thank the fans after the final whistle. */
-const FULLTIME_MS = 9000;
+/** How long the players celebrate, thank the fans and go off after the final whistle. */
+const FULLTIME_MS = 14000;
+/** Past the near touchline (pitch y), a player is in the tunnel and out of sight. */
+const IN_TUNNEL = 101.5;
+
+export interface FullTimeStage {
+  /** Until this many ms after the whistle. */
+  until: number;
+  targets: Record<string, Point>;
+}
 
 /**
- * After the final whistle. Each side's fans are behind their own goal (home
- * on the left, as the stands are drawn). Winners first mob each other in a
- * ring, then line up in front of their fans and applaud them; losers stop
- * where they are, then walk off to the tunnel at the halfway line. A draw:
- * both sides go and thank their own fans.
+ * After the final whistle, in stages. The winners mob each other in a ring,
+ * then run to their own fans (behind their goal: home on the left, as the
+ * stands are drawn) and applaud them for a few seconds, then go off. The
+ * losers stand a moment, then walk straight off. Off is down the tunnel in
+ * the middle of the near touchline, between the dugouts, where they
+ * disappear. After a draw both sides just walk off.
  */
-export function fullTimeTargets(ctx: Ctx, t: number, winner: Side | null, bodies: Record<string, Point>): {targets: Record<string, Point>; huddle: Record<string, Point>} {
-  const targets: Record<string, Point> = {};
-  const huddle: Record<string, Point> = {};
+export function fullTimeStages(ctx: Ctx, t: number, winner: Side | null, bodies: Record<string, Point>): FullTimeStage[] {
+  const stand: Record<string, Point> = {};
+  const thank: Record<string, Point> = {};
+  const off: Record<string, Point> = {};
   for (const side of ["home", "away"] as const) {
     const ids = [...onPitchAt(ctx.report, side, t).values()];
-    const happy = winner === null || winner === side;
     const fansX = side === "home" ? 3 : 97;
     const ring = {x: side === "home" ? 38 : 62, y: 50};
+    // Into the tunnel, each side on its own side of it.
+    const tunnel = {x: side === "home" ? 49.4 : 50.6, y: IN_TUNNEL + 6};
     ids.forEach((id, k) => {
-      const at = bodies[id] ?? {x: 50, y: 50};
-      if (happy) {
-        targets[id] = {x: fansX, y: 22 + (k * 56) / Math.max(1, ids.length - 1)};
-        // A draw is no reason to celebrate: they just walk over to the fans.
+      off[id] = tunnel;
+      if (winner === side) {
         const angle = (k / ids.length) * Math.PI * 2;
-        huddle[id] = winner ? {x: ring.x + Math.cos(angle) * 3, y: ring.y + Math.sin(angle) * 4} : targets[id];
+        stand[id] = {x: ring.x + Math.cos(angle) * 3, y: ring.y + Math.sin(angle) * 4};
+        thank[id] = {x: fansX, y: 22 + (k * 56) / Math.max(1, ids.length - 1)};
       } else {
-        // Heads down where they stood, then off to the tunnel in single file.
-        huddle[id] = at;
-        targets[id] = {x: 47 + (k % 3) * 3, y: 1 + Math.floor(k / 3) * 1.5};
+        stand[id] = bodies[id] ?? {x: 50, y: 50};
+        thank[id] = tunnel;
       }
     });
   }
-  return {targets, huddle};
+  return [
+    {until: 2000, targets: stand},
+    // A draw: nothing to thank anyone for, everyone goes.
+    {until: winner ? 6500 : 2000, targets: thank},
+    {until: Infinity, targets: off},
+  ];
 }
 
 /** Match minutes play may run on past a stop while the ball is still getting there (the clock slows meanwhile). */
@@ -1101,6 +1314,8 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   const [replay, setReplay] = useState<GoalReplay | null>(null);
   /** Asking whether to leave a live match before the end. */
   const [confirmClose, setConfirmClose] = useState(false);
+  const [talking, setTalking] = useState(false);
+  const [watchingAd, setWatchingAd] = useState(false);
   /** The last few minutes as they were shown, so a goal can be replayed exactly. */
   const history = useRef<Scene[]>([]);
 
@@ -1243,7 +1458,9 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
       const fz = freezeRef.current;
       if (fz) {
         const elapsed = now - fz.started;
-        const targets = fz.huddle && elapsed < fz.duration * 0.45 ? fz.huddle : fz.targets;
+        const targets = fz.stages
+          ? (fz.stages.find((s) => elapsed < s.until) ?? fz.stages[fz.stages.length - 1]).targets
+          : fz.huddle && elapsed < fz.duration * 0.45 ? fz.huddle : fz.targets;
         const step = (dt / MS_PER_MINUTE) * 2.2;
         // At a set piece or restart the ball is brought to the spot while everyone lines up.
         const spot = fz.sp ? fz.sp.spot : fz.restart ? {x: fz.restart.x, y: fz.restart.y} : null;
@@ -1345,6 +1562,16 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   }, [freeze, endFreeze]);
 
   const finished = time >= length - 1e-6 && (!live || live.done);
+  // A cup tie level at the end: the user takes the shoot-out (once; it's saved on the fixture).
+  const tie = live ? findFixture(game, report.fixtureId) : undefined;
+  const [pens, setPens] = useState<[number, number] | null>(null);
+  const shootoutScore = pens ?? (tie && isCupFixture(tie) ? tie.penalties : undefined) ?? null;
+  const needsShootout = !!live && finished && !!tie && isCupFixture(tie) && report.homeGoals === report.awayGoals && !shootoutScore;
+  // The user won (in the match, or on penalties).
+  const ours = live?.userSide === "home" ? report.homeGoals : report.awayGoals;
+  const theirs = live?.userSide === "home" ? report.awayGoals : report.homeGoals;
+  const wonIt = !!live && finished && (ours > theirs || (ours === theirs && !!shootoutScore && (shootoutScore[0] > shootoutScore[1]) === (live.userSide === "home")));
+  const notify = useGame((s) => s.notify);
   useEffect(() => {
     if (finished) setPlaying(false);
   }, [finished]);
@@ -1352,10 +1579,16 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   // The final whistle: the winners celebrate and go to thank their fans; the
   // losers trudge off to the tunnel. After a draw both go to their own fans.
   useEffect(() => {
-    if (!finished || freeze || replay || done.current.has("ft")) return;
-    const winner: Side | null = report.homeGoals > report.awayGoals ? "home" : report.awayGoals > report.homeGoals ? "away" : null;
-    setFreeze({key: "ft", kind: "fulltime", time, side: winner ?? "home", started: performance.now(), duration: FULLTIME_MS, ...fullTimeTargets(ctx, time, winner, scene.bodies)});
-  }, [finished, freeze, replay, report, ctx, time, scene.bodies]);
+    if (!finished || needsShootout || freeze || replay || done.current.has("ft")) return;
+    // Level, but won on penalties: the shoot-out winners celebrate.
+    const winner: Side | null =
+      report.homeGoals > report.awayGoals ? "home"
+      : report.awayGoals > report.homeGoals ? "away"
+      : shootoutScore ? (shootoutScore[0] > shootoutScore[1] ? "home" : "away")
+      : null;
+    const stages = fullTimeStages(ctx, time, winner, scene.bodies);
+    setFreeze({key: "ft", kind: "fulltime", time, side: winner ?? "home", started: performance.now(), duration: FULLTIME_MS, stages, targets: stages[stages.length - 1].targets});
+  }, [finished, needsShootout, shootoutScore, freeze, replay, report, ctx, time, scene.bodies]);
 
   const current = shown ?? (pendingReady ? {sp: pendingReady} : null);
 
@@ -1382,6 +1615,7 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
     const full = live.command(cmd);
     act((g) => {
       if (g.liveMatch) g.liveMatch.commands = [...(g.liveMatch.commands ?? []), full];
+      taskProgress(g, "order");
     });
     rerender((n) => n + 1);
   };
@@ -1462,19 +1696,22 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   const userSide = live?.userSide;
   const managerLook = game.managerLook ?? defaultManagerLook(game.managerName);
   // Winners jump for joy after the final whistle.
-  const celebrating = freeze?.kind === "fulltime" && report.homeGoals !== report.awayGoals ? freeze.side : null;
+  // A winner, in the match or on penalties.
+  const decided = report.homeGoals !== report.awayGoals || !!shootoutScore;
+  const celebrating = freeze?.kind === "fulltime" && decided ? freeze.side : null;
   const dots = (side: Side) => {
     const club = side === "home" ? home : away;
     const mine = side === userSide;
     return [...onPitchAt(report, side, view.time).values()].map((id) => {
       const b = view.bodies[id];
-      if (!b) return null;
+      // Gone down the tunnel after the final whistle.
+      if (!b || (finished && b.y > IN_TUNNEL)) return null;
       const cx = b.x * 1.05;
       const cy = b.y * 0.68;
       // Trail length follows actual speed, so fast sprinters leave longer trails.
       const trail = b.sprint ? 0.12 : 0;
       return (
-        <g key={id} className={`dot${mine ? " mine" : ""}${celebrating === side ? " celebrate" : ""}`} onClick={mine && !freeze ? () => setSelected(id) : undefined}>
+        <g key={id} className={`dot${mine && !finished ? " mine" : ""}${celebrating === side ? " celebrate" : ""}`} onClick={mine && !freeze && !finished ? () => setSelected(id) : undefined}>
           {trail > 0 && (
             <line x1={(b.x - b.vx * trail) * 1.05} y1={(b.y - b.vy * trail) * 0.68} x2={cx} y2={cy} className="trail" stroke={club.color} />
           )}
@@ -1560,6 +1797,7 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
         {live && <span className="team-ovr" title={t("tac.teamOvrHint")}>{t("tac.teamOvr")} <strong>{teamOvr(game, home.id)}</strong></span>}
         <span className="crest" style={{background: home.color, color: home.color2}}>{home.short}</span>
         <span className="score">{score.home} – {score.away}</span>
+        {shootoutScore && <small className="score-pens">{t("fx.penalties", {h: shootoutScore[0], a: shootoutScore[1]})}</small>}
         <span className="crest" style={{background: away.color, color: away.color2}}>{away.short}</span>
         {live && <span className="team-ovr" title={t("tac.teamOvrHint")}>{t("tac.teamOvr")} <strong>{teamOvr(game, away.id)}</strong></span>}
         <span className="clock">{clock}</span>
@@ -1568,7 +1806,20 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
         )}
       </div>
 
-      {current && live ? (
+      {needsShootout && live ? (
+        <Shootout
+          report={report}
+          seed={game.liveMatch?.seed ?? 1}
+          userSide={live.userSide}
+          onDone={(score) => {
+            act((g) => {
+              const f = findFixture(g, report.fixtureId);
+              if (f && isCupFixture(f)) f.penalties = score;
+            });
+            setPens(score);
+          }}
+        />
+      ) : current && live ? (
         <SetPieceView
           key={current.sp.index}
           sp={current.sp}
@@ -1586,8 +1837,9 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
       ) : (
         <div className="pitch-wrap">
           <svg className="pitch" viewBox={viewBox} role="img" aria-label={t("match.pitch")}>
-            <Stands home={home} away={away} cheering={(freeze?.kind === "goal" || (freeze?.kind === "fulltime" && report.homeGoals !== report.awayGoals)) && !replay ? freeze.side : null} boards={(userSide === "away" ? away : home).color} />
+            <Stands home={home} away={away} cheering={(freeze?.kind === "goal" || (freeze?.kind === "fulltime" && decided)) && !replay ? freeze.side : null} boards={(userSide === "away" ? away : home).color} />
             {PITCH}
+            <Dugouts home={home} away={away} />
             {(!freeze || replay) && cones}
             {dots("home")}
             {dots("away")}
@@ -1629,7 +1881,7 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
           {atHalftime && !live && <div className="setup-banner">{t("ev.halftime")}</div>}
           {freeze?.kind === "fulltime" && (
             <div className="setup-banner">
-              🏁 {report.homeGoals === report.awayGoals ? t("match.ftDraw") : t("match.ftWin", {team: (freeze.side === "home" ? home : away).name})}
+              🏁 {!decided ? t("match.ftDraw") : t("match.ftWin", {team: (freeze.side === "home" ? home : away).name})}
             </div>
           )}
           {shouts.length > 0 && userSide && (
@@ -1661,6 +1913,17 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
         </MatchDialog>
       )}
 
+      {watchingAd && (
+        <VideoAd
+          onClose={() => setWatchingAd(false)}
+          onReward={() => {
+            setWatchingAd(false);
+            const err = act((g) => videoAfterWin(g, new Date().toISOString().slice(0, 10), report.fixtureId));
+            notify(err ?? "toast.videoDiamonds", {n: WIN_VIDEO_DIAMONDS}, err ? "error" : "good");
+          }}
+        />
+      )}
+      {talking && onFinish && <TeamTalkDialog report={report} onDone={(words) => { setTalking(false); onFinish(words); }} />}
       {confirmClose && (
         <MatchDialog title={`⏹ ${t("match.closeTitle")}`} onClose={() => setConfirmClose(false)}>
           <p>{t("match.closeText")}</p>
@@ -1675,7 +1938,7 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
         <InjuryDialog live={live} playerId={injuryStop.playerId} pos={injuryStop.pos} onPick={replaceInjured} />
       )}
 
-      {live && selected && !current && !injuryStop && (
+      {live && selected && !finished && !current && !injuryStop && (
         <MatchDialog title={`📋 ${t("orders.title")}`} onClose={() => setSelected(null)}>
           <OrdersPanel
             live={live}
@@ -1692,23 +1955,35 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
 
       <div className="match-controls">
         {finished && onFinish ? (
-          <button className="btn primary" onClick={onFinish}>{t("match.finish")} ▶</button>
+          !needsShootout && (
+            <>
+              {/* Won: a video for bonus diamonds, once per match. */}
+              {wonIt && game.daily?.winVideoFixture !== report.fixtureId && (
+                <button className="btn push-right" onClick={() => setWatchingAd(true)}>🎬 {t("video.win", {n: WIN_VIDEO_DIAMONDS})}</button>
+              )}
+              <button className={wonIt && game.daily?.winVideoFixture !== report.fixtureId ? "btn primary" : "btn primary push-right"} onClick={() => setTalking(true)}>{t("match.finish")} ▶</button>
+            </>
+          )
         ) : (
           <>
-            <button
-              className="btn ctl"
-              disabled={!!current}
-              title={finished ? t("match.replay") : playing ? t("match.pause") : t("match.play")}
-              aria-label={finished ? t("match.replay") : playing ? t("match.pause") : t("match.play")}
-              onClick={() => (finished ? jump(0) : setPlaying(!playing))}
-            >
-              {finished ? "↺" : playing ? "⏸" : "▶"}
-            </button>
-            <span className="speed-group" role="group" aria-label={t("match.speed")}>
-              {SPEEDS.map((s) => (
-                <button key={s} className={s === speed ? "chip active" : "chip"} onClick={() => setSpeed(s)}>{s}×</button>
-              ))}
-            </span>
+            {finished ? (
+              <button className="btn ctl" title={t("match.replay")} aria-label={t("match.replay")} onClick={() => jump(0)}>↺</button>
+            ) : (
+              // Pause, play at normal speed, and fast-forward: each press a step faster, up to 5×.
+              <span className="speed-group" role="group" aria-label={t("match.speed")}>
+                <button className={!playing ? "chip active" : "chip"} disabled={!!current} title={t("match.pause")} aria-label={t("match.pause")} onClick={() => setPlaying(false)}><ControlIcon kind="pause" /></button>
+                <button className={playing && speed === 1 ? "chip active" : "chip"} disabled={!!current} title={t("match.play")} aria-label={t("match.play")} onClick={() => { setSpeed(1); setPlaying(true); }}><ControlIcon kind="play" /></button>
+                <button
+                  className={playing && speed > 1 ? "chip active" : "chip"}
+                  disabled={!!current}
+                  title={t("match.fastForward")}
+                  aria-label={t("match.fastForward")}
+                  onClick={() => { setSpeed(playing ? Math.min(MAX_SPEED, speed + 1) : Math.max(2, speed)); setPlaying(true); }}
+                >
+                  <ControlIcon kind="forward" />{speed > 1 ? " " + speed + "×" : ""}
+                </button>
+              </span>
+            )}
             {live && !finished && (
               <>
                 <button className="btn ctl" disabled={!!freeze && !atHalftime} onClick={() => setSelected(selected ? null : "team")}>📋 {t("orders.button")}</button>
@@ -1729,7 +2004,11 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
                 </button>
               </>
             )}
-            {!finished && <button className="btn ctl push-right" onClick={() => jump(Infinity)}>⏭ {t("match.skip")}</button>}
+            {!finished && (
+              <button className="btn ctl push-right" title={t("match.skip")} aria-label={t("match.skip")} onClick={() => jump(Infinity)}>
+                ⏭<span className="skip-label"> {t("match.skip")}</span>
+              </button>
+            )}
           </>
         )}
       </div>
@@ -1776,7 +2055,7 @@ function MatchDialog({title, onClose, children}: {title: ReactNode; onClose: () 
 }
 
 /** Confetti in the scoring club's colours. */
-function Confetti({colors}: {colors: string[]}) {
+export function Confetti({colors}: {colors: string[]}) {
   const pieces = useMemo(
     () =>
       Array.from({length: 80}, (_, i) => ({

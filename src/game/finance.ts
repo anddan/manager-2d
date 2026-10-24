@@ -42,10 +42,42 @@ export function weeklyFinances(state: GameState, homeClubs: Set<string>): void {
 
   const user = state.clubs[state.userClubId];
   closeReport(state);
-  if (user.cash < 0 && state.absWeek % 4 === 0) {
-    addMessage(state, {kind: "finance", key: "msg.boardDebt", params: {cash: user.cash}});
-  }
+  boardPatience(state, user.cash);
   if (user.cash < -2_000_000) user.transferBudget = Math.min(user.transferBudget, 0);
+}
+
+/** Weeks in a row in the red before the board gives a warning. */
+export const DEBT_WARNING_WEEKS = 4;
+/** The warning that ends it: the manager is sacked. */
+export const BOARD_WARNINGS = 3;
+
+/**
+ * The board watches the money. Every few weeks in a row in the red is a
+ * warning; at the third the manager is sacked (game over). Getting back into
+ * the black stops the count, and a season ending in the black wipes one
+ * warning (see seasonBoardReview).
+ */
+function boardPatience(state: GameState, cash: number): void {
+  const board = (state.board ??= {debtWeeks: 0, warnings: 0});
+  if (cash >= 0) {
+    board.debtWeeks = 0;
+    return;
+  }
+  board.debtWeeks++;
+  if (board.debtWeeks === 1) addMessage(state, {kind: "finance", key: "msg.boardDebt", params: {cash}});
+  if (board.debtWeeks % DEBT_WARNING_WEEKS !== 0) return;
+  board.warnings++;
+  if (board.warnings >= BOARD_WARNINGS) {
+    state.gameOver = {season: state.season, week: state.week, reason: "debt"};
+    return;
+  }
+  addMessage(state, {kind: "finance", key: "msg.boardWarning", params: {n: board.warnings, max: BOARD_WARNINGS, cash, left: BOARD_WARNINGS - board.warnings}});
+}
+
+/** At the end of a season: finishing it in the black earns back one warning. */
+export function seasonBoardReview(state: GameState): void {
+  const board = state.board;
+  if (board && board.warnings > 0 && state.clubs[state.userClubId].cash >= 0) board.warnings--;
 }
 
 /** Moves this week's lines into history and the season totals. */

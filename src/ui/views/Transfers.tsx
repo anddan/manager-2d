@@ -4,7 +4,9 @@ import {askingPrice, estimatedOverall, respondToBid} from "../../game/transfers"
 import {POSITIONS, type Position} from "../../game/types";
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
-import {Card, Empty, Flag, Ovr, PosBadge, StatusIcons, Tabs} from "../common";
+import {Card, Empty, Flag, Ovr, PosBadge, SortTh, StatusIcons, Tabs, sortRows, useSort} from "../common";
+
+type SearchSort = "pos" | "name" | "age" | "ovr" | "club" | "price" | "contract";
 
 type Tab = "search" | "bids" | "listed" | "scouting";
 
@@ -42,15 +44,33 @@ function Search() {
   const [maxPrice, setMaxPrice] = useState(0);
   const [minOvr, setMinOvr] = useState(0);
   const [source, setSource] = useState<"all" | "free" | "listed">("all");
+  // Best first to start with; any column sorts the whole search, then the first 80 show.
+  const sort = useSort<SearchSort>("ovr", true);
 
-  const results = Object.values(game.players)
-    .filter((p) => p.clubId !== game.userClubId && p.loan?.parentClubId !== game.userClubId && !(p.clubId && game.clubs[p.clubId]?.guest))
+  const found = Object.values(game.players)
+    .filter((p) => p.clubId !== game.userClubId && p.loan?.parentClubId !== game.userClubId && !(p.clubId && game.clubs[p.clubId]?.guest) && !game.packChoice?.includes(p.id))
     .filter((p) => (!pos || p.position === pos) && p.age <= maxAge)
     .filter((p) => (source === "free" ? !p.clubId : source === "listed" ? p.transferListed || p.loanListed : true))
     .map((p) => ({p, est: estimatedOverall(game, p), price: askingPrice(game, p)}))
-    .filter(({est, price}) => est.high >= minOvr && (!maxPrice || price <= maxPrice))
-    .sort((a, b) => b.est.high - a.est.high)
-    .slice(0, 80);
+    .filter(({est, price}) => est.high >= minOvr && (!maxPrice || price <= maxPrice));
+  const results = sortRows(
+    found.sort((a, b) => b.est.high - a.est.high),
+    ({p, est, price}): number | string => {
+      switch (sort.key) {
+        case "pos": return POSITIONS.indexOf(p.position);
+        case "name": return listName(p);
+        case "age": return p.age;
+        case "ovr": return est.high;
+        case "club": return p.clubId ? game.clubs[p.clubId].short : "";
+        case "price": return p.clubId ? price : 0;
+        case "contract": return p.clubId ? p.contract.expiresSeason : 0;
+      }
+    },
+    sort.desc
+  ).slice(0, 80);
+  const th = (key: SearchSort, label: string, descFirst = true, title?: string) => (
+    <SortTh label={label} title={title} active={sort.key === key} desc={sort.desc} onClick={() => sort.onSort(key, descFirst)} />
+  );
 
   return (
     <>
@@ -88,8 +108,8 @@ function Search() {
         <table className="table">
           <thead>
             <tr>
-              <th>{t("col.pos")}</th><th>{t("col.name")}</th><th>{t("col.age")}</th><th title={t("col.ovrHint")}>{t("col.ovr")}</th>
-              <th>{t("tbl.club")}</th><th>{t("tr.asking")}</th><th>{t("col.contract")}</th>
+              {th("pos", t("col.pos"), false)}{th("name", t("col.name"), false)}{th("age", t("col.age"), false)}{th("ovr", t("col.ovr"), true, t("col.ovrHint"))}
+              {th("club", t("tbl.club"), false)}{th("price", t("tr.asking"), false)}{th("contract", t("col.contract"), false)}
             </tr>
           </thead>
           <tbody>

@@ -1,5 +1,6 @@
 // Shared game types. The whole save is one GameState object, kept plain
 // (no classes, no Maps) so it survives JSON and structuredClone.
+import type {Daily} from "./daily";
 import type {SetPiece, SetPieceInput, SetPieceOutcome} from "./setpieces";
 
 export const ATTRIBUTES = [
@@ -150,6 +151,8 @@ export interface Club {
   installments: Installment[];
   /** Captain and set-piece takers; the best on the pitch steps in when they're off. Missing in old saves. */
   roles?: TeamRoles;
+  /** The real name, when the manager has given the club a nickname (then `name` is the nickname). */
+  officialName?: string;
   /** A club from another league, here only for the Champions Cup: not in the table, the market or the money. */
   guest?: true;
   /** For a guest club: the league it's from (flag). */
@@ -367,6 +370,8 @@ export interface SeasonHistory {
   season: number;
   championId: string;
   userPosition: number;
+  /** How far the user got in the Champions Cup: 0 round of 16 … 3 final, 4 won. Missing if not in it. */
+  cup?: number;
 }
 
 export const PLAYERS_GENDERS = ["men", "women", "mix"] as const;
@@ -422,6 +427,18 @@ export interface GameState {
   nextId: number;
   /** Set between starting a match week and finishing it. Missing in old saves. */
   liveMatch?: LiveMatchState | null;
+  /** The board's patience with debts: weeks in a row in the red, and warnings given. Missing in old saves. */
+  board?: {debtWeeks: number; warnings: number};
+  /** Today's tasks and videos watched. Missing in old saves. */
+  daily?: Daily;
+  /** A diamond pack opened but no player picked yet: the four to choose from (free agents until then). */
+  packChoice?: string[];
+  /** Trophies won and not celebrated yet (shown once, then removed). */
+  celebrations?: {kind: "league" | "cup"; season: number}[];
+  /** Set when the manager is sacked: the game is over. */
+  gameOver?: {season: number; week: number; reason: "debt"};
+  /** The last few post-match team talks, oldest first: the same words every week wear thin. */
+  talkHistory?: string[];
   /** This season's Champions Cup. Missing in old saves until it's set up. */
   cup?: CupState;
 }

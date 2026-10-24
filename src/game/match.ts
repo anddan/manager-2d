@@ -67,13 +67,17 @@ const MENTALITY: Record<Mentality, {def: number; att: number}> = {
 
 const HOME_ADVANTAGE = 1.02;
 // Lower than it would be without added time and the frequent set pieces, which add goals of their own.
-const CHANCE_BASE = 0.25;
+const CHANCE_BASE = 0.29;
 /**
  * How sharply strength differences turn into possession and chances. Kept
  * moderate so teams at about the same level get even matches where both
  * sides score, while a much better side still wins most of the time.
  */
 const POSSESSION_POWER = 2.2;
+/** On top of midfield strength, how often the side with the ball keeps it into the next minute (fewer turnovers, same possession share). */
+const POSSESSION_KEEP = 0.4;
+/** A shot on target goes in this often against a keeper as good as the shooter. */
+const GOAL_BASE = 0.22;
 const CHANCE_POWER = 1.5;
 
 /**
@@ -284,7 +288,8 @@ export const DISALLOW_REASONS = ["offside", "offside", "foul", "handball"] as co
 export type DisallowReason = (typeof DISALLOW_REASONS)[number];
 
 /** Share of minutes without a shot where the ball goes out for a throw-in (in the replay only). */
-const THROW_IN_CHANCE = 0.22;
+/** Of the times the ball is lost in open play, how often it goes out for a throw-in. */
+const THROW_IN_CHANCE = 0.3;
 /** How far up (0–100) a move that creates nothing may get before the defence cuts it out. */
 const DANGER_DEPTH = 74;
 /** A cross or through ball into the box that comes to nothing: how often the keeper claims it. */
@@ -634,7 +639,8 @@ class Replay {
     this.ledUp = minute;
   }
 
-  minute(minute: number, attacking: Team, defending: Team, outcome: ShotOutcome): void {
+  /** `turnover`: the other side has the ball next minute (after a shot, or won off them). */
+  minute(minute: number, attacking: Team, defending: Team, outcome: ShotOutcome, turnover = false): void {
     const side = attacking.side;
     const {touches, add} = this.recorder(side);
     // A set piece's build-up is already drawn (leadUp): just the kick and what followed, in the rest of the minute.
@@ -652,12 +658,14 @@ class Replay {
       // Near goal with nothing on: it ends here (cut out below), not played back out.
       if (outcome.type === "none" && this.inFrontOfGoal(side)) break;
       // Wide in the final third: take it down the line and cross it into the box.
-      if (settled && this.wideAndHigh(attacking, carrier) && this.rng.chance(0.5)) {
+      // (In a minute that ends with them keeping the ball, nothing goes into the box.)
+      const intoBox = outcome.type !== "none" || turnover;
+      if (intoBox && settled && this.wideAndHigh(attacking, carrier) && this.rng.chance(0.5)) {
         carrier = this.crossIn(attacking, carrier, add) ?? carrier;
         break;
       }
       // A ball in behind for a forward to run onto, or a long one out to the far flank.
-      const special: {to: string; at: Point; flight: "through" | "long"} | undefined = this.throughBall(attacking, carrier) ?? this.switchPlay(attacking, carrier);
+      const special: {to: string; at: Point; flight: "through" | "long"} | undefined = (intoBox ? this.throughBall(attacking, carrier) : undefined) ?? this.switchPlay(attacking, carrier);
       if (special) {
         add("pass", special.to, special.at, side, special.flight);
         lastPasser = carrier;
@@ -668,7 +676,7 @@ class Replay {
         // Faster players get further with the ball.
         const depth = progressFor(side, this.ball.x) + this.rng.range(6, 10) + this.state.players[carrier].attrs.pace / 15;
         const width = (side === "home" ? this.ball.y : 100 - this.ball.y) + this.rng.range(-8, 8);
-        add("dribble", carrier, fromSide(side, clamp(depth, 5, 88), clamp(width, 5, 95)));
+        add("dribble", carrier, fromSide(side, clamp(depth, 5, intoBox ? 88 : DANGER_DEPTH), clamp(width, 5, 95)));
         continue;
       }
       // Give and go: the player who just passed has run on and gets it back further up.
@@ -688,15 +696,14 @@ class Replay {
       carrier = next;
     }
 
-    // Nothing came of it: near goal the defence (or the keeper) cuts it out, so
-    // no attacker is left free in front of goal without a shot.
-    if (outcome.type === "none" && this.inFrontOfGoal(side)) {
+    // Won off them: near goal the defence (or the keeper) cuts it out, so no
+    // attacker is left free in front of goal; elsewhere an interception or a
+    // tackle, and now and then the ball goes out for a throw-in.
+    if (outcome.type === "none" && turnover && (this.inFrontOfGoal(side) || !this.rng.chance(THROW_IN_CHANCE))) {
       this.cutOut(attacking, defending, touches, add);
       return flush();
     }
-
-    // Now and then the move ends with the ball over the touchline: a throw-in to the other side.
-    if (outcome.type === "none" && this.rng.chance(THROW_IN_CHANCE)) {
+    if (outcome.type === "none" && turnover) {
       const near = this.ball.y < 50 ? 0.3 : 99.7;
       const along = clamp(this.ball.x + (side === "home" ? 1 : -1) * this.rng.range(2, 8), 3, 97);
       add("out", undefined, {x: along, y: near});
@@ -794,9 +801,13 @@ class Replay {
       this.restart = {side: defending.side, kind: "keeper"};
       return;
     }
+    // A throw-in, goal kick or kick-off still reaches the teammate, who plays it on; it's won after that.
+    const fromRestart = touches.slice(-3, -1).some((t) => ["throwin", "goalkick", "kickoff"].includes(t.kind ?? ""));
+    if (fromRestart && last?.playerId) {
+      const next = this.receiver(attacking, last.playerId);
+      if (next) add("pass", next, this.jitter(this.spot(attacking, next, true), 4));
+    }
     const by = this.nearest(defending, this.ball, false);
-    // A throw-in or goal kick still reaches the teammate; it's won off them after.
-    const fromRestart = ["throwin", "goalkick", "kickoff"].includes(touches[touches.length - 2]?.kind ?? "");
     if (last?.kind === "pass" && !fromRestart) won("tackle", by);
     else add("tackle", by, this.jitter(this.ball, 2), defending.side);
   }
@@ -1019,6 +1030,9 @@ export function createMatch(
 
   function* play(): Generator<MatchStep, MatchReport, SetPieceInput | null | undefined> {
     let homePossession = 0;
+    // Who has the ball: the home side kicks off. It changes hands after a shot
+    // (the other side restarts) or when it is won off them (see the end of the minute).
+    let holder: Team = home;
     let minute = 0;
     // The second half's added time is only known at 90 minutes.
     let end = Infinity;
@@ -1030,7 +1044,7 @@ export function createMatch(
       const h = lines(state, home, true);
       const a = lines(state, away, false);
       const pHome = h.mid ** POSSESSION_POWER / (h.mid ** POSSESSION_POWER + a.mid ** POSSESSION_POWER);
-      const attacking = rng.chance(pHome) ? home : away;
+      const attacking: Team = holder;
       const defending = attacking === home ? away : home;
       const att = attacking === home ? h : a;
       const def = attacking === home ? a : h;
@@ -1051,7 +1065,7 @@ export function createMatch(
           if (rng.chance(pOnTarget)) {
             attacking.onTarget++;
             rate(shooterSlot.id, 0.1);
-            const pGoal = clamp(0.37 + (skill - def.gk) / 150, 0.12, 0.62);
+            const pGoal = clamp(GOAL_BASE + (skill - def.gk) / 150, 0.12, 0.62);
             const keeper = defending.onPitch.find((o) => defending.slots[o.slot].pos === "GK");
             const scored = rng.chance(pGoal);
             if (scored && rng.chance(DISALLOWED_CHANCE)) {
@@ -1097,8 +1111,14 @@ export function createMatch(
           : null;
         if (kind) outcome = yield* takeSetPiece(kind, minute, attacking, defending);
       }
+      // Who has it next minute. After a shot, the other side (kick-off, goal kick, the
+      // keeper). Otherwise the better side in midfield keeps it more often: the share of
+      // possession still follows pHome, with fewer, longer spells.
+      const share = attacking === home ? pHome : 1 - pHome;
+      const turnover = outcome.type !== "none" || !rng.chance(POSSESSION_KEEP + (1 - POSSESSION_KEEP) * share);
+      holder = turnover ? defending : attacking;
       // Drawn before cards and injuries: those players were still on during this minute.
-      replay?.minute(minute, attacking, defending, outcome);
+      replay?.minute(minute, attacking, defending, outcome, turnover);
       report.homeGoals = home.goals;
       report.awayGoals = away.goals;
 
@@ -1168,6 +1188,7 @@ export function createMatch(
       if (minute === 45 + added[0]) {
         ctx.events.push({minute, type: "halftime"});
         replay?.halftime();
+        holder = away;
         yield {type: "halftime", minute};
       }
       if (minute === 90 + added[0]) {

@@ -3,6 +3,7 @@ import {isCupFixture, nextUserFixture, userClub} from "../../game/helpers";
 import {leaguePosition, standings} from "../../game/league";
 import {clubPlayers, teamOvr, wageBill} from "../../game/ratings";
 import {useT} from "../../i18n";
+import {DailyTasks} from "../DailyTasks";
 import {useGame, useGameState} from "../../store";
 import {Card, Empty, Face, PlayerLink} from "../common";
 
@@ -24,6 +25,7 @@ export function Overview() {
 
   return (
     <div className="grid">
+      <DailyTasks />
       <Card title={t("ov.nextMatch")}>
         {next ? (
           <div className="next-match">

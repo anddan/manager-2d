@@ -1,15 +1,18 @@
 import {ENERGY_COST_EXTRA_TRAINING, MAX_EXTRA_TRAININGS} from "../../game/constants";
 import {listName, userClub} from "../../game/helpers";
+import {taskProgress} from "../../game/daily";
 import {spendEnergy} from "../../game/monetization";
 import {clubPlayers, overall} from "../../game/ratings";
 import {extraTraining, FOCUS_ATTRIBUTES} from "../../game/training";
-import {ATTRIBUTES, INTENSITIES, TRAINING_FOCUSES, type Attribute, type Player} from "../../game/types";
+import {ATTRIBUTES, INTENSITIES, POSITIONS, TRAINING_FOCUSES, type Attribute, type Intensity, type Player, type TrainingFocus} from "../../game/types";
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
-import {Bar, Card, Delta, PosBadge} from "../common";
+import {Bar, Card, Delta, PosBadge, SortTh, sortRows, useSort} from "../common";
+
+type TrainingSort = "pos" | "name" | "age" | "ovr" | "fitness" | "change" | "focus";
 
 const FOCUS_ICONS: Record<string, string> = {
-  attack: "🎯", defense: "🛡️", passing: "🔀", physical: "💪", conditioning: "🫁", technique: "✨", goalkeeping: "🧤", recovery: "🛌",
+  attack: "🎯", defense: "🛡️", passing: "🔀", physical: "💪", conditioning: "🏃", technique: "✨", goalkeeping: "🧤", recovery: "🛌",
 };
 
 function totalChange(p: Player): number {
@@ -33,34 +36,51 @@ export function Training() {
       if (!spendEnergy(g.monetization, ENERGY_COST_EXTRA_TRAINING, Date.now())) return "energy";
       g.monetization.extraTrainingsThisWeek++;
       extraTraining(g, rng);
+      taskProgress(g, "train");
       return "ok";
     });
     if (ok === "ok") notify("toast.extraTraining", undefined, "good");
     else notify(ok === "energy" ? "err.noEnergy" : "train.extraLimit", undefined, "error");
   };
 
+  // Sortable by any column; biggest weekly gain first to start with.
+  const sort = useSort<TrainingSort>("change", true);
+  const trainingValue = (p: Player, key: TrainingSort): number | string => {
+    switch (key) {
+      case "pos": return POSITIONS.indexOf(p.position);
+      case "name": return listName(p);
+      case "age": return p.age;
+      case "ovr": return overall(p);
+      case "fitness": return p.fitness;
+      case "change": return totalChange(p);
+      case "focus": return p.individualFocus ?? "";
+    }
+  };
+  const th = (key: TrainingSort, label: string, descFirst = true, title?: string) => (
+    <SortTh label={label} title={title} active={sort.key === key} desc={sort.desc} onClick={() => sort.onSort(key, descFirst)} />
+  );
+
   return (
     <div className="grid">
       <Card title={t("train.programme")}>
-        <div className="focus-grid">
-          {TRAINING_FOCUSES.map((f) => (
-            <button key={f} className={f === focus ? "focus-btn active" : "focus-btn"} onClick={() => act((g) => { g.training.focus = f; })}>
-              <span className="focus-icon">{FOCUS_ICONS[f]}</span>
-              <span>{t(`focus.${f}`)}</span>
-              <small className="muted">
-                {Object.keys(FOCUS_ATTRIBUTES[f]).map((a) => t(`attr.${a as Attribute}`)).join(", ") || t("train.restores")}
-              </small>
-            </button>
-          ))}
+        <div className="tac-pickers">
+          <label className="field">
+            <span>{t("train.focus")}</span>
+            <select value={focus} onChange={(e) => act((g) => { g.training.focus = e.target.value as TrainingFocus; })}>
+              {TRAINING_FOCUSES.map((f) => <option key={f} value={f}>{FOCUS_ICONS[f]} {t(`focus.${f}`)}</option>)}
+            </select>
+          </label>
+          <label className="field">
+            <span>{t("train.intensity")}</span>
+            <select value={intensity} onChange={(e) => act((g) => { g.training.intensity = e.target.value as Intensity; })}>
+              {INTENSITIES.map((i) => <option key={i} value={i}>{t(`intensity.${i}`)}</option>)}
+            </select>
+          </label>
         </div>
-        <h3>{t("train.intensity")}</h3>
-        <div className="btn-row">
-          {INTENSITIES.map((i) => (
-            <button key={i} className={i === intensity ? "chip active" : "chip"} onClick={() => act((g) => { g.training.intensity = i; })}>
-              {t(`intensity.${i}`)}
-            </button>
-          ))}
-        </div>
+        {/* What the chosen focus trains, and what the intensity means. */}
+        <p className="muted small">
+          {FOCUS_ICONS[focus]} {Object.keys(FOCUS_ATTRIBUTES[focus]).map((a) => t(`attr.${a as Attribute}`)).join(", ") || t("train.restores")}
+        </p>
         <p className="muted small">{t(`intensity.${intensity}Hint`)}</p>
       </Card>
 
@@ -74,12 +94,12 @@ export function Training() {
           <table className="table">
             <thead>
               <tr>
-                <th>{t("col.pos")}</th><th>{t("col.name")}</th><th>{t("col.age")}</th><th title={t("col.ovrHint")}>{t("col.ovr")}</th>
-                <th>{t("col.fitness")}</th><th>{t("train.change")}</th><th>{t("train.biggest")}</th><th>{t("pl.individualFocus")}</th>
+                {th("pos", t("col.pos"), false)}{th("name", t("col.name"), false)}{th("age", t("col.age"), false)}{th("ovr", t("col.ovr"), true, t("col.ovrHint"))}
+                {th("fitness", t("col.fitness"))}{th("change", t("train.change"))}<th>{t("train.biggest")}</th>{th("focus", t("pl.individualFocus"), false)}
               </tr>
             </thead>
             <tbody>
-              {squad.map((p) => {
+              {sortRows(squad, (p) => trainingValue(p, sort.key), sort.desc).map((p) => {
                 const changes = ATTRIBUTES.map((a) => ({a, d: p.weeklyChange[a] ?? 0})).filter((c) => Math.abs(c.d) >= 0.05).sort((x, y) => Math.abs(y.d) - Math.abs(x.d));
                 return (
                   <tr key={p.id}>

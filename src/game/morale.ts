@@ -2,9 +2,9 @@
 // manager's talks and the promises they create.
 import {addMessage, newId, playerName} from "./helpers";
 import {recentPointsPerGame} from "./league";
-import {deservedRole, expectedWage, overall} from "./ratings";
+import {deservedRole, expectedWage, overall, teamOvr} from "./ratings";
 import {Rng, clamp} from "./rng";
-import type {GameState, Player, SquadRole} from "./types";
+import type {GameState, MatchReport, Player, SquadRole} from "./types";
 
 const EXPECTED_STARTS: Record<SquadRole, number> = {key: 0.75, rotation: 0.45, reserve: 0.2, youth: 0.1};
 const ROLE_RANK: Record<SquadRole, number> = {key: 3, rotation: 2, reserve: 1, youth: 0};
@@ -135,6 +135,167 @@ export function talkToPlayer(state: GameState, rng: Rng, playerId: string, talk:
   p.relation = clamp(p.relation + 3, 0, 100);
   if (p.wantsToLeave && p.happiness >= 35) p.wantsToLeave = false;
   return "talk.promise.made";
+}
+
+// The team talk after a match. What lands depends on how the result compares
+// with what was expected (team strengths, home or away): praise after a poor
+// display rings hollow, a telling-off after a fine win is unfair, and the same
+// words every week wear thin.
+
+export const TEAM_TALKS = ["praise", "calm", "demand", "disappointed"] as const;
+export type TeamTalk = (typeof TEAM_TALKS)[number];
+export const PLAYER_TALKS = ["praise", "criticize"] as const;
+export type PlayerTalk = (typeof PLAYER_TALKS)[number];
+/** How a talk went down: 1 it hit home, 0 shrugged off, -1 it backfired. */
+export type TalkFit = -1 | 0 | 1;
+
+export interface MatchVerdict {
+  result: "W" | "D" | "L";
+  /** Goal difference against what the strengths said: + better than expected. */
+  surprise: number;
+  /** "better" | "expected" | "worse", for the UI. */
+  how: "better" | "expected" | "worse";
+}
+
+/** How the user's match went compared with what was expected. */
+export function matchVerdict(state: GameState, report: MatchReport): MatchVerdict {
+  const home = report.homeId === state.userClubId;
+  const us = home ? report.homeGoals : report.awayGoals;
+  const them = home ? report.awayGoals : report.homeGoals;
+  const opponent = home ? report.awayId : report.homeId;
+  // About a goal for every five points of team strength, and a little for home.
+  const expected = clamp((teamOvr(state, state.userClubId) - teamOvr(state, opponent)) / 5 + (home ? 0.3 : -0.3), -4, 4);
+  const surprise = us - them - expected;
+  return {
+    result: us > them ? "W" : us === them ? "D" : "L",
+    surprise,
+    how: surprise >= 1.2 ? "better" : surprise <= -1.2 ? "worse" : "expected",
+  };
+}
+
+/** Whether a team talk suits the match. */
+export function talkFit(talk: TeamTalk, v: MatchVerdict): TalkFit {
+  switch (talk) {
+    case "praise":
+      // Deserved after a win (unless scraped against much weaker) or a draw against the odds.
+      if (v.result === "W") return v.how === "worse" ? 0 : 1;
+      if (v.how === "better") return v.result === "D" ? 1 : 0;
+      return v.result === "D" ? 0 : -1;
+    case "calm":
+      // Never wrong; right after a draw, or a defeat that was no disgrace.
+      if (v.result === "D" || (v.result === "L" && v.how !== "worse")) return 1;
+      return 0;
+    case "demand":
+      // "You can do better": they didn't do what they could. Unfair after a fine display.
+      if (v.how === "worse" && !(v.result === "L" && v.surprise <= -3)) return 1;
+      if (v.how === "better" || (v.result === "W" && v.how === "expected")) return -1;
+      return 0;
+    case "disappointed":
+      // A poor defeat deserves it; a win never does.
+      if (v.result === "L" && v.how !== "better") return v.how === "worse" ? 1 : 0;
+      if (v.result === "W" || v.how === "better") return -1;
+      return 0;
+  }
+}
+
+export interface TalkResult {
+  fit: TalkFit;
+  /** "tt.react.<talk>.<good|meh|bad>" */
+  key: string;
+  /** Average morale change among those who played. */
+  morale: number;
+  /** Heard it too often lately. */
+  worn: boolean;
+  player?: {id: string; key: string};
+}
+
+const FIT_NAME = {1: "good", 0: "meh", [-1]: "bad"} as const;
+
+/**
+ * The manager's words after the match: one for the team, and optionally one
+ * for a single player who played. Players who played feel it fully, the
+ * bench half. Tough talk works on professionals; praise works on everyone,
+ * when it's deserved.
+ */
+export function teamTalk(state: GameState, rng: Rng, report: MatchReport, talk: TeamTalk, single?: {playerId: string; talk: PlayerTalk}): TalkResult {
+  const v = matchVerdict(state, report);
+  const fit = talkFit(talk, v);
+  // The same words again: each of the last three times takes some of the effect away.
+  const history = state.talkHistory ?? [];
+  const repeats = history.slice(-3).filter((t) => t === talk).length;
+  const wear = 1 / (1 + repeats * 0.7);
+  state.talkHistory = [...history, talk].slice(-5);
+
+  const side = report.homeId === state.userClubId ? "home" : "away";
+  const played = new Set(report.lineups[side].filter((id) => report.ratings[id] !== undefined));
+  let total = 0;
+  let count = 0;
+  for (const p of Object.values(state.players)) {
+    if (p.clubId !== state.userClubId) continue;
+    const share = played.has(p.id) || report.ratings[p.id] !== undefined ? 1 : 0.5;
+    const tough = talk === "demand" || talk === "disappointed";
+    let morale = 0;
+    let happiness = 0;
+    let relation = 0;
+    if (fit === 1) {
+      morale = (tough ? 2 + (6 * p.professionalism) / 100 : 6) * wear;
+      happiness = tough ? (p.professionalism < 40 ? -1 : 0) : 2 * wear;
+      relation = 1;
+    } else if (fit === 0) {
+      morale = talk === "calm" || talk === "praise" ? 1 * wear : tough ? (p.professionalism - 50) / 25 : 0;
+    } else {
+      // Praise after a poor game: they know better. Tough words after a good one: unfair.
+      morale = talk === "praise" ? -2 : -7;
+      happiness = talk === "praise" ? 0 : -4;
+      relation = talk === "praise" ? -1 : -3;
+    }
+    p.morale = clamp(p.morale + morale * share, 0, 100);
+    p.happiness = clamp(p.happiness + happiness * share, 0, 100);
+    p.relation = clamp(p.relation + relation * share, 0, 100);
+    if (share === 1) {
+      total += morale;
+      count++;
+    }
+  }
+
+  const result: TalkResult = {fit, key: `tt.react.${talk}.${FIT_NAME[fit]}`, morale: count ? total / count : 0, worn: repeats >= 2 && fit >= 0};
+  if (single && state.players[single.playerId]) result.player = {id: single.playerId, key: playerTalk(state, rng, report, single.playerId, single.talk)};
+  return result;
+}
+
+/** A word with one player about their game: judged on their match rating. */
+function playerTalk(state: GameState, rng: Rng, report: MatchReport, playerId: string, talk: PlayerTalk): string {
+  const p = state.players[playerId];
+  const rating = report.ratings[playerId] ?? 6;
+  const scored = report.events.some((e) => e.type === "goal" && e.playerId === playerId);
+  p.lastTalkWeek = state.absWeek;
+  if (talk === "praise") {
+    if (rating >= 7.2 || scored) {
+      p.happiness = clamp(p.happiness + 4, 0, 100);
+      p.morale = clamp(p.morale + 6, 0, 100);
+      p.relation = clamp(p.relation + 3, 0, 100);
+      return "tt.player.praise.good";
+    }
+    if (rating < 6.2) {
+      p.relation = clamp(p.relation - 1, 0, 100);
+      return "tt.player.praise.bad";
+    }
+    p.morale = clamp(p.morale + 2, 0, 100);
+    return "tt.player.praise.meh";
+  }
+  if (rating >= 6.8 || scored) {
+    p.morale = clamp(p.morale - 10, 0, 100);
+    p.happiness = clamp(p.happiness - 8, 0, 100);
+    p.relation = clamp(p.relation - 8, 0, 100);
+    return "tt.player.criticize.bad";
+  }
+  if (rating < 6.1 && rng.chance(p.professionalism / 100)) {
+    p.morale = clamp(p.morale + 5, 0, 100);
+    return "tt.player.criticize.good";
+  }
+  p.morale = clamp(p.morale - 5, 0, 100);
+  p.happiness = clamp(p.happiness - 3, 0, 100);
+  return "tt.player.criticize.meh";
 }
 
 /** After each user match: count starts and judge promises that are due. */

@@ -4,9 +4,10 @@
 //   finishWeek: the user's match counts -> training -> moods -> market -> money -> season end
 // advanceWeek does both at once, with the computer deciding every set piece.
 import {CUP_WEEKS, DIAMONDS_SEASON, ENERGY_COST_MATCH, FORMATIONS, SEASON_WEEKS} from "./constants";
-import {payPrizeMoney, setSeasonBudgets, weeklyFinances} from "./finance";
+import {payPrizeMoney, seasonBoardReview, setSeasonBudgets, weeklyFinances} from "./finance";
 import {assignRoles, createFreeAgents, createPlayer} from "./generate";
-import {finishCupStage, setupCup} from "./cup";
+import {finishCupStage, setupCup, userCupResult} from "./cup";
+import {taskProgress} from "./daily";
 import {addMessage, cupFixturesInStage, currentCupStage, currentRound, findFixture, fixturesInRound, fullName, leagueClubs, playerName} from "./helpers";
 import {makeFixtures, standings} from "./league";
 import {pickBestLineup, repairLineup} from "./lineup";
@@ -27,6 +28,7 @@ export type AdvanceResult = {ok: true; report?: MatchReport} | {ok: false; reaso
  * user has a match, sets it up in `state.liveMatch` to be played live.
  */
 export function startWeek(state: GameState, rng: Rng, now: number, opts = {useEnergy: true}): StartResult {
+  if (state.gameOver) return {ok: false, reason: "err.gameOver"};
   if (state.liveMatch) return {ok: true, live: true};
   // Old saves have no cup yet: set one up if this season's hasn't started, else wait for the next.
   if ((!state.cup || state.cup.season !== state.season) && state.week <= CUP_WEEKS[0]) setupCup(state, rng);
@@ -85,6 +87,11 @@ export function finishWeek(state: GameState, rng: Rng): MatchReport | undefined 
     applyMatch(state, report);
     state.liveMatch = null;
     userReport = report;
+    // Today's tasks: a win, goals.
+    const ours = f.homeId === user.id ? report.homeGoals : report.awayGoals;
+    const theirs = f.homeId === user.id ? report.awayGoals : report.homeGoals;
+    if (ours > theirs) taskProgress(state, "win");
+    taskProgress(state, "goals", ours);
     state.reports.unshift(report);
     if (state.reports.length > 6) state.reports.length = 6;
     updatePromises(state, user.lineup);
@@ -147,8 +154,11 @@ function endSeason(state: GameState, rng: Rng): void {
   const table = standings(state);
   const order = table.map((row) => row.club.id);
   payPrizeMoney(state, order);
+  seasonBoardReview(state);
   const userPosition = order.indexOf(state.userClubId) + 1;
-  state.history.push({season: state.season, championId: order[0], userPosition});
+  const cup = userCupResult(state);
+  state.history.push({season: state.season, championId: order[0], userPosition, ...(cup !== undefined ? {cup} : {})});
+  if (userPosition === 1) state.celebrations = [...(state.celebrations ?? []), {kind: "league", season: state.season}];
   const m = state.monetization;
   m.diamonds += userPosition === 1 ? DIAMONDS_SEASON.champion : userPosition <= 3 ? DIAMONDS_SEASON.top3 : DIAMONDS_SEASON.rest;
   addMessage(state, {

@@ -43,7 +43,8 @@ export const BID_EXPIRY_WEEKS = 2;
 
 // Monetization: energy for matches and extra training, diamonds as premium currency.
 export const ENERGY_MAX = 5;
-export const ENERGY_REGEN_MS = 20 * 60 * 1000;
+/** One ⚡ back every 9 min 59 s. */
+export const ENERGY_REGEN_MS = (9 * 60 + 59) * 1000;
 export const ENERGY_COST_MATCH = 1;
 export const ENERGY_COST_EXTRA_TRAINING = 1;
 export const MAX_EXTRA_TRAININGS = 2;

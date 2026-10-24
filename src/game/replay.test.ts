@@ -106,7 +106,7 @@ describe("match replay", () => {
     }
     expect(crosses).toBeGreaterThan(1);
     expect(cutOut).toBeGreaterThan(3);
-    expect(crosses + cutOut).toBeGreaterThan(10);
+    expect(crosses + cutOut).toBeGreaterThan(6);
   });
 
   it("sometimes rules a goal out, and then it doesn't count", () => {

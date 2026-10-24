@@ -1,0 +1,33 @@
+// The board and debts: warnings for long spells in the red, then the sack.
+import {describe, expect, it} from "vitest";
+import {BOARD_WARNINGS, DEBT_WARNING_WEEKS, weeklyFinances} from "./finance";
+import {newGame} from "./generate";
+import {Rng} from "./rng";
+import {startWeek} from "./week";
+
+describe("the board", () => {
+  it("warns about debts, then sacks the manager", () => {
+    const g = newGame("Debt", 3, 7);
+    const club = g.clubs[g.userClubId];
+    club.cash = -50_000_000;
+    for (let week = 1; week < DEBT_WARNING_WEEKS * BOARD_WARNINGS; week++) {
+      weeklyFinances(g, new Set());
+      expect(g.gameOver).toBeUndefined();
+    }
+    expect(g.inbox.filter((m) => m.key === "msg.boardWarning")).toHaveLength(BOARD_WARNINGS - 1);
+    weeklyFinances(g, new Set());
+    expect(g.gameOver?.reason).toBe("debt");
+    // No more weeks once sacked.
+    expect(startWeek(g, new Rng(1), Date.now(), {useEnergy: false}).ok).toBe(false);
+  });
+
+  it("stops counting once the club is back in the black", () => {
+    const g = newGame("Debt", 3, 7);
+    const club = g.clubs[g.userClubId];
+    club.cash = -50_000_000;
+    for (let week = 0; week < DEBT_WARNING_WEEKS - 1; week++) weeklyFinances(g, new Set());
+    club.cash = 50_000_000;
+    weeklyFinances(g, new Set());
+    expect(g.board).toEqual({debtWeeks: 0, warnings: 0});
+  });
+});

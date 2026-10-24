@@ -101,6 +101,18 @@ export function shootout(rng: Rng, homeStrength: number, awayStrength: number): 
 }
 
 /**
+ * Whether a shoot-out is decided, from the score and the kicks each side has
+ * taken (home kicks first). In the first five each, as soon as one side can't
+ * catch up; after that, sudden death: a pair of kicks with one scored.
+ */
+export function shootoutOver(score: [number, number], taken: [number, number]): boolean {
+  if (taken[0] < 5 || taken[1] < 5) {
+    return score[0] + (5 - taken[0]) < score[1] || score[1] + (5 - taken[1]) < score[0];
+  }
+  return taken[0] === taken[1] && score[0] !== score[1];
+}
+
+/**
  * After a cup week's matches: penalties where it was level, prize money for
  * the winners, then the draw for the next stage (or the trophy).
  */
@@ -111,7 +123,8 @@ export function finishCupStage(state: GameState, rng: Rng, stage: number): void 
   const winners: string[] = [];
   for (const f of fixtures) {
     if (!f.played) continue;
-    if (f.homeGoals === f.awayGoals) {
+    // Level: penalties, unless the user already took them in the live match.
+    if (f.homeGoals === f.awayGoals && !f.penalties) {
       f.penalties = shootout(rng, clubStrength(state, f.homeId), clubStrength(state, f.awayId));
     }
     const homeWon = f.homeGoals > f.awayGoals || (f.homeGoals === f.awayGoals && f.penalties![0] > f.penalties![1]);
@@ -125,6 +138,7 @@ export function finishCupStage(state: GameState, rng: Rng, stage: number): void 
       const params = {stage: CUP_STAGES[stage], opponent: state.clubs[f.homeId === user ? f.awayId : f.homeId].name, prize: CUP_PRIZE[stage]};
       if (won && stage === CUP_STAGES.length - 1) {
         state.monetization.diamonds += CUP_DIAMONDS;
+        state.celebrations = [...(state.celebrations ?? []), {kind: "cup", season: state.season}];
         addMessage(state, {kind: "news", key: "msg.cupWon", params: {...params, diamonds: CUP_DIAMONDS}});
       } else {
         addMessage(state, {kind: "news", key: won ? "msg.cupThrough" : "msg.cupOut", params});
@@ -142,6 +156,15 @@ export function finishCupStage(state: GameState, rng: Rng, stage: number): void 
   cup.fixtures.push(...draw(state, rng, winners, stage + 1));
   const opponent = opponentOf(state, stage + 1);
   if (opponent) addMessage(state, {kind: "news", key: "msg.cupDraw", params: {stage: CUP_STAGES[stage + 1], opponent: state.clubs[opponent].name}});
+}
+
+/** How far the user got this season: 0 round of 16 … 3 final, 4 won; undefined if not in it. */
+export function userCupResult(state: GameState): number | undefined {
+  const cup = state.cup;
+  if (!cup || !cup.clubIds.includes(state.userClubId)) return undefined;
+  if (cup.winnerId === state.userClubId) return CUP_STAGES.length;
+  const mine = cup.fixtures.filter((f) => f.homeId === state.userClubId || f.awayId === state.userClubId);
+  return Math.max(0, ...mine.map((f) => f.stage));
 }
 
 /** The clubs still in it (not knocked out yet). */

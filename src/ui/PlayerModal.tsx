@@ -11,6 +11,8 @@ import {
   evaluateBid,
   evaluateLoanRequest,
   isKnown,
+  quickSaleOffer,
+  quickSell,
   scoutPlayer,
   type BidResult,
 } from "../game/transfers";
@@ -225,6 +227,40 @@ function OwnActions({player: p}: {player: Player}) {
           {t("pl.loanList")}
         </label>
       </div>
+      <QuickSale player={p} />
+    </div>
+  );
+}
+
+/** Sell now to the club that pays most, for less than waiting for bids would bring. Asks first. */
+function QuickSale({player: p}: {player: Player}) {
+  const {t, money} = useT();
+  const game = useGameState();
+  const act = useGame((s) => s.act);
+  const notify = useGame((s) => s.notify);
+  const openPlayer = useGame((s) => s.openPlayer);
+  const [sure, setSure] = useState(false);
+  if (p.clubId !== game.userClubId || p.loan) return null;
+  const offer = quickSaleOffer(game, p.id);
+  if (!offer) return <p className="muted small">{t("pl.noBuyer")}</p>;
+  const club = game.clubs[offer.clubId].name;
+  const sell = () => {
+    const err = act((g) => quickSell(g, p.id));
+    if (err) return notify(err, undefined, "error");
+    notify("toast.sold", {name: shortName(p), club, fee: offer.fee}, "good");
+    openPlayer(null);
+  };
+  return (
+    <div className="quick-sale">
+      <p className="muted small">{t("pl.quickSaleHint", {club, fee: money(offer.fee)})}</p>
+      {sure ? (
+        <div className="btn-row">
+          <button className="btn primary" onClick={sell}>{t("pl.quickSaleYes", {fee: money(offer.fee)})}</button>
+          <button className="btn" onClick={() => setSure(false)}>{t("common.cancel")}</button>
+        </div>
+      ) : (
+        <button className="btn" onClick={() => setSure(true)}>💸 {t("pl.quickSale")}</button>
+      )}
     </div>
   );
 }

@@ -2,9 +2,7 @@ import {useRef} from "react";
 import {parseSave} from "../../game/save";
 import {LANGS, useT, type Lang} from "../../i18n";
 import {useGame, useGameState} from "../../store";
-import {defaultManagerLook} from "../Avatar";
 import {Card} from "../common";
-import {ManagerEditor} from "../ManagerEditor";
 
 const LANG_NAMES: Record<Lang, string> = {sv: "Svenska", en: "English", es: "Español"};
 
@@ -16,7 +14,6 @@ export function Settings() {
   const replace = useGame((s) => s.replace);
   const quit = useGame((s) => s.quit);
   const notify = useGame((s) => s.notify);
-  const act = useGame((s) => s.act);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const exportSave = () => {
@@ -39,18 +36,9 @@ export function Settings() {
   return (
     <div className="grid">
       <Card title={t("settings.language")}>
-        <div className="btn-row">
-          {LANGS.map((l) => (
-            <button key={l} className={l === lang ? "chip active" : "chip"} onClick={() => setLang(l)}>{LANG_NAMES[l]}</button>
-          ))}
-        </div>
-      </Card>
-      <Card title={t("settings.manager")}>
-        <label className="field">
-          <span>{t("new.managerName")}</span>
-          <input value={game.managerName} maxLength={30} onChange={(e) => act((g) => { g.managerName = e.target.value; })} />
-        </label>
-        <ManagerEditor look={game.managerLook ?? defaultManagerLook(game.managerName)} onChange={(look) => act((g) => { g.managerLook = look; })} />
+        <select className="lang-select" value={lang} onChange={(e) => setLang(e.target.value as Lang)} aria-label={t("settings.language")}>
+          {LANGS.map((l) => <option key={l} value={l}>{LANG_NAMES[l]}</option>)}
+        </select>
       </Card>
       <Card title={t("settings.save")}>
         <p className="muted">{t("settings.saveHint")}</p>

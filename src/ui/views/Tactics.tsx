@@ -1,10 +1,11 @@
-// Lineup and tactics. Tap a slot on the pitch, then a player to put there.
-import {useState} from "react";
+// Lineup and tactics. Tap a slot on the pitch, then a player to put there; or
+// drag a shirt onto another slot and they swap.
+import {useEffect, useRef, useState, type PointerEvent as ReactPointerEvent} from "react";
 import {BENCH_SIZE, FORMATIONS, type Slot} from "../../game/constants";
 import {listName, shortName, userClub} from "../../game/helpers";
 import {isAvailable, pickBestLineup} from "../../game/lineup";
 import {clubPlayers, effectiveRating, familiarity, teamOvr} from "../../game/ratings";
-import {FORMATION_IDS, MENTALITIES} from "../../game/types";
+import {FORMATION_IDS, MENTALITIES, type FormationId, type Mentality} from "../../game/types";
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
 import {Bar, Card, Flag, PosBadge, StatusIcons} from "../common";
@@ -66,16 +67,16 @@ export function Tactics() {
   const [selected, setSelected] = useState<number | null>(null);
   const squad = clubPlayers(game, club.id);
 
-  const assign = (playerId: string) => {
-    if (selected === null) return;
+  const assign = (playerId: string, slot = selected) => {
+    if (slot === null) return;
     act((g) => {
       const c = g.clubs[g.userClubId];
       const lineup = [...c.lineup];
       while (lineup.length < slots.length) lineup.push("");
-      const current = lineup[selected];
+      const current = lineup[slot];
       const otherSlot = lineup.indexOf(playerId);
       if (otherSlot >= 0) lineup[otherSlot] = current; // Swap two starters.
-      lineup[selected] = playerId;
+      lineup[slot] = playerId;
       let bench = c.bench.filter((id) => id !== playerId);
       if (otherSlot < 0 && current) bench = [current, ...bench].slice(0, BENCH_SIZE);
       c.lineup = lineup;
@@ -99,6 +100,10 @@ export function Tactics() {
       c.bench = best.bench;
     });
 
+  const drag = useDrag((playerId, fromSlot, toSlot) => {
+    if (toSlot !== fromSlot) assign(playerId, toSlot);
+  });
+
   const pos = selected !== null ? slots[selected].pos : null;
   const candidates = pos
     ? squad.slice().sort((a, b) => effectiveRating(b, pos) - effectiveRating(a, pos))
@@ -108,19 +113,21 @@ export function Tactics() {
     <div className="grid tactics">
       <Card
         title={<>{t("nav.tactics")} <span className="team-ovr" title={t("tac.teamOvrHint")}>{t("tac.teamOvr")} <strong>{teamOvr(game, club.id)}</strong></span></>}
-        actions={<button className="btn small" onClick={auto}>✨ {t("tac.auto")}</button>}
+        actions={<button className="btn small" onClick={auto}>{t("tac.auto")}</button>}
       >
-        <div className="btn-row wrap">
-          {FORMATION_IDS.map((f) => (
-            <button key={f} className={f === club.formation ? "chip active" : "chip"} onClick={() => act((g) => { g.clubs[g.userClubId].formation = f; })}>{f}</button>
-          ))}
-        </div>
-        <div className="btn-row wrap">
-          {MENTALITIES.map((m) => (
-            <button key={m} className={m === club.mentality ? "chip active" : "chip"} onClick={() => act((g) => { g.clubs[g.userClubId].mentality = m; })}>
-              {t(`tac.${m}`)}
-            </button>
-          ))}
+        <div className="tac-pickers">
+          <label className="field">
+            <span>{t("tac.formation")}</span>
+            <select value={club.formation} onChange={(e) => act((g) => { g.clubs[g.userClubId].formation = e.target.value as FormationId; })}>
+              {FORMATION_IDS.map((f) => <option key={f} value={f}>{f}</option>)}
+            </select>
+          </label>
+          <label className="field">
+            <span>{t("tac.mentality")}</span>
+            <select value={club.mentality} onChange={(e) => act((g) => { g.clubs[g.userClubId].mentality = e.target.value as Mentality; })}>
+              {MENTALITIES.map((m) => <option key={m} value={m}>{t(`tac.${m}`)}</option>)}
+            </select>
+          </label>
         </div>
         <p className="muted small">{t(`tac.${club.mentality}Hint`)}</p>
 
@@ -132,9 +139,11 @@ export function Tactics() {
             return (
               <button
                 key={i}
-                className={`slot ${selected === i ? "selected" : ""} ${bad ? "empty" : ""}`}
+                data-slot={i}
+                className={`slot ${selected === i ? "selected" : ""} ${bad ? "empty" : ""} ${drag.over === i ? "drop" : ""}`}
                 style={spots[i]}
-                onClick={() => setSelected(selected === i ? null : i)}
+                onPointerDown={p && !bad ? (e) => drag.start(e, p.id, i, shortName(p)) : undefined}
+                onClick={() => !drag.justDropped() && setSelected(selected === i ? null : i)}
               >
                 {p && !bad && club.roles?.captain === p.id && <span className="armband" title={t("roles.captain")}>C</span>}
                 {bad ? (
@@ -154,7 +163,9 @@ export function Tactics() {
             );
           })}
         </div>
+        <p className="muted small">{t("tac.dragHint")}</p>
       </Card>
+      {drag.ghost && <div className="drag-ghost" style={{left: drag.ghost.x, top: drag.ghost.y}}>{drag.ghost.label}</div>}
 
       <Card title={selected !== null && pos ? t("tac.pickFor", {pos: t(`pos.${pos}`)}) : t("tac.bench", {n: club.bench.length, max: BENCH_SIZE})}>
         {selected !== null && pos ? (
@@ -195,4 +206,63 @@ export function Tactics() {
       </Card>
     </div>
   );
+}
+
+/**
+ * Dragging players with the mouse or a finger (pointer events, so touch works
+ * too). A press only becomes a drag once it has moved a few pixels, so taps
+ * still select. `onDrop` gets the player, the slot they came from and the slot
+ * they were dropped on.
+ */
+function useDrag(onDrop: (playerId: string, fromSlot: number, toSlot: number) => void) {
+  const [ghost, setGhost] = useState<{x: number; y: number; label: string} | null>(null);
+  const [over, setOver] = useState<number | null>(null);
+  const press = useRef<{playerId: string; fromSlot: number; label: string; x: number; y: number; dragging: boolean} | null>(null);
+  const dropped = useRef(0);
+  const dropRef = useRef(onDrop);
+  dropRef.current = onDrop;
+
+  useEffect(() => {
+    const targetAt = (x: number, y: number): number | null => {
+      const slot = document.elementFromPoint(x, y)?.closest("[data-slot]")?.getAttribute("data-slot");
+      return slot != null ? Number(slot) : null;
+    };
+    const move = (e: PointerEvent) => {
+      const p = press.current;
+      if (!p) return;
+      if (!p.dragging && Math.hypot(e.clientX - p.x, e.clientY - p.y) < 6) return;
+      p.dragging = true;
+      setGhost({x: e.clientX, y: e.clientY, label: p.label});
+      setOver(targetAt(e.clientX, e.clientY));
+    };
+    const up = (e: PointerEvent) => {
+      const p = press.current;
+      press.current = null;
+      if (!p?.dragging) return;
+      dropped.current = performance.now();
+      setGhost(null);
+      setOver(null);
+      const to = targetAt(e.clientX, e.clientY);
+      if (to !== null) dropRef.current(p.playerId, p.fromSlot, to);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+    };
+  }, []);
+
+  return {
+    ghost,
+    over,
+    start: (e: ReactPointerEvent, playerId: string, fromSlot: number, label: string) => {
+      if (e.button !== 0) return;
+      press.current = {playerId, fromSlot, label, x: e.clientX, y: e.clientY, dragging: false};
+    },
+    /** True right after a drop, so the click that follows it doesn't also select. */
+    justDropped: () => performance.now() - dropped.current < 300,
+  };
 }

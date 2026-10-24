@@ -2,7 +2,7 @@
 // cup weeks to a winner, and kept apart from the league.
 import {describe, expect, it} from "vitest";
 import {CUP_FROM_LEAGUE, CUP_SIZE, CUP_WEEKS, SEASON_WEEKS} from "./constants";
-import {shootout} from "./cup";
+import {shootout, shootoutOver} from "./cup";
 import {newGame} from "./generate";
 import {currentRound, leagueClubs} from "./helpers";
 import {standings} from "./league";
@@ -62,6 +62,16 @@ describe("Champions Cup", () => {
     expect(g.cup!.season).toBe(g.season);
     expect(g.cup!.fixtures.every((f) => !f.played)).toBe(true);
   }, 120000);
+
+  it("ends a shoot-out as soon as it's decided", () => {
+    expect(shootoutOver([3, 0], [3, 3])).toBe(true); // 3–0 with two each left: can't catch up.
+    expect(shootoutOver([3, 1], [3, 3])).toBe(false);
+    expect(shootoutOver([4, 4], [5, 5])).toBe(false); // Level after five: sudden death.
+    expect(shootoutOver([5, 4], [6, 5])).toBe(false); // Home scored, away still to kick.
+    expect(shootoutOver([5, 4], [6, 6])).toBe(true);
+    expect(shootoutOver([4, 3], [5, 4])).toBe(false); // Away can still level with their fifth.
+    expect(shootoutOver([4, 2], [5, 4])).toBe(true); // Now they can't.
+  });
 
   it("settles level ties on penalties", () => {
     const r = new Rng(9);

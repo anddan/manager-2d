@@ -37,14 +37,12 @@ export function NewGame() {
     <main className="welcome">
       <div className="welcome-card">
         <p className="eyebrow">{league.name}</p>
-        <h1>⚽ Manager 2D</h1>
+        <h1>⚽ Forza Manager</h1>
         <p className="muted">{t("new.intro")}</p>
 
-        <div className="lang-switch" role="group" aria-label={t("settings.language")}>
-          {LANGS.map((l) => (
-            <button key={l} className={l === lang ? "chip active" : "chip"} onClick={() => setLang(l)}>{LANG_NAMES[l]}</button>
-          ))}
-        </div>
+        <select className="lang-select" value={lang} onChange={(e) => setLang(e.target.value as Lang)} aria-label={t("settings.language")}>
+          {LANGS.map((l) => <option key={l} value={l}>{LANG_NAMES[l]}</option>)}
+        </select>
 
         <h3>{t("new.yourManager")}</h3>
         <label className="field">

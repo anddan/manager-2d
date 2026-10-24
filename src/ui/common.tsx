@@ -1,5 +1,5 @@
 // Small building blocks shared by the screens.
-import {useEffect, type ReactNode} from "react";
+import {useEffect, useState, type ReactNode} from "react";
 import {listName} from "../game/helpers";
 import {overall} from "../game/ratings";
 import {estimatedOverall, isKnown} from "../game/transfers";
@@ -132,4 +132,43 @@ export function Tabs<T extends string>({value, options, onChange}: {value: T; op
 
 export function Empty({children}: {children: ReactNode}) {
   return <p className="empty">{children}</p>;
+}
+
+/**
+ * Sorting a table by a column. Clicking the column sorted by flips it;
+ * another column starts high-to-low for numbers (`descFirst`) and A–Z otherwise.
+ */
+export function useSort<K extends string>(initial: K, initialDesc = false) {
+  const [key, setKey] = useState<K>(initial);
+  const [desc, setDesc] = useState(initialDesc);
+  const onSort = (k: K, descFirst: boolean) => {
+    if (k === key) setDesc(!desc);
+    else {
+      setKey(k);
+      setDesc(descFirst);
+    }
+  };
+  return {key, desc, onSort};
+}
+
+/** Rows sorted by a value; ties keep their order. */
+export function sortRows<T>(rows: T[], value: (row: T) => number | string, desc: boolean): T[] {
+  return rows
+    .map((row, i) => ({row, i, v: value(row)}))
+    .sort((a, b) => {
+      const cmp = typeof a.v === "string" ? a.v.localeCompare(String(b.v)) : a.v - Number(b.v);
+      return (desc ? -cmp : cmp) || a.i - b.i;
+    })
+    .map((x) => x.row);
+}
+
+/** A header cell that sorts by its column, with ▲ / ▼ on the one in use. */
+export function SortTh({label, active, desc, onClick, title}: {label: ReactNode; active: boolean; desc: boolean; onClick: () => void; title?: string}) {
+  return (
+    <th title={title}>
+      <button className="th-btn" onClick={onClick}>
+        {label}{active ? (desc ? " ▼" : " ▲") : ""}
+      </button>
+    </th>
+  );
 }

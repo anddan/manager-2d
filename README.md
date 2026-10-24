@@ -1,4 +1,4 @@
-# Manager 2D
+# Forza Manager
 
 A football manager game for the browser (desktop and mobile). Fictional clubs,
 leagues and players. Swedish, English and Spanish.
