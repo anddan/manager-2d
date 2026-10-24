@@ -248,6 +248,11 @@ export const sv = {
   // Fixtures and match
   "fx.onlyMine": "Bara mina matcher",
   "fx.next": "Nästa",
+  "formLevel.0": "Form: toppform",
+  "formLevel.1": "Form: bra",
+  "formLevel.2": "Form: normal",
+  "formLevel.3": "Form: svag",
+  "formLevel.4": "Form: dålig",
   "tbl.scorers": "⚽ Skytteligan",
   "tbl.assists": "🅰️ Assistligan",
   "tbl.cards": "🟨 Kortligan",

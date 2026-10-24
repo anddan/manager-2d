@@ -6,7 +6,7 @@ import {POSITIONS, TEAM_ROLES, type Player, type TeamRole} from "../../game/type
 import {useT, type TKey} from "../../i18n";
 import {useGame, useGameState} from "../../store";
 import {Avatar} from "../Avatar";
-import {Bar, Card, Face, Flag, PosBadge, StatusIcons} from "../common";
+import {Bar, Card, Face, Flag, FormArrow, PosBadge, StatusIcons} from "../common";
 
 type SortKey = "pos" | "name" | "age" | "ovr" | "form" | "fitness" | "happiness" | "value" | "wage";
 
@@ -89,7 +89,7 @@ export function Squad() {
                 </td>
                 <td>{p.age}</td>
                 <td className="num strong">{overall(p)}</td>
-                <td><Bar value={p.form} small /></td>
+                <td><FormArrow form={p.form} /></td>
                 <td><Bar value={p.fitness} small /></td>
                 <td><Face value={p.happiness} /></td>
                 <td className="num">{money(p.value)}</td>

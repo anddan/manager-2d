@@ -4,7 +4,7 @@ import {askingPrice, estimatedOverall, respondToBid} from "../../game/transfers"
 import {POSITIONS, type Position} from "../../game/types";
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
-import {Card, Empty, Flag, Ovr, PosBadge, SortTh, StatusIcons, Tabs, sortRows, useSort} from "../common";
+import {Card, Empty, Flag, NumberInput, Ovr, PosBadge, SortTh, StatusIcons, Tabs, sortRows, useSort} from "../common";
 
 type SearchSort = "pos" | "name" | "age" | "ovr" | "club" | "price" | "contract";
 
@@ -84,15 +84,15 @@ function Search() {
         </label>
         <label className="field">
           <span>{t("tr.maxAge")}</span>
-          <input type="number" min={16} max={40} value={maxAge} onChange={(e) => setMaxAge(Number(e.target.value))} />
+          <NumberInput max={40} value={maxAge} onChange={setMaxAge} />
         </label>
         <label className="field">
           <span>{t("tr.minOvr")}</span>
-          <input type="number" min={0} max={99} value={minOvr} onChange={(e) => setMinOvr(Number(e.target.value))} />
+          <NumberInput max={99} value={minOvr} onChange={setMinOvr} />
         </label>
         <label className="field">
           <span>{t("tr.maxPrice")}</span>
-          <input type="number" min={0} step={100_000} value={maxPrice} onChange={(e) => setMaxPrice(Number(e.target.value))} placeholder="0 = ∞" />
+          <NumberInput step={100_000} value={maxPrice} onChange={setMaxPrice} placeholder="0 = ∞" />
         </label>
         <label className="field">
           <span>{t("tr.source")}</span>
@@ -161,7 +161,7 @@ export function BidCard({bidId}: {bidId: string}) {
         <button className="btn" onClick={() => respond("reject")}>{t("tr.reject")}</button>
         {!bid.loan && (
           <>
-            <input type="number" className="small-input" step={10_000} value={counter} onChange={(e) => setCounter(Number(e.target.value))} aria-label={t("tr.counterAmount")} />
+            <span className="small-input"><NumberInput step={10_000} value={counter} onChange={setCounter} ariaLabel={t("tr.counterAmount")} /></span>
             <button className="btn" onClick={() => respond("counter")}>{t("tr.counter")}</button>
           </>
         )}

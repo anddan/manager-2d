@@ -8,7 +8,7 @@ import {clubPlayers, effectiveRating, familiarity, teamOvr} from "../../game/rat
 import {FORMATION_IDS, MENTALITIES, type FormationId, type Mentality} from "../../game/types";
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
-import {Bar, Card, Flag, PosBadge, StatusIcons} from "../common";
+import {Bar, Card, Flag, FormArrow, PosBadge, StatusIcons} from "../common";
 import {Jersey} from "../Jersey";
 
 /**
@@ -157,6 +157,7 @@ export function Tactics() {
                     {p && !bad && <Flag code={p.nationality} size={13} />}
                     <span>{t(`pos.${slot.pos}`)}</span>
                     {p && !bad && <strong>{Math.round(effectiveRating(p, slot.pos))}</strong>}
+                    {p && !bad && <FormArrow form={p.form} size={12} />}
                   </span>
                 </span>
               </button>
@@ -176,6 +177,7 @@ export function Tactics() {
                   <PosBadge pos={p.position} />
                   <span className="pick-name"><Flag code={p.nationality} size={15} /> {listName(p)} <StatusIcons player={p} /></span>
                   <span className="muted small">{club.lineup.includes(p.id) ? t("tac.starting") : club.bench.includes(p.id) ? t("tac.onBench") : ""}</span>
+                  <FormArrow form={p.form} />
                   <span className={familiarity(p, pos) < 1 ? "num warn" : "num strong"}>{Math.round(effectiveRating(p, pos))}</span>
                   <Bar value={p.fitness} small />
                 </button>
@@ -195,6 +197,7 @@ export function Tactics() {
                       <input type="checkbox" aria-label={t("tac.toBench")} checked={club.bench.includes(p.id)} disabled={!isAvailable(p)} onChange={() => toggleBench(p.id)} />
                       <PosBadge pos={p.position} />
                       <button className="link pick-name" onClick={() => openPlayer(p.id)}><Flag code={p.nationality} size={15} /> {listName(p)} <StatusIcons player={p} /></button>
+                      <FormArrow form={p.form} />
                       <span className="num">{Math.round(effectiveRating(p, p.position))}</span>
                       <Bar value={p.fitness} small />
                     </div>

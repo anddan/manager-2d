@@ -188,7 +188,7 @@ h3 { font-size: 1rem; margin-top: 1rem; color: var(--muted); text-transform: upp
 input[type="number"], input:not([type]), input[type="text"], select {
   background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; min-width: 0;
 }
-.small-input { width: 130px; }
+.small-input, .small-input input { width: 130px; }
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 4px 12px; }
 .filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 4px 10px; margin-bottom: 6px; }
 .toggle { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
@@ -999,3 +999,5 @@ button.pick { grid-template-columns: auto 1fr auto auto 60px; }
 /* Every control in the match row as tall as the tallest (play / pause / fast-forward included). */
 .match-controls { align-items: stretch; }
 .match-controls .speed-group .chip { padding: 6px 12px; }
+.form-arrow { display: inline-block; vertical-align: middle; flex-shrink: 0; }
+.dot-captain { font-size: 1.7px; font-weight: 900; text-anchor: middle; pointer-events: none; }

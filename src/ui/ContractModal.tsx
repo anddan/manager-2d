@@ -7,7 +7,7 @@ import {completeTransfer} from "../game/transfers";
 import {SQUAD_ROLES, type SquadRole} from "../game/types";
 import {useT} from "../i18n";
 import {useGame, useGameState} from "../store";
-import {Modal} from "./common";
+import {Modal, NumberInput} from "./common";
 
 export function ContractModal() {
   const {t, tx, money} = useT();
@@ -53,7 +53,7 @@ export function ContractModal() {
   const numberField = (key: "wage" | "signingBonus" | "goalBonus" | "appearanceBonus", step: number) => (
     <label className="field">
       <span>{t(`neg.${key}`)} <small className="muted">({t("neg.asks")} {money(neg.demand[key])})</small></span>
-      <input type="number" min={0} step={step} value={offer[key]} onChange={(e) => set(key, Math.max(0, Number(e.target.value)))} />
+      <NumberInput step={step} value={offer[key]} onChange={(n) => set(key, n)} />
     </label>
   );
 
@@ -85,7 +85,7 @@ export function ContractModal() {
             {t("pl.releaseClause")}
           </span>
           {offer.releaseClause !== null && (
-            <input type="number" min={0} step={50_000} value={offer.releaseClause} onChange={(e) => set("releaseClause", Math.max(0, Number(e.target.value)))} />
+            <NumberInput step={50_000} value={offer.releaseClause} onChange={(n) => set("releaseClause", n)} />
           )}
         </label>
       </div>

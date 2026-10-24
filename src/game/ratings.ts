@@ -52,10 +52,14 @@ export function familiarity(player: Player, pos: Position): number {
 }
 
 /** Rating in a slot today, after condition, form and mood. */
+/** How much form moves a player: ±18 % between the worst and the best form. */
+export const FORM_EFFECT = 0.18;
+
 export function effectiveRating(player: Player, pos: Position): number {
   const base = ratingAt(player, pos) * familiarity(player, pos);
   const fitness = 0.75 + 0.25 * (player.fitness / 100);
-  const form = 0.93 + 0.14 * (player.form / 100);
+  // Form counts a lot: from 18 % below their level in bad form to 18 % above in top form (none at average).
+  const form = 1 + FORM_EFFECT * (player.form / 50 - 1);
   const morale = 0.95 + 0.1 * (player.morale / 100);
   const sharpness = 0.95 + 0.05 * (player.sharpness / 100);
   // Unhappy players don't give everything.

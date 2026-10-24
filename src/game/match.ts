@@ -11,7 +11,7 @@ import {DIAMONDS_PER_WIN, FORMATIONS, MAX_SUBS, type Slot} from "./constants";
 import {book, findFixture} from "./helpers";
 import {isAvailable} from "./lineup";
 import {distance, fromSide, progressFor, teamSpot, type Point} from "./pitch";
-import {effectiveRating} from "./ratings";
+import {FORM_EFFECT, effectiveRating} from "./ratings";
 import {Rng, clamp} from "./rng";
 import {
   CORNER_RATE,
@@ -188,7 +188,7 @@ function shotSkill(team: Team, p: Player): number {
   const raw = p.attrs.finishing * 0.65 + p.attrs.technique * 0.2 + p.attrs.vision * 0.15;
   // Shooting more means trying from further out; less means only clear chances.
   const choice = [4, 0, -6][level(team, p.id, "shooting") + 1];
-  return (raw + choice) * (0.8 + 0.2 * (p.fitness / 100)) * (0.93 + 0.14 * (p.form / 100));
+  return (raw + choice) * (0.8 + 0.2 * (p.fitness / 100)) * (1 + FORM_EFFECT * (p.form / 50 - 1));
 }
 
 /** Picks a player on the pitch weighted by slot position and an attribute. */
@@ -655,8 +655,9 @@ class Replay {
     const settled = touches.length === 0 && progressFor(side, this.ball.x) > 45;
     let lastPasser: string | undefined;
     for (let i = 0; i < passes; i++) {
-      // Near goal with nothing on: it ends here (cut out below), not played back out.
-      if (outcome.type === "none" && this.inFrontOfGoal(side)) break;
+      // In front of goal it is never played back out: the chance comes from here (the shot
+      // below), or nothing does and the defence cuts it out.
+      if (this.inFrontOfGoal(side)) break;
       // Wide in the final third: take it down the line and cross it into the box.
       // (In a minute that ends with them keeping the ball, nothing goes into the box.)
       const intoBox = outcome.type !== "none" || turnover;

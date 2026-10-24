@@ -19,7 +19,7 @@ import {
 import {ATTRIBUTES, type Player} from "../game/types";
 import {useT} from "../i18n";
 import {useGame, useGameState} from "../store";
-import {Bar, Delta, Face, Flag, Modal, Ovr, PosBadge, StatusIcons} from "./common";
+import {Bar, Delta, Face, Flag, FormArrow, Modal, NumberInput, Ovr, PosBadge, StatusIcons} from "./common";
 import {PlayerCard} from "./PlayerCard";
 
 export function PlayerModal({playerId}: {playerId: string}) {
@@ -123,7 +123,7 @@ function Condition({player: p}: {player: Player}) {
     <>
       <h3>{t("pl.condition")}</h3>
       <dl className="kv bars">
-        <dt>{t("col.form")}</dt><dd><Bar value={p.form} /></dd>
+        <dt>{t("col.form")}</dt><dd><FormArrow form={p.form} size={20} /></dd>
         <dt>{t("col.fitness")}</dt><dd><Bar value={p.fitness} /></dd>
         <dt>{t("pl.morale")}</dt><dd><Bar value={p.morale} /></dd>
         <dt>{t("pl.sharpness")}</dt><dd><Bar value={p.sharpness} /></dd>
@@ -345,7 +345,7 @@ function MarketActions({player: p}: {player: Player}) {
           <div className="form-grid">
             <label className="field">
               <span>{t("pl.fee")}</span>
-              <input type="number" min={0} step={10_000} value={fee} onChange={(e) => setFee(Math.max(0, Number(e.target.value)))} />
+              <NumberInput step={10_000} value={fee} onChange={setFee} />
             </label>
             <label className="field">
               <span>{t("pl.upfront")}</span>

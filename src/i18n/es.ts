@@ -233,6 +233,11 @@ export const es: Record<keyof typeof sv, string> = {
 
   "fx.onlyMine": "Solo mis partidos",
   "fx.next": "Siguiente",
+  "formLevel.0": "Forma: excelente",
+  "formLevel.1": "Forma: buena",
+  "formLevel.2": "Forma: normal",
+  "formLevel.3": "Forma: floja",
+  "formLevel.4": "Forma: mala",
   "tbl.scorers": "⚽ Goleadores",
   "tbl.assists": "🅰️ Asistentes",
   "tbl.cards": "🟨 Tarjetas",

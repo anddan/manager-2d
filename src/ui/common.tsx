@@ -172,3 +172,60 @@ export function SortTh({label, active, desc, onClick, title}: {label: ReactNode;
     </th>
   );
 }
+
+/**
+ * A number input that can be cleared while typing (a plain controlled
+ * number input snaps back to 0 and you can't type over it). Empty counts as 0.
+ */
+export function NumberInput({value, onChange, min = 0, max, step, placeholder, ariaLabel}: {value: number; onChange: (n: number) => void; min?: number; max?: number; step?: number; placeholder?: string; ariaLabel?: string}) {
+  const [text, setText] = useState(String(value));
+  // Follow changes from outside (a counter-offer, a reset), but not while the text already says it.
+  useEffect(() => {
+    if ((text === "" ? 0 : Number(text)) !== value) setText(String(value));
+  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <input
+      type="number"
+      inputMode="numeric"
+      min={min}
+      max={max}
+      step={step}
+      placeholder={placeholder}
+      aria-label={ariaLabel}
+      value={text}
+      onChange={(e) => {
+        setText(e.target.value);
+        const n = e.target.value === "" ? 0 : Number(e.target.value);
+        if (Number.isFinite(n)) onChange(Math.max(min, max !== undefined ? Math.min(max, n) : n));
+      }}
+      onBlur={() => text === "" && setText(String(value))}
+    />
+  );
+}
+
+/** Form in five steps, from top form down. Thresholds on the 0–100 form value. */
+const FORM_STEPS = [
+  {min: 70, angle: -90, color: "#16a34a"},
+  {min: 57, angle: -45, color: "#84cc16"},
+  {min: 43, angle: 0, color: "#eab308"},
+  {min: 30, angle: 45, color: "#f97316"},
+  {min: -Infinity, angle: 90, color: "#ef4444"},
+];
+
+/**
+ * A player's form as an arrow, so it can't be mistaken for fitness (a bar):
+ * up green, up-right light green, right yellow, down-right orange, down red.
+ */
+export function FormArrow({form, size = 16}: {form: number; size?: number}) {
+  const {tx} = useT();
+  const step = FORM_STEPS.findIndex((s) => form >= s.min);
+  const {angle, color} = FORM_STEPS[step];
+  const label = tx(`formLevel.${step}`);
+  return (
+    <svg className="form-arrow" width={size} height={size} viewBox="0 0 16 16" role="img" aria-label={label}>
+      <title>{label}</title>
+      <circle cx={8} cy={8} r={7.5} fill={color} />
+      <path d="M4 8h7M8 4.5 11.5 8 8 11.5" stroke="#fff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" fill="none" transform={`rotate(${angle} 8 8)`} />
+    </svg>
+  );
+}

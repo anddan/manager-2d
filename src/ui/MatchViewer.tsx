@@ -1702,7 +1702,14 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   const dots = (side: Side) => {
     const club = side === "home" ? home : away;
     const mine = side === userSide;
-    return [...onPitchAt(report, side, view.time).values()].map((id) => {
+    const onPitch = [...onPitchAt(report, side, view.time).values()];
+    // The armband: the chosen captain, or (none chosen, or off) the best outfield player on the pitch.
+    const captain = club.roles?.captain && onPitch.includes(club.roles.captain)
+      ? club.roles.captain
+      : onPitch
+          .filter((id) => game.players[id]?.position !== "GK")
+          .reduce<string | undefined>((best, id) => (!best || overall(game.players[id]) > overall(game.players[best]) ? id : best), undefined);
+    return onPitch.map((id) => {
       const b = view.bodies[id];
       // Gone down the tunnel after the final whistle.
       if (!b || (finished && b.y > IN_TUNNEL)) return null;
@@ -1721,6 +1728,7 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
             {id === carrierId && <circle r={2.4} className="carrier-ring" />}
             {id === selected && <circle r={2.8} className="selected-ring" />}
             <circle r={1.6} fill={club.color} stroke={club.color2} strokeWidth={0.4} className="body" />
+            {id === captain && <text y={0.62} className="dot-captain" fill={club.color2}>C</text>}
             {booked.has(id) && <rect x={0.9} y={-2.6} width={1.1} height={1.5} rx={0.2} className="booked" />}
             {hurt.has(id) && <text x={-2.6} y={0.6} className="dot-hurt">✚</text>}
             <text y={-2.4} className="dot-label">{name(id)}</text>

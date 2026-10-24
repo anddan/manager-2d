@@ -17,7 +17,12 @@ function segmentDistance(p: {x: number; y: number}, a: {x: number; y: number}, b
 
 describe("replay movement", () => {
   const game = newGame("Physics", 2, 9);
-  const report = simulateMatch(game, new Rng(3), game.fixtures[0], true);
+  // A match with goals in it (the checks below look at goals); tried on copies, then played for real.
+  const seed = [3, 4, 5, 6, 7, 8, 9, 10].find((n) => {
+    const r = simulateMatch(structuredClone(game), new Rng(n), game.fixtures[0], true);
+    return r.homeGoals + r.awayGoals > 0;
+  })!;
+  const report = simulateMatch(game, new Rng(seed), game.fixtures[0], true);
   const ctx: Ctx = {
     report,
     frames: report.frames,
@@ -84,7 +89,7 @@ describe("replay movement", () => {
     expect(goals.length).toBeGreaterThan(0);
     const restarts = ["setpiece", "kickoff", "goalkick", "throwin"];
     let s = snap(ctx, 0, dyn);
-    let checked = 0;
+    const arrived = new Map<number, number>();
     // To the end of the match, added time included.
     const end = report.frames[report.frames.length - 1].minute + 0.5;
     for (let t = 0.02; t <= end; t += 0.02) {
@@ -96,16 +101,14 @@ describe("replay movement", () => {
       for (const {f, i} of goals) {
         const kickoff = report.frames[i + 1];
         const behindLine = s.ball.x > 100.5 || s.ball.x < -0.5;
-        // In the net within the wait the viewer allows (it then stops for the celebration)...
-        if (t > f.minute + 0.4 && t < f.minute + 0.42) {
-          expect(s.reached).toBeGreaterThanOrEqual(i);
-          checked++;
-        }
+        // When it got into the net (the first step it has)...
+        if (s.reached >= i && !arrived.has(i)) arrived.set(i, t - f.minute);
         // ...and once in, it stays in until play restarts.
         if (s.reached >= i && s.reached < i + 1 && t < (kickoff?.minute ?? Infinity)) expect(behindLine).toBe(true);
       }
     }
-    expect(checked).toBe(goals.length);
+    // Every goal in the net within the wait the viewer allows before it stops for the celebration.
+    for (const {i} of goals) expect(arrived.get(i)).toBeLessThanOrEqual(0.4);
   });
 
   it("has attackers in the box when a cross comes in", () => {
