@@ -1,11 +1,13 @@
 // Today's three tasks, their diamonds, and the bonus pack for doing all three.
 import {useState} from "react";
-import {ENERGY_VIDEOS_PER_DAY, TASKS, claimDailyBonus, claimTask, taskDone, taskProgress, videoForEnergy, type TaskKind} from "../game/daily";
-import {fullName} from "../game/helpers";
+import {STREAK_PACKS, dayBefore, ENERGY_VIDEOS_PER_DAY, TASKS, claimDailyBonus, claimTask, taskDone, taskProgress, videoForEnergy, type TaskKind} from "../game/daily";
+import type {PlayerPackId} from "../game/packs";
 import {useT} from "../i18n";
 import {useGame, useGameState} from "../store";
 import {Card} from "./common";
 import {VideoAd} from "./VideoAd";
+import {PackReveal} from "./PackReveal";
+import {diamondBurst} from "./effects";
 
 const ICONS: Record<TaskKind, string> = {win: "🏆", goals: "⚽", order: "📣", talk: "🗣️", train: "🏋️", pack: "🎁", video: "🎬"};
 
@@ -17,20 +19,23 @@ export function DailyTasks() {
   const act = useGame((s) => s.act);
   const notify = useGame((s) => s.notify);
   const [watching, setWatching] = useState(false);
+  // The bonus pack being opened.
+  const [bonusPlayer, setBonusPlayer] = useState<{id: string; pack: PlayerPackId} | null>(null);
   const [open, setOpen] = useState(false);
   const daily = game.daily;
   if (!daily) return null;
+  // Today's streak, if it's still alive (done yesterday or today).
+  const streak = game.dailyStreak && (game.dailyStreak.lastDay === daily.day || game.dailyStreak.lastDay === dayBefore(daily.day)) ? game.dailyStreak.count : 0;
   const allClaimed = daily.tasks.every((task) => task.claimed);
 
-  const claim = (i: number) => {
+  const claim = (i: number, from: Element) => {
     const n = act((g) => claimTask(g, i));
-    if (n > 0) notify("toast.taskClaimed", {n}, "good");
+    if (n > 0) diamondBurst(from, n);
   };
   const bonus = () => {
     const res = act((g, rng) => claimDailyBonus(g, rng));
     if ("error" in res) return notify(res.error, undefined, "error");
-    const p = useGame.getState().game?.players[res.playerId];
-    notify("pack.got", {name: p ? fullName(p) : ""}, "good");
+    setBonusPlayer({id: res.playerId, pack: res.pack});
   };
   // The video task is done by watching one: it gives the energy point too, if there's room.
   const watched = () => {
@@ -44,15 +49,17 @@ export function DailyTasks() {
   // All done for today: folded up behind a tick, to open again if wanted.
   if (daily.bonusClaimed && !open) {
     return (
-      <Card title={<>📋 {t("daily.title")} <span className="daily-tick">✓</span></>} className="span-2 daily-folded" actions={<button className="btn small" onClick={() => setOpen(true)}>{t("daily.show")}</button>}>
+      <Card title={<>📋 {t("daily.title")}{streak > 0 && <span className="daily-streak">🔥 {t("daily.streak", {n: streak})}</span>} <span className="daily-tick">✓</span></>} className="span-2 daily-folded" actions={<button className="btn small" onClick={() => setOpen(true)}>{t("daily.show")}</button>}>
         <p className="muted small">{t("daily.allDone")}</p>
+        {/* The bonus pack just claimed folds the card; its reveal still shows. */}
+        {bonusPlayer && <PackReveal playerId={bonusPlayer.id} pack={bonusPlayer.pack} onClose={() => setBonusPlayer(null)} />}
       </Card>
     );
   }
 
   return (
     <Card
-      title={<>📋 {t("daily.title")}{daily.bonusClaimed && <span className="daily-tick">✓</span>}</>}
+      title={<>📋 {t("daily.title")}{streak > 0 && <span className="daily-streak">🔥 {t("daily.streak", {n: streak})}</span>}{daily.bonusClaimed && <span className="daily-tick">✓</span>}</>}
       className="span-2"
       actions={daily.bonusClaimed ? <button className="btn small" onClick={() => setOpen(false)}>{t("daily.hide")}</button> : undefined}
     >
@@ -71,7 +78,7 @@ export function DailyTasks() {
               {task.claimed ? (
                 <span className="daily-done">✓</span>
               ) : done ? (
-                <button className="btn primary small" onClick={() => claim(i)}>{t("daily.claim", {n: goal.reward})}</button>
+                <button className="btn primary small" onClick={(e) => claim(i, e.currentTarget)}>{t("daily.claim", {n: goal.reward})}</button>
               ) : task.kind === "video" ? (
                 <button className="btn small" onClick={() => setWatching(true)}>🎬 {t("daily.watch")}</button>
               ) : (
@@ -85,8 +92,26 @@ export function DailyTasks() {
         <span>🎁 {daily.bonusClaimed ? t("daily.bonusDone") : t("daily.bonus")}</span>
         {!daily.bonusClaimed && <button className="btn primary small" disabled={!allClaimed} onClick={bonus}>{t("daily.bonusClaim")}</button>}
       </div>
+      {/* The streak ladder: what keeping it going can bring, and how far to the next step. */}
+      <div className="streak-ladder">
+        {[...STREAK_PACKS].reverse().map((s) => (
+          <div key={s.pack} className={`streak-step ppack-${s.pack} ${streak >= s.days ? "reached" : ""}`}>
+            <strong>{streak >= s.days ? "✓ " : ""}{t("daily.streakDays", {n: s.days})}</strong>
+            <span>{t("daily.streakChance", {pct: Math.round(s.chance * 100), pack: t(`pack.${s.pack}`)})}</span>
+          </div>
+        ))}
+      </div>
+      {(() => {
+        const next = [...STREAK_PACKS].reverse().find((s) => streak < s.days);
+        return next ? (
+          <p className="streak-next">🔥 {t("daily.streakNext", {n: next.days - streak, pack: t(`pack.${next.pack}`)})}</p>
+        ) : (
+          <p className="streak-next">🔥 {t("daily.streakMax")}</p>
+        );
+      })()}
       <p className="muted small">{t("daily.videos", {n: ENERGY_VIDEOS_PER_DAY - daily.energyVideos})}</p>
       {watching && <VideoAd onReward={watched} onClose={() => setWatching(false)} />}
+      {bonusPlayer && <PackReveal playerId={bonusPlayer.id} pack={bonusPlayer.pack} onClose={() => setBonusPlayer(null)} />}
     </Card>
   );
 }

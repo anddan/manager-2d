@@ -1,6 +1,8 @@
 // Shared game types. The whole save is one GameState object, kept plain
 // (no classes, no Maps) so it survives JSON and structuredClone.
+import type {Slot} from "./constants";
 import type {Daily} from "./daily";
+import type {Tutorial} from "./tutorial";
 import type {SetPiece, SetPieceInput, SetPieceOutcome} from "./setpieces";
 
 export const ATTRIBUTES = [
@@ -153,6 +155,8 @@ export interface Club {
   roles?: TeamRoles;
   /** The real name, when the manager has given the club a nickname (then `name` is the nickname). */
   officialName?: string;
+  /** The manager's own positions (a custom formation); missing for a standard one. */
+  customSlots?: Slot[];
   /** A club from another league, here only for the Champions Cup: not in the table, the market or the money. */
   guest?: true;
   /** For a guest club: the league it's from (flag). */
@@ -271,6 +275,8 @@ export interface MatchReport {
   onTarget: [number, number];
   lineups: {home: string[]; away: string[]};
   formations: {home: FormationId; away: FormationId};
+  /** The slots each side played in (custom formations included). Missing in old saves. */
+  slots?: {home: Slot[]; away: Slot[]};
   /** Penalties and free kicks, with where the ball went. Missing in old saves. */
   setPieces?: (SetPiece & SetPieceOutcome)[];
   /**
@@ -429,6 +435,10 @@ export interface GameState {
   liveMatch?: LiveMatchState | null;
   /** The board's patience with debts: weeks in a row in the red, and warnings given. Missing in old saves. */
   board?: {debtWeeks: number; warnings: number};
+  /** Days in a row with all daily tasks done (and the last such day). */
+  dailyStreak?: {count: number; lastDay: string};
+  /** The guide for new players. Missing when it isn't running (old saves). */
+  tutorial?: Tutorial;
   /** Today's tasks and videos watched. Missing in old saves. */
   daily?: Daily;
   /** A diamond pack opened but no player picked yet: the four to choose from (free agents until then). */

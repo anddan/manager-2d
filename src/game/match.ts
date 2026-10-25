@@ -7,7 +7,7 @@
 // A match is a generator: it pauses before every minute (so the manager's
 // substitutions and instructions can come in) and at every set piece (so the
 // user can take it). simulateMatch runs one straight through.
-import {DIAMONDS_PER_WIN, FORMATIONS, MAX_SUBS, type Slot} from "./constants";
+import {DIAMONDS_PER_WIN, MAX_SUBS, clubSlots, type Slot} from "./constants";
 import {book, findFixture} from "./helpers";
 import {isAvailable} from "./lineup";
 import {distance, fromSide, progressFor, teamSpot, type Point} from "./pitch";
@@ -118,7 +118,7 @@ export interface Team {
 }
 
 function buildTeam(state: GameState, club: Club, side: Side): Team {
-  const slots = FORMATIONS[club.formation];
+  const slots = clubSlots(club);
   const onPitch = club.lineup
     .map((id, slot) => ({id, slot}))
     .filter(({id}) => state.players[id] && isAvailable(state.players[id]));
@@ -913,6 +913,7 @@ export function createMatch(
     onTarget: [0, 0],
     lineups: {home: homeClub.lineup.slice(), away: awayClub.lineup.slice()},
     formations: {home: homeClub.formation, away: awayClub.formation},
+    slots: {home: clubSlots(homeClub), away: clubSlots(awayClub)},
     setPieces: [],
     added: [0, 0],
   };

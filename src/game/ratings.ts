@@ -1,6 +1,6 @@
 // Overall rating, market value and wage levels. Everything that turns
 // attributes into a single number lives here.
-import {FORMATIONS} from "./constants";
+import {clubSlots} from "./constants";
 import {clamp} from "./rng";
 import type {Attribute, Club, GameState, Player, Position, SquadRole} from "./types";
 
@@ -142,7 +142,7 @@ export function clubStrength(state: GameState, clubId: string): number {
  */
 export function teamOvr(state: GameState, clubId: string): number {
   const club = state.clubs[clubId];
-  const slots = FORMATIONS[club.formation];
+  const slots = clubSlots(club);
   const ratings = club.lineup
     .map((id, i) => {
       const p = state.players[id];

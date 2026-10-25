@@ -8,6 +8,7 @@ import {payPrizeMoney, seasonBoardReview, setSeasonBudgets, weeklyFinances} from
 import {assignRoles, createFreeAgents, createPlayer} from "./generate";
 import {finishCupStage, setupCup, userCupResult} from "./cup";
 import {taskProgress} from "./daily";
+import {tutorialMatchSeed} from "./tutorial";
 import {addMessage, cupFixturesInStage, currentCupStage, currentRound, findFixture, fixturesInRound, fullName, leagueClubs, playerName} from "./helpers";
 import {makeFixtures, standings} from "./league";
 import {pickBestLineup, repairLineup} from "./lineup";
@@ -63,7 +64,13 @@ export function startWeek(state: GameState, rng: Rng, now: number, opts = {useEn
   for (const f of fixtures) {
     if (f.homeId === state.userClubId || f.awayId === state.userClubId) {
       // Fixed seed: reloading mid-match replays the same match, not a new one.
-      state.liveMatch = {fixtureId: f.id, seed: rng.int(1, 2 ** 31 - 1), inputs: {}, commands: []};
+      let seed = rng.int(1, 2 ** 31 - 1);
+      // The guide's first match: one with a penalty to take and a win.
+      if (state.tutorial && !state.tutorial.firstMatch) {
+        state.tutorial.firstMatch = true;
+        seed = tutorialMatchSeed(state, f, f.homeId === state.userClubId ? "home" : "away", seed);
+      }
+      state.liveMatch = {fixtureId: f.id, seed, inputs: {}, commands: []};
       live = true;
     } else {
       applyMatch(state, simulateMatch(state, rng, f, false));

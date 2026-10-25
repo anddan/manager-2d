@@ -10,7 +10,7 @@
 // personalised ads, child-safe content only, no tracking.
 import {ENERGY_MAX} from "./constants";
 import {regenerateEnergy} from "./monetization";
-import {openPack} from "./packs";
+import {PLAYER_PACKS, openPack, type PlayerPackId} from "./packs";
 import type {Rng} from "./rng";
 import type {GameState} from "./types";
 
@@ -91,18 +91,44 @@ export function claimTask(state: GameState, index: number): number {
 }
 
 /** All three done and collected: a free bronze pack. The new player's id, or an error key. */
-export function claimDailyBonus(state: GameState, rng: Rng): {playerId: string} | {error: string} {
+export function claimDailyBonus(state: GameState, rng: Rng): {playerId: string; pack: PlayerPackId; streak: number} | {error: string} {
   const daily = state.daily;
   if (!daily || daily.bonusClaimed || !daily.tasks.every((t) => t.claimed)) return {error: "daily.notYet"};
+  // Days in a row with all three done: yesterday's streak goes on, otherwise it starts again.
+  const prev = state.dailyStreak;
+  const streak = prev && prev.lastDay === dayBefore(daily.day) ? prev.count + 1 : prev?.lastDay === daily.day ? prev.count : 1;
+  const pack = streakPack(rng, streak);
   // The pack is on the house: give its price, then open it.
-  state.monetization.diamonds += 20;
-  const res = openPack(state, rng, "bronze");
+  const price = PLAYER_PACKS[pack].price;
+  state.monetization.diamonds += price;
+  const res = openPack(state, rng, pack);
   if ("error" in res) {
-    state.monetization.diamonds -= 20;
+    state.monetization.diamonds -= price;
     return res;
   }
   daily.bonusClaimed = true;
-  return res;
+  state.dailyStreak = {count: streak, lastDay: daily.day};
+  return {...res, pack, streak};
+}
+
+/** The streak's chances of a better bonus pack than bronze: special from 30 days, gold from 15, silver from 7. */
+export const STREAK_PACKS: {days: number; pack: PlayerPackId; chance: number}[] = [
+  {days: 30, pack: "special", chance: 0.1},
+  {days: 15, pack: "gold", chance: 0.15},
+  {days: 7, pack: "silver", chance: 0.25},
+];
+
+/** The bonus pack for a streak: the best one whose chance comes up, or bronze. */
+export function streakPack(rng: Rng, streak: number): PlayerPackId {
+  for (const s of STREAK_PACKS) if (streak >= s.days && rng.chance(s.chance)) return s.pack;
+  return "bronze";
+}
+
+/** The calendar day before (YYYY-MM-DD). */
+export function dayBefore(day: string): string {
+  const d = new Date(day + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
 }
 
 /** After watching a video for energy: +1 ⚡ (a few times a day). An error key if not allowed. */

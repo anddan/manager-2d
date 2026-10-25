@@ -10,8 +10,10 @@ import {ManagerAvatar, defaultManagerLook} from "./Avatar";
 import {ContractModal} from "./ContractModal";
 import {LiveMatchViewer, MatchViewer} from "./MatchViewer";
 import {GameOver} from "./GameOver";
+import {diamondBurst} from "./effects";
 import {ManagerProfile} from "./ManagerProfile";
 import {TrophyCelebration} from "./TrophyCelebration";
+import {TutorialCoach} from "./TutorialCoach";
 import {NewGame} from "./NewGame";
 import {PlayerModal} from "./PlayerModal";
 import {Contracts} from "./views/Contracts";
@@ -84,7 +86,11 @@ function Game() {
     const given = act((g) => claimDailyBonus(g.monetization, today));
     // Today's tasks.
     act((g) => ensureDaily(g, today));
-    if (given > 0) notify("toast.dailyBonus", {n: given}, "good");
+    if (given > 0) {
+      notify("toast.dailyBonus", {n: given}, "good");
+      // Once the page has drawn, so the diamonds have somewhere to fly to.
+      setTimeout(() => diamondBurst(null, given), 600);
+    }
   }, [act, notify]);
 
   return (
@@ -103,6 +109,7 @@ function Game() {
       {playerId && <PlayerModal key={playerId} playerId={playerId} />}
       {negotiation && <ContractModal />}
       <TrophyCelebration />
+      <TutorialCoach />
       <ToastView />
     </div>
   );
@@ -118,7 +125,7 @@ function Nav() {
     <nav className="nav" aria-label={t("nav.label")}>
       <div className="brand">⚽ <span>Forza Manager</span></div>
       {VIEWS.map((v) => (
-        <button key={v} className={v === view ? "nav-item active" : "nav-item"} onClick={() => setView(v)} aria-current={v === view ? "page" : undefined}>
+        <button key={v} data-tour={`nav-${v}`} className={v === view ? "nav-item active" : "nav-item"} onClick={() => setView(v)} aria-current={v === view ? "page" : undefined}>
           <span className="nav-icon" aria-hidden>{ICONS[v]}</span>
           <span className="nav-label">{t(`nav.${v}`)}</span>
           {v === "inbox" && unread > 0 && <span className="badge">{unread}</span>}
@@ -184,7 +191,7 @@ function TopBar() {
         </button>
       </div>
       <div className="topbar-stats">
-        <span className="chip" title={t("fin.cash")}>💰 {money(club.cash)}</span>
+        <button className="chip" onClick={() => setView("finance")} title={t("fin.cash")}>💰 {money(club.cash)}</button>
         <button className="chip" onClick={() => setView("shop")} title={t("shop.energy")}>
           ⚡ {m.energy}/{ENERGY_MAX}
           {wait > 0 && <small className="timer">{formatWait(wait)}</small>}

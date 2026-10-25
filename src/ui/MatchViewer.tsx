@@ -49,6 +49,7 @@ import {Football} from "./Ball";
 import {Bar, Flag, Modal, PosBadge} from "./common";
 import {SetPieceView} from "./SetPieceView";
 import {VideoAd} from "./VideoAd";
+import {diamondBurst} from "./effects";
 
 /** Fast-forward goes up one step per press, to this. */
 const MAX_SPEED = 5;
@@ -980,7 +981,7 @@ function Shootout({report, seed, userSide, onDone}: {report: MatchReport; seed: 
 }
 
 /** Pause, play and fast-forward, drawn alike (emoji differ between systems). */
-function ControlIcon({kind}: {kind: "pause" | "play" | "forward"}) {
+export function ControlIcon({kind}: {kind: "pause" | "play" | "forward"}) {
   return (
     <svg className="ctl-icon" viewBox="0 0 16 16" aria-hidden>
       {kind === "pause" && <path d="M4 3h3v10H4zM9 3h3v10H9z" />}
@@ -1286,7 +1287,7 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
     () => ({
       report,
       frames: report.frames,
-      slots: {home: FORMATIONS[report.formations.home], away: FORMATIONS[report.formations.away]},
+      slots: report.slots ?? {home: FORMATIONS[report.formations.home], away: FORMATIONS[report.formations.away]},
       players: game.players,
     }),
     // Players only matter for pace and stamina, which don't change mid-replay.
@@ -1927,7 +1928,8 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
           onReward={() => {
             setWatchingAd(false);
             const err = act((g) => videoAfterWin(g, new Date().toISOString().slice(0, 10), report.fixtureId));
-            notify(err ?? "toast.videoDiamonds", {n: WIN_VIDEO_DIAMONDS}, err ? "error" : "good");
+            if (err) notify(err, undefined, "error");
+            else diamondBurst(null, WIN_VIDEO_DIAMONDS);
           }}
         />
       )}
@@ -1994,10 +1996,11 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
             )}
             {live && !finished && (
               <>
-                <button className="btn ctl" disabled={!!freeze && !atHalftime} onClick={() => setSelected(selected ? null : "team")}>📋 {t("orders.button")}</button>
+                <button className="btn ctl" data-tour="orders" disabled={!!freeze && !atHalftime} onClick={() => setSelected(selected ? null : "team")}>📋 {t("orders.button")}</button>
                 <button
                   className={live.manualSetPieces ? "chip active" : "chip"}
                   title={t("match.setPiecesHint")}
+                  data-tour="setpieces"
                   onClick={() => {
                     live.manualSetPieces = !live.manualSetPieces;
                     try {
@@ -2020,7 +2023,14 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
           </>
         )}
       </div>
-      {live && !finished && !selected && <p className="muted small">{t("orders.hint")}</p>}
+      {/* What the buttons above do. */}
+      {live && !finished && !selected && (
+        <ul className="control-help muted small">
+          <li>📋 {t("orders.hint")}</li>
+          <li>🎯 {t("match.setPiecesHint")}</li>
+          <li>🔍 {t("match.zoomHint")}</li>
+        </ul>
+      )}
 
       <div className="match-columns">
         {feed}

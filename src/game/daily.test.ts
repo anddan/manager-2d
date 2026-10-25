@@ -1,6 +1,6 @@
 // Daily tasks and rewarded videos.
 import {describe, expect, it} from "vitest";
-import {ENERGY_VIDEOS_PER_DAY, TASKS, TASKS_PER_DAY, WIN_VIDEO_DIAMONDS, claimDailyBonus, claimTask, ensureDaily, taskProgress, videoAfterWin, videoForEnergy} from "./daily";
+import {ENERGY_VIDEOS_PER_DAY, TASKS, TASKS_PER_DAY, WIN_VIDEO_DIAMONDS, claimDailyBonus, claimTask, dayBefore, ensureDaily, streakPack, taskProgress, videoAfterWin, videoForEnergy} from "./daily";
 import {newGame} from "./generate";
 import {Rng} from "./rng";
 
@@ -55,5 +55,27 @@ describe("rewarded videos", () => {
     expect(videoAfterWin(g, "2026-10-24", "f1")).toBeNull();
     expect(videoAfterWin(g, "2026-10-24", "f1")).toBe("video.done");
     expect(g.monetization.diamonds).toBe(start + WIN_VIDEO_DIAMONDS);
+  });
+});
+
+describe("daily streak", () => {
+  it("counts days in a row, starts again after a missed day, and upgrades the pack sometimes", () => {
+    const g = newGame("Streak", 3, 4);
+    for (const p of Object.values(g.players).filter((x) => x.clubId === g.userClubId).slice(0, 8)) p.clubId = null;
+    const finishDay = (day: string, seed: number) => {
+      const daily = ensureDaily(g, day);
+      daily.tasks.forEach((t, i) => { taskProgress(g, t.kind, TASKS[t.kind].target); claimTask(g, i); });
+      return claimDailyBonus(g, new Rng(seed));
+    };
+    expect(finishDay("2026-10-01", 1)).toMatchObject({streak: 1, pack: "bronze"});
+    expect(finishDay("2026-10-02", 1)).toMatchObject({streak: 2});
+    expect(finishDay("2026-10-04", 1)).toMatchObject({streak: 1}); // Missed the 3rd.
+    expect(dayBefore("2026-11-01")).toBe("2026-10-31");
+    // Long streaks: better packs now and then, never before their day count.
+    const counts: Record<string, number> = {};
+    for (let s = 1; s <= 400; s++) { const p = streakPack(new Rng(s), 30); counts[p] = (counts[p] ?? 0) + 1; }
+    expect(counts.special).toBeGreaterThan(10);
+    expect(counts.bronze).toBeGreaterThan(200);
+    for (let s = 1; s <= 200; s++) expect(streakPack(new Rng(s), 6)).toBe("bronze");
   });
 });

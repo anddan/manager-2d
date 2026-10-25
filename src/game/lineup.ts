@@ -1,5 +1,5 @@
 // Team selection: the AI's picks and checks on the user's lineup.
-import {BENCH_SIZE, FORMATIONS, type Slot} from "./constants";
+import {BENCH_SIZE, clubSlots, type Slot} from "./constants";
 import {effectiveRating} from "./ratings";
 import type {Club, GameState, Player, Position} from "./types";
 
@@ -53,7 +53,7 @@ export function pickBestLineup(
 
 /** Problems with a lineup: empty slots or unavailable players. */
 export function lineupProblems(state: GameState, club: Club): string[] {
-  const slots = FORMATIONS[club.formation];
+  const slots = clubSlots(club);
   const problems: string[] = [];
   for (let i = 0; i < slots.length; i++) {
     const p = state.players[club.lineup[i]];
@@ -64,7 +64,7 @@ export function lineupProblems(state: GameState, club: Club): string[] {
 
 /** Keeps the user's choices where possible and fills gaps with the best available. */
 export function repairLineup(state: GameState, club: Club): boolean {
-  const slots = FORMATIONS[club.formation];
+  const slots = clubSlots(club);
   const valid = (id: string | undefined) => {
     const p = id ? state.players[id] : undefined;
     return !!p && p.clubId === club.id && isAvailable(p);

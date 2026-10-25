@@ -23,6 +23,7 @@ import {Card, Modal} from "../common";
 import {ENERGY_VIDEOS_PER_DAY, videoForEnergy} from "../../game/daily";
 import {today} from "../DailyTasks";
 import {VideoAd} from "../VideoAd";
+import {PackReveal} from "../PackReveal";
 import {PlayerCard} from "../PlayerCard";
 
 export function Shop() {
@@ -40,14 +41,6 @@ export function Shop() {
   };
   // The player from the last pack opened, shown until closed.
   const [opened, setOpened] = useState<{playerId: string; pack: PlayerPackId} | null>(null);
-  // How much of the new card is showing (see PlayerCard's stage); 6 is all of it.
-  const [stage, setStage] = useState(0);
-  useEffect(() => {
-    if (!opened || stage >= 6) return;
-    // A longer wait before the overall, for the suspense.
-    const id = setTimeout(() => setStage((s) => s + 1), stage === 0 ? 900 : stage === 3 ? 1300 : 750);
-    return () => clearTimeout(id);
-  }, [opened, stage]);
   const m = {...game.monetization};
   regenerateEnergy(m, Date.now());
 
@@ -74,12 +67,8 @@ export function Shop() {
   const open = (pack: PlayerPackId) => {
     const res = act((g, rng) => openPack(g, rng, pack));
     if ("error" in res) notify(res.error, undefined, "error");
-    else {
-      setStage(0);
-      setOpened({playerId: res.playerId, pack});
-    }
+    else setOpened({playerId: res.playerId, pack});
   };
-  const openedPlayer = opened ? game.players[opened.playerId] : undefined;
 
   // The diamond pack: four to pick from. Shown while choosing; reopened from the tile if closed.
   const [choosing, setChoosing] = useState(false);
@@ -190,23 +179,7 @@ export function Shop() {
           </div>
         </div>
       </Card>
-      {opened && openedPlayer && (
-        <Modal title={`🎁 ${t(`pack.${opened.pack}`)}`} onClose={() => setOpened(null)}>
-          <div className="pack-reveal">
-            <div className="pack-flip">
-              <PlayerCard game={game} player={openedPlayer} reveal stage={stage} />
-            </div>
-            {stage >= 6 ? (
-              <>
-                <h3 className="pack-got">{t("pack.got", {name: fullName(openedPlayer)})}</h3>
-                <button className="btn primary" onClick={() => setOpened(null)}>{t("pack.great")}</button>
-              </>
-            ) : (
-              <button className="btn" onClick={() => setStage(6)}>{t("pack.showAll")}</button>
-            )}
-          </div>
-        </Modal>
-      )}
+      {opened && <PackReveal playerId={opened.playerId} pack={opened.pack} onClose={() => setOpened(null)} />}
 
       {choosing && choices.length > 0 && (
         <Modal wide title={`💠 ${t("pack.diamond")}`} onClose={() => setChoosing(false)}>

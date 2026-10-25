@@ -14,6 +14,8 @@ export function Settings() {
   const replace = useGame((s) => s.replace);
   const quit = useGame((s) => s.quit);
   const notify = useGame((s) => s.notify);
+  const act = useGame((s) => s.act);
+  const setView = useGame((s) => s.setView);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const exportSave = () => {
@@ -39,6 +41,9 @@ export function Settings() {
         <select className="lang-select" value={lang} onChange={(e) => setLang(e.target.value as Lang)} aria-label={t("settings.language")}>
           {LANGS.map((l) => <option key={l} value={l}>{LANG_NAMES[l]}</option>)}
         </select>
+      </Card>
+      <Card title={`🧭 ${t("settings.tour")}`}>
+        <button className="btn" onClick={() => { act((g) => { g.tutorial = {step: 0, firstMatch: true}; }); setView("overview"); }}>{t("settings.tour")}</button>
       </Card>
       <Card title={t("settings.save")}>
         <p className="muted">{t("settings.saveHint")}</p>

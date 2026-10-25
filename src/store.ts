@@ -99,6 +99,8 @@ export const useGame = create<Store>((set, get) => ({
   },
   start: (managerName, clubIndex, look, playersGender, leagueId) => {
     const game = newGame(managerName, clubIndex, (Math.random() * 2 ** 32) >>> 0, look, playersGender, leagueId);
+    // New players get the guide.
+    game.tutorial = {step: 0};
     saveGame(game);
     set({game, view: "overview"});
   },

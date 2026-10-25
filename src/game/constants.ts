@@ -1,5 +1,5 @@
 // Balance knobs in one place. Tune here, not inside the systems.
-import type {FormationId, Position} from "./types";
+import type {Club, FormationId, Position} from "./types";
 
 export const SAVE_VERSION = 1;
 
@@ -121,3 +121,22 @@ export const FORMATIONS: Record<FormationId, Slot[]> = {
 export const SQUAD_TEMPLATE: Record<Position, number> = {
   GK: 3, CB: 4, FB: 4, DM: 2, CM: 3, AM: 2, W: 3, ST: 3,
 };
+
+/** A club's slots: its own custom positions if the manager made them, else its formation's. */
+export function clubSlots(club: Club): Slot[] {
+  return club.customSlots ?? FORMATIONS[club.formation];
+}
+
+/**
+ * The role for a spot on the pitch (x along it from own goal, y across): back
+ * near goal (wide: full-back), then holding, central and attacking midfield
+ * (wide: winger), and up front a striker (wide: winger).
+ */
+export function roleAt(x: number, y: number): Position {
+  const wide = y < 22 || y > 78;
+  if (x < 32) return wide ? "FB" : "CB";
+  if (x < 42) return wide ? "FB" : "DM";
+  if (x < 58) return wide ? "W" : "CM";
+  if (x < 68) return wide ? "W" : "AM";
+  return wide ? "W" : "ST";
+}

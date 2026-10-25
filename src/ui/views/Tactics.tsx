@@ -1,14 +1,15 @@
 // Lineup and tactics. Tap a slot on the pitch, then a player to put there; or
-// drag a shirt onto another slot and they swap.
+// drag a shirt onto another slot and they swap, or a player from the list (by
+// their handle) onto a slot to bring them in.
 import {useEffect, useRef, useState, type PointerEvent as ReactPointerEvent} from "react";
-import {BENCH_SIZE, FORMATIONS, type Slot} from "../../game/constants";
+import {BENCH_SIZE, clubSlots, roleAt, type Slot} from "../../game/constants";
 import {listName, shortName, userClub} from "../../game/helpers";
 import {isAvailable, pickBestLineup} from "../../game/lineup";
 import {clubPlayers, effectiveRating, familiarity, teamOvr} from "../../game/ratings";
-import {FORMATION_IDS, MENTALITIES, type FormationId, type Mentality} from "../../game/types";
+import {FORMATION_IDS, MENTALITIES, type FormationId, type Mentality, type Player} from "../../game/types";
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
-import {Bar, Card, Flag, FormArrow, PosBadge, StatusIcons} from "../common";
+import {Bar, Card, Flag, FormArrow, Modal, PosBadge, StatusIcons} from "../common";
 import {Jersey} from "../Jersey";
 
 /**
@@ -61,8 +62,10 @@ export function Tactics() {
   const game = useGameState();
   const act = useGame((s) => s.act);
   const openPlayer = useGame((s) => s.openPlayer);
+  const notify = useGame((s) => s.notify);
   const club = userClub(game);
-  const slots = FORMATIONS[club.formation];
+  const slots = clubSlots(club);
+  const custom = !!club.customSlots;
   const spots = boardSpots(slots);
   const [selected, setSelected] = useState<number | null>(null);
   const squad = clubPlayers(game, club.id);
@@ -95,31 +98,116 @@ export function Tactics() {
   const auto = () =>
     act((g) => {
       const c = g.clubs[g.userClubId];
-      const best = pickBestLineup(g, c, FORMATIONS[c.formation]);
+      const best = pickBestLineup(g, c, clubSlots(c));
       c.lineup = best.lineup;
       c.bench = best.bench;
     });
 
-  const drag = useDrag((playerId, fromSlot, toSlot) => {
-    if (toSlot !== fromSlot) assign(playerId, toSlot);
+  // Custom formation: a shirt dropped on open grass moves that position there (the keeper stays in goal).
+  const moveSlot = (i: number, left: number, top: number) =>
+    act((g) => {
+      const c = g.clubs[g.userClubId];
+      if (!c.customSlots || i === 0) return;
+      const x = Math.round(Math.max(10, Math.min(80, 5 + (1 - (top - 8) / 79) * 71)));
+      const y = Math.round(Math.max(5, Math.min(95, 50 + (left - 50) / 0.95)));
+      c.customSlots[i] = {pos: roleAt(x, y), x, y};
+    });
+
+  const drag = useDrag((playerId, fromSlot, to) => {
+    if (typeof to === "object" && "point" in to) {
+      if (fromSlot !== null) moveSlot(fromSlot, to.point.left, to.point.top);
+      return;
+    }
+    if (typeof to === "number") {
+      if (to !== fromSlot) assign(playerId, to);
+      return;
+    }
+    // Dropped on a group in the list: onto the bench, or off it to rest (list players only).
+    if (fromSlot !== null || !("zone" in to)) return;
+    const onBench = club.bench.includes(playerId);
+    if ((to.zone === "bench") === onBench) return;
+    if (to.zone === "bench" && club.bench.length >= BENCH_SIZE) {
+      // Full: dropped on a substitute, the two swap; on the heading, nothing to make room.
+      if (to.playerId && club.bench.includes(to.playerId)) {
+        act((g) => {
+          const c = g.clubs[g.userClubId];
+          c.bench = c.bench.map((id) => (id === to.playerId ? playerId : id));
+        });
+      } else notify("tac.benchFull", {max: BENCH_SIZE}, "error");
+      return;
+    }
+    toggleBench(playerId);
   });
+  // The list beside the pitch: on the bench first, then those resting.
+  const row = (p: Player, onBench: boolean) => (
+    <li key={p.id} className={!isAvailable(p) ? "out-row" : onBench ? "bench-row" : "rest-row"} data-zone={isAvailable(p) ? (onBench ? "bench" : "rest") : undefined} data-player={p.id}>
+      <div className="pick">
+        <span className="drag-handle" title={t("tac.dragIn")} onPointerDown={isAvailable(p) ? (e) => drag.start(e, p.id, null, shortName(p)) : undefined}>
+          <Jersey color={club.color} trim={club.color2} keeper={p.position === "GK"} size={26} />
+        </span>
+        <input type="checkbox" className="bench-check" aria-label={t("tac.toBench")} checked={onBench} disabled={!isAvailable(p)} onChange={() => toggleBench(p.id)} />
+        <PosBadge pos={p.position} />
+        <button className="link pick-name" onClick={() => openPlayer(p.id)}><Flag code={p.nationality} size={15} /> {listName(p)} <StatusIcons player={p} /></button>
+        <FormArrow form={p.form} />
+        <span className="num">{Math.round(effectiveRating(p, p.position))}</span>
+        <Bar value={p.fitness} small />
+      </div>
+    </li>
+  );
+  const notPlaying = squad.filter((p) => !club.lineup.includes(p.id));
+  const benched = notPlaying.filter((p) => isAvailable(p) && club.bench.includes(p.id));
+  const resting = notPlaying.filter((p) => isAvailable(p) && !club.bench.includes(p.id));
+  // Injured or suspended: can't play, listed last.
+  const out = notPlaying.filter((p) => !isAvailable(p));
 
   const pos = selected !== null ? slots[selected].pos : null;
+  // Phones and narrow windows: the list is far below the pitch, so the picker opens as a dialog.
+  const narrow = useNarrow();
   const candidates = pos
     ? squad.slice().sort((a, b) => effectiveRating(b, pos) - effectiveRating(a, pos))
     : [];
+  const candidateList = pos ? (
+    <ul className="pick-list">
+      {candidates.map((p) => (
+        <li key={p.id}>
+          <button className="pick" disabled={!isAvailable(p)} onClick={() => assign(p.id)}>
+            <PosBadge pos={p.position} />
+            <span className="pick-name"><Flag code={p.nationality} size={15} /> {listName(p)} <StatusIcons player={p} /></span>
+            <span className="muted small">{club.lineup.includes(p.id) ? t("tac.starting") : club.bench.includes(p.id) ? t("tac.onBench") : ""}</span>
+            <FormArrow form={p.form} />
+            <span className={familiarity(p, pos) < 1 ? "num warn" : "num strong"}>{Math.round(effectiveRating(p, pos))}</span>
+            <Bar value={p.fitness} small />
+          </button>
+        </li>
+      ))}
+    </ul>
+  ) : null;
 
   return (
     <div className="grid tactics">
       <Card
         title={<>{t("nav.tactics")} <span className="team-ovr" title={t("tac.teamOvrHint")}>{t("tac.teamOvr")} <strong>{teamOvr(game, club.id)}</strong></span></>}
-        actions={<button className="btn small" onClick={auto}>{t("tac.auto")}</button>}
+        actions={<button className="btn small" data-tour="best-xi" onClick={auto}>{t("tac.auto")}</button>}
       >
         <div className="tac-pickers">
-          <label className="field">
+          <label className="field" data-tour="formation">
             <span>{t("tac.formation")}</span>
-            <select value={club.formation} onChange={(e) => act((g) => { g.clubs[g.userClubId].formation = e.target.value as FormationId; })}>
+            <select
+              value={custom ? "custom" : club.formation}
+              onChange={(e) =>
+                act((g) => {
+                  const c = g.clubs[g.userClubId];
+                  // Custom starts from the positions in use now; a standard formation drops them.
+                  if (e.target.value === "custom") c.customSlots = clubSlots(c).map((sl) => ({...sl}));
+                  else {
+                    delete c.customSlots;
+                    c.formation = e.target.value as FormationId;
+                  }
+                })
+              }
+            >
               {FORMATION_IDS.map((f) => <option key={f} value={f}>{f}</option>)}
+              <option value="custom">{t("tac.custom")}</option>
             </select>
           </label>
           <label className="field">
@@ -131,7 +219,7 @@ export function Tactics() {
         </div>
         <p className="muted small">{t(`tac.${club.mentality}Hint`)}</p>
 
-        <div className="pitch-board" role="group" aria-label={t("tac.pitch")}>
+        <div className={`pitch-board ${custom ? "custom" : ""}`} data-free={custom ? "" : undefined} role="group" aria-label={t("tac.pitch")}>
           <div className="pitch-lines" aria-hidden />
           {slots.map((slot, i) => {
             const p = game.players[club.lineup[i]];
@@ -164,45 +252,29 @@ export function Tactics() {
             );
           })}
         </div>
-        <p className="muted small">{t("tac.dragHint")}</p>
+        <p className="muted small">{t(custom ? "tac.customHint" : "tac.dragHint")}</p>
       </Card>
       {drag.ghost && <div className="drag-ghost" style={{left: drag.ghost.x, top: drag.ghost.y}}>{drag.ghost.label}</div>}
 
-      <Card title={selected !== null && pos ? t("tac.pickFor", {pos: t(`pos.${pos}`)}) : t("tac.bench", {n: club.bench.length, max: BENCH_SIZE})}>
-        {selected !== null && pos ? (
-          <ul className="pick-list">
-            {candidates.map((p) => (
-              <li key={p.id}>
-                <button className="pick" disabled={!isAvailable(p)} onClick={() => assign(p.id)}>
-                  <PosBadge pos={p.position} />
-                  <span className="pick-name"><Flag code={p.nationality} size={15} /> {listName(p)} <StatusIcons player={p} /></span>
-                  <span className="muted small">{club.lineup.includes(p.id) ? t("tac.starting") : club.bench.includes(p.id) ? t("tac.onBench") : ""}</span>
-                  <FormArrow form={p.form} />
-                  <span className={familiarity(p, pos) < 1 ? "num warn" : "num strong"}>{Math.round(effectiveRating(p, pos))}</span>
-                  <Bar value={p.fitness} small />
-                </button>
-              </li>
-            ))}
-          </ul>
+      {/* Phones: the picker over the pitch, so nobody has to scroll down to it. */}
+      {selected !== null && pos && narrow && (
+        <Modal title={t("tac.pickFor", {pos: t(`pos.${pos}`)})} onClose={() => setSelected(null)}>
+          {candidateList}
+        </Modal>
+      )}
+      <Card title={selected !== null && pos && !narrow ? t("tac.pickFor", {pos: t(`pos.${pos}`)}) : t("tac.bench", {n: club.bench.length, max: BENCH_SIZE})}>
+        {selected !== null && pos && !narrow ? (
+          candidateList
         ) : (
           <>
             <p className="muted small">{t("tac.benchHint")}</p>
             <ul className="pick-list">
-              {squad
-                .filter((p) => !club.lineup.includes(p.id))
-                .sort((a, b) => Number(club.bench.includes(b.id)) - Number(club.bench.includes(a.id)))
-                .map((p) => (
-                  <li key={p.id}>
-                    <div className="pick">
-                      <input type="checkbox" aria-label={t("tac.toBench")} checked={club.bench.includes(p.id)} disabled={!isAvailable(p)} onChange={() => toggleBench(p.id)} />
-                      <PosBadge pos={p.position} />
-                      <button className="link pick-name" onClick={() => openPlayer(p.id)}><Flag code={p.nationality} size={15} /> {listName(p)} <StatusIcons player={p} /></button>
-                      <FormArrow form={p.form} />
-                      <span className="num">{Math.round(effectiveRating(p, p.position))}</span>
-                      <Bar value={p.fitness} small />
-                    </div>
-                  </li>
-                ))}
+              <li className={`pick-group bench-head ${typeof drag.over === "object" && drag.over !== null && "zone" in drag.over && drag.over.zone === "bench" ? "drop" : ""}`} data-zone="bench">🪑 {t("tac.benchGroup", {n: benched.length, max: BENCH_SIZE})}</li>
+              {benched.map((p) => row(p, true))}
+              <li className={`pick-group rest-head ${typeof drag.over === "object" && drag.over !== null && "zone" in drag.over && drag.over.zone === "rest" ? "drop" : ""}`} data-zone="rest">💤 {t("tac.restGroup", {n: resting.length})}</li>
+              {resting.map((p) => row(p, false))}
+              {out.length > 0 && <li className="pick-group out-head">🩹 {t("tac.outGroup", {n: out.length})}</li>}
+              {out.map((p) => row(p, club.bench.includes(p.id)))}
             </ul>
           </>
         )}
@@ -217,18 +289,32 @@ export function Tactics() {
  * still select. `onDrop` gets the player, the slot they came from and the slot
  * they were dropped on.
  */
-function useDrag(onDrop: (playerId: string, fromSlot: number, toSlot: number) => void) {
+/** Where a player can be dropped: a slot on the pitch, or a group in the list. */
+type DropTarget = number | {zone: "bench" | "rest"; playerId?: string} | {point: {left: number; top: number}};
+
+function useDrag(onDrop: (playerId: string, fromSlot: number | null, to: DropTarget) => void) {
   const [ghost, setGhost] = useState<{x: number; y: number; label: string} | null>(null);
-  const [over, setOver] = useState<number | null>(null);
-  const press = useRef<{playerId: string; fromSlot: number; label: string; x: number; y: number; dragging: boolean} | null>(null);
+  const [over, setOver] = useState<DropTarget | null>(null);
+  const press = useRef<{playerId: string; fromSlot: number | null; label: string; x: number; y: number; dragging: boolean} | null>(null);
   const dropped = useRef(0);
   const dropRef = useRef(onDrop);
   dropRef.current = onDrop;
 
   useEffect(() => {
-    const targetAt = (x: number, y: number): number | null => {
-      const slot = document.elementFromPoint(x, y)?.closest("[data-slot]")?.getAttribute("data-slot");
-      return slot != null ? Number(slot) : null;
+    const targetAt = (x: number, y: number): DropTarget | null => {
+      const el = document.elementFromPoint(x, y);
+      const slot = el?.closest("[data-slot]")?.getAttribute("data-slot");
+      if (slot != null) return Number(slot);
+      const z = el?.closest("[data-zone]");
+      const zone = z?.getAttribute("data-zone");
+      if (zone === "bench" || zone === "rest") return {zone, playerId: z?.getAttribute("data-player") ?? undefined};
+      // Open grass on a free-form board: where on it, in percent.
+      const board = el?.closest("[data-free]");
+      if (board) {
+        const r = board.getBoundingClientRect();
+        return {point: {left: ((x - r.left) / r.width) * 100, top: ((y - r.top) / r.height) * 100}};
+      }
+      return null;
     };
     const move = (e: PointerEvent) => {
       const p = press.current;
@@ -261,11 +347,25 @@ function useDrag(onDrop: (playerId: string, fromSlot: number, toSlot: number) =>
   return {
     ghost,
     over,
-    start: (e: ReactPointerEvent, playerId: string, fromSlot: number, label: string) => {
+    start: (e: ReactPointerEvent, playerId: string, fromSlot: number | null, label: string) => {
       if (e.button !== 0) return;
       press.current = {playerId, fromSlot, label, x: e.clientX, y: e.clientY, dragging: false};
     },
     /** True right after a drop, so the click that follows it doesn't also select. */
     justDropped: () => performance.now() - dropped.current < 300,
   };
+}
+
+/** True on phones and narrow windows (where the list sits below the pitch). */
+function useNarrow(): boolean {
+  const query = "(max-width: 899px)";
+  const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && !!window.matchMedia?.(query).matches);
+  useEffect(() => {
+    const m = window.matchMedia?.(query);
+    if (!m) return;
+    const on = () => setNarrow(m.matches);
+    m.addEventListener("change", on);
+    return () => m.removeEventListener("change", on);
+  }, []);
+  return narrow;
 }
