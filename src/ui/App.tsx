@@ -16,6 +16,7 @@ import {diamondBurst} from "./effects";
 import {ManagerProfile} from "./ManagerProfile";
 import {TrophyCelebration} from "./TrophyCelebration";
 import {TutorialCoach} from "./TutorialCoach";
+import {useUpdates} from "./updates";
 import {NewGame} from "./NewGame";
 import {PlayerModal} from "./PlayerModal";
 import {Contracts} from "./views/Contracts";
@@ -68,6 +69,8 @@ const SCREENS: Record<View, () => React.JSX.Element> = {
 };
 
 export function App() {
+  // A phone with the game on its home screen picks up each new deploy.
+  useUpdates();
   const game = useGame((s) => s.game);
   const lang = useGame((s) => s.lang);
   useEffect(() => {

@@ -1404,3 +1404,8 @@ button.manager-item:hover:not(:disabled) { background: rgb(127 127 127 / 0.1); }
 
 /* The picker's filter above the list. */
 .pick-filter { list-style: none; padding: 2px 2px 6px; font-size: 0.85rem; }
+/* Phones zoom the page in when a field with text under 16px gets focus (and don't zoom back out),
+   leaving dialogs off to one side with their close button out of view. 16px in every field stops it. */
+@media (max-width: 899px), (pointer: coarse) {
+  input, select, textarea { font-size: 16px; }
+}
