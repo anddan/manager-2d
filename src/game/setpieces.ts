@@ -3,6 +3,7 @@
 //
 // Goal coordinates, seen from the taker: x runs from the left post (-1) to the
 // right post (1), y from the ground (0) to the crossbar (1). Outside that is a miss.
+import {geared} from "./gear";
 import type {Point} from "./pitch";
 import {clamp, type Rng} from "./rng";
 import type {Player, Side} from "./types";
@@ -165,9 +166,12 @@ export function resolveSetPiece(
   rng: Rng,
   sp: SetPiece,
   input: SetPieceInput | null,
-  taker: Player,
-  keeper: Player | undefined
+  wornTaker: Player,
+  wornKeeper: Player | undefined
 ): SetPieceOutcome {
+  // With their boots and gloves on.
+  const taker = geared(wornTaker);
+  const keeper = wornKeeper && geared(wornKeeper);
   const noiseX = rng.normal();
   const noiseY = rng.normal();
   const corner = rng.next();

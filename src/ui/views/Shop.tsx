@@ -25,6 +25,7 @@ import {today} from "../DailyTasks";
 import {VideoAd} from "../VideoAd";
 import {PackReveal} from "../PackReveal";
 import {PlayerCard} from "../PlayerCard";
+import {GearShop} from "../Gear";
 
 export function Shop() {
   const {t, lang, money, num} = useT();
@@ -129,7 +130,7 @@ export function Shop() {
         <div className="energy-meter" aria-label={`${m.energy}/${ENERGY_MAX}`}>
           {Array.from({length: ENERGY_MAX}, (_, i) => <span key={i} className={i < m.energy ? "pip on" : "pip"}>⚡</span>)}
         </div>
-        <p className="muted">{t("shop.energyHint", {time: `${Math.floor(ENERGY_REGEN_MS / 60_000)}:${String(Math.round((ENERGY_REGEN_MS % 60_000) / 1000)).padStart(2, "0")}`, match: ENERGY_COST_MATCH, training: ENERGY_COST_EXTRA_TRAINING})}</p>
+        <p className="muted">{t("shop.energyHint", {time: Math.round(ENERGY_REGEN_MS / 60_000), match: ENERGY_COST_MATCH, training: ENERGY_COST_EXTRA_TRAINING})}</p>
         <div className="btn-row wrap">
           <button className="btn primary" disabled={m.energy >= ENERGY_MAX} onClick={refill}>💎 {t("shop.refill", {cost: DIAMONDS_REFILL_COST})}</button>
           {/* A video for one energy point, a few times a day. */}
@@ -138,6 +139,10 @@ export function Shop() {
           </button>
         </div>
         {watching && <VideoAd onReward={energyVideo} onClose={() => setWatching(false)} />}
+      </Card>
+
+      <Card title={`👟 ${t("gear.title")}`} className="span-2">
+        <GearShop />
       </Card>
 
       <Card title={`💎 ${t("shop.diamonds")}`}>
@@ -193,7 +198,7 @@ export function Shop() {
             ))}
           </div>
           {!allShown && (
-            <div className="btn-row tt-actions">
+            <div className="btn-row dialog-actions">
               <button className="btn" onClick={() => setSeq(choices.length * 6)}>{t("pack.showAll")}</button>
             </div>
           )}

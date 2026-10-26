@@ -1,5 +1,6 @@
 // Overall rating, market value and wage levels. Everything that turns
 // attributes into a single number lives here.
+import {geared} from "./gear";
 import {clubSlots} from "./constants";
 import {clamp} from "./rng";
 import type {Attribute, Club, GameState, Player, Position, SquadRole} from "./types";
@@ -56,7 +57,8 @@ export function familiarity(player: Player, pos: Position): number {
 export const FORM_EFFECT = 0.18;
 
 export function effectiveRating(player: Player, pos: Position): number {
-  const base = ratingAt(player, pos) * familiarity(player, pos);
+  // With their boots (or gloves) on: the bonus counts on the day, not in their own rating.
+  const base = ratingAt(geared(player), pos) * familiarity(player, pos);
   const fitness = 0.75 + 0.25 * (player.fitness / 100);
   // Form counts a lot: from 18 % below their level in bad form to 18 % above in top form (none at average).
   const form = 1 + FORM_EFFECT * (player.form / 50 - 1);

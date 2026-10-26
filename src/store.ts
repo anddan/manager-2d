@@ -24,6 +24,7 @@ export const VIEWS = [
   "transfers",
   "contracts",
   "finance",
+  "storage",
   "shop",
   "settings",
 ] as const;

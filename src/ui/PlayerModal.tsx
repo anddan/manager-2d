@@ -23,6 +23,8 @@ import {Bar, Delta, Face, Flag, FormArrow, Modal, NumberInput, Ovr, PosBadge, St
 import {PlayerCard} from "./PlayerCard";
 import {KitAvatar, editableLook, lookFromEditor} from "./Avatar";
 import {ManagerEditor} from "./ManagerEditor";
+import {GearPanel} from "./Gear";
+import {totalGearBonus} from "../game/gear";
 
 export function PlayerModal({playerId}: {playerId: string}) {
   const {t} = useT();
@@ -33,6 +35,8 @@ export function PlayerModal({playerId}: {playerId: string}) {
   const own = p.clubId === game.userClubId || p.loan?.parentClubId === game.userClubId;
   const known = isKnown(game, p);
   const club = p.clubId ? game.clubs[p.clubId] : null;
+  // Boots or gloves on: their bonus shown beside the attribute.
+  const gear = totalGearBonus(p);
 
   return (
     <Modal wide onClose={() => openPlayer(null)} title={<><Flag code={p.nationality} /> {profileName(p)} <StatusIcons player={p} /></>}>
@@ -61,7 +65,7 @@ export function PlayerModal({playerId}: {playerId: string}) {
               {ATTRIBUTES.map((a) => (
                 <tr key={a}>
                   <td>{t(`attr.${a}`)}</td>
-                  <td className="num strong">{known ? Math.round(p.attrs[a]) : "?"}</td>
+                  <td className="num strong">{known ? Math.round(p.attrs[a]) : "?"}{known && gear[a] ? <small className="gear-plus"> +{gear[a]}</small> : null}</td>
                   <td>{known && <Delta value={p.weeklyChange[a]} digits={2} />}</td>
                   <td>{known && <Delta value={p.attrs[a] - p.seasonStartAttrs[a]} />}</td>
                 </tr>
@@ -236,6 +240,10 @@ function OwnActions({player: p}: {player: Player}) {
       <QuickSale player={p} />
       </Fold>
 
+      <Fold title={`🎽 ${t("gear.equipment")}`}>
+        <GearPanel player={p} />
+      </Fold>
+
       <LookEditor player={p} />
     </div>
   );
@@ -275,7 +283,8 @@ function LookEditor({player: p}: {player: Player}) {
 }
 
 /** Sell now to the club that pays most, for less than waiting for bids would bring. Asks first. */
-function QuickSale({player: p}: {player: Player}) {
+/** Sell at once to the best offer, asked once more. `onSold`: what to do after (e.g. close a pack). */
+export function QuickSale({player: p, onSold}: {player: Player; onSold?: () => void}) {
   const {t, money} = useT();
   const game = useGameState();
   const act = useGame((s) => s.act);
@@ -291,14 +300,15 @@ function QuickSale({player: p}: {player: Player}) {
     if (err) return notify(err, undefined, "error");
     notify("toast.sold", {name: shortName(p), club, fee: offer.fee}, "good");
     openPlayer(null);
+    onSold?.();
   };
   return (
     <div className="quick-sale">
       <p className="muted small">{t("pl.quickSaleHint", {club, fee: money(offer.fee)})}</p>
       {sure ? (
-        <div className="btn-row">
-          <button className="btn primary" onClick={sell}>{t("pl.quickSaleYes", {fee: money(offer.fee)})}</button>
+        <div className="btn-row dialog-actions">
           <button className="btn" onClick={() => setSure(false)}>{t("common.cancel")}</button>
+          <button className="btn primary" onClick={sell}>{t("pl.quickSaleYes", {fee: money(offer.fee)})}</button>
         </div>
       ) : (
         <button className="btn" onClick={() => setSure(true)}>💸 {t("pl.quickSale")}</button>

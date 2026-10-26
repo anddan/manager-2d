@@ -13,6 +13,7 @@ import {useGame, useGameState} from "../../store";
 import {Bar, Card, Flag, FormArrow, Modal, PosBadge, StatusIcons} from "../common";
 import {Avatar} from "../Avatar";
 import {Jersey} from "../Jersey";
+import {GearPicture} from "../Gear";
 
 /**
  * Where a slot sits on the lineup board. Formations only use depth 5 (keeper)
@@ -308,7 +309,13 @@ export function Tactics() {
                 ) : bad ? (
                   <span className="slot-empty">+</span>
                 ) : (
-                  <Jersey color={club.color} trim={club.color2} keeper={slot.pos === "GK"} number={i + 1} />
+                  <>
+                    {/* Boots or gloves, in front of the shirt at its lower right. */}
+                    {p?.gear && <span className={p.gear.kind === "gloves" ? "slot-gear gloves" : "slot-gear"} aria-hidden><GearPicture item={p.gear} size={p.gear.kind === "gloves" ? 22 : 24} /></span>}
+                    {/* Shin guards on the other side. */}
+                    {p?.shin && <span className="slot-gear slot-shin" aria-hidden><GearPicture item={p.shin} size={15} /></span>}
+                    <Jersey color={club.color} trim={club.color2} keeper={slot.pos === "GK"} number={i + 1} />
+                  </>
                 )}
                 <span className="plate">
                   <span className="plate-name">{p && (!bad || out) ? shortName(p) : t(`pos.${slot.pos}`)}</span>

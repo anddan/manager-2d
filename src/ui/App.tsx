@@ -34,6 +34,7 @@ import {Stadium} from "./views/Stadium";
 import {Tactics} from "./views/Tactics";
 import {Training} from "./views/Training";
 import {Transfers} from "./views/Transfers";
+import {Storage} from "./views/Storage";
 
 const ICONS: Record<View, string> = {
   overview: "🏠",
@@ -49,6 +50,7 @@ const ICONS: Record<View, string> = {
   contracts: "✍️",
   finance: "💰",
   shop: "💎",
+  storage: "👟",
   settings: "⚙️",
 };
 
@@ -66,6 +68,7 @@ const SCREENS: Record<View, () => React.JSX.Element> = {
   contracts: Contracts,
   finance: Finance,
   shop: Shop,
+  storage: Storage,
   settings: Settings,
 };
 
@@ -221,9 +224,9 @@ function TopBar() {
     <header className="topbar">
       {profile && <ManagerProfile onClose={() => setProfile(false)} />}
       {gaps > 0 && (
-        <Modal title={`⚠️ ${t("top.gapsTitle")}`} onClose={() => setGaps(0)}>
+        <Modal compact title={`⚠️ ${t("top.gapsTitle")}`} onClose={() => setGaps(0)}>
           <p>{t("top.gapsText", {n: gaps, total: clubSlots(club).length})}</p>
-          <div className="btn-row gaps-actions">
+          <div className="btn-row dialog-actions">
             <button className="btn" onClick={() => setGaps(0)}>{t("top.gapsBack")}</button>
             <button className="btn primary" onClick={bestAndPlay}>{t("top.gapsBest")}</button>
           </div>

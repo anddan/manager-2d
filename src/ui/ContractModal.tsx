@@ -99,9 +99,9 @@ export function ContractModal() {
           {t("neg.confirmOver")}
         </label>
       )}
-      <div className="btn-row">
-        <button className="btn primary" disabled={budget.over && !confirmOver} onClick={submit}>{t("neg.send")}</button>
+      <div className="btn-row dialog-actions">
         <button className="btn" onClick={close}>{t("common.cancel")}</button>
+        <button className="btn primary" disabled={budget.over && !confirmOver} onClick={submit}>{t("neg.send")}</button>
       </div>
       <p className="muted small">{tx("neg.hint")}</p>
     </Modal>

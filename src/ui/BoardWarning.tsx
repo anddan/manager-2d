@@ -15,13 +15,13 @@ export function BoardWarningPopup() {
   const last = alert.n >= alert.max - 1;
   const close = () => act((g) => { delete g.boardAlert; });
   return (
-    <Modal title={`⚠️ ${t("board.title", {n: alert.n, max: alert.max})}`} onClose={close}>
+    <Modal compact title={`⚠️ ${t("board.title", {n: alert.n, max: alert.max})}`} onClose={close}>
       <div className={`board-alert ${last ? "last" : ""}`}>
         <p>{t("board.text", {cash: alert.cash, club: game.clubs[game.userClubId].name})}</p>
         <p className="strong">{last ? t("board.last") : t("board.left", {n: alert.max - alert.n})}</p>
         <p className="muted small">{t("board.hint")}</p>
       </div>
-      <div className="btn-row" style={{justifyContent: "flex-end"}}>
+      <div className="btn-row dialog-actions">
         <button className="btn" onClick={close}>{t("board.ok")}</button>
         <button className="btn primary" onClick={() => { close(); setView("finance"); }}>💰 {t("board.toFinance")}</button>
       </div>

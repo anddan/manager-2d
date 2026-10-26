@@ -3,6 +3,7 @@
 //   (the user watches and plays the match: penalties, free kicks)
 //   finishWeek: the user's match counts -> training -> moods -> market -> money -> season end
 // advanceWeek does both at once, with the computer deciding every set piece.
+import {unequipGear} from "./gear";
 import {CUP_WEEKS, DIAMONDS_SEASON, ENERGY_COST_MATCH, FORMATIONS, SEASON_WEEKS} from "./constants";
 import {payPrizeMoney, seasonBoardReview, setSeasonBudgets, weeklyFinances} from "./finance";
 import {assignRoles, createFreeAgents, createPlayer} from "./generate";
@@ -185,7 +186,10 @@ function endSeason(state: GameState, rng: Rng): void {
   const leaving: string[] = [];
   for (const p of Object.values(state.players)) {
     if (p.clubId && !state.clubs[p.clubId]?.guest && p.contract.expiresSeason <= state.season) {
-      if (p.clubId === state.userClubId) leaving.push(`${fullName(p)}`);
+      if (p.clubId === state.userClubId) {
+        leaving.push(`${fullName(p)}`);
+        unequipGear(state, p.id);
+      }
       p.clubId = null;
       p.transferListed = false;
       p.wantsToLeave = false;
@@ -198,7 +202,11 @@ function endSeason(state: GameState, rng: Rng): void {
   for (const p of Object.values(state.players)) {
     p.age++;
     if (p.age >= 34 && rng.chance(clamp(0.35 * (p.age - 33), 0, 0.95))) {
-      if (p.clubId === state.userClubId) retired.push(`${fullName(p)}`);
+      if (p.clubId === state.userClubId || p.loan?.parentClubId === state.userClubId) {
+        if (p.clubId === state.userClubId) retired.push(`${fullName(p)}`);
+        // Their boots stay with the club.
+        unequipGear(state, p.id);
+      }
       delete state.players[p.id];
     }
   }

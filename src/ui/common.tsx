@@ -1,4 +1,6 @@
 // Small building blocks shared by the screens.
+import {GearPicture} from "./Gear";
+import {wornGear} from "../game/gear";
 import {useEffect, useState, type ReactNode} from "react";
 import {createPortal} from "react-dom";
 import {listName} from "../game/helpers";
@@ -23,8 +25,11 @@ export function Card({title, actions, children, className = ""}: {title?: ReactN
   );
 }
 
-/** A dialog. `backdropCloses` false keeps a click beside it from closing it (✕ and Escape still do). */
-export function Modal({title, onClose, children, wide, backdropCloses = true}: {title: ReactNode; onClose: () => void; children: ReactNode; wide?: boolean; backdropCloses?: boolean}) {
+/**
+ * A dialog. `backdropCloses` false keeps a click beside it from closing it (✕ and Escape still do).
+ * `compact`: a short question, kept small in the middle of a phone instead of filling the screen.
+ */
+export function Modal({title, onClose, children, wide, compact, backdropCloses = true}: {title: ReactNode; onClose: () => void; children: ReactNode; wide?: boolean; compact?: boolean; backdropCloses?: boolean}) {
   const {t} = useT();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -32,8 +37,8 @@ export function Modal({title, onClose, children, wide, backdropCloses = true}: {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
   const dialog = (
-    <div className="modal-backdrop" onClick={backdropCloses ? onClose : undefined}>
-      <div className={`modal ${wide ? "modal-wide" : ""}`} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+    <div className={compact ? "modal-backdrop compact" : "modal-backdrop"} onClick={backdropCloses ? onClose : undefined}>
+      <div className={`modal ${wide ? "modal-wide" : ""} ${compact ? "modal-compact" : ""}`} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
         <header className="modal-head">
           <h2>{title}</h2>
           <button className="icon-btn" onClick={onClose} aria-label={t("common.close")}>✕</button>
@@ -111,6 +116,12 @@ export function StatusIcons({player}: {player: Player}) {
       {player.loanListed && <span title={t("status.loanListed")}>🔁</span>}
       {player.wantsToLeave && <span title={t("status.wantsOut")}>✈️</span>}
       {player.loan && <span title={t("status.onLoan")}>📎</span>}
+      {/* The boot (or glove) itself, small: its colour says the kind, its trim the tier. */}
+      {wornGear(player).map(({slot, item}) => (
+        <span key={slot} className="gear-mini" title={`${t(`gear.kind.${item.kind}`)} · ${t(`gear.tier.${item.tier}`)}`}>
+          <GearPicture item={item} size={item.kind === "gloves" ? 16 : item.kind === "shin" ? 12 : 24} />
+        </span>
+      ))}
     </span>
   );
 }

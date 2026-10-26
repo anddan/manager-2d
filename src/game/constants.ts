@@ -50,7 +50,7 @@ export const BID_EXPIRY_WEEKS = 2;
 // Monetization: energy for matches and extra training, diamonds as premium currency.
 export const ENERGY_MAX = 9;
 /** One ⚡ back every 9 min 59 s. */
-export const ENERGY_REGEN_MS = (9 * 60 + 59) * 1000;
+export const ENERGY_REGEN_MS = 10 * 60 * 1000;
 export const ENERGY_COST_MATCH = 1;
 export const ENERGY_COST_EXTRA_TRAINING = 1;
 /** "Forza!" is free once a match; each one after that costs this. */

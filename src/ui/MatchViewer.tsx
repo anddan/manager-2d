@@ -29,7 +29,8 @@ import {LiveMatch} from "../game/live";
 import {distance, fromSide, kickoffSpot, progressFor, teamSpot, type Point} from "../game/pitch";
 import {effectiveRating, overall, teamOvr} from "../game/ratings";
 import {aerial, cornerAttacker, resolveSetPiece, type SetPiece, type SetPieceInput, type SetPieceOutcome} from "../game/setpieces";
-import {cornerZone, FORZA} from "../game/match";
+import {cornerZone, FORZA, hashString} from "../game/match";
+import {GEAR_COLOR, GEAR_KIND_COLOR} from "../game/gear";
 import {
   INSTRUCTIONS,
   type Club,
@@ -52,7 +53,7 @@ import {Bar, Flag, Modal, PosBadge} from "./common";
 import {SetPieceView} from "./SetPieceView";
 import {VideoAd} from "./VideoAd";
 import {diamondBurst, energySpent} from "./effects";
-import {chatter, crowd, crowdMurmur, isMuted, kick, onMutedChange, setMuted, whistle} from "./sound";
+import {chatter, rallyFanfare, crowd, crowdMurmur, isMuted, kick, onMutedChange, setMuted, whistle} from "./sound";
 
 /** Fast-forward goes up one step per press, to this. */
 const MAX_SPEED = 5;
@@ -423,6 +424,13 @@ function pushesAt(report: MatchReport, t: number): Record<string, number> {
       for (const id of Object.keys(push)) if (sideOf[id] === e.side) delete push[id];
       push[`@${e.side}`] = value;
     }
+  }
+  // Fired up ("Forza!"): the whole side pushes up for as long as it lasts, whatever they were told.
+  for (const e of report.events) {
+    if (e.type !== "instruction" || (e.note !== "forza" && e.note !== "forzaRival") || !e.side) continue;
+    if (t < e.minute || t >= e.minute + FORZA.minutes) continue;
+    for (const id of Object.keys(push)) if (sideOf[id] === e.side) push[id] = 1;
+    push[`@${e.side}`] = 1;
   }
   return push;
 }
@@ -1152,6 +1160,51 @@ const Dugouts = memo(function Dugouts({home, away}: {home: Club; away: Club}) {
   );
 });
 
+/** A supporter's flag on a pole, flying away from the pitch (`out`: -1 left, 1 right), striped in the club's colours. */
+function FanFlag({x, y, club, out, delay}: {x: number; y: number; club: Club; out: number; delay: number}) {
+  const top = y - 3;
+  const fly = x + out * 2.4;
+  return (
+    <g>
+      <line x1={x} y1={y - 0.4} x2={x} y2={top} stroke="#e5e7eb" strokeWidth={0.18} />
+      <g className={out < 0 ? "fan-flag wave-l" : "fan-flag wave-r"} style={{animationDelay: `${delay * 3}s`}}>
+        <rect x={Math.min(x, fly)} y={top} width={2.4} height={0.8} fill={club.color} />
+        <rect x={Math.min(x, fly)} y={top + 0.8} width={2.4} height={0.8} fill={club.color2} />
+      </g>
+    </g>
+  );
+}
+
+/** A banner in the stands: where, and turned which way (±90 in an end). */
+interface BannerSpot {
+  x: number;
+  y: number;
+  rotate: number;
+}
+
+/** Where a club's fans hold up their banner: somewhere along the end behind their goal, from the club's id (the same every match). */
+function bannerSpots(id: string, side: Side): BannerSpot[] {
+  const rng = new Rng(hashString(id + ":banners"));
+  const home = side === "home";
+  return [{x: home ? -8 : 113, y: rng.range(10, 58), rotate: home ? -90 : 90}];
+}
+
+/** A small banner with the club's initials, read along it. */
+function Banner({club, spot}: {club: Club; spot: BannerSpot}) {
+  const {x, y, rotate} = spot;
+  return (
+    // Turned on an outer group: the sway animation sets its own transform on the inner one.
+    <g transform={`rotate(${rotate} ${x} ${y})`}>
+      <g className="end-banner">
+      <rect x={x - 4.2} y={y - 1.3} width={8.4} height={2.6} rx={0.4} fill={club.color} stroke={club.color2} strokeWidth={0.28} />
+      <text x={x} y={y} textAnchor="middle" dominantBaseline="central" fill={club.color2} fontSize={1.8} fontWeight={900} letterSpacing={0.3}>
+        {club.short}
+      </text>
+      </g>
+    </g>
+  );
+}
+
 /** `fill`: share of seats taken (the crowd that came); the rest show as empty seats. */
 const Stands = memo(function Stands({home, away, cheering, boards, fill = 1}: {home: Club; away: Club; cheering: Side | null; boards: string; fill?: number}) {
   const fans = useMemo(() => {
@@ -1177,7 +1230,10 @@ const Stands = memo(function Stands({home, away, cheering, boards, fill = 1}: {h
       const h = (i * 37) % 11;
       const shirt = h < 5 ? club.color : h < 8 ? club.color2 : ["#e5e7eb", "#64748b", "#1f2937"][h % 3];
       const skin = ["#f6d5bd", "#ebbd9c", "#d49c74", "#8a5638"][(i * 7) % 4];
-      return {...s, shirt, skin, delay: (h % 5) * 0.08, empty: !taken.has(i)};
+      // Behind the goals, every so often a supporter with a flag (striped in the club's colours).
+      const end = s.y >= -1.2 && s.y <= 70;
+      const flag = end && taken.has(i) && ((i * 2654435761) >>> 0) % 7 === 0;
+      return {...s, shirt, skin, delay: (h % 5) * 0.08, empty: !taken.has(i), flag};
     });
   }, [home, away, fill]);
   const crowds = useMemo(() => {
@@ -1189,16 +1245,20 @@ const Stands = memo(function Stands({home, away, cheering, boards, fill = 1}: {h
           <g key={i} className="fan" style={{animationDelay: `${f.delay}s`}}>
             <rect x={f.x - 0.55} y={f.y - 0.2} width={1.1} height={1} rx={0.35} fill={f.shirt} />
             <circle cx={f.x} cy={f.y - 0.45} r={0.42} fill={f.skin} />
+            {f.flag && <FanFlag x={f.x} y={f.y} club={side === "home" ? home : away} out={f.x < 52.5 ? -1 : 1} delay={f.delay} />}
           </g>
         )
       );
     return {home: draw("home"), away: draw("away")};
-  }, [fans]);
+  }, [fans, home, away]);
   return (
     <g className="stands" aria-hidden>
       <rect x={-14} y={-7} width={132} height={82} className="stand-bg" />
       <g className={cheering === "home" ? "fans cheer" : "fans"}>{crowds.home}</g>
       <g className={cheering === "away" ? "fans cheer" : "fans"}>{crowds.away}</g>
+      {/* Each end's banner with the club's initials, over the fans behind the goal (once there are fans to hold it). */}
+      {fill > 0.25 && bannerSpots(home.id, "home").map((spot, i) => <Banner key={"h" + i} club={home} spot={spot} />)}
+      {fill > 0.25 && bannerSpots(away.id, "away").map((spot, i) => <Banner key={"a" + i} club={away} spot={spot} />)}
       {/* Advertising boards round the pitch. */}
       <path d="M-4.6 -1.4 H109.6 V69.4 H-4.6 Z" className="ad-boards" stroke={boards} />
     </g>
@@ -1314,7 +1374,7 @@ function TeamTalkDialog({report, onDone}: {report: MatchReport; onDone: (words?:
         })}
       </div>
       </details>
-      <div className="btn-row tt-actions">
+      <div className="btn-row dialog-actions">
         <button className="btn" onClick={() => onDone()}>{t("tt.skip")}</button>
         <button className="btn primary" disabled={!talk} onClick={() => talk && onDone({talk, ...(single ? {single} : {})})}>{t("tt.say")} ▶</button>
       </div>
@@ -1350,6 +1410,8 @@ interface Shout {
   id: number;
   playerId: string;
   text: string;
+  /** "Forza!" gets its fanfare instead of the usual chatter. */
+  cry?: boolean;
 }
 
 const setPieceKey = (sp: {minute: number; side: Side}) => `s${sp.minute}-${sp.side}`;
@@ -1839,11 +1901,12 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
     }
     shouting.current = true;
     setShouts([s]);
-    chatter(s.text.length);
+    if (s.cry) rallyFanfare();
+    else chatter(s.text.length);
     setTimeout(nextShout, shoutQueue.current.length > 0 ? SHOUT_MS * 0.65 : SHOUT_MS);
   };
-  const shout = (playerId: string, text: string) => {
-    shoutQueue.current.push({id: performance.now() + Math.random(), playerId, text});
+  const shout = (playerId: string, text: string, cry = false) => {
+    shoutQueue.current.push({id: performance.now() + Math.random(), playerId, text, cry});
     if (!shouting.current) nextShout();
   };
 
@@ -1920,8 +1983,8 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
       energySpent(e?.currentTarget, ENERGY_COST_FORZA);
     }
     give({type: "forza"});
-    shout("", t("shout.forza"));
-    crowd("rally");
+    // Only the manager is heard: no roar from the crowd for our own call.
+    shout("", t("shout.forza"), true);
     setMenuOpen(false);
   };
 
@@ -2019,6 +2082,11 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
       const cy = b.y * 0.68;
       // Trail length follows actual speed, so fast sprinters leave longer trails.
       const trail = b.sprint ? 0.12 : 0;
+      const gear = game.players[id]?.gear;
+      // Which way they face (degrees, as drawn): the way they run, or standing still the goal they attack.
+      const speed = Math.hypot(b.vx, b.vy);
+      const running = speed > 0.8;
+      const facing = running ? (Math.atan2(b.vy * 0.68, b.vx * 1.05) * 180) / Math.PI : side === "home" ? 0 : 180;
       return (
         <g key={id} className={`dot${mine && !finished ? " mine" : ""}${celebrating === side ? " celebrate" : ""}`} onClick={mine && !freeze && !finished ? () => setSelected(id) : undefined}>
           {trail > 0 && (
@@ -2030,6 +2098,23 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
             {shoutedAt.has(id) && <circle r={3.2} className="shout-ring" />}
             {id === carrierId && <circle r={2.4} className="carrier-ring" />}
             {id === selected && <circle r={2.8} className="selected-ring" />}
+            {/* Boots (or a keeper's gloves) in their tier's colour, under the player: the toes point
+                the way they run and step in turn while running; standing, they face the other goal. */}
+            {gear && (
+              <g transform={`rotate(${facing.toFixed(0)})`} className={running ? "gear-feet running" : "gear-feet"} fill={GEAR_KIND_COLOR[gear.kind]} stroke={GEAR_COLOR[gear.tier]}>
+                {gear.kind === "gloves" ? (
+                  <>
+                    <circle cx={0.75} cy={-1.45} r={0.48} className={gear.tier === "special" ? "gear-dot special" : "gear-dot"} />
+                    <circle cx={0.75} cy={1.45} r={0.48} className={gear.tier === "special" ? "gear-dot special" : "gear-dot"} />
+                  </>
+                ) : (
+                  <>
+                    <g className="foot left"><ellipse cx={1.45} cy={-0.56} rx={0.8} ry={0.34} className={gear.tier === "special" ? "gear-dot special" : "gear-dot"} /></g>
+                    <g className="foot right"><ellipse cx={1.45} cy={0.56} rx={0.8} ry={0.34} className={gear.tier === "special" ? "gear-dot special" : "gear-dot"} /></g>
+                  </>
+                )}
+              </g>
+            )}
             {air[id] && <ellipse cx={0.5 + air[id].lift} cy={0.6 + air[id].lift * 1.2} rx={1.6} ry={1} className="ball-shadow" />}
             {air[id]?.dive !== undefined ? (
               <ellipse rx={1.6 + air[id].lift * 1.6} ry={1.4} transform={`rotate(${air[id].dive!.toFixed(0)}) translate(${(air[id].lift * 1.2).toFixed(2)} 0)`} fill={club.color} stroke={club.color2} strokeWidth={0.4} className="body" />
@@ -2386,7 +2471,7 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
             ))}
           </ul>
           <p className="muted small">{t("match.htHint")}</p>
-          <div className="btn-row" style={{justifyContent: "flex-end"}}>
+          <div className="btn-row dialog-actions">
             <button className="btn" onClick={() => setSelected("team")}>📋 {t("match.giveOrders")}</button>
             <button className="btn primary" onClick={startSecondHalf}>▶ {t("match.secondHalf")}</button>
           </div>
@@ -2408,9 +2493,9 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
       {confirmClose && (
         <MatchDialog title={`⏹ ${t("match.closeTitle")}`} onClose={() => setConfirmClose(false)}>
           <p>{t("match.closeText")}</p>
-          <div className="btn-row">
+          <div className="btn-row dialog-actions">
             <button className="btn" onClick={() => setConfirmClose(false)}>{t("match.closeNo")}</button>
-            <button className="btn primary push-right" onClick={onClose}>{t("match.closeYes")}</button>
+            <button className="btn primary" onClick={onClose}>{t("match.closeYes")}</button>
           </div>
         </MatchDialog>
       )}

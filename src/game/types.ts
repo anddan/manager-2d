@@ -4,6 +4,8 @@ import type {Slot} from "./constants";
 import type {StadiumState} from "./stadium";
 import type {Daily} from "./daily";
 import type {Tutorial} from "./tutorial";
+import type {BankLoan} from "./loans";
+import type {GearItem} from "./gear";
 import type {SetPiece, SetPieceInput, SetPieceOutcome} from "./setpieces";
 
 export const ATTRIBUTES = [
@@ -78,6 +80,10 @@ export interface Player {
   lastName: string;
   /** What the manager calls them; shown instead of their name everywhere but their profile. */
   nickname?: string;
+  /** Boots (or a keeper's gloves) worn: a bonus on a couple of attributes while they're on. */
+  gear?: GearItem;
+  /** Shin guards worn: a bonus, and fewer injuries. */
+  shin?: GearItem;
   /** A look the manager picked (skin, hair, beard…); missing means the one the player came with. */
   look?: {skin: string; hair: string; style: string; beard: string; eyes?: string; glasses?: boolean; lashes?: boolean};
   age: number;
@@ -159,6 +165,8 @@ export interface Club {
   lineup: string[];
   bench: string[];
   installments: Installment[];
+  /** A bank loan being paid back (the user's club only). */
+  loan?: BankLoan;
   /** Captain and set-piece takers; the best on the pitch steps in when they're off. Missing in old saves. */
   roles?: TeamRoles;
   /** The real name, when the manager has given the club a nickname (then `name` is the nickname). */
@@ -369,12 +377,15 @@ export const FINANCE_CATEGORIES = [
   "sponsor",
   "prize",
   "sales",
+  "loan",
   "premium",
   "wages",
   "bonuses",
   "transfers",
+  "loanRepay",
   "signing",
   "scouting",
+  "equipment",
   "operations",
   "construction",
 ] as const;
@@ -473,6 +484,8 @@ export interface GameState {
   daily?: Daily;
   /** A diamond pack opened but no player picked yet: the four to choose from (free agents until then). */
   packChoice?: string[];
+  /** Boots and gloves bought and not worn by anyone. */
+  gearBag?: GearItem[];
   /** Trophies won and not celebrated yet (shown once, then removed). */
   celebrations?: {kind: "league" | "cup"; season: number}[];
   /** Set when the manager is sacked: the game is over. */

@@ -1,4 +1,5 @@
 // The transfer market: scouting, bids, loans, AI clubs buying and selling.
+import {unequipGear} from "./gear";
 import {
   BID_EXPIRY_WEEKS,
   DIAMONDS_SCOUT_COST,
@@ -131,6 +132,7 @@ export function completeTransfer(
       });
     }
   }
+  if (p.clubId === state.userClubId) unequipGear(state, p.id);
   p.clubId = toClubId;
   p.loan = null;
   p.transferListed = false;
@@ -175,6 +177,7 @@ export function completeTransfer(
 export function completeLoan(state: GameState, playerId: string, toClubId: string, wageShare: number): void {
   const p = state.players[playerId];
   const parent = p.clubId!;
+  if (parent === state.userClubId) unequipGear(state, p.id);
   p.loan = {parentClubId: parent, wageShare};
   p.clubId = toClubId;
   p.loanListed = false;

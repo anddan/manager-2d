@@ -1,5 +1,6 @@
 // Weekly club finances: gate money, sponsors, wages, instalments and running
 // costs. The user's club gets an itemised report each week.
+import {weeklyLoan} from "./loans";
 import {PRIZE_MONEY} from "./constants";
 import {addMessage, book, isCupFixture, leagueClubs} from "./helpers";
 import {leaguePosition, recentPointsPerGame} from "./league";
@@ -141,6 +142,7 @@ export function weeklyFinances(state: GameState, played: Fixture[]): void {
     if (club.id !== state.userClubId && club.cash < 0) club.transferBudget = 0;
   }
 
+  weeklyLoan(state);
   const user = state.clubs[state.userClubId];
   closeReport(state);
   boardPatience(state, user.cash);

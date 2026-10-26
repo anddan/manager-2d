@@ -30,9 +30,11 @@ export function Overview() {
       <DailyTasks />
       <Card title={t("ov.nextMatch")}>
         {next ? (
-          <div className="next-match">
+          <div className="ov-next">
+            {/* What it is first, a little bigger: the cup round or the league round. */}
+            <div className="ov-next-what">{isCupFixture(next) ? `🏆 ${t("cup.name")} · ${t(CUP_STAGES[next.stage])}` : t("ov.round", {round: next.round})}</div>
             <Team id={next.homeId} />
-            <span className="vs">{isCupFixture(next) ? `🏆 ${t("cup.name")} · ${t(CUP_STAGES[next.stage])}` : t("ov.round", {round: next.round})}</span>
+            <span className="vs">–</span>
             <Team id={next.awayId} />
             <p className="muted">
               {next.homeId === club.id ? t("ov.home") : t("ov.away")} · {t(matchup(teamOvr(game, club.id) - teamOvr(game, next.homeId === club.id ? next.awayId : next.homeId)))}

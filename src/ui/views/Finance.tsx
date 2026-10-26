@@ -5,7 +5,9 @@ import {wageBill} from "../../game/ratings";
 import {FINANCE_CATEGORIES, type FinanceLines} from "../../game/types";
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
-import {Card, Empty, NumberInput} from "../common";
+import {Card, Empty, Modal, NumberInput} from "../common";
+import {loanLeft, loanOffers, repayLoan, takeLoan} from "../../game/loans";
+import {useState} from "react";
 
 export function Finance() {
   const {t, money} = useT();
@@ -103,6 +105,8 @@ export function Finance() {
         <Lines lines={game.finance.season} />
       </Card>
 
+      <Loans />
+
       {club.installments.length > 0 && (
         <Card title={t("fin.installments")}>
           <ul className="plain-list">
@@ -136,6 +140,68 @@ export function Finance() {
         </div>
       </Card>
     </div>
+  );
+}
+
+/** A bank loan: three to choose from (asked once more before it's taken), or the one being paid back. */
+function Loans() {
+  const {t, money} = useT();
+  const game = useGameState();
+  const act = useGame((s) => s.act);
+  const notify = useGame((s) => s.notify);
+  const club = userClub(game);
+  const [asking, setAsking] = useState<number | null>(null);
+  const offers = loanOffers(club);
+  const loan = club.loan;
+  const left = loanLeft(club);
+  const offer = asking === null ? undefined : offers[asking];
+  const take = () => {
+    if (asking === null) return;
+    const err = act((g) => takeLoan(g, asking));
+    setAsking(null);
+    if (err) notify(err, undefined, "error");
+  };
+  const repay = () => {
+    const err = act((g) => repayLoan(g));
+    if (err) notify(err, undefined, "error");
+  };
+  return (
+    <Card title={`🏦 ${t("loan.title")}`}>
+      {loan ? (
+        <>
+          <dl className="kv">
+            <dt>{t("loan.current")}</dt><dd>{money(loan.amount)}</dd>
+            <dt>{t("loan.weekly")}</dt><dd className="neg">{money(-loan.weekly)} {t("common.perWeek")}</dd>
+            <dt>{t("loan.weeksLeft")}</dt><dd>{loan.weeksLeft}</dd>
+            <dt>{t("loan.left")}</dt><dd>{money(left)}</dd>
+          </dl>
+          <div className="btn-row">
+            <button className="btn" disabled={club.cash < left} onClick={repay}>{t("loan.repay", {left})}</button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="muted small">{t("loan.hint")}</p>
+          <div className="loan-offers">
+            {offers.map((o) => (
+              <button key={o.index} className="loan-offer" onClick={() => setAsking(o.index)}>
+                <strong>{t("loan.offer", {amount: o.amount})}</strong>
+                <small className="muted">{t("loan.terms", {weekly: o.weekly, weeks: o.weeks, total: o.total})}</small>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      {offer && (
+        <Modal compact title={`🏦 ${t("loan.confirmTitle")}`} onClose={() => setAsking(null)}>
+          <p>{t("loan.confirmText", {amount: offer.amount, weekly: offer.weekly, weeks: offer.weeks, total: offer.total})}</p>
+          <div className="btn-row dialog-actions">
+            <button className="btn" onClick={() => setAsking(null)}>{t("common.cancel")}</button>
+            <button className="btn primary" onClick={take}>{t("loan.take")}</button>
+          </div>
+        </Modal>
+      )}
+    </Card>
   );
 }
 

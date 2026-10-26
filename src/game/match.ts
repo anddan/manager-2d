@@ -7,6 +7,7 @@
 // A match is a generator: it pauses before every minute (so the manager's
 // substitutions and instructions can come in) and at every set piece (so the
 // user can take it). simulateMatch runs one straight through.
+import {SHIN_PROTECT, geared} from "./gear";
 import {DIAMONDS_PER_WIN, MAX_SUBS, clubSlots, type Slot} from "./constants";
 import {crowdFor, matchAppeal} from "./finance";
 import {book, findFixture, isCupFixture, isKnockout} from "./helpers";
@@ -124,7 +125,7 @@ export interface Team {
 export const FORZA = {boost: 1.2, minutes: 10, onTarget: 0.92, goalBonus: 0.08};
 
 /** A small, stable number from a string (the same string, the same number). */
-function hashString(s: string): number {
+export function hashString(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
   return h;
@@ -212,7 +213,8 @@ const SHOOTER_WEIGHT: Record<Position, number> = {GK: 0, CB: 0.4, FB: 0.4, DM: 0
 const ASSIST_WEIGHT: Record<Position, number> = {GK: 0.05, CB: 0.4, FB: 1.5, DM: 1.2, CM: 3, AM: 4, W: 3.5, ST: 2};
 const FOUL_WEIGHT: Record<Position, number> = {GK: 0.2, CB: 3, FB: 2, DM: 3, CM: 2, AM: 1, W: 1, ST: 1};
 
-function shotSkill(team: Team, p: Player): number {
+function shotSkill(team: Team, player: Player): number {
+  const p = geared(player);
   const raw = p.attrs.finishing * 0.65 + p.attrs.technique * 0.2 + p.attrs.vision * 0.15;
   // Shooting more means trying from further out; less means only clear chances.
   const choice = [4, 0, -6][level(team, p.id, "shooting") + 1];
@@ -352,6 +354,8 @@ class Replay {
   private restart: {side: Side; kind: "kickoff" | "goalKick" | "throwIn" | "keeper"; at?: Point} | null = {side: "home", kind: "kickoff"};
   /** The minute whose set-piece build-up is already drawn. */
   private ledUp = -1;
+  /** The side fired up ("Forza!") this minute, if the side with the ball is: it goes straight at goal. */
+  private fired: Side | null = null;
   private state: GameState;
   private rng: Rng;
 
@@ -362,7 +366,7 @@ class Replay {
 
   private spot(team: Team, id: string, inPossession: boolean): Point {
     const o = team.onPitch.find((p) => p.id === id);
-    return o ? teamSpot(team.slots[o.slot], team.side, this.ball, inPossession, level(team, id, "position")) : this.ball;
+    return o ? teamSpot(team.slots[o.slot], team.side, this.ball, inPossession, this.fired === team.side ? 1 : level(team, id, "position")) : this.ball;
   }
 
   private nearest(team: Team, to: Point, inPossession: boolean): string | undefined {
@@ -469,7 +473,7 @@ class Replay {
     const progress = progressFor(team.side, this.ball.x);
     if (progress < 35 || progress > 78) return undefined;
     const style = level(team, from, "passing");
-    const chance = (0.16 + this.state.players[from].attrs.vision / 500) * (style < 0 ? 1.6 : style > 0 ? 0.6 : 1);
+    const chance = (0.16 + this.state.players[from].attrs.vision / 500) * (style < 0 ? 1.6 : style > 0 ? 0.6 : 1) * (this.fired === team.side ? 2 : 1);
     if (!this.rng.chance(chance)) return undefined;
     const runners = team.onPitch.filter((o) => {
       const p = team.slots[o.slot].pos;
@@ -489,6 +493,7 @@ class Replay {
     if (pos !== "CB" && pos !== "FB" && pos !== "DM" && pos !== "CM") return undefined;
     const width = team.side === "home" ? this.ball.y : 100 - this.ball.y;
     if (width > 30 && width < 70) return undefined;
+    if (this.fired === team.side) return undefined;
     if (!this.rng.chance(0.05 + this.state.players[from].attrs.vision / 900)) return undefined;
     const far = team.onPitch.filter((o) => {
       const s = team.slots[o.slot];
@@ -566,9 +571,10 @@ class Replay {
     const deep = fromPos === "GK" || fromPos === "CB" || fromPos === "FB" || fromPos === "DM";
     const vision = this.state.players[from].attrs.vision;
     const style = level(team, from, "passing");
+    const fired = this.fired === team.side;
     // How far back a pass may go before it gets unlikely, by the passer's role.
-    // In the final third, everyone looks forward.
-    const backTolerance = progress > 66 ? 5 : fromPos === "ST" || fromPos === "W" || fromPos === "AM" ? 7 : deep ? 18 : 11;
+    // In the final third, everyone looks forward (and fired up, everyone everywhere).
+    const backTolerance = fired ? 2.5 : progress > 66 ? 5 : fromPos === "ST" || fromPos === "W" || fromPos === "AM" ? 7 : deep ? 18 : 11;
     const options = team.onPitch.filter((o) => {
       if (o.id === from) return false;
       if (team.slots[o.slot].pos !== "GK") return true;
@@ -580,9 +586,9 @@ class Replay {
       const depth = progressFor(team.side, spot.x) - progress;
       const length = distance(spot, this.ball);
       // Forward is good, sideways is fine, backwards fades fast.
-      let w = depth >= 0 ? 1 + Math.min(depth, 25) / (style < 0 ? 12 : 22) : Math.exp(depth / backTolerance);
+      let w = depth >= 0 ? 1 + Math.min(depth, fired ? 35 : 25) / (fired ? 6 : style < 0 ? 12 : 22) : Math.exp(depth / backTolerance);
       // Short passes are the norm; long ones need a passer who sees them.
-      const comfortable = 14 + vision / 6 + (style < 0 ? 10 : style > 0 ? -4 : 0);
+      const comfortable = 14 + vision / 6 + (fired || style < 0 ? 10 : style > 0 ? -4 : 0);
       if (length > comfortable) w *= Math.exp(-(length - comfortable) / (6 + vision / 12));
       if (length < 4) w *= 0.3;
       if (team.slots[o.slot].pos === "GK") w *= 0.25;
@@ -600,7 +606,8 @@ class Replay {
     const told = [0.4, 1, 2.2][level(team, id, "dribbling") + 1];
     const pos = team.slots[o.slot].pos;
     const attacking = progressFor(team.side, this.ball.x) > 50 && (pos === "W" || pos === "AM" || pos === "ST") ? 1.5 : 1;
-    return this.rng.chance(clamp((0.08 + (technique + pace - 110) / 300) * told * attacking, 0.02, 0.65));
+    const fired = this.fired === team.side ? 2 : 1;
+    return this.rng.chance(clamp((0.08 + (technique + pace - 110) / 300) * told * attacking * fired, 0.02, fired > 1 ? 0.8 : 0.65));
   }
 
   /** Touches for this minute, collected before they're given times. */
@@ -668,6 +675,7 @@ class Replay {
    */
   leadUp(minute: number, attacking: Team, defending: Team, sp: {kind: SetPieceKind; spot: Point}): void {
     const side = attacking.side;
+    this.fired = minute < attacking.forzaUntil ? side : null;
     const {touches, add} = this.recorder(side);
     let carrier = this.opening(attacking, defending, add);
     const spotWidth = side === "home" ? sp.spot.y : 100 - sp.spot.y;
@@ -698,6 +706,8 @@ class Replay {
   /** `turnover`: the other side has the ball next minute (after a shot, or won off them). */
   minute(minute: number, attacking: Team, defending: Team, outcome: ShotOutcome, turnover = false): void {
     const side = attacking.side;
+    this.fired = minute < attacking.forzaUntil ? side : null;
+    const fired = this.fired === side;
     const {touches, add} = this.recorder(side);
     // A set piece's build-up is already drawn (leadUp): just the kick and what followed, in the rest of the minute.
     const ledUp = outcome.type !== "none" && !!outcome.setPiece && this.ledUp === minute;
@@ -749,7 +759,7 @@ class Replay {
       if (driveOn && progressFor(side, this.ball.x) < 80) {
         driveOn = false;
         const here = side === "home" ? this.ball.y : 100 - this.ball.y;
-        const depth = progressFor(side, this.ball.x) + this.rng.range(7, 12) + this.state.players[carrier].attrs.pace / 20;
+        const depth = progressFor(side, this.ball.x) + this.rng.range(7, 12) + this.state.players[carrier].attrs.pace / 20 + (fired ? 5 : 0);
         add("dribble", carrier, fromSide(side, clamp(depth, 5, intoBox ? 86 : DANGER_DEPTH), clamp(here + (50 - here) * 0.25, 5, 95)));
         continue;
       }
@@ -757,7 +767,7 @@ class Replay {
       if (this.dribbles(attacking, carrier)) {
         const progress = progressFor(side, this.ball.x);
         const nowWide = side === "home" ? this.ball.y : 100 - this.ball.y;
-        if (progress > 45 && this.rng.chance(0.5)) {
+        if (progress > 45 && this.rng.chance(fired ? 0.85 : 0.5)) {
           driveOn = true;
           passes++;
           // The feint: a quick shift sideways past the defender before the burst.
@@ -766,7 +776,7 @@ class Replay {
         }
         // Faster players get further with the ball; a winger out wide often cuts inside.
         const cutIn = this.posOf(attacking, carrier) === "W" && (nowWide < 25 || nowWide > 75) && this.rng.chance(0.4);
-        const depth = progressFor(side, this.ball.x) + this.rng.range(6, 10) + this.state.players[carrier].attrs.pace / 15;
+        const depth = progressFor(side, this.ball.x) + this.rng.range(6, 10) + this.state.players[carrier].attrs.pace / 15 + (fired ? 5 : 0);
         const here = side === "home" ? this.ball.y : 100 - this.ball.y;
         const width = cutIn ? here + (here < 50 ? 1 : -1) * this.rng.range(12, 20) : here + this.rng.range(-8, 8);
         add("dribble", carrier, fromSide(side, clamp(depth, 5, intoBox ? 88 : DANGER_DEPTH), clamp(width, 5, 95)));
@@ -797,7 +807,9 @@ class Replay {
       for (let k = touches.length; k < 3; k++) {
         const depth = progressFor(side, this.ball.x);
         const width = side === "home" ? this.ball.y : 100 - this.ball.y;
-        if (k % 2 === 1 && near.length > 0) {
+        if (fired) {
+          add("dribble", carrier, fromSide(side, clamp(depth + this.rng.range(3, 6), DANGER_DEPTH + 1, 90), clamp(width + (50 - width) * 0.5, 30, 70)));
+        } else if (k % 2 === 1 && near.length > 0) {
           // A lay-off to the nearest mate, to a spot still on the edge of the box.
           let to = near[0].id;
           for (const o of near) if (distance(this.spot(attacking, o.id, true), this.ball) < distance(this.spot(attacking, to, true), this.ball)) to = o.id;
@@ -1321,7 +1333,10 @@ export function createMatch(
       // Injuries.
       if (rng.chance(0.003)) {
         const team = rng.chance(0.5) ? home : away;
-        const hurt = team.onPitch.length > 0 ? rng.pick(team.onPitch) : undefined;
+        const picked = team.onPitch.length > 0 ? rng.pick(team.onPitch) : undefined;
+        // Shin guards keep some knocks from becoming injuries.
+        const guard = picked && state.players[picked.id].shin;
+        const hurt = guard && rng.chance(SHIN_PROTECT[guard.tier]) ? undefined : picked;
         if (hurt) {
           const p = state.players[hurt.id];
           p.injuryWeeks = rng.weighted([1, 2, 3, 5, 8, 14], (w) => ({1: 40, 2: 22, 3: 15, 5: 12, 8: 7, 14: 4})[w] ?? 1);

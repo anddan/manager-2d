@@ -249,3 +249,43 @@ export function chatter(textLength = 20): void {
     at += len + 0.025 + Math.random() * 0.03;
   }
 }
+
+/**
+ * The manager's "Forza!": a short, bright fanfare going up (four quick notes, the last
+ * held a little), soft like a toy trumpet, so it stands apart from the usual chatter.
+ */
+export function rallyFanfare(): void {
+  const a = audio();
+  if (!a || muted) return;
+  const t0 = a.ctx.currentTime + 0.02;
+  // C, E, G, then the high C held.
+  const notes: [number, number][] = [[523.25, 0.09], [659.25, 0.09], [783.99, 0.09], [1046.5, 0.32]];
+  let at = t0;
+  for (const [freq, len] of notes) {
+    const osc = a.ctx.createOscillator();
+    osc.type = "triangle";
+    osc.frequency.value = freq;
+    // A touch of brass: a quiet square an octave down, softened.
+    const brass = a.ctx.createOscillator();
+    brass.type = "square";
+    brass.frequency.value = freq / 2;
+    const soft = a.ctx.createBiquadFilter();
+    soft.type = "lowpass";
+    soft.frequency.value = 1800;
+    const brassGain = a.ctx.createGain();
+    brassGain.gain.value = 0.25;
+    const g = a.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(0.16, at + 0.015);
+    g.gain.setValueAtTime(0.16, at + len * 0.6);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + len + 0.08);
+    osc.connect(g);
+    brass.connect(brassGain).connect(soft).connect(g);
+    g.connect(a.out);
+    osc.start(at);
+    brass.start(at);
+    osc.stop(at + len + 0.12);
+    brass.stop(at + len + 0.12);
+    at += len + 0.02;
+  }
+}

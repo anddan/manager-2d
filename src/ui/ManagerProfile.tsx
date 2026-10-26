@@ -108,7 +108,7 @@ export function ManagerProfile({onClose}: {onClose: () => void}) {
       </section>
 
       {/* Always in view at the bottom of the dialog, however far it's scrolled. */}
-      <div className="btn-row mgr-actions">
+      <div className="btn-row dialog-actions mgr-actions">
         <button className="btn" onClick={onClose}>{t("common.cancel")}</button>
         <button className="btn primary" onClick={save}>{t("mgr.save")}</button>
       </div>
