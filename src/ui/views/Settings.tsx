@@ -4,6 +4,7 @@ import {LANGS, useT, type Lang} from "../../i18n";
 import {useGame, useGameState} from "../../store";
 import {Card} from "../common";
 import {isMuted, onMutedChange, setMuted} from "../sound";
+import {BUILD_ID, checkForUpdate} from "../updates";
 
 const LANG_NAMES: Record<Lang, string> = {sv: "Svenska", en: "English", es: "Español", it: "Italiano", fr: "Français"};
 
@@ -19,6 +20,12 @@ export function Settings() {
   const setView = useGame((s) => s.setView);
   const fileRef = useRef<HTMLInputElement>(null);
   const [soundOff, setSoundOff] = useState(isMuted());
+  // The running version: when it was built, in local time.
+  const [checking, setChecking] = useState(false);
+  const builtAt = (() => {
+    const d = new Date(BUILD_ID);
+    return Number.isNaN(d.getTime()) ? BUILD_ID : new Intl.DateTimeFormat(lang, {dateStyle: "medium", timeStyle: "short"}).format(d);
+  })();
   useEffect(() => onMutedChange(setSoundOff), []);
 
   const exportSave = () => {
@@ -40,6 +47,28 @@ export function Settings() {
 
   return (
     <div className="grid">
+      <Card title={`ℹ️ ${t("version.title")}`}>
+        <dl className="kv">
+          <dt>{t("version.built")}</dt>
+          <dd><strong>{builtAt}</strong></dd>
+        </dl>
+        <div className="btn-row">
+          <button
+            className="btn"
+            disabled={checking}
+            onClick={async () => {
+              setChecking(true);
+              const found = await checkForUpdate();
+              setChecking(false);
+              if (found === "latest") notify("version.latest", undefined, "good");
+              if (found === "match") notify("version.afterMatch");
+            }}
+          >
+            🔄 {checking ? t("version.checking") : t("version.check")}
+          </button>
+        </div>
+        <p className="muted small">{t("version.hint")}</p>
+      </Card>
       <Card title={`🔊 ${t("sound.title")}`}>
         <label className="toggle">
           <input type="checkbox" className="bench-check" checked={!soundOff} onChange={(e) => setMuted(!e.target.checked)} /> {t("sound.label")}

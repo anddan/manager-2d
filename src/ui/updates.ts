@@ -8,6 +8,9 @@ import {useGame} from "../store";
 
 declare const __BUILD_ID__: string;
 
+/** This build's id: when it was built (an ISO time). */
+export const BUILD_ID = __BUILD_ID__;
+
 const EVERY_MS = 5 * 60 * 1000;
 
 async function newerBuildOut(): Promise<boolean> {
@@ -19,6 +22,17 @@ async function newerBuildOut(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * Looks for a newer build now: reloads into it if there is one (not during a live match).
+ * Says what it found: "reload", "latest", or "match" (one is out, after the match).
+ */
+export async function checkForUpdate(): Promise<"reload" | "latest" | "match"> {
+  if (!(await newerBuildOut())) return "latest";
+  if (useGame.getState().game?.liveMatch) return "match";
+  location.reload();
+  return "reload";
 }
 
 /** Keeps the game up to date with the latest deploy (built game only; not while developing). */

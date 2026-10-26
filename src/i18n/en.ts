@@ -873,6 +873,20 @@ export const en: Record<keyof typeof sv, string> = {
   "sound.on": "Turn sound on",
 
   "sound.off": "Turn sound off",
+
+  "version.title": "Version",
+
+  "version.built": "Built",
+
+  "version.check": "Check for updates",
+
+  "version.checking": "Checking…",
+
+  "version.latest": "You have the latest version! ✅",
+
+  "version.afterMatch": "A new version is out – it loads when the match is over.",
+
+  "version.hint": "The game updates itself when a new version is out – even on your home screen.",
   "settings.save": "Save file",
   "settings.saveHint": "The game saves automatically in your browser. Export a file as a backup or to move your game.",
   "settings.export": "Export",

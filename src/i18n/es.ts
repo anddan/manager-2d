@@ -873,6 +873,20 @@ export const es: Record<keyof typeof sv, string> = {
   "sound.on": "Activar el sonido",
 
   "sound.off": "Silenciar",
+
+  "version.title": "Versión",
+
+  "version.built": "Compilada",
+
+  "version.check": "Buscar actualizaciones",
+
+  "version.checking": "Buscando…",
+
+  "version.latest": "¡Tienes la última versión! ✅",
+
+  "version.afterMatch": "Hay una versión nueva – se carga cuando acabe el partido.",
+
+  "version.hint": "El juego se actualiza solo cuando hay una versión nueva – también en la pantalla de inicio.",
   "settings.save": "Partida guardada",
   "settings.saveHint": "La partida se guarda sola en el navegador. Exporta un archivo como copia o para llevártela a otro sitio.",
   "settings.export": "Exportar",
