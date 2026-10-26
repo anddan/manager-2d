@@ -1,6 +1,6 @@
 // Player details. Own players: condition, mood, talks, focus, listing.
 // Others: scouting, bids, loans and free-agent offers.
-import {useState} from "react";
+import {useState, type ReactNode} from "react";
 import {profileName, shortName} from "../game/helpers";
 import {DIAMONDS_SCOUT_COST, SCOUT_COST} from "../game/constants";
 import {startNegotiation} from "../game/contracts";
@@ -16,11 +16,13 @@ import {
   scoutPlayer,
   type BidResult,
 } from "../game/transfers";
-import {ATTRIBUTES, type Player} from "../game/types";
+import {ATTRIBUTES, type ManagerLook, type Player} from "../game/types";
 import {useT} from "../i18n";
 import {useGame, useGameState} from "../store";
 import {Bar, Delta, Face, Flag, FormArrow, Modal, NumberInput, Ovr, PosBadge, StatusIcons} from "./common";
 import {PlayerCard} from "./PlayerCard";
+import {KitAvatar, editableLook, lookFromEditor} from "./Avatar";
+import {ManagerEditor} from "./ManagerEditor";
 
 export function PlayerModal({playerId}: {playerId: string}) {
   const {t} = useT();
@@ -37,11 +39,13 @@ export function PlayerModal({playerId}: {playerId: string}) {
       <div className="player-top">
         <PlayerCard game={game} player={p} />
         <div className="player-head">
-          <PosBadge pos={p.position} />
-          <Flag code={p.nationality} named size={22} />
-          <span>{t("pl.age", {age: p.age})}</span>
-          <span>{club ? club.name : t("pl.freeAgent")}</span>
-          <span className="rating-pill" title={t("col.ovrHint")}>{t("col.ovr")} <Ovr game={game} player={p} /></span>
+          <dl className="pm-facts">
+            <div className="pm-fact"><dt>{t("pl.position")}</dt><dd><PosBadge pos={p.position} /></dd></div>
+            <div className="pm-fact" title={t("col.ovrHint")}><dt>{t("col.ovr")}</dt><dd className="strong"><Ovr game={game} player={p} /></dd></div>
+            <div className="pm-fact"><dt>{t("pl.nation")}</dt><dd><Flag code={p.nationality} named size={18} /></dd></div>
+            <div className="pm-fact"><dt>{t("col.age")}</dt><dd>{t("pl.age", {age: p.age})}</dd></div>
+            <div className="pm-fact wide"><dt>{t("pl.club")}</dt><dd>{club ? club.name : t("pl.freeAgent")}</dd></div>
+          </dl>
           {own && <Nickname key={p.id} player={p} />}
         </div>
       </div>
@@ -68,14 +72,15 @@ export function PlayerModal({playerId}: {playerId: string}) {
 
         <section>
           {own && <Condition player={p} />}
-          <h3>{t("pl.stats")}</h3>
-          <dl className="kv">
-            <dt>{t("pl.apps")}</dt><dd>{p.stats.apps} ({p.stats.starts})</dd>
-            <dt>{t("pl.goals")}</dt><dd>{p.stats.goals}</dd>
-            <dt>{t("pl.assists")}</dt><dd>{p.stats.assists}</dd>
-            <dt>{t("pl.cards")}</dt><dd>🟨 {p.stats.yellow} 🟥 {p.stats.red}</dd>
-            <dt>{t("pl.avgRating")}</dt><dd>{p.stats.apps ? (p.stats.ratingSum / p.stats.apps).toFixed(2) : "–"}</dd>
-          </dl>
+          <Fold title={`📊 ${t("pl.stats")}`}>
+            <dl className="kv">
+              <dt>{t("pl.apps")}</dt><dd>{p.stats.apps} ({p.stats.starts})</dd>
+              <dt>{t("pl.goals")}</dt><dd>{p.stats.goals}</dd>
+              <dt>{t("pl.assists")}</dt><dd>{p.stats.assists}</dd>
+              <dt>{t("pl.cards")}</dt><dd>🟨 {p.stats.yellow} 🟥 {p.stats.red}</dd>
+              <dt>{t("pl.avgRating")}</dt><dd>{p.stats.apps ? (p.stats.ratingSum / p.stats.apps).toFixed(2) : "–"}</dd>
+            </dl>
+          </Fold>
           <ContractInfo player={p} />
         </section>
       </div>
@@ -149,8 +154,7 @@ function ContractInfo({player: p}: {player: Player}) {
   if (!p.clubId) return null;
   const known = isKnown(game, p);
   return (
-    <>
-      <h3>{t("pl.contract")}</h3>
+    <Fold title={`📝 ${t("pl.contract")}`}>
       <dl className="kv">
         <dt>{t("col.value")}</dt><dd>{money(p.value)}</dd>
         {known && <><dt>{t("col.wage")}</dt><dd>{money(p.contract.wage)} {t("common.perWeek")}</dd></>}
@@ -159,7 +163,7 @@ function ContractInfo({player: p}: {player: Player}) {
         {known && p.contract.releaseClause !== null && <><dt>{t("pl.releaseClause")}</dt><dd>{money(p.contract.releaseClause)}</dd></>}
         {p.loan && <><dt>{t("pl.loan")}</dt><dd>{game.clubs[p.loan.parentClubId].name} → {game.clubs[p.clubId].name}</dd></>}
       </dl>
-    </>
+    </Fold>
   );
 }
 
@@ -192,7 +196,7 @@ function OwnActions({player: p}: {player: Player}) {
           <button className="btn" onClick={() => act((g) => answerTransferRequest(g, p.id, false))}>{t("pl.rejectRequest")}</button>
         </div>
       )}
-      <h3>{t("pl.talk")}</h3>
+      <Fold title={`💬 ${t("pl.talk")}`}>
       <div className="btn-row">
         {TALKS.map((k) => (
           <button key={k} className="btn" disabled={talkedThisWeek} onClick={() => talk(k)}>{t(`talk.${k}`)}</button>
@@ -203,8 +207,9 @@ function OwnActions({player: p}: {player: Player}) {
       {game.promises.filter((pr) => pr.playerId === p.id).map((pr) => (
         <p key={pr.id} className="muted small">🤝 {t("pl.promiseStatus", {starts: pr.starts, required: pr.requiredStarts, left: pr.matchesLeft})}</p>
       ))}
+      </Fold>
 
-      <h3>{t("pl.development")}</h3>
+      <Fold title={`📈 ${t("pl.development")}`}>
       <label className="field inline">
         <span>{t("pl.individualFocus")}</span>
         <select
@@ -215,8 +220,9 @@ function OwnActions({player: p}: {player: Player}) {
           {ATTRIBUTES.map((a) => <option key={a} value={a}>{t(`attr.${a}`)}</option>)}
         </select>
       </label>
+      </Fold>
 
-      <h3>{t("pl.market")}</h3>
+      <Fold title={`🏷️ ${t("pl.market")}`}>
       <div className="btn-row">
         <label className="toggle">
           <input type="checkbox" checked={p.transferListed} onChange={(e) => act((g) => { g.players[p.id].transferListed = e.target.checked; })} />
@@ -228,7 +234,43 @@ function OwnActions({player: p}: {player: Player}) {
         </label>
       </div>
       <QuickSale player={p} />
+      </Fold>
+
+      <LookEditor player={p} />
     </div>
+  );
+}
+
+/** A heading that folds its part of the profile open and shut (shut to start with). */
+function Fold({title, children, open = false}: {title: string; children: ReactNode; open?: boolean}) {
+  return (
+    <details className="pm-fold" open={open}>
+      <summary><h3>{title}</h3></summary>
+      <div className="pm-fold-body">{children}</div>
+    </details>
+  );
+}
+
+/** Change how one of your players looks: the manager's look editor, drawn in the club's kit. */
+function LookEditor({player: p}: {player: Player}) {
+  const {t} = useT();
+  const game = useGameState();
+  const act = useGame((s) => s.act);
+  const club = p.clubId ? game.clubs[p.clubId] : null;
+  if (!club) return null;
+  const keeper = p.position === "GK";
+  const draw = (look: ManagerLook, size: number) => <KitAvatar look={lookFromEditor(p, look)} keeper={keeper} shirt={club.color} trim={club.color2} size={size} />;
+  const set = (look: ManagerLook) =>
+    act((g) => {
+      g.players[p.id].look = {skin: look.skin, hair: look.hair, style: look.style, beard: look.beard, eyes: look.eyes, glasses: look.glasses, lashes: look.lashes};
+    });
+  return (
+    <Fold title={`🎨 ${t("pl.look")}`}>
+      <ManagerEditor look={editableLook(p)} onChange={set} draw={draw} noSuit />
+      {p.look && (
+        <button className="btn small" onClick={() => act((g) => { delete g.players[p.id].look; })}>↩️ {t("pl.lookReset")}</button>
+      )}
+    </Fold>
   );
 }
 

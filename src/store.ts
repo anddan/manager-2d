@@ -1,6 +1,7 @@
 // App state: the game save plus UI state (current view, open dialogs).
 // Every game change goes through `act`, which works on a copy, keeps the
 // random sequence going and autosaves.
+import {TUTORIAL_VERSION} from "./game/tutorial";
 import {create} from "zustand";
 import type {Negotiation} from "./game/contracts";
 import {newGame} from "./game/generate";
@@ -104,7 +105,7 @@ export const useGame = create<Store>((set, get) => ({
   start: (managerName, clubIndex, look, playersGender, leagueId) => {
     const game = newGame(managerName, clubIndex, (Math.random() * 2 ** 32) >>> 0, look, playersGender, leagueId);
     // New players get the guide.
-    game.tutorial = {step: 0};
+    game.tutorial = {step: 0, v: TUTORIAL_VERSION};
     saveGame(game);
     set({game, view: "overview"});
   },

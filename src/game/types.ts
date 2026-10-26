@@ -78,6 +78,8 @@ export interface Player {
   lastName: string;
   /** What the manager calls them; shown instead of their name everywhere but their profile. */
   nickname?: string;
+  /** A look the manager picked (skin, hair, beard…); missing means the one the player came with. */
+  look?: {skin: string; hair: string; style: string; beard: string; eyes?: string; glasses?: boolean; lashes?: boolean};
   age: number;
   /** "f" for women; missing means a man (older saves only had men). */
   gender?: "f";
@@ -416,6 +418,8 @@ export interface ManagerLook {
   suit: string;
   /** Eyelashes and softer brows. Missing in older saves. */
   lashes?: boolean;
+  /** Eye colour; missing means brown. */
+  eyes?: string;
 }
 
 export interface GameState {

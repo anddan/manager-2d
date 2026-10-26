@@ -1,5 +1,6 @@
 // Small building blocks shared by the screens.
 import {useEffect, useState, type ReactNode} from "react";
+import {createPortal} from "react-dom";
 import {listName} from "../game/helpers";
 import {overall} from "../game/ratings";
 import {estimatedOverall, isKnown} from "../game/transfers";
@@ -30,7 +31,7 @@ export function Modal({title, onClose, children, wide, backdropCloses = true}: {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
-  return (
+  const dialog = (
     <div className="modal-backdrop" onClick={backdropCloses ? onClose : undefined}>
       <div className={`modal ${wide ? "modal-wide" : ""}`} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
         <header className="modal-head">
@@ -41,6 +42,9 @@ export function Modal({title, onClose, children, wide, backdropCloses = true}: {
       </div>
     </div>
   );
+  // On the page's top layer, whatever opened it (a dialog opened from the top bar would otherwise
+  // sit under the phone's bottom menu). Drawn in place where there's no page (rendering on the server).
+  return typeof document === "undefined" ? dialog : createPortal(dialog, document.body);
 }
 
 /** A 0..100 meter; colours go red -> amber -> green. */

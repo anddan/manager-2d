@@ -29,9 +29,12 @@ const STEPS: Record<TutorialStep, StepSpec> = {
   match: {target: ".speed-group", showWhen: ".match-controls", next: true},
   orders: {target: '[data-tour="orders"]', showWhen: '[data-tour="orders"]', next: true},
   setpieces: {target: '[data-tour="orders"]', showWhen: '[data-tour="orders"]', next: true},
-  zoom: {target: ".zoom-btn", showWhen: ".match-controls", next: true},
   talk: {target: ".tt-options", showWhen: ".tt-options"},
   daily: {target: ".daily-tasks", showWhen: ".daily-tasks", next: true},
+  // Tapping the manager opens the profile, where the club's name, initials and colours are changed.
+  club: {target: ".topbar-manager", next: true, onClick: true},
+  // Waits for the profile to be closed again.
+  names: {target: '[data-tour="nav-squad"]', showWhen: "body:not(:has(.modal-backdrop))", next: true},
 };
 
 /** The pause / play / fast-forward symbols in a text, drawn as the match's own buttons. */
@@ -61,7 +64,7 @@ export function TutorialCoach() {
       if (game.reports.length > 0) act((g) => tutorialNext(g, "talk"));
     }
     // A match finished without its steps being seen (skipped through): on to the talk.
-    if ((step === "match" || step === "orders" || step === "setpieces" || step === "zoom") && !game.liveMatch && game.reports.length > 0) {
+    if ((step === "match" || step === "orders" || step === "setpieces") && !game.liveMatch && game.reports.length > 0) {
       act((g) => { if (g.tutorial) g.tutorial.step = TUTORIAL_STEPS.indexOf("talk"); });
     }
   });

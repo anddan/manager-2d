@@ -1,4 +1,5 @@
 // Local saves in localStorage, plus file export/import as a backup.
+import {upgradeTutorial} from "./tutorial";
 import {SAVE_VERSION, SEASON_WEEKS} from "./constants";
 import {roundInWeek} from "./helpers";
 import type {GameState} from "./types";
@@ -50,6 +51,7 @@ export function parseSave(raw: string): GameState | null {
  * otherwise from next season.
  */
 function migrate(state: GameState): void {
+  upgradeTutorial(state);
   if (state.cup && !state.cup.groups) {
     const cupIds = new Set(state.cup.fixtures.map((f) => f.id));
     if (state.liveMatch && cupIds.has(state.liveMatch.fixtureId)) state.liveMatch = null;

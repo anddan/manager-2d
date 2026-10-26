@@ -84,7 +84,7 @@ export function Finance() {
             </dd>
           )}
           <dt>{t("fin.attendance")}</dt>
-          <dd className={crowd.rate >= 0.995 ? "pos" : crowd.rate < 0.6 ? "neg" : ""}>
+          <dd className={crowd.rate >= 0.995 ? "pos-num" : crowd.rate < 0.6 ? "neg" : ""}>
             {t("fin.crowd", {fans: crowd.fans, pct: Math.round(crowd.rate * 100)})}{crowd.rate >= 0.995 ? ` · ${t("match.soldOut")}` : ""}
           </dd>
           <dt>{t("fin.perHomeGame")}</dt><dd>{money(crowd.fans * crowd.price)}</dd>

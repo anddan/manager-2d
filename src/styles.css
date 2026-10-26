@@ -1437,3 +1437,60 @@ button.manager-item:hover:not(:disabled) { background: rgb(127 127 127 / 0.1); }
 .board-banner { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; padding: 10px 14px; border-radius: var(--radius); background: rgb(220 38 38 / 0.1); border: 1px solid rgb(220 38 38 / 0.35); color: var(--bad, #dc2626); font-size: 0.9rem; }
 /* The squad list: avatar, flag and name on one line. */
 .name-cell .avatar, .name-cell svg { display: inline-block; vertical-align: middle; }
+
+/* Manager profile: name fields, and the club's colours to tap. */
+.mgr-input { width: 100%; max-width: 360px; }
+.mgr-colors { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.mgr-swatch-rows { display: grid; gap: 8px; min-width: 0; }
+.mgr-swatch-row { display: grid; gap: 4px; }
+.mgr-swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+.mgr-swatch { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--border); padding: 0; cursor: pointer; box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.15); }
+.mgr-swatch.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.mgr-swatch-own { position: relative; display: inline-grid; place-items: center; background: conic-gradient(#ef4444, #f59e0b, #22c55e, #3b82f6, #a855f7, #ef4444); font-weight: 800; color: #fff; text-shadow: 0 1px 2px rgb(0 0 0 / 0.6); overflow: hidden; }
+.mgr-swatch-own input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.mgr-initials { width: 5.5em; text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em; text-align: center; }
+/* Dialogs never taller than what's visible (dvh: the real visible height on phones), and their
+   body scrolls: as a flex child it must be allowed to shrink (min-height: 0) to do so. */
+.modal { max-height: calc(100dvh - 32px); }
+.modal-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+@media (max-width: 599px) { .modal, .modal-wide { max-height: 100dvh; } }
+
+/* Manager profile in two parts: the manager, and the club. */
+.mgr-section { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; background: var(--surface-2, transparent); }
+.mgr-section-title { margin: 0 0 8px; font-size: 1.05rem; text-transform: uppercase; }
+.mgr-section h4 { margin: 12px 0 6px; }
+
+/* The profile's save and cancel stay in view at the bottom while scrolling. */
+.mgr-actions { position: sticky; bottom: -14px; justify-content: flex-end; margin: 0 -16px -14px; padding: 10px 16px; background: var(--surface); border-top: 1px solid var(--border); z-index: 1; }
+@media (max-width: 599px) { .mgr-actions { bottom: -12px; margin: 0 -12px -12px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); } }
+
+/* Player profile: parts that fold open and shut. */
+.pm-fold { border-top: 1px solid var(--border); padding: 4px 0; }
+.pm-fold > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; padding: 6px 0; }
+.pm-fold > summary::-webkit-details-marker { display: none; }
+.pm-fold > summary::after { content: "▼"; font-size: 0.7rem; opacity: 0.6; margin-left: auto; }
+.pm-fold[open] > summary::after { content: "▲"; }
+.pm-fold > summary h3 { margin: 0; }
+.pm-fold-body { padding: 4px 0 8px; }
+/* The folds bring their own line, so the panel under them doesn't add a second. */
+.actions-panel:has(> .pm-fold) { border-top: 0; margin-top: 0; padding-top: 0; }
+
+/* Player profile: the facts beside the card, as labelled tiles, and the nickname in a box under them. */
+.player-top .player-head { display: grid; gap: 10px; align-content: start; }
+.pm-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.pm-fact { border: 1px solid var(--border); border-radius: 10px; padding: 6px 10px; min-width: 0; }
+.pm-fact.wide { grid-column: 1 / -1; }
+.pm-fact dt { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.pm-fact dd { margin: 2px 0 0; display: flex; align-items: center; gap: 6px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.player-head .nickname { border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; align-items: flex-end; }
+.player-head .nickname label { flex: 1; min-width: 0; }
+.player-head .nickname input { width: 100%; }
+@media (max-width: 700px) {
+  .player-top .player-head { text-align: left; justify-content: stretch; }
+  .player-top .player-head .nickname { justify-content: flex-start; }
+}
+/* One scroll at a time: while a dialog is open the page behind it stays put, and on phones
+   only the dialog's body scrolls (not the backdrop, and never sideways). */
+html:has(.modal-backdrop), body:has(.modal-backdrop) { overflow: hidden; }
+.modal-body { overflow-x: hidden; }
+@media (max-width: 599px) { .modal-backdrop { overflow: hidden; } }

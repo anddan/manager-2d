@@ -26,6 +26,8 @@ export const HAIR_STYLES = [...MALE_STYLES, "ponytail", "bun", "bob", "braids", 
 export type HairStyle = (typeof HAIR_STYLES)[number];
 export const BEARDS = ["none", "stubble", "beard", "moustache"] as const;
 export type Beard = (typeof BEARDS)[number];
+/** Eye colours: brown (the default), hazel, green, blue, grey. */
+export const EYES = ["#4a2c17", "#8a5a2b", "#3f7d3a", "#2f6db5", "#6b7b8c"];
 export const SUITS = ["#1f2937", "#1e3a8a", "#374151", "#3f2a1d", "#14532d", "#7f1d1d"];
 
 export interface Look {
@@ -37,6 +39,8 @@ export interface Look {
   eyeGap: number;
   glasses?: boolean;
   lashes?: boolean;
+  /** Eye colour; missing means brown. */
+  eyes?: string;
 }
 
 function seedOf(id: string): number {
@@ -53,6 +57,36 @@ const FIXED_LOOKS: Record<string, Look> = {
 
 /** The player's fixed look. */
 export function lookFor(p: Player): Look {
+  const base = bornLook(p);
+  const own = p.look;
+  if (!own) return base;
+  // The manager's pick, over what the player came with (unknown styles fall back).
+  return {
+    ...base,
+    skin: own.skin,
+    hair: own.hair,
+    style: (HAIR_STYLES as readonly string[]).includes(own.style) ? (own.style as HairStyle) : base.style,
+    beard: (BEARDS as readonly string[]).includes(own.beard) ? (own.beard as Beard) : base.beard,
+    eyes: own.eyes ?? base.eyes,
+    glasses: own.glasses,
+    lashes: own.lashes,
+  };
+}
+
+/** The look a player comes with: from their id, nationality, age and gender. */
+function bornLook(p: Player): Look {
+  return {...bornFace(p), eyes: bornEyes(p)};
+}
+
+/** Eye colour from its own seed (so the rest of everyone's look stays as it was): light eyes mostly up north. */
+function bornEyes(p: Player): string {
+  if (FIXED_LOOKS[p.id]) return FIXED_LOOKS[p.id].eyes ?? EYES[0];
+  const rng = new Rng(seedOf(p.id + ":eyes"));
+  const north = REGION[p.nationality] === "north";
+  return rng.weighted(EYES, (e) => (e === EYES[0] ? (north ? 3 : 8) : e === EYES[1] ? 2 : north ? 2 : 0.3));
+}
+
+function bornFace(p: Player): Look {
   const fixed = FIXED_LOOKS[p.id];
   if (fixed) return fixed;
   const rng = new Rng(seedOf(p.id));
@@ -99,6 +133,7 @@ export function managerFace(m: ManagerLook): Look {
     hair: m.hair,
     style: (HAIR_STYLES as readonly string[]).includes(m.style) ? (m.style as HairStyle) : "short",
     beard: (BEARDS as readonly string[]).includes(m.beard) ? (m.beard as Beard) : "none",
+    eyes: m.eyes,
     brows: 0,
     eyeGap: 8,
     glasses: m.glasses,
@@ -258,8 +293,14 @@ export function Face({look, mood = 60}: {look: Look; mood?: number}) {
         <>
           <ellipse cx={50 - gap} cy={45} rx={3.4} ry={3.8} fill="#fff" />
           <ellipse cx={50 + gap} cy={45} rx={3.4} ry={3.8} fill="#fff" />
-          <circle cx={50 - gap + 0.6} cy={droopy ? 46.4 : 45.6} r={1.9} fill="#1f2937" />
-          <circle cx={50 + gap + 0.6} cy={droopy ? 46.4 : 45.6} r={1.9} fill="#1f2937" />
+          {[50 - gap + 0.6, 50 + gap + 0.6].map((x) => (
+            // Coloured iris, dark pupil, a glint.
+            <g key={x}>
+              <circle cx={x} cy={droopy ? 46.4 : 45.6} r={2.2} fill={look.eyes ?? EYES[0]} />
+              <circle cx={x} cy={droopy ? 46.4 : 45.6} r={1.1} fill="#111827" />
+              <circle cx={x + 0.7} cy={droopy ? 45.6 : 44.8} r={0.55} fill="#fff" />
+            </g>
+          ))}
           {droopy && (
             // Heavy eyelids.
             <g fill={look.skin}>
@@ -292,8 +333,11 @@ export function Face({look, mood = 60}: {look: Look; mood?: number}) {
 
 /** A player's portrait; the face follows their happiness unless `mood` is given. */
 export function Avatar({player, shirt, trim, size = 96, mood}: {player: Player; shirt: string; trim: string; size?: number; mood?: number}) {
-  const look = lookFor(player);
-  const keeper = player.position === "GK";
+  return <KitAvatar look={lookFor(player)} keeper={player.position === "GK"} shirt={shirt} trim={trim} size={size} mood={mood ?? player.happiness} />;
+}
+
+/** A player's face and shoulders in the kit, for any look (the look editor draws with it too). */
+export function KitAvatar({look, keeper = false, shirt, trim, size = 96, mood = 70}: {look: Look; keeper?: boolean; shirt: string; trim: string; size?: number; mood?: number}) {
   const kit = keeper ? "#16a34a" : shirt;
   const kitTrim = keeper ? "#facc15" : trim;
   return (
@@ -301,9 +345,20 @@ export function Avatar({player, shirt, trim, size = 96, mood}: {player: Player; 
       <path d="M14 100 Q16 80 34 76 L66 76 Q84 80 86 100Z" fill={kit} />
       <path d="M40 76 L50 86 L60 76" fill="none" stroke={kitTrim} strokeWidth={3} strokeLinejoin="round" />
       <rect x={43} y={64} width={14} height={14} rx={4} fill={look.skin} />
-      <Face look={look} mood={mood ?? player.happiness} />
+      <Face look={look} mood={mood} />
     </svg>
   );
+}
+
+/** A player's look in the editor's shape (it edits the manager's look, which has a suit too). */
+export function editableLook(p: Player): ManagerLook {
+  const l = lookFor(p);
+  return {skin: l.skin, hair: l.hair, style: l.style, beard: l.beard, eyes: l.eyes, glasses: !!l.glasses, lashes: !!l.lashes, suit: "#1f2937"};
+}
+
+/** The editor's look back into a full look (with the face's fixed details from the player). */
+export function lookFromEditor(p: Player, m: ManagerLook): Look {
+  return {...lookFor({...p, look: {skin: m.skin, hair: m.hair, style: m.style, beard: m.beard, eyes: m.eyes, glasses: m.glasses, lashes: m.lashes}})};
 }
 
 /** The manager in a suit and tie. */

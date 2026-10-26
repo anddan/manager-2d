@@ -1,4 +1,5 @@
 import {useEffect, useRef, useState} from "react";
+import {TUTORIAL_VERSION} from "../../game/tutorial";
 import {parseSave} from "../../game/save";
 import {LANGS, useT, type Lang} from "../../i18n";
 import {useGame, useGameState} from "../../store";
@@ -81,7 +82,7 @@ export function Settings() {
         </select>
       </Card>
       <Card title={`🧭 ${t("settings.tour")}`}>
-        <button className="btn" onClick={() => { act((g) => { g.tutorial = {step: 0, firstMatch: true}; }); setView("overview"); }}>{t("settings.tour")}</button>
+        <button className="btn" onClick={() => { act((g) => { g.tutorial = {step: 0, firstMatch: true, v: TUTORIAL_VERSION}; }); setView("overview"); }}>{t("settings.tour")}</button>
       </Card>
       <Card title={t("settings.save")}>
         <p className="muted">{t("settings.saveHint")}</p>
