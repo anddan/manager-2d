@@ -26,7 +26,7 @@ export function Inbox() {
   return (
     <Card
       title={t("nav.inbox")}
-      actions={<button className="btn small" onClick={() => act((g) => g.inbox.forEach((m) => (m.read = true)))}>{t("inbox.markAll")}</button>}
+      actions={<button className="btn small" disabled={game.inbox.every((m) => m.read)} onClick={() => act((g) => g.inbox.forEach((m) => (m.read = true)))}>{t("inbox.markAll")}</button>}
     >
       <Tabs
         value={filter}

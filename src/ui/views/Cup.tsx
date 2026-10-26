@@ -1,6 +1,7 @@
 // The Champions Cup: the four groups (tables and games), and the knockout
 // bracket from the quarter-finals to the final. Before the knockout the
 // bracket shows who would meet (winner of group A against runner-up of B…).
+import {useState} from "react";
 import {CUP_FROM_LEAGUE, CUP_GROUP_DAYS, CUP_WEEKS} from "../../game/constants";
 import {CUP_STAGES, GROUP_NAMES, groupTable} from "../../game/cup";
 import {currentCupStage} from "../../game/helpers";
@@ -57,11 +58,25 @@ function Groups() {
   const game = useGameState();
   const cup = game.cup!;
   const now = currentCupStage(game);
+  // Just our group to start with (if we are in it); the box shows all four.
+  const ours = cup.groups.findIndex((ids) => ids.includes(game.userClubId));
+  const [onlyOurs, setOnlyOurs] = useState(true);
   return (
-    <Card title={`🏆 ${t("cup.groups")}`} className="span-2">
+    <Card
+      title={`🏆 ${t("cup.groups")}`}
+      className="span-2"
+      actions={
+        ours >= 0 ? (
+          <label className="toggle">
+            <input type="checkbox" checked={onlyOurs} onChange={(e) => setOnlyOurs(e.target.checked)} /> {t("cup.onlyOurs")}
+          </label>
+        ) : undefined
+      }
+    >
       <p className="muted small">{t("cup.groupHint")}</p>
       <div className="cup-groups">
         {cup.groups.map((ids, g) => {
+          if (onlyOurs && ours >= 0 && g !== ours) return null;
           const rows = groupTable(game, g);
           const mine = ids.includes(game.userClubId);
           const games = cup.fixtures.filter((f) => f.group === g).sort((a, b) => a.stage - b.stage);

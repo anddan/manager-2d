@@ -1,4 +1,5 @@
 import {CUP_STAGES} from "../../game/cup";
+import {BoardWarningBanner} from "../BoardWarning";
 import {isCupFixture, nextUserFixture, userClub} from "../../game/helpers";
 import {leaguePosition, standings} from "../../game/league";
 import {clubPlayers, teamOvr, wageBill} from "../../game/ratings";
@@ -25,6 +26,7 @@ export function Overview() {
 
   return (
     <div className="grid">
+      <BoardWarningBanner />
       <DailyTasks />
       <Card title={t("ov.nextMatch")}>
         {next ? (

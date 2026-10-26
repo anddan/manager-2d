@@ -173,6 +173,15 @@ function boardPatience(state: GameState, cash: number): void {
     return;
   }
   addMessage(state, {kind: "finance", key: "msg.boardWarning", params: {n: board.warnings, max: BOARD_WARNINGS, cash, left: BOARD_WARNINGS - board.warnings}});
+  // And in the manager's face, not just in the inbox.
+  state.boardAlert = {n: board.warnings, max: BOARD_WARNINGS, cash};
+}
+
+/** Weeks in the red left before the board's next warning (or the sack), while in the red. */
+export function weeksToNextWarning(state: GameState): number | null {
+  const board = state.board;
+  if (!board || board.debtWeeks === 0) return null;
+  return DEBT_WARNING_WEEKS - (board.debtWeeks % DEBT_WARNING_WEEKS);
 }
 
 /** At the end of a season: finishing it in the black earns back one warning. */

@@ -15,6 +15,7 @@ import {GameOver} from "./GameOver";
 import {diamondBurst} from "./effects";
 import {ManagerProfile} from "./ManagerProfile";
 import {TrophyCelebration} from "./TrophyCelebration";
+import {BoardWarningPopup} from "./BoardWarning";
 import {TutorialCoach} from "./TutorialCoach";
 import {useUpdates} from "./updates";
 import {NewGame} from "./NewGame";
@@ -120,6 +121,7 @@ function Game() {
       {playerId && <PlayerModal key={playerId} playerId={playerId} />}
       {negotiation && <ContractModal />}
       <TrophyCelebration />
+      <BoardWarningPopup />
       <TutorialCoach />
       <ToastView />
     </div>

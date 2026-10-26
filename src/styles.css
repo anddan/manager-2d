@@ -1425,3 +1425,15 @@ button.manager-item:hover:not(:disabled) { background: rgb(127 127 127 / 0.1); }
 .max-forza { height: 36px; min-width: 36px; padding: 0 12px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
 .max-manager .max-forza:last-child { width: 36px; padding: 0; border-radius: 50%; }
 @media (max-width: 560px) { .max-manager .max-forza { width: 36px; padding: 0; border-radius: 50%; } }
+/* Maximised on a phone held upright: too narrow for commentary beside the score, so it goes
+   under the score, centred; the crowd a line below that. */
+@media (orientation: portrait) and (max-width: 700px) {
+  .pitch-wrap.maxed .setup-banner { top: calc(var(--edge-t, 14px) + 46px); left: 50%; right: auto; transform: translateX(-50%); max-width: calc(100% - 28px); text-align: center; }
+  .pitch-wrap.maxed .crowd-banner { top: calc(var(--edge-t, 14px) + 92px); left: 50%; transform: translateX(-50%); }
+}
+
+/* The board's warnings. */
+.board-alert.last p.strong { color: var(--bad, #dc2626); }
+.board-banner { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; padding: 10px 14px; border-radius: var(--radius); background: rgb(220 38 38 / 0.1); border: 1px solid rgb(220 38 38 / 0.35); color: var(--bad, #dc2626); font-size: 0.9rem; }
+/* The squad list: avatar, flag and name on one line. */
+.name-cell .avatar, .name-cell svg { display: inline-block; vertical-align: middle; }

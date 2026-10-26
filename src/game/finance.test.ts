@@ -30,4 +30,11 @@ describe("the board", () => {
     weeklyFinances(g, []);
     expect(g.board).toEqual({debtWeeks: 0, warnings: 0});
   });
+
+  it("puts each board warning in front of the manager, not just in the inbox", () => {
+    const g = newGame("Board", 3, 1);
+    g.clubs[g.userClubId].cash = -5_000_000;
+    for (let week = 0; week < DEBT_WARNING_WEEKS; week++) weeklyFinances(g, []);
+    expect(g.boardAlert).toEqual({n: 1, max: BOARD_WARNINGS, cash: expect.any(Number)});
+  });
 });

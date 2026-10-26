@@ -459,6 +459,8 @@ export interface GameState {
   liveMatch?: LiveMatchState | null;
   /** The board's patience with debts: weeks in a row in the red, and warnings given. Missing in old saves. */
   board?: {debtWeeks: number; warnings: number};
+  /** A board warning just given, shown as a pop-up until the manager has read it. */
+  boardAlert?: {n: number; max: number; cash: number};
   /** Days in a row with all daily tasks done (and the last such day). */
   dailyStreak?: {count: number; lastDay: string};
   /** The guide for new players. Missing when it isn't running (old saves). */

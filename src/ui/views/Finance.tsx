@@ -1,4 +1,5 @@
 import {TICKET_ADJUST, TICKET_PRICE, crowdFor, fairPrice, operatingCost, sumLines} from "../../game/finance";
+import {BoardWarningBanner} from "../BoardWarning";
 import {fixtureWeek, userClub} from "../../game/helpers";
 import {wageBill} from "../../game/ratings";
 import {FINANCE_CATEGORIES, type FinanceLines} from "../../game/types";
@@ -38,6 +39,7 @@ export function Finance() {
 
   return (
     <div className="grid">
+      <BoardWarningBanner />
       <Card title={t("fin.overview")}>
         <dl className="kv">
           <dt>{t("fin.cash")}</dt><dd className={club.cash < 0 ? "neg" : ""}>{money(club.cash)}</dd>
