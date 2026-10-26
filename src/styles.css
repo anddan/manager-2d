@@ -1409,3 +1409,19 @@ button.manager-item:hover:not(:disabled) { background: rgb(127 127 127 / 0.1); }
 @media (max-width: 899px), (pointer: coarse) {
   input, select, textarea { font-size: 16px; }
 }
+/* Maximise top right, zoom bottom right; both round. */
+.zoom-btn, .max-btn { width: 36px; height: 36px; padding: 0; border-radius: 50%; display: inline-grid; place-items: center; }
+.zoom-btn { top: auto; bottom: 6px; right: 6px; }
+.max-btn { bottom: auto; top: 6px; right: 6px; }
+.pitch-wrap.maxed .zoom-btn { top: auto; bottom: var(--edge-b, 14px); right: var(--edge-r, 14px); }
+.pitch-wrap.maxed .max-btn { bottom: auto; top: var(--edge-t, 14px); right: var(--edge-r, 14px); left: auto; }
+/* Buttons on the pitch, all round: maximise top right, zoom bottom right; Forza and instructions
+   bottom left (Forza a pill while its name shows, a circle when it's just the flame). */
+.zoom-btn, .max-btn { width: 36px; height: 36px; padding: 0; border-radius: 50%; display: inline-grid; place-items: center; }
+.zoom-btn { top: auto; bottom: 6px; right: 6px; }
+.max-btn { bottom: auto; top: 6px; right: 6px; }
+.pitch-wrap.maxed .zoom-btn { top: auto; bottom: var(--edge-b, 14px); right: var(--edge-r, 14px); }
+.pitch-wrap.maxed .max-btn { bottom: auto; top: var(--edge-t, 14px); right: var(--edge-r, 14px); left: auto; }
+.max-forza { height: 36px; min-width: 36px; padding: 0 12px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
+.max-manager .max-forza:last-child { width: 36px; padding: 0; border-radius: 50%; }
+@media (max-width: 560px) { .max-manager .max-forza { width: 36px; padding: 0; border-radius: 50%; } }
