@@ -1,7 +1,9 @@
 import {useEffect, useState} from "react";
-import {ENERGY_MAX} from "../game/constants";
+import {clubSlots, ENERGY_MAX} from "../game/constants";
 import {fixtureWeek, nextUserFixture, userClub} from "../game/helpers";
-import {ensureDaily} from "../game/daily";
+import {lineupProblems, pickBestLineup} from "../game/lineup";
+import {Modal} from "./common";
+import {dailyToCollect, ensureDaily} from "../game/daily";
 import {claimDailyBonus, msToNextEnergy, regenerateEnergy} from "../game/monetization";
 import {finishWeek, startWeek} from "../game/week";
 import {useT, type TKey} from "../i18n";
@@ -25,6 +27,8 @@ import {Settings} from "./views/Settings";
 import {Shop} from "./views/Shop";
 import {Squad} from "./views/Squad";
 import {Table} from "./views/Table";
+import {Cup} from "./views/Cup";
+import {Stadium} from "./views/Stadium";
 import {Tactics} from "./views/Tactics";
 import {Training} from "./views/Training";
 import {Transfers} from "./views/Transfers";
@@ -36,7 +40,9 @@ const ICONS: Record<View, string> = {
   tactics: "📋",
   training: "🏋️",
   fixtures: "📅",
-  table: "🏆",
+  table: "📊",
+  cup: "🏆",
+  stadium: "🏟️",
   transfers: "🔄",
   contracts: "✍️",
   finance: "💰",
@@ -52,6 +58,8 @@ const SCREENS: Record<View, () => React.JSX.Element> = {
   training: Training,
   fixtures: Fixtures,
   table: Table,
+  cup: Cup,
+  stadium: Stadium,
   transfers: Transfers,
   contracts: Contracts,
   finance: Finance,
@@ -121,6 +129,8 @@ function Nav() {
   const setView = useGame((s) => s.setView);
   const game = useGameState();
   const unread = game.inbox.filter((m) => !m.read).length;
+  // Daily rewards ready to collect (on the overview).
+  const toCollect = dailyToCollect(game.daily);
   return (
     <nav className="nav" aria-label={t("nav.label")}>
       <div className="brand">⚽ <span>Forza Manager</span></div>
@@ -129,6 +139,7 @@ function Nav() {
           <span className="nav-icon" aria-hidden>{ICONS[v]}</span>
           <span className="nav-label">{t(`nav.${v}`)}</span>
           {v === "inbox" && unread > 0 && <span className="badge">{unread}</span>}
+          {v === "overview" && toCollect > 0 && <span className="badge" title={t("daily.toCollect", {n: toCollect})}>{toCollect}</span>}
         </button>
       ))}
     </nav>
@@ -150,6 +161,7 @@ function TopBar() {
   const act = useGame((s) => s.act);
   const notify = useGame((s) => s.notify);
   const setView = useGame((s) => s.setView);
+  const view = useGame((s) => s.view);
   const now = useNow(1000);
   const [profile, setProfile] = useState(false);
   const club = userClub(game);
@@ -161,7 +173,35 @@ function TopBar() {
   const isMatchWeek = !!next && fixtureWeek(next) === game.week;
 
   // Match weeks open the live match; finishing it moves the week on.
+  // Kicking off with gaps in the team (empty spots, injured or banned): ask first.
+  const [gaps, setGaps] = useState(0);
   const advance = () => {
+    // Before a match: first a look at the team in Tactics; the next press kicks off.
+    if (isMatchWeek && view !== "tactics") {
+      setView("tactics");
+      window.scrollTo({top: 0});
+      notify("top.checkTeam");
+      return;
+    }
+    const missing = isMatchWeek ? lineupProblems(game, club).length : 0;
+    if (missing > 0) {
+      setGaps(missing);
+      return;
+    }
+    play();
+  };
+  /** Picks the best eleven, then plays. */
+  const bestAndPlay = () => {
+    act((g) => {
+      const c = g.clubs[g.userClubId];
+      const best = pickBestLineup(g, c, clubSlots(c));
+      c.lineup = best.lineup;
+      c.bench = best.bench;
+    });
+    setGaps(0);
+    play();
+  };
+  const play = () => {
     const result = act((g, rng) => {
       const started = startWeek(g, rng, Date.now());
       if (started.ok && !started.live) finishWeek(g, rng);
@@ -176,6 +216,15 @@ function TopBar() {
   return (
     <header className="topbar">
       {profile && <ManagerProfile onClose={() => setProfile(false)} />}
+      {gaps > 0 && (
+        <Modal title={`⚠️ ${t("top.gapsTitle")}`} onClose={() => setGaps(0)}>
+          <p>{t("top.gapsText", {n: gaps, total: clubSlots(club).length})}</p>
+          <div className="btn-row gaps-actions">
+            <button className="btn" onClick={() => setGaps(0)}>{t("top.gapsBack")}</button>
+            <button className="btn primary" onClick={bestAndPlay}>{t("top.gapsBest")}</button>
+          </div>
+        </Modal>
+      )}
       {/* The club (to its tactics) and, right after it, the manager (to their profile). */}
       <div className="topbar-id">
         <button className="topbar-club" onClick={() => setView("tactics")} title={t("nav.tactics")}>

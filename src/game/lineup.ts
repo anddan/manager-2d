@@ -41,10 +41,12 @@ export function pickBestLineup(
   const rest = pool
     .filter((p) => !used.has(p.id))
     .sort((a, b) => effectiveRating(b, b.position) - effectiveRating(a, a.position));
+  // One keeper on the bench is enough; the rest are outfield players (more
+  // keepers only if there aren't enough of them).
   const bench: string[] = [];
   const keeper = rest.find((p) => p.position === "GK");
   if (keeper) bench.push(keeper.id);
-  for (const p of rest) {
+  for (const p of [...rest.filter((p) => p.position !== "GK"), ...rest.filter((p) => p.position === "GK")]) {
     if (bench.length >= BENCH_SIZE) break;
     if (!bench.includes(p.id)) bench.push(p.id);
   }

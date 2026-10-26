@@ -654,9 +654,23 @@ button.pick { grid-template-columns: auto 1fr auto auto auto 60px; }
 .figure { pointer-events: none; }
 
 /* Team roles */
-.roles-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; }
-.role-pick { display: grid; gap: 4px; }
-.role-label { font-weight: 700; font-size: 0.9rem; }
+/* Team roles: a tile per role; its list folds out underneath (and takes the full row). */
+.roles-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); gap: 10px; align-items: start; }
+.role-tile { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; display: grid; gap: 8px; min-width: 0; }
+.role-tile.open { grid-column: 1 / -1; border-color: var(--accent, #2563eb); }
+.role-head { display: flex; align-items: center; gap: 8px; }
+.role-icon { font-size: 1.2rem; }
+.role-label { font-weight: 700; font-size: 0.95rem; flex: 1; }
+.role-holder { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.role-who { display: grid; min-width: 0; flex: 1; }
+.role-who strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.role-skill { display: grid; justify-items: end; gap: 2px; width: 64px; }
+.role-options { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); gap: 4px 12px; }
+.role-option { display: grid; grid-template-columns: auto 1fr auto 56px; align-items: center; gap: 8px; width: 100%; padding: 6px 8px; border: 1px solid transparent; border-radius: 8px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.role-option:hover { background: rgb(127 127 127 / 0.1); }
+.role-option.active { border-color: var(--accent, #2563eb); background: rgb(37 99 235 / 0.08); font-weight: 700; }
+.role-option > span:first-child:only-child { grid-column: 1 / -1; }
+.role-option-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .role-select { display: flex; align-items: center; gap: 8px; }
 .role-select select { flex: 1; min-width: 0; }
 .role-select .avatar { border-radius: 50%; background: var(--surface-2); flex-shrink: 0; }
@@ -1091,4 +1105,177 @@ button.pick { grid-template-columns: auto 1fr auto auto auto 60px; }
   .modal-wide .pitch-wrap { width: fit-content; max-width: 100%; margin: 0 auto; }
   .modal-wide .pitch { width: auto; max-width: 100%; height: calc(100dvh - 120px); }
   .modal-wide .match-controls { margin: 4px 0; flex-wrap: nowrap; overflow-x: auto; }
+}
+
+/* Pause / play / fast-forward and Skip together on the right. */
+.ctl-right { display: inline-flex; align-items: stretch; gap: 6px; flex-shrink: 0; }
+/* Folded help under the match controls, and talking to one player after it. */
+.control-help-fold { margin: 2px 0 8px; }
+.control-help-fold summary, .tt-fold summary { cursor: pointer; }
+.tt-fold summary h4 { display: inline; }
+.tt-fold { margin: 8px 0; }
+
+/* The net bulges and flashes when a goal goes in. */
+.net-hit rect { fill: rgb(255 255 255 / 0.55); stroke: #ffffff; stroke-width: 0.25; transform-box: fill-box; animation: net-bulge 0.7s ease-out 1 forwards; }
+.net-hit.right rect { transform-origin: left center; }
+.net-hit.left rect { transform-origin: right center; }
+@keyframes net-bulge {
+  0% { transform: scale(1, 1); opacity: 1; }
+  30% { transform: scale(1.8, 1.12); opacity: 0.9; }
+  65% { transform: scale(0.9, 1); opacity: 0.6; }
+  100% { transform: scale(1, 1); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .net-hit rect { animation: none; opacity: 0; } }
+
+/* Ticket price with arrows either side. */
+.price-stepper { display: inline-flex; align-items: center; gap: 6px; }
+.price-stepper input { width: 4.5em; text-align: center; }
+.big-match { color: var(--warn, #d97706); font-weight: 600; }
+
+/* The crowd, announced at kick-off. */
+.crowd-banner { position: absolute; top: 10px; left: 10px; display: flex; gap: 8px; align-items: center; padding: 6px 14px; border-radius: 999px; background: rgb(15 23 42 / 0.82); color: #fff; font-size: 0.9rem; white-space: nowrap; pointer-events: none; animation: crowd-in 0.5s ease-out; }
+.crowd-banner span { color: #fde047; font-weight: 700; }
+@keyframes crowd-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+
+/* An empty seat in the stands. */
+.seat { fill: rgb(255 255 255 / 0.13); }
+
+/* Auto ticket price: the price it will charge and how far it's been moved. */
+.price-auto { display: grid; justify-items: center; min-width: 4.5em; line-height: 1.1; }
+/* An on/off switch. */
+.switch { display: inline-flex; align-items: center; gap: 8px; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; text-align: left; }
+.switch-track { position: relative; flex: none; width: 38px; height: 22px; border-radius: 999px; background: var(--border); transition: background 0.15s; }
+.switch-knob { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / 0.3); transition: transform 0.15s; }
+.switch.on .switch-track { background: var(--good, #16a34a); }
+.switch.on .switch-knob { transform: translateX(16px); }
+
+/* Training: three big one-tap modes, then (choosing yourself) focus tiles and intensity. */
+.train-modes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
+.train-mode { display: grid; justify-items: center; gap: 2px; padding: 12px 8px; border: 2px solid var(--border); border-radius: 14px; background: var(--card, transparent); color: inherit; font: inherit; cursor: pointer; text-align: center; }
+.train-mode:hover { border-color: var(--accent, #2563eb); }
+.train-mode.active { border-color: var(--good, #16a34a); background: rgb(22 163 74 / 0.1); }
+.train-mode-icon { font-size: 1.8rem; line-height: 1.1; }
+.train-mode small { color: var(--muted, #64748b); font-size: 0.75rem; line-height: 1.2; }
+.train-sub { margin: 10px 0 6px; font-size: 0.85rem; }
+.train-focuses { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 140px), 1fr)); gap: 6px; }
+.train-focus { padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.train-focus.active { border-color: var(--good, #16a34a); background: rgb(22 163 74 / 0.1); font-weight: 700; }
+.train-intensity { margin-bottom: 4px; }
+.train-plan { display: flex; gap: 10px; align-items: flex-start; margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: rgb(127 127 127 / 0.08); }
+.train-plan-icon { font-size: 1.6rem; }
+@media (max-width: 420px) { .train-mode small { display: none; } }
+
+/* A card whose title folds it open and shut. */
+.card-toggle { display: inline-flex; align-items: center; gap: 8px; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; text-transform: inherit; letter-spacing: inherit; }
+.card-toggle-arrow { font-size: 0.7em; opacity: 0.7; }
+/* Team roles folded: one row of who does what. */
+.roles-summary { display: flex; flex-wrap: wrap; gap: 6px 16px; width: 100%; padding: 2px 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.roles-summary-item { white-space: nowrap; }
+
+/* Emptying a spot on the pitch, first in the list. */
+.pick.pick-clear { color: var(--bad, #dc2626); border-style: dashed; }
+
+/* Champions Cup: the groups side by side, and the knockout bracket. */
+.cup-groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 14px; }
+.cup-group { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+.cup-group.mine { border-color: var(--good, #16a34a); box-shadow: 0 0 0 1px var(--good, #16a34a); }
+.cup-group h3 { margin: 0 0 6px; }
+.cup-group .table { font-size: 0.82rem; }
+.cup-group .table th, .cup-group .table td { padding: 4px 5px; }
+.cup-group .table tr.through td:first-child { box-shadow: inset 3px 0 0 var(--good, #16a34a); }
+.cup-club { max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+.cup-group-games .round h4 { margin: 8px 0 2px; font-size: 0.8rem; }
+.cup-group-games .fixture { font-size: 0.8rem; }
+.bracket { display: grid; grid-template-columns: repeat(4, minmax(150px, 1fr)); gap: 12px; overflow-x: auto; padding-bottom: 4px; }
+.bracket-round { display: flex; flex-direction: column; min-width: 0; }
+.bracket-round h4 { margin: 0 0 8px; font-size: 0.8rem; white-space: nowrap; }
+.bracket-ties { flex: 1; display: flex; flex-direction: column; justify-content: space-around; gap: 10px; }
+.bracket-tie { display: grid; gap: 2px; width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface, transparent); color: inherit; font: inherit; text-align: left; }
+.bracket-tie:not(:disabled) { cursor: pointer; }
+.bracket-tie.mine { border-color: var(--good, #16a34a); }
+.bracket-tie.tbd { border-style: dashed; }
+.bracket-tie.champion { border-color: #eab308; background: rgb(234 179 8 / 0.12); font-weight: 700; min-height: 40px; align-content: center; }
+.bracket-team { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; min-width: 0; }
+.bracket-team.won { font-weight: 700; }
+.bracket-team.me .bracket-name { text-decoration: underline; text-underline-offset: 2px; }
+.bracket-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bracket-score { font-variant-numeric: tabular-nums; font-weight: 700; }
+@media (max-width: 699px) { .bracket { grid-template-columns: repeat(4, 150px); } }
+
+/* The stadium from above, and the list of what can be built. */
+.stadium-svg { width: 100%; height: auto; display: block; max-height: 360px; }
+.stadium-ground { fill: #475569; }
+.stadium-pitch { fill: #2f8f46; }
+.stadium-lines { stroke: rgb(255 255 255 / 0.7); stroke-width: 0.6; }
+.stadium-stand, .stadium-extra { cursor: pointer; }
+.stadium-stand-outline { stroke: rgb(255 255 255 / 0.35); stroke-width: 0.5; }
+.stadium-stand.picked .stadium-stand-outline, .stadium-stand:hover .stadium-stand-outline { stroke: #fde047; stroke-width: 1.2; }
+.stadium-stand.building .stadium-stand-outline { stroke: #fde047; stroke-dasharray: 2 1.5; }
+.stadium-extra.picked text { filter: drop-shadow(0 0 2px #fde047); }
+.stadium-locked { position: relative; filter: grayscale(0.7); opacity: 0.7; }
+.stadium-lock-badge { position: absolute; inset: 0; display: grid; place-items: center; font-size: 3rem; filter: none; }
+.stadium-project { font-weight: 700; color: var(--mid, #d97706); }
+.stadium-parts { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 6px; }
+.stadium-part { border: 1px solid var(--border); border-radius: 10px; }
+.stadium-part.open { border-color: var(--good, #16a34a); }
+.stadium-part-head { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.stadium-part-icon { font-size: 1.1rem; }
+.stadium-part-name { flex: 1; font-weight: 600; }
+.stadium-levels { display: inline-flex; gap: 3px; }
+.stadium-levels span { width: 10px; height: 10px; border-radius: 3px; background: var(--border); }
+.stadium-levels span.on { background: var(--good, #16a34a); }
+.stadium-levels span.building { background: #fde047; }
+.stadium-part-body { padding: 0 10px 10px; }
+
+/* Kick-off with gaps in the team: the choices, bottom right. */
+.gaps-actions { justify-content: flex-end; }
+
+/* Picker rows in Tactics: the player, and a button for their profile. */
+.pick-row { display: flex; align-items: stretch; gap: 4px; }
+.pick-row > .pick { flex: 1; min-width: 0; }
+.pick-avatar { flex: none; display: grid; place-items: center; width: 42px; padding: 0; border: 1px solid var(--border); border-radius: 8px; background: none; cursor: pointer; }
+.pick-avatar:hover { background: rgb(127 127 127 / 0.12); border-color: var(--accent, #2563eb); }
+
+/* The manager's menu in the match: the avatar, and what folds out under it. */
+.manager-menu { position: relative; }
+.manager-btn { display: inline-flex; align-items: center; gap: 6px; padding-top: 3px; padding-bottom: 3px; }
+.manager-btn.open { border-color: var(--accent); }
+.manager-pop { position: absolute; top: calc(100% + 6px); left: 0; z-index: 30; width: min(320px, calc(100vw - 32px)); display: grid; gap: 6px; padding: 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface, #fff); box-shadow: var(--shadow); }
+.manager-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: none; color: inherit; font: inherit; text-align: left; }
+button.manager-item { cursor: pointer; font-weight: 600; }
+button.manager-item:hover:not(:disabled) { background: rgb(127 127 127 / 0.1); }
+.manager-toggle .speed-group .chip { padding: 4px 10px; }
+.manager-hint { margin: 2px 2px 0; }
+@container (max-width: 520px) { .manager-btn-label { display: none; } }
+/* Maximise, bottom right of the pitch; maximised, the pitch fills the window with the play controls under it. */
+.max-btn { position: absolute; right: 6px; bottom: 6px; z-index: 2; display: inline-grid; place-items: center; padding: 6px; background: rgb(11 20 48 / 0.75); color: #fff; border-color: rgb(255 255 255 / 0.25); }
+.max-btn .ctl-icon { width: 16px; height: 16px; fill: currentColor; }
+.pitch-wrap.maxed { position: fixed; inset: 0; z-index: 55; border-radius: 0; background: #0b1220; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.pitch-wrap.maxed .pitch { width: auto; max-width: 100%; height: auto; max-height: calc(100dvh - 64px); border-radius: 0; }
+.pitch-wrap.maxed .max-btn { bottom: 70px; }
+.max-controls { position: absolute; left: 0; right: 0; bottom: 10px; display: flex; justify-content: center; }
+.max-controls .speed-group { background: rgb(255 255 255 / 0.95); }
+
+/* A picked player who can't play (injured or banned): greyed out, with why. */
+.slot.out svg { opacity: 0.4; filter: grayscale(1); }
+.slot-out { position: absolute; top: -4px; right: calc(50% - 22px); font-size: 1rem; }
+/* The row is short now (manager + play controls): let it wrap rather than scroll, so the manager's menu isn't cut off. */
+.match-controls { overflow: visible; flex-wrap: wrap; }
+/* Maximised: the play controls see-through on the pitch, like the maximise button. */
+.max-controls .speed-group { background: rgb(11 20 48 / 0.75); border-color: rgb(255 255 255 / 0.25); }
+.max-controls .speed-group .chip { background: transparent; color: #fff; }
+.max-controls .speed-group .chip .ctl-icon { fill: currentColor; }
+.max-controls .speed-group .chip.active { background: rgb(255 255 255 / 0.22); color: #fff; }
+.max-controls .speed-group .chip:hover:not(:disabled) { background: rgb(255 255 255 / 0.12); }
+/* The manager's menu opens upwards, over the pitch, so it's never below the fold. */
+.manager-pop { top: auto; bottom: calc(100% + 6px); }
+/* Maximised always fills the window, whatever the phone-on-its-side rules say
+   (they size the pitch to its content, which left a maximised pitch with no size). */
+.modal-wide .pitch-wrap.maxed, .pitch-wrap.maxed { width: 100vw; max-width: none; height: 100dvh; margin: 0; }
+.modal-wide .pitch-wrap.maxed .pitch, .pitch-wrap.maxed .pitch { width: 100%; height: calc(100dvh - 64px); max-width: none; max-height: none; }
+/* On its side there's little height: the pitch gets all of it, the see-through controls sit over its bottom edge. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .modal-wide .pitch-wrap.maxed .pitch, .pitch-wrap.maxed .pitch { height: 100dvh; }
+  .pitch-wrap.maxed .max-controls { bottom: 6px; }
+  .pitch-wrap.maxed .max-btn { bottom: 6px; }
 }

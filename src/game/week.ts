@@ -7,6 +7,7 @@ import {CUP_WEEKS, DIAMONDS_SEASON, ENERGY_COST_MATCH, FORMATIONS, SEASON_WEEKS}
 import {payPrizeMoney, seasonBoardReview, setSeasonBudgets, weeklyFinances} from "./finance";
 import {assignRoles, createFreeAgents, createPlayer} from "./generate";
 import {finishCupStage, setupCup, userCupResult} from "./cup";
+import {weeklyStadium} from "./stadium";
 import {taskProgress} from "./daily";
 import {tutorialMatchSeed} from "./tutorial";
 import {addMessage, cupFixturesInStage, currentCupStage, currentRound, findFixture, fixturesInRound, fullName, leagueClubs, playerName} from "./helpers";
@@ -124,12 +125,12 @@ export function finishWeek(state: GameState, rng: Rng): MatchReport | undefined 
   const round = currentRound(state);
   const stage = currentCupStage(state);
   const played: Fixture[] = round !== null ? fixturesInRound(state, round) : stage !== null ? cupFixturesInStage(state, stage) : [];
-  const homeClubs = new Set(played.map((f) => f.homeId));
   if (stage !== null) finishCupStage(state, rng, stage);
   weeklyTraining(state, rng);
   weeklyMorale(state, rng);
   weeklyTransfers(state, rng);
-  weeklyFinances(state, homeClubs);
+  weeklyStadium(state, played);
+  weeklyFinances(state, played);
   for (const p of Object.values(state.players)) p.value = marketValue(p, state.season);
 
   state.monetization.extraTrainingsThisWeek = 0;

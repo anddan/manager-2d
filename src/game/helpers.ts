@@ -1,5 +1,5 @@
 // Small helpers shared by the systems.
-import {CUP_WEEKS, PRESEASON_WEEKS, SEASON_WEEKS} from "./constants";
+import {CUP_GROUP_DAYS, CUP_WEEKS, PRESEASON_WEEKS, SEASON_WEEKS} from "./constants";
 import type {Club, CupFixture, Fixture, FinanceCategory, GameState, Message, Player} from "./types";
 
 export function newId(state: GameState, prefix: string): string {
@@ -23,7 +23,7 @@ export function currentRound(state: GameState): number | null {
   return roundInWeek(state.week);
 }
 
-/** Champions Cup stage played this week (0 = round of 16 … 3 = final), or null. */
+/** Champions Cup stage played this week (0–2 group matchdays, 3 quarters … 5 final), or null. */
 export function currentCupStage(state: GameState): number | null {
   const stage = CUP_WEEKS.indexOf(state.week);
   return stage >= 0 ? stage : null;
@@ -31,6 +31,11 @@ export function currentCupStage(state: GameState): number | null {
 
 export function isCupFixture(f: Fixture): f is CupFixture {
   return "stage" in f;
+}
+
+/** A cup tie that needs a winner on the day (penalties if level): the knockout, not the groups. */
+export function isKnockout(f: Fixture): f is CupFixture {
+  return isCupFixture(f) && f.stage >= CUP_GROUP_DAYS;
 }
 
 /** The week of the season a fixture is played in. */

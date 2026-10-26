@@ -1,32 +1,133 @@
 // Weekly club finances: gate money, sponsors, wages, instalments and running
 // costs. The user's club gets an itemised report each week.
 import {PRIZE_MONEY} from "./constants";
-import {addMessage, book, leagueClubs} from "./helpers";
+import {addMessage, book, isCupFixture, leagueClubs} from "./helpers";
 import {leaguePosition, recentPointsPerGame} from "./league";
 import {wageBill} from "./ratings";
 import {clamp} from "./rng";
-import type {Club, FinanceLines, GameState} from "./types";
+import type {Club, FinanceLines, Fixture, GameState} from "./types";
 
-/** Share of seats sold: reputation, current form and table position. */
-export function attendanceRate(state: GameState, club: Club): number {
-  const position = leaguePosition(state, club.id);
-  const tableBoost = (leagueClubs(state).length / 2 - position) * 0.012;
-  const formBoost = (recentPointsPerGame(state, club.id) - 1.4) * 0.05;
-  return clamp(0.45 + club.reputation / 220 + tableBoost + formBoost, 0.3, 1);
+/** Lowest and highest ticket price a club can set. */
+export const TICKET_PRICE = {min: 5, max: 250};
+
+/** Goals per game in a club's last five matches (both ends): fans like a show. */
+function goalsPerGame(state: GameState, clubId: string): number {
+  const recent = state.fixtures
+    .filter((f) => f.played && (f.homeId === clubId || f.awayId === clubId))
+    .sort((a, b) => b.round - a.round)
+    .slice(0, 5);
+  if (recent.length === 0) return 2.6;
+  return recent.reduce((n, f) => n + f.homeGoals + f.awayGoals, 0) / recent.length;
 }
 
-export function ticketIncome(state: GameState, club: Club): number {
-  return Math.round(club.capacity * attendanceRate(state, club) * club.ticketPrice);
+/**
+ * How many want to come at a fair price (0.3 to about 1.1 of the seats):
+ * the club's standing, how it's going (form and table), and goals.
+ */
+export function crowdDemand(state: GameState, club: Club): number {
+  if (club.guest) return clamp(0.5 + club.reputation / 200, 0.3, 1.1);
+  const position = leaguePosition(state, club.id);
+  const tableBoost = (leagueClubs(state).length / 2 - position) * 0.012;
+  const formBoost = (recentPointsPerGame(state, club.id) - 1.4) * 0.06;
+  const goalsBoost = clamp((goalsPerGame(state, club.id) - 2.6) * 0.04, -0.06, 0.08);
+  return clamp(0.45 + club.reputation / 220 + tableBoost + formBoost + goalsBoost, 0.3, 1.1);
+}
+
+/**
+ * How big a match is for the fans (1 = an ordinary league game): the
+ * opponent's name, a clash at the top, and Champions Cup nights, the final most.
+ */
+export function matchAppeal(state: GameState, fixture: Fixture): number {
+  if (isCupFixture(fixture)) return [1.3, 1.3, 1.35, 1.55, 1.8, 2.2][fixture.stage] ?? 1.3;
+  const home = state.clubs[fixture.homeId];
+  const away = state.clubs[fixture.awayId];
+  let appeal = 1 + clamp((away.reputation - home.reputation) / 200, -0.1, 0.2);
+  const top = (id: string) => leaguePosition(state, id) <= 3;
+  if (top(home.id) && top(away.id)) appeal += 0.2;
+  return appeal;
+}
+
+/** What the fans think a ticket is worth: more for a big club and a big match. */
+export function fairPrice(club: Club, appeal = 1): number {
+  return (10 + club.reputation * 0.12) * appeal;
+}
+
+/**
+ * The crowd at a home match: demand, made bigger by a big match, then the
+ * price. At the fair price demand decides it; dearer, seats stay empty; cheaper
+ * fills it (but each ticket brings in less). Rounded to tens.
+ */
+export function crowdFor(state: GameState, club: Club, fixture?: Fixture, price?: number): {fans: number; rate: number; appeal: number; price: number} {
+  const {appeal, demand} = pull(state, club, fixture);
+  const paid = price ?? matchPrice(state, club, fixture);
+  const priceEffect = clamp(Math.pow(fairPrice(club, appeal) / Math.max(1, paid), PRICE_EFFECT.power), PRICE_EFFECT.min, PRICE_EFFECT.max);
+  const rate = clamp(demand * priceEffect, 0.03, 1);
+  return {fans: Math.round((club.capacity * rate) / 10) * 10, rate, appeal, price: paid};
+}
+
+/** How hard the price bites: (fair / price) to this power, kept between min and max. */
+const PRICE_EFFECT = {power: 1.4, min: 0.08, max: 1.8};
+
+/** A match's pull and the demand for it at a fair price. */
+function pull(state: GameState, club: Club, fixture?: Fixture): {appeal: number; demand: number} {
+  const appeal = fixture ? matchAppeal(state, fixture) : 1;
+  return {appeal, demand: crowdDemand(state, club) * (0.8 + 0.2 * appeal)};
+}
+
+/**
+ * The best price for a match: the highest that still fills the ground. (Dearer
+ * loses more fans than it gains per ticket; cheaper only gives money away.) If
+ * it can't be filled at all, as low as still pulls more people in.
+ */
+export function autoPrice(state: GameState, club: Club, fixture?: Fixture): number {
+  const {appeal, demand} = pull(state, club, fixture);
+  const fair = fairPrice(club, appeal);
+  const fill = fair * Math.pow(demand, 1 / PRICE_EFFECT.power);
+  const lowest = fair / Math.pow(PRICE_EFFECT.max, 1 / PRICE_EFFECT.power);
+  // Whole euros: the few around it, whichever brings in most (seats come in tens).
+  const around = clamp(Math.floor(Math.max(fill, lowest)), TICKET_PRICE.min, TICKET_PRICE.max);
+  let best = around;
+  let bestIncome = -1;
+  for (let p = Math.max(TICKET_PRICE.min, around - 2); p <= Math.min(TICKET_PRICE.max, around + 3); p++) {
+    const income = crowdFor(state, club, fixture, p).fans * p;
+    if (income > bestIncome) {
+      bestIncome = income;
+      best = p;
+    }
+  }
+  return best;
+}
+
+/** The price for a match: the club's own, or on auto the best one moved by the manager's percent. */
+export function matchPrice(state: GameState, club: Club, fixture?: Fixture): number {
+  if (!club.ticketAuto) return club.ticketPrice;
+  const adjusted = autoPrice(state, club, fixture) * (1 + (club.ticketAdjust ?? 0) / 100);
+  return clamp(Math.round(adjusted), TICKET_PRICE.min, TICKET_PRICE.max);
+}
+
+/** How far the manager may move an automatic price, in percent. */
+export const TICKET_ADJUST = {min: -50, max: 50, step: 5};
+
+/** Share of seats sold at the next home match (or an ordinary one). */
+export function attendanceRate(state: GameState, club: Club, fixture?: Fixture): number {
+  return crowdFor(state, club, fixture).rate;
+}
+
+export function ticketIncome(state: GameState, club: Club, fixture?: Fixture): number {
+  const crowd = crowdFor(state, club, fixture);
+  return crowd.fans * crowd.price;
 }
 
 export function operatingCost(club: Club): number {
   return Math.round(25_000 + club.facilities * 9_000 + club.capacity * 0.8);
 }
 
-/** Runs one week of money for every club. `homeClubs` played at home. */
-export function weeklyFinances(state: GameState, homeClubs: Set<string>): void {
+/** Runs one week of money for every club. `played`: this week's matches (the home side keeps the gate). */
+export function weeklyFinances(state: GameState, played: Fixture[]): void {
+  const gates = new Map(played.map((f) => [f.homeId, f.gate ?? ticketIncome(state, state.clubs[f.homeId], f)]));
   for (const club of leagueClubs(state)) {
-    if (homeClubs.has(club.id)) book(state, club.id, "tickets", ticketIncome(state, club));
+    const gate = gates.get(club.id);
+    if (gate !== undefined) book(state, club.id, "tickets", gate);
     book(state, club.id, "sponsor", club.sponsorWeekly);
     book(state, club.id, "wages", -wageBill(state, club.id));
     book(state, club.id, "operations", -operatingCost(club));

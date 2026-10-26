@@ -7,8 +7,10 @@ export const SAVE_VERSION = 1;
 export const LEAGUE_SIZE = 14;
 export const ROUNDS = (LEAGUE_SIZE - 1) * 2;
 export const PRESEASON_WEEKS = 2;
-/** Champions Cup weeks (round of 16, quarters, semis, final), about every month and a half; no league games then. */
-export const CUP_WEEKS = [8, 14, 20, 26];
+/** Champions Cup weeks: three group matchdays, then quarters, semis and the final; no league games then. */
+export const CUP_WEEKS = [6, 10, 14, 20, 25, 31];
+/** Group matchdays come first in CUP_WEEKS; the knockout rounds after. */
+export const CUP_GROUP_DAYS = 3;
 export const SEASON_WEEKS = PRESEASON_WEEKS + ROUNDS + CUP_WEEKS.length;
 export const FIRST_SEASON = 2026;
 export const SQUAD_MIN = 18;
@@ -22,11 +24,15 @@ export const PRIZE_MONEY = [
   1_200_000, 1_050_000, 900_000, 800_000, 700_000, 600_000, 500_000,
 ];
 
-// Champions Cup: 16 clubs, knockout. Your league sends its top four.
+// Champions Cup: 16 clubs in four groups of four, the top two of each into the knockout. Your league sends its top four.
 export const CUP_SIZE = 16;
+export const CUP_GROUPS = 4;
 export const CUP_FROM_LEAGUE = 4;
-/** Paid for each round won (index = stage won: round of 16, quarters, semis, final). */
-export const CUP_PRIZE = [1_000_000, 1_600_000, 2_500_000, 4_000_000];
+/** Paid for each group win, and for getting out of the group. */
+export const CUP_GROUP_WIN = 400_000;
+export const CUP_QUALIFY = 1_000_000;
+/** Paid for each knockout round won (quarters, semis, final). */
+export const CUP_PRIZE = [1_600_000, 2_500_000, 4_000_000];
 /** Just for taking part. */
 export const CUP_ENTRY = 800_000;
 export const CUP_DIAMONDS = 60;
@@ -42,7 +48,7 @@ export const SALE_TO_BUDGET_SHARE = 0.7;
 export const BID_EXPIRY_WEEKS = 2;
 
 // Monetization: energy for matches and extra training, diamonds as premium currency.
-export const ENERGY_MAX = 5;
+export const ENERGY_MAX = 9;
 /** One ⚡ back every 9 min 59 s. */
 export const ENERGY_REGEN_MS = (9 * 60 + 59) * 1000;
 export const ENERGY_COST_MATCH = 1;

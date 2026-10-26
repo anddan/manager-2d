@@ -1,10 +1,10 @@
-import {attendanceRate, operatingCost, sumLines, ticketIncome} from "../../game/finance";
-import {userClub} from "../../game/helpers";
+import {TICKET_ADJUST, TICKET_PRICE, crowdFor, fairPrice, operatingCost, sumLines} from "../../game/finance";
+import {fixtureWeek, userClub} from "../../game/helpers";
 import {wageBill} from "../../game/ratings";
 import {FINANCE_CATEGORIES, type FinanceLines} from "../../game/types";
 import {useT} from "../../i18n";
-import {useGameState} from "../../store";
-import {Card, Empty} from "../common";
+import {useGame, useGameState} from "../../store";
+import {Card, Empty, NumberInput} from "../common";
 
 export function Finance() {
   const {t, money} = useT();
@@ -12,6 +12,29 @@ export function Finance() {
   const club = userClub(game);
   const last = game.finance.weeks[0];
   const bill = wageBill(game, club.id);
+  const act = useGame((s) => s.act);
+  const setPrice = (price: number) =>
+    act((g) => {
+      g.clubs[g.userClubId].ticketPrice = Math.max(TICKET_PRICE.min, Math.min(TICKET_PRICE.max, Math.round(price)));
+    });
+  const adjust = club.ticketAdjust ?? 0;
+  const setAdjust = (pct: number) =>
+    act((g) => {
+      g.clubs[g.userClubId].ticketAdjust = Math.max(TICKET_ADJUST.min, Math.min(TICKET_ADJUST.max, pct));
+    });
+  // Switching auto off keeps the price it would have charged, as a starting point.
+  const toggleAuto = () =>
+    act((g) => {
+      const c = g.clubs[g.userClubId];
+      if (c.ticketAuto) c.ticketPrice = crowd.price;
+      c.ticketAuto = !c.ticketAuto;
+    });
+  // The next home match, league or cup, and the crowd it would get at this price.
+  const nextHome = [...game.fixtures, ...(game.cup?.fixtures ?? [])]
+    .filter((f) => !f.played && f.homeId === club.id)
+    .sort((a, b) => fixtureWeek(a) - fixtureWeek(b))[0];
+  const crowd = crowdFor(game, club, nextHome);
+  const fair = Math.round(fairPrice(club, crowd.appeal));
 
   return (
     <div className="grid">
@@ -27,12 +50,47 @@ export function Finance() {
       <Card title={t("fin.stadium")}>
         <dl className="kv">
           <dt>{t("fin.capacity")}</dt><dd>{club.capacity.toLocaleString()}</dd>
-          <dt>{t("fin.attendance")}</dt><dd>{Math.round(attendanceRate(game, club) * 100)} %</dd>
-          <dt>{t("fin.ticketPrice")}</dt><dd>{money(club.ticketPrice)}</dd>
-          <dt>{t("fin.perHomeGame")}</dt><dd>{money(ticketIncome(game, club))}</dd>
+          <dt>{t("fin.priceMode")}</dt>
+          <dd>
+            <button className={`switch ${club.ticketAuto ? "on" : ""}`} role="switch" aria-checked={!!club.ticketAuto} onClick={toggleAuto}>
+              <span className="switch-track" aria-hidden><span className="switch-knob" /></span>
+              {club.ticketAuto ? t("fin.priceAuto") : t("fin.priceManual")}
+            </button>
+          </dd>
+          <dt>{t("fin.ticketPrice")}</dt>
+          {club.ticketAuto ? (
+            <dd className="price-stepper">
+              <button className="btn small" aria-label={t("fin.priceDown")} disabled={adjust <= TICKET_ADJUST.min} onClick={() => setAdjust(adjust - TICKET_ADJUST.step)}>▼</button>
+              <span className="price-auto">
+                <strong>{money(crowd.price)}</strong>
+                <small className="muted">{adjust === 0 ? t("fin.priceBest") : `${adjust > 0 ? "+" : ""}${adjust} %`}</small>
+              </span>
+              <button className="btn small" aria-label={t("fin.priceUp")} disabled={adjust >= TICKET_ADJUST.max} onClick={() => setAdjust(adjust + TICKET_ADJUST.step)}>▲</button>
+            </dd>
+          ) : (
+            <dd className="price-stepper">
+              <button className="btn small" aria-label={t("fin.priceDown")} disabled={club.ticketPrice <= TICKET_PRICE.min} onClick={() => setPrice(club.ticketPrice - 1)}>▼</button>
+              <NumberInput value={club.ticketPrice} min={TICKET_PRICE.min} max={TICKET_PRICE.max} ariaLabel={t("fin.ticketPrice")} onChange={setPrice} />
+              <button className="btn small" aria-label={t("fin.priceUp")} disabled={club.ticketPrice >= TICKET_PRICE.max} onClick={() => setPrice(club.ticketPrice + 1)}>▲</button>
+            </dd>
+          )}
+          {nextHome && <dt>{t("fin.nextHome")}</dt>}
+          {nextHome && (
+            <dd>
+              {t("fin.vsOpponent", {opponent: game.clubs[nextHome.awayId].name})}
+              {crowd.appeal >= 1.3 && <span className="big-match"> ⭐ {t("fin.bigMatch")}</span>}
+            </dd>
+          )}
+          <dt>{t("fin.attendance")}</dt>
+          <dd className={crowd.rate >= 0.995 ? "pos" : crowd.rate < 0.6 ? "neg" : ""}>
+            {t("fin.crowd", {fans: crowd.fans, pct: Math.round(crowd.rate * 100)})}{crowd.rate >= 0.995 ? ` · ${t("match.soldOut")}` : ""}
+          </dd>
+          <dt>{t("fin.perHomeGame")}</dt><dd>{money(crowd.fans * crowd.price)}</dd>
+          <dt>{t("fin.fairPrice")}</dt><dd>{money(fair)}</dd>
           <dt>{t("fin.sponsor")}</dt><dd>{money(club.sponsorWeekly)} {t("common.perWeek")}</dd>
           <dt>{t("fin.operations")}</dt><dd>{money(-operatingCost(club))} {t("common.perWeek")}</dd>
         </dl>
+        <p className="muted small">{club.ticketAuto && <>{t("fin.autoHint")} </>}{t("fin.crowdHint")}</p>
       </Card>
 
       <Card title={last ? t("fin.lastWeek", {week: last.week}) : t("fin.lastWeekEmpty")}>

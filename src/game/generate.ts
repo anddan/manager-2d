@@ -295,7 +295,7 @@ export function newGame(
     incomingBids: [],
     reports: [],
     finance: {weeks: [], season: {}, current: {}},
-    training: {focus: "technique", intensity: "normal"},
+    training: {focus: "technique", intensity: "normal", auto: true},
     monetization: {
       energy: ENERGY_MAX,
       energyAt: Date.now(),
@@ -331,6 +331,8 @@ export function newGame(
 
   const clubIds = Object.keys(state.clubs);
   state.userClubId = clubIds[clamp(clubIndex, 0, clubIds.length - 1)];
+  // Prices look after themselves to begin with; the manager can take over in Finance.
+  state.clubs[state.userClubId].ticketAuto = true;
   state.fixtures = makeFixtures(state, rng, clubIds);
   createWorldClass(state, new Rng(seed ^ WORLD_CLASS_SALT));
   setupCup(state, new Rng(seed ^ CUP_SALT));

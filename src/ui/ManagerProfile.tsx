@@ -2,7 +2,7 @@
 // once, at the start; the club can be given a nickname here, the way players
 // can (shown everywhere, with the real name kept alongside in brackets here).
 import {useState} from "react";
-import {CUP_STAGES} from "../game/cup";
+import {CUP_ROUNDS} from "../game/cup";
 import {leaguePosition} from "../game/league";
 import {useT} from "../i18n";
 import {useGame, useGameState} from "../store";
@@ -18,9 +18,9 @@ export function ManagerProfile({onClose}: {onClose: () => void}) {
   const [nick, setNick] = useState(club.officialName ? club.name : "");
   const trophies = [
     ...game.history.filter((h) => h.userPosition === 1).map((h) => ({season: h.season, key: "trophy.leagueShort"})),
-    ...game.history.filter((h) => h.cup === CUP_STAGES.length).map((h) => ({season: h.season, key: "trophy.cupShort"})),
+    ...game.history.filter((h) => h.cup === CUP_ROUNDS.length).map((h) => ({season: h.season, key: "trophy.cupShort"})),
   ].sort((a, b) => a.season - b.season);
-  const cupText = (cup?: number) => (cup === undefined ? "" : cup === CUP_STAGES.length ? t("mgr.cupWon") : tx(CUP_STAGES[cup]));
+  const cupText = (cup?: number) => (cup === undefined ? "" : cup === CUP_ROUNDS.length ? t("mgr.cupWon") : tx(CUP_ROUNDS[cup]));
   const save = () =>
     act((g) => {
       const c = g.clubs[g.userClubId];

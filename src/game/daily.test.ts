@@ -1,10 +1,22 @@
 // Daily tasks and rewarded videos.
 import {describe, expect, it} from "vitest";
-import {ENERGY_VIDEOS_PER_DAY, TASKS, TASKS_PER_DAY, WIN_VIDEO_DIAMONDS, claimDailyBonus, claimTask, dayBefore, ensureDaily, streakPack, taskProgress, videoAfterWin, videoForEnergy} from "./daily";
+import {ENERGY_VIDEOS_PER_DAY, TASKS, TASKS_PER_DAY, WIN_VIDEO_DIAMONDS, claimDailyBonus, claimTask, dailyToCollect, dayBefore, ensureDaily, streakPack, taskProgress, videoAfterWin, videoForEnergy} from "./daily";
 import {newGame} from "./generate";
 import {Rng} from "./rng";
 
 describe("daily tasks", () => {
+  it("counts the rewards waiting to be collected, the bonus once all tasks are", () => {
+    const g = newGame("Daily", 3, 4);
+    const daily = ensureDaily(g, "2026-10-26");
+    expect(dailyToCollect(daily)).toBe(0);
+    for (const t of daily.tasks) taskProgress(g, t.kind, TASKS[t.kind].target);
+    expect(dailyToCollect(daily)).toBe(daily.tasks.length);
+    daily.tasks.forEach((_, i) => claimTask(g, i));
+    expect(dailyToCollect(daily)).toBe(1);
+    claimDailyBonus(g, new Rng(1));
+    expect(dailyToCollect(daily)).toBe(0);
+  });
+
   it("gives three different tasks a day, the same all day, new the next", () => {
     const g = newGame("Daily", 3, 4);
     const a = ensureDaily(g, "2026-10-24").tasks.map((t) => t.kind);

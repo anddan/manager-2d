@@ -120,11 +120,30 @@ function pick(focus: Partial<Record<Attribute, number>>, scale: number): Partial
 /** AI clubs rotate programmes so their squads stay rounded. */
 const AI_ROTATION: TrainingFocus[] = ["technique", "attack", "defense", "passing", "physical", "conditioning", "recovery"];
 
+/** Why the assistant picked this week's training. */
+export type PlanReason = "tired" | "fresh" | "rotation";
+
+/**
+ * This week's training for the user's squad. On auto the assistant decides:
+ * rest when the squad is tired, hard work when everyone is fresh, and
+ * otherwise a different area each week.
+ */
+export function trainingPlan(state: GameState): {focus: TrainingFocus; intensity: Intensity; reason?: PlanReason} {
+  const {focus, intensity, auto} = state.training;
+  if (!auto) return {focus, intensity};
+  const squad = Object.values(state.players).filter((p) => p.clubId === state.userClubId && p.injuryWeeks === 0);
+  const fitness = squad.length ? squad.reduce((s, p) => s + p.fitness, 0) / squad.length : 100;
+  if (fitness < 72) return {focus: "recovery", intensity: "light", reason: "tired"};
+  const rotation = AI_ROTATION.filter((f) => f !== "recovery");
+  const next = rotation[state.absWeek % rotation.length];
+  return fitness > 90 ? {focus: next, intensity: "hard", reason: "fresh"} : {focus: next, intensity: "normal", reason: "rotation"};
+}
+
 export function weeklyTraining(state: GameState, rng: Rng): void {
   for (const club of leagueClubs(state)) {
     const isUser = club.id === state.userClubId;
     const opts: TrainOptions = isUser
-      ? state.training
+      ? trainingPlan(state)
       : {focus: AI_ROTATION[state.absWeek % AI_ROTATION.length], intensity: "normal"};
     for (const p of Object.values(state.players)) {
       if (p.clubId !== club.id) continue;
@@ -143,7 +162,7 @@ export function extraTraining(state: GameState, rng: Rng): void {
   const club = state.clubs[state.userClubId];
   for (const p of Object.values(state.players)) {
     if (p.clubId !== club.id) continue;
-    const changes = trainPlayer(rng, club, p, {...state.training, extraSession: true});
+    const changes = trainPlayer(rng, club, p, {...trainingPlan(state), extraSession: true});
     for (const [a, d] of Object.entries(changes)) {
       const attr = a as Attribute;
       p.weeklyChange[attr] = (p.weeklyChange[attr] ?? 0) + (d ?? 0);

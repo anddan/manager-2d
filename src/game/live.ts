@@ -32,6 +32,8 @@ export class LiveMatch {
   done = false;
   /** Whether the user takes set pieces themselves; off, the computer plays them all. */
   manualSetPieces = true;
+  /** Whether the user makes substitutions for injuries; off, the assistant does it without stopping. */
+  manualSubs = true;
   /**
    * The minute the engine is parked before, or is in the middle of when it's
    * stopped at a set piece, an injury or half-time.
@@ -114,8 +116,9 @@ export class LiveMatch {
         this.nextMinute = step.minute;
         // Already decided before a reload, or the computer decides.
         const decided = this.commands.some((c) => c.type === "sub" && c.outId === step.playerId);
-        if (!decided && this.auto) this.autoSub(step.playerId, step.pos);
-        if (decided || this.auto) {
+        const assistant = this.auto || !this.manualSubs;
+        if (!decided && assistant) this.autoSub(step.playerId, step.pos);
+        if (decided || assistant) {
           next = this.run.next(undefined);
           continue;
         }

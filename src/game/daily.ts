@@ -90,6 +90,14 @@ export function claimTask(state: GameState, index: number): number {
   return reward;
 }
 
+/** Rewards waiting to be collected: each task done but not claimed, and the bonus once all are. */
+export function dailyToCollect(daily: Daily | undefined): number {
+  if (!daily) return 0;
+  const tasks = daily.tasks.filter((t) => taskDone(t) && !t.claimed).length;
+  const bonus = !daily.bonusClaimed && daily.tasks.every((t) => t.claimed) ? 1 : 0;
+  return tasks + bonus;
+}
+
 /** All three done and collected: a free bronze pack. The new player's id, or an error key. */
 export function claimDailyBonus(state: GameState, rng: Rng): {playerId: string; pack: PlayerPackId; streak: number} | {error: string} {
   const daily = state.daily;

@@ -17,7 +17,7 @@
 // Goals stop play for a celebration and a kick-off from the centre spot;
 // penalties, free kicks and corners stop play while the players line up.
 import {memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode} from "react";
-import {addMessage, findFixture, fullName, isCupFixture, listName, playerName, shortName} from "../game/helpers";
+import {addMessage, findFixture, fullName, isCupFixture, isKnockout, listName, playerName, shortName} from "../game/helpers";
 import {shootoutOver} from "../game/cup";
 import {WIN_VIDEO_DIAMONDS, taskProgress, videoAfterWin} from "../game/daily";
 import {Rng} from "../game/rng";
@@ -55,6 +55,8 @@ import {diamondBurst} from "./effects";
 const MAX_SPEED = 5;
 /** Real milliseconds per match minute at 1x. */
 const MS_PER_MINUTE = 1200;
+/** Normal play (▶, not fast-forward) runs a bit slower than that, so it is easy to follow. */
+const NORMAL_PLAY_RATE = 0.8;
 /** Physics step in match minutes. */
 const STEP = 0.02;
 /** Share of the gap between touches that the carrier keeps the ball. */
@@ -80,6 +82,7 @@ const THROW_IN_PAUSE_MS = 700;
 const HALFTIME_REPLAY_MS = 3000;
 const SHOUT_MS = 3200;
 const SET_PIECES_KEY = "manager2d.manualSetPieces";
+const SUBS_KEY = "manager2d.manualSubs";
 
 interface Body {
   x: number;
@@ -97,6 +100,11 @@ export interface Scene {
   reached: number;
   /** On its way to the next touch (it only sets off from a player's feet). */
   flying?: boolean;
+  /**
+   * Touches taken by a nearer teammate than the one recorded: a loose ball is
+   * picked up by whoever of that side gets there first (touch index -> player).
+   */
+  subs?: Record<number, string>;
 }
 
 export interface Ctx {
@@ -185,11 +193,33 @@ function wander(id: string, t: number, amount = 1): Point {
   return {x: Math.sin(t * 0.8 + h) * 2.5 * amount, y: Math.cos(t * 0.6 + h * 1.7) * 3 * amount};
 }
 
-/** Kick-off: everyone in their own half, the taker on the centre spot. */
+/** The centre circle's radius in metres (9.15 m), and a step to spare. */
+const CENTRE_CIRCLE_M = 10.2;
+
+/**
+ * Kick-off: everyone in their own half, the taker on the centre spot, and
+ * nobody from the other side inside the centre circle.
+ */
 function kickoffTargets(ctx: Ctx, t: number, kickerId?: string): Record<string, Point> {
   const targets: Record<string, Point> = {};
   for (const side of ["home", "away"] as const) {
-    for (const [slot, id] of onPitchAt(ctx.report, side, t)) targets[id] = kickoffSpot(ctx.slots[side][slot], side);
+    const players = onPitchAt(ctx.report, side, t);
+    const kicking = !!kickerId && [...players.values()].includes(kickerId);
+    for (const [slot, id] of players) {
+      let spot = kickoffSpot(ctx.slots[side][slot], side);
+      if (!kicking) {
+        // Out of the circle (in metres: the pitch is 105 x 68), still in their own half.
+        const dx = (spot.x - 50) * 1.05;
+        const dy = (spot.y - 50) * 0.68;
+        const d = Math.hypot(dx, dy);
+        if (d < CENTRE_CIRCLE_M) {
+          const ux = d > 0.01 ? dx / d : side === "home" ? -1 : 1;
+          const uy = d > 0.01 ? dy / d : 0;
+          spot = {x: 50 + (ux * CENTRE_CIRCLE_M) / 1.05, y: 50 + (uy * CENTRE_CIRCLE_M) / 0.68};
+        }
+      }
+      targets[id] = spot;
+    }
   }
   if (kickerId) targets[kickerId] = {x: 50, y: 50};
   return targets;
@@ -434,6 +464,12 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
   let ball = {...prev.ball};
   let reached = prev.reached;
   let flying = prev.flying ?? false;
+  const subs = {...(prev.subs ?? {})};
+  const fr = (k: number): Frame => {
+    const f = ctx.frames[k];
+    const sub = subs[k];
+    return sub && f ? {...f, playerId: sub} : f;
+  };
   const bodies: Record<string, Body> = {};
   for (const [id, b] of Object.entries(prev.bodies)) bodies[id] = {...b};
   let t = prev.time;
@@ -442,7 +478,7 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
     const dt = Math.min(STEP, t1 - t);
     t += dt;
     const i = touchIndex(ctx.frames, t);
-    const cur = i >= 0 ? ctx.frames[i] : undefined;
+    const cur = i >= 0 ? fr(i) : undefined;
     const possession: Side = cur?.possession ?? "home";
     const override = dyn.overrides.find((o) => overrideOn(o, t, reached, flying));
 
@@ -452,22 +488,36 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
     // pieces. Its speed is capped, so it never jumps; running late, it goes
     // at top speed until it has caught up.
     const holdOn = (k: number) => {
-      const f = ctx.frames[k];
-      const after = ctx.frames[k + 1];
+      const f = fr(k);
+      const after = fr(k + 1);
       if (!after) return true;
       // In the net or out of play, it stays there until play restarts.
       if (!f.playerId || f.kind === "goal" || f.kind === "nogoal") return t < after.minute;
       return after.playerId !== f.playerId && t - f.minute < (after.minute - f.minute) * HOLD;
     };
     const aimFor = (k: number): Point => {
-      const f = ctx.frames[k];
+      const f = fr(k);
       // A goal ends up in the back of the net.
       if (f.kind === "goal" || f.kind === "nogoal") return {x: f.x > 50 ? NET_DEPTH : 100 - NET_DEPTH, y: f.y};
-      // The ball is played into the shooting position, and the shooter runs onto it.
-      if (isShotSetup(ctx.frames, k)) return f;
-      // A cross goes into the box, for the attacker to meet.
-      // Crosses and through balls go into space, for the attacker to run onto.
-      if (isCross(ctx.frames, k) || f.flight === "through") return f;
+      // Played into space for someone to run onto: the shooting position, a cross into
+      // the box, a ball in behind. Never further than they can get to in time (then it's
+      // played nearer to them, on their way there), so nobody else is left standing by it.
+      if (isShotSetup(ctx.frames, k) || isCross(ctx.frames, k) || f.flight === "through") {
+        // Carried into the shot: it stays at the shooter's feet.
+        if (f.kind === "dribble") return (f.playerId && bodies[f.playerId]) || f;
+        const rb = f.playerId ? bodies[f.playerId] : undefined;
+        if (!rb) return f;
+        const reach = topSpeed(ctx, f.playerId!, t) * CATCH_UP * Math.max(0, f.minute - t) + 1.5;
+        const d = distance(rb, f);
+        if (d <= reach) return f;
+        let k2 = reach / d;
+        // A shot is still struck from around the box (a shooter far off sprints the rest).
+        if (isShotSetup(ctx.frames, k)) {
+          const depth = (q: number) => progressFor(f.possession, rb.x + (f.x - rb.x) * q);
+          if (depth(k2) < 70 && depth(1) > depth(0)) k2 = Math.min(1, Math.max(k2, (70 - depth(0)) / (depth(1) - depth(0))));
+        }
+        return {x: rb.x + (f.x - rb.x) * k2, y: rb.y + (f.y - rb.y) * k2};
+      }
       // Placed balls go to the spot. Everything else, dribbles included (carried
       // at the player's feet), goes to the player.
       const toSpot = ["setpiece", "kickoff", "goalkick", "throwin"].includes(f.kind ?? "");
@@ -475,7 +525,7 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
       return body ?? f;
     };
     const holderOf = (k: number) => {
-      const f = ctx.frames[k];
+      const f = fr(k);
       return f.playerId && f.kind !== "goal" && f.kind !== "nogoal" ? bodies[f.playerId] : undefined;
     };
     // It only leaves a player from their feet.
@@ -489,47 +539,96 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
       const h = reached >= 0 ? holderOf(reached) : undefined;
       if (h) ball = {x: h.x, y: h.y};
       flying = true;
+      // Won off them: by whoever of that side is nearest the ball, not someone far away.
+      const won = fr(reached + 1);
+      const tackler = won?.kind === "tackle" && won.playerId ? bodies[won.playerId] : undefined;
+      if (won && tackler && distance(tackler, ball) > 6) {
+        let best: string | undefined;
+        let bestD = distance(tackler, ball) - 3;
+        for (const [slot, id] of onPitchAt(ctx.report, won.possession, t)) {
+          if (ctx.slots[won.possession][slot].pos === "GK" || !bodies[id]) continue;
+          const d = distance(bodies[id], ball);
+          if (d < bestD) {
+            bestD = d;
+            best = id;
+          }
+        }
+        if (best) {
+          const original = won.playerId!;
+          for (let j = reached + 1; j < ctx.frames.length && ctx.frames[j].playerId === original; j++) subs[j] = best;
+        }
+      }
     }
     const ahead = flying;
-    if (ahead && ctx.frames[reached + 1]) {
+    if (ahead && fr(reached + 1)) {
       const k = reached + 1;
       const to = aimFor(k);
       const gap = distance(ball, to);
-      const timeLeft = ctx.frames[k].minute - t;
+      // Into space for a shooter who is still on his way: weighted so the two get there together.
+      const meet = fr(k);
+      const runner = isShotSetup(ctx.frames, k) && meet.kind === "pass" && meet.playerId ? bodies[meet.playerId] : undefined;
+      const eta = runner ? distance(runner, to) / (topSpeed(ctx, meet.playerId!, t) * CATCH_UP) : 0;
+      const timeLeft = Math.max(meet.minute - t, eta);
       const speed = Math.min(BALL_TOP_SPEED, timeLeft > dt ? gap / timeLeft : BALL_TOP_SPEED);
       const move = Math.min(gap, speed * dt);
       if (gap > 0) ball = {x: ball.x + ((to.x - ball.x) / gap) * move, y: ball.y + ((to.y - ball.y) / gap) * move};
       // A dribble is done when the run is (the ball rides along at their feet until then).
       // The run to a foul or out for a corner goes all the way there (play stops there, and waits for it).
-      const f = ctx.frames[k];
-      const beforeStop = ctx.frames[k + 1]?.kind === "setpiece" || (ctx.frames[k + 1]?.kind === "out" && ctx.frames[k + 2]?.kind === "setpiece");
-      const runDone = f.kind !== "dribble" || (t >= f.minute - 0.02 && (!beforeStop || distance(ball, f) < 3));
-      if (gap - move < 0.8 && runDone) {
+      const f = fr(k);
+      const beforeStop = fr(k + 1)?.kind === "setpiece" || (fr(k + 1)?.kind === "out" && fr(k + 2)?.kind === "setpiece");
+      // Running at goal to shoot: all the way to where the shot is struck from.
+      const toSpot = beforeStop || isShotSetup(ctx.frames, k);
+      const runDone = f.kind !== "dribble" || (t >= f.minute - 0.02 && (!toSpot || distance(ball, f) < 3));
+      // A tackle is won as soon as the ball is within the tackler's reach.
+      if (gap - move < (f.kind === "tackle" ? 2 : 0.8) && runDone) {
         reached = k;
         flying = false;
+        // Lying loose with the player it was meant for far off: a nearer teammate takes it.
+        const lying = fr(k);
+        const meant = lying.playerId ? bodies[lying.playerId] : undefined;
+        if (meant && lying.playerId && ["pass", "dribble", "tackle"].includes(lying.kind ?? "") && !isShotSetup(ctx.frames, k) && distance(meant, ball) > 5) {
+          const side = onPitchAt(ctx.report, lying.possession, t);
+          let best: string | undefined;
+          let bestD = distance(meant, ball) - 3;
+          for (const [slot, id] of side) {
+            if (ctx.slots[lying.possession][slot].pos === "GK" || !bodies[id]) continue;
+            const d = distance(bodies[id], ball);
+            if (d < bestD) {
+              bestD = d;
+              best = id;
+            }
+          }
+          if (best) {
+            // And their next touches too, if the same player had them.
+            const original = lying.playerId;
+            for (let j = k; j < ctx.frames.length && ctx.frames[j].playerId === original; j++) subs[j] = best;
+          }
+        }
       }
     } else if (reached >= 0) {
       // Holding: at the player's feet it goes with them. Otherwise it lies
       // still until they get to it (they run onto it). Out of play or in the net, it stays.
       const carrier = holderOf(reached);
       // Fouled, or the ball has gone out for a corner: it stays where it is for the set piece.
-      const stopped = ctx.frames[reached + 1]?.kind === "setpiece";
+      const stopped = fr(reached + 1)?.kind === "setpiece";
       if (carrier && !stopped && distance(carrier, ball) < 2.2) ball = {x: carrier.x, y: carrier.y};
     }
 
     const sides = {home: onPitchAt(ctx.report, "home", t), away: onPitchAt(ctx.report, "away", t)};
     // Who has the ball and who it's on its way to, from where the ball really is.
-    const heading = ctx.frames[reached + 1];
+    const heading = fr(reached + 1);
     const travelling = !!heading && flying;
-    const held = reached >= 0 ? ctx.frames[reached] : undefined;
+    const held = reached >= 0 ? fr(reached) : undefined;
     const carrierId = !travelling && held?.playerId && held.kind !== "goal" ? held.playerId : undefined;
     const receiver = travelling && heading.playerId && heading.minute - t < 1 ? heading : undefined;
     const receiverId = receiver?.playerId;
     // Players who get the ball in the next few touches start heading there now.
     const upcoming = new Map<string, Frame>();
-    for (let k = reached + 2; k <= reached + 5 && k < ctx.frames.length; k++) {
-      const f = ctx.frames[k];
-      if (f.minute - t > 1.5) break;
+    for (let k = reached + 2; k <= reached + 8 && k < ctx.frames.length; k++) {
+      const f = fr(k);
+      const shot = isShotSetup(ctx.frames, k);
+      if (f.minute - t > (shot ? 2.5 : 1.5)) continue;
+      if (!shot && k > reached + 5) continue;
       if (f.playerId && (f.kind === "pass" || f.kind === "dribble") && !upcoming.has(f.playerId)) upcoming.set(f.playerId, f);
     }
     // The ball is behind: whoever it is waiting for gets there quicker.
@@ -595,9 +694,9 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
       // on the way down the line (the attackers read it and get into the box).
       const wide = ballWidth < 25 || ballWidth > 75;
       let crossComing = false;
-      for (let k = reached + 1; k < ctx.frames.length && ctx.frames[k].minute - t < 1.6; k++) {
+      for (let k = reached + 1; k < ctx.frames.length && fr(k).minute - t < 1.6; k++) {
         // Whose cross it is: the side crossing it, even if a defender gets to it first.
-        if (isCross(ctx.frames, k) && (ctx.frames[k - 1]?.possession ?? ctx.frames[k].possession) === possession) crossComing = true;
+        if (isCross(ctx.frames, k) && (fr(k - 1)?.possession ?? fr(k).possession) === possession) crossComing = true;
       }
       const crossing = inPossession && !override && ((ballDepth > 55 && wide) || crossComing);
       const underCross = !inPossession && !override && ((ballDepth < 45 && wide) || crossComing);
@@ -630,7 +729,7 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
         let boxRun = false;
 
         if (receiverId === id && receiver) {
-          target = {x: receiver.x, y: receiver.y};
+          target = receiver.kind === "tackle" ? {x: ball.x, y: ball.y} : {x: receiver.x, y: receiver.y};
           sprint = true;
         } else if (override?.targets[id]) {
           target = override.targets[id];
@@ -646,8 +745,31 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
           target = {x: ball.x, y: ball.y};
           sprint = distance(body, ball) > 3;
         } else if (id === presser) {
-          target = ball;
-          sprint = true;
+          // A loose ball (in flight, or lying there waiting for who gets it next):
+          // close it down but stop a step short, so nobody stands on a free ball and leaves it.
+          const holder = carrierId ? bodies[carrierId] : undefined;
+          if (travelling && heading.possession !== side) {
+            // In the air to one of theirs: get goal side of where it comes down and challenge for it.
+            // (Next to the one it's meant for, never ahead of them onto the ball.)
+            const land = (heading.playerId && bodies[heading.playerId]) || heading;
+            const gl = distance(land, ownGoal) || 1;
+            target = {x: land.x + ((ownGoal.x - land.x) / gl) * 2.5, y: land.y + ((ownGoal.y - land.y) / gl) * 2.5};
+            sprint = true;
+          } else {
+            const loose = !holder || distance(holder, ball) > 3;
+            const gap = distance(body, ball);
+            if (loose) {
+              target = gap > 0.01 ? {x: ball.x + ((body.x - ball.x) / gap) * 4, y: ball.y + ((body.y - ball.y) / gap) * 4} : ball;
+              sprint = gap > 8;
+            } else {
+              // On the ball: close them down to a couple of steps, goal side, and wait for the moment
+              // (the tackle, when it comes, is his own touch); never stand on top of them.
+              const gl = distance(ball, ownGoal) || 1;
+              target = {x: ball.x + ((ownGoal.x - ball.x) / gl) * 2.6, y: ball.y + ((ownGoal.y - ball.y) / gl) * 2.6};
+              sprint = gap > 6;
+            }
+            hurry = true;
+          }
         } else if (id === cover) {
           // Between the ball and the goal, a few steps behind the presser.
           target = {x: ball.x + (ownGoal.x - ball.x) * 0.22, y: ball.y + (ownGoal.y - ball.y) * 0.22};
@@ -794,7 +916,7 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
     // (not after a foul or with it out for a corner, when it stays put).
     const dribbling = travelling && heading.kind === "dribble" && heading.playerId === held?.playerId ? heading.playerId : undefined;
     const runner = carrierId ?? dribbling;
-    const owner = runner && ctx.frames[reached + 1]?.kind !== "setpiece" ? bodies[runner] : undefined;
+    const owner = runner && fr(reached + 1)?.kind !== "setpiece" ? bodies[runner] : undefined;
     if (owner && distance(owner, ball) < 2.5) {
       const pace = Math.hypot(owner.vx, owner.vy);
       if (pace > 3) ball = {x: owner.x + (owner.vx / pace) * BALL_LEAD, y: owner.y + (owner.vy / pace) * BALL_LEAD};
@@ -803,7 +925,7 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
   // Drop players who went off.
   const onNow = new Set([...onPitchAt(ctx.report, "home", t1).values(), ...onPitchAt(ctx.report, "away", t1).values()]);
   for (const id of Object.keys(bodies)) if (!onNow.has(id)) delete bodies[id];
-  return {time: t1, ball, bodies, reached, flying};
+  return {time: t1, ball, bodies, reached, flying, subs};
 }
 
 /** While play is stopped: everyone jogs (or sprints) to their target spots. */
@@ -981,12 +1103,15 @@ function Shootout({report, seed, userSide, onDone}: {report: MatchReport; seed: 
 }
 
 /** Pause, play and fast-forward, drawn alike (emoji differ between systems). */
-export function ControlIcon({kind}: {kind: "pause" | "play" | "forward"}) {
+export function ControlIcon({kind}: {kind: "pause" | "play" | "forward" | "end" | "maximize" | "minimize"}) {
   return (
     <svg className="ctl-icon" viewBox="0 0 16 16" aria-hidden>
       {kind === "pause" && <path d="M4 3h3v10H4zM9 3h3v10H9z" />}
       {kind === "play" && <path d="M4 2.5l9 5.5-9 5.5z" />}
       {kind === "forward" && <path d="M1.5 3l6.5 5-6.5 5zM8 3l6.5 5L8 13z" />}
+      {kind === "end" && <path d="M1.5 3l5.5 5-5.5 5zM7 3l5.5 5L7 13zM12.5 3h2v10h-2z" />}
+      {kind === "maximize" && <path d="M2 2h5v2H4v3H2zM9 2h5v5h-2V4H9zM2 9h2v3h3v2H2zM12 9h2v5H9v-2h3z" />}
+      {kind === "minimize" && <path d="M5 2h2v5H2V5h3zM9 2h2v3h3v2H9zM2 9h5v5H5v-3H2zM9 9h5v2h-3v3H9z" />}
     </svg>
   );
 }
@@ -1017,7 +1142,8 @@ const Dugouts = memo(function Dugouts({home, away}: {home: Club; away: Club}) {
   );
 });
 
-const Stands = memo(function Stands({home, away, cheering, boards}: {home: Club; away: Club; cheering: Side | null; boards: string}) {
+/** `fill`: share of seats taken (the crowd that came); the rest show as empty seats. */
+const Stands = memo(function Stands({home, away, cheering, boards, fill = 1}: {home: Club; away: Club; cheering: Side | null; boards: string; fill?: number}) {
   const fans = useMemo(() => {
     const spots: {x: number; y: number; side: Side}[] = [];
     // Pitch units as drawn (105 x 68). Top and bottom: two rows; ends: three columns.
@@ -1027,22 +1153,35 @@ const Stands = memo(function Stands({home, away, cheering, boards}: {home: Club;
     for (const x of [-6.2, -8, -9.8, 111.2, 113, 114.8]) {
       for (let y = -1.2; y <= 69.2; y += 1.75) spots.push({x, y: y + (x % 2 ? 0.8 : 0), side: x < 52.5 ? "home" : "away"});
     }
+    // Who sits where: the best seats (halfway down the long sides) go first, with
+    // some chance in it, so a half-full ground has gaps all round, more at the ends.
+    const order = spots
+      .map((s, i) => {
+        const fromMiddle = Math.hypot((s.x - 52.5) / 63, s.y < 0 || s.y > 68 ? 0 : 0.6);
+        return {i, score: fromMiddle * 0.55 + ((((i * 2654435761) >>> 0) % 1000) / 1000) * 0.45};
+      })
+      .sort((a, b) => a.score - b.score);
+    const taken = new Set(order.slice(0, Math.round(spots.length * Math.max(0, Math.min(1, fill)))).map((o) => o.i));
     return spots.map((s, i) => {
       const club = s.side === "home" ? home : away;
       const h = (i * 37) % 11;
       const shirt = h < 5 ? club.color : h < 8 ? club.color2 : ["#e5e7eb", "#64748b", "#1f2937"][h % 3];
       const skin = ["#f6d5bd", "#ebbd9c", "#d49c74", "#8a5638"][(i * 7) % 4];
-      return {...s, shirt, skin, delay: (h % 5) * 0.08};
+      return {...s, shirt, skin, delay: (h % 5) * 0.08, empty: !taken.has(i)};
     });
-  }, [home, away]);
+  }, [home, away, fill]);
   const crowds = useMemo(() => {
     const draw = (side: Side) =>
-      fans.filter((f) => f.side === side).map((f, i) => (
-        <g key={i} className="fan" style={{animationDelay: `${f.delay}s`}}>
-          <rect x={f.x - 0.55} y={f.y - 0.2} width={1.1} height={1} rx={0.35} fill={f.shirt} />
-          <circle cx={f.x} cy={f.y - 0.45} r={0.42} fill={f.skin} />
-        </g>
-      ));
+      fans.filter((f) => f.side === side).map((f, i) =>
+        f.empty ? (
+          <rect key={i} x={f.x - 0.5} y={f.y - 0.5} width={1} height={1} rx={0.25} className="seat" />
+        ) : (
+          <g key={i} className="fan" style={{animationDelay: `${f.delay}s`}}>
+            <rect x={f.x - 0.55} y={f.y - 0.2} width={1.1} height={1} rx={0.35} fill={f.shirt} />
+            <circle cx={f.x} cy={f.y - 0.45} r={0.42} fill={f.skin} />
+          </g>
+        )
+      );
     return {home: draw("home"), away: draw("away")};
   }, [fans]);
   return (
@@ -1073,6 +1212,7 @@ export function LiveMatchViewer() {
     const m = new LiveMatch(game);
     try {
       m.manualSetPieces = localStorage.getItem(SET_PIECES_KEY) !== "auto";
+      m.manualSubs = localStorage.getItem(SUBS_KEY) !== "auto";
     } catch {
       // Default: take set pieces yourself.
     }
@@ -1140,7 +1280,8 @@ function TeamTalkDialog({report, onDone}: {report: MatchReport; onDone: (words?:
           </button>
         ))}
       </div>
-      <h4>{t("tt.onePlayer")}</h4>
+      <details className="tt-fold" open={!!single}>
+      <summary><h4>{t("tt.onePlayer")}</h4></summary>
       <div className="tt-players">
         {played.map(([id, rating]) => {
           const p = game.players[id];
@@ -1157,6 +1298,7 @@ function TeamTalkDialog({report, onDone}: {report: MatchReport; onDone: (words?:
           );
         })}
       </div>
+      </details>
       <div className="btn-row tt-actions">
         <button className="btn" onClick={() => onDone()}>{t("tt.skip")}</button>
         <button className="btn primary" disabled={!talk} onClick={() => talk && onDone({talk, ...(single ? {single} : {})})}>{t("tt.say")} ▶</button>
@@ -1316,6 +1458,44 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   /** Asking whether to leave a live match before the end. */
   const [confirmClose, setConfirmClose] = useState(false);
   const [talking, setTalking] = useState(false);
+  // The manager's menu under the avatar, and the pitch filling the screen.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const away = (e: PointerEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", away);
+    return () => document.removeEventListener("pointerdown", away);
+  }, [menuOpen]);
+  const [maxed, setMaxed] = useState(false);
+  const toggleMax = () => {
+    const next = !maxed;
+    setMaxed(next);
+    // The whole page full screen where the browser allows it (dialogs stay visible); otherwise just the pitch.
+    try {
+      if (next && !document.fullscreenElement) void document.documentElement.requestFullscreen?.().catch(() => undefined);
+      if (!next && document.fullscreenElement) void document.exitFullscreen?.().catch(() => undefined);
+    } catch {
+      // Not supported: the pitch still fills the window.
+    }
+  };
+  useEffect(() => {
+    // Leaving full screen with the browser's own key or gesture shrinks it back too.
+    const onChange = () => !document.fullscreenElement && setMaxed(false);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onChange);
+      if (document.fullscreenElement) void document.exitFullscreen?.().catch(() => undefined);
+    };
+  }, []);
+  // The crowd is announced as the teams kick off, for a few seconds.
+  const [crowdShown, setCrowdShown] = useState(true);
+  useEffect(() => {
+    const id = setTimeout(() => setCrowdShown(false), 4500);
+    return () => clearTimeout(id);
+  }, []);
   const [watchingAd, setWatchingAd] = useState(false);
   /** The last few minutes as they were shown, so a goal can be replayed exactly. */
   const history = useRef<Scene[]>([]);
@@ -1446,7 +1626,16 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
     const h = history.current;
     const recorded = h.length > 0 && h[0].time <= from + 0.05 && h[h.length - 1].time >= goalTime - 0.02;
     const first = recorded ? h.find((s) => s.time >= from) ?? h[0] : snap(ctx, from, dynRef.current);
-    setReplay({from, to: goalTime + 0.05, started: performance.now(), scene: first, recorded});
+    // The ball can reach the net a little after its touch: run on until it's in.
+    let to = goalTime + 0.05;
+    if (recorded) to = Math.max(to, h[h.length - 1].time + 0.05);
+    else {
+      const idx = report.frames.findIndex((f) => (f.kind === "goal" || f.kind === "nogoal") && Math.abs(f.minute - goalTime) < 1e-6);
+      let s = first;
+      while (idx >= 0 && s.reached < idx && s.time < goalTime + 1.5) s = advance(s, s.time + 0.02, ctx, dynRef.current);
+      to = Math.max(to, s.time + 0.2);
+    }
+    setReplay({from, to, started: performance.now(), scene: first, recorded});
   };
   useEffect(() => {
     if (!running && !freeze) return;
@@ -1489,7 +1678,7 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
           // ball is still catching up with the last touch (or it would wait forever).
           const behind = prev.reached < ctx.frames.length - 1;
           const cap = Math.min(limit, liveCap + (behind ? STOP_GRACE : 0));
-          const next = Math.min(cap, prev.time + (dt / MS_PER_MINUTE) * speed);
+          const next = Math.min(cap, prev.time + (dt / MS_PER_MINUTE) * (speed === 1 ? NORMAL_PLAY_RATE : speed));
           return next > prev.time ? advance(prev, next, ctx, dynRef.current) : prev;
         });
       }
@@ -1567,7 +1756,8 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   const tie = live ? findFixture(game, report.fixtureId) : undefined;
   const [pens, setPens] = useState<[number, number] | null>(null);
   const shootoutScore = pens ?? (tie && isCupFixture(tie) ? tie.penalties : undefined) ?? null;
-  const needsShootout = !!live && finished && !!tie && isCupFixture(tie) && report.homeGoals === report.awayGoals && !shootoutScore;
+  // Only the knockout needs a winner on the day; a group game can be drawn.
+  const needsShootout = !!live && finished && !!tie && isKnockout(tie) && report.homeGoals === report.awayGoals && !shootoutScore;
   // The user won (in the match, or on penalties).
   const ours = live?.userSide === "home" ? report.homeGoals : report.awayGoals;
   const theirs = live?.userSide === "home" ? report.awayGoals : report.homeGoals;
@@ -1728,7 +1918,12 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
             {shoutedAt.has(id) && <circle r={3.2} className="shout-ring" />}
             {id === carrierId && <circle r={2.4} className="carrier-ring" />}
             {id === selected && <circle r={2.8} className="selected-ring" />}
-            <circle r={1.6} fill={club.color} stroke={club.color2} strokeWidth={0.4} className="body" />
+            {air[id] && <ellipse cx={0.5 + air[id].lift} cy={0.6 + air[id].lift * 1.2} rx={1.6} ry={1} className="ball-shadow" />}
+            {air[id]?.dive !== undefined ? (
+              <ellipse rx={1.6 + air[id].lift * 1.6} ry={1.4} transform={`rotate(${air[id].dive!.toFixed(0)}) translate(${(air[id].lift * 1.2).toFixed(2)} 0)`} fill={club.color} stroke={club.color2} strokeWidth={0.4} className="body" />
+            ) : (
+              <circle r={1.6 * (1 + (air[id]?.lift ?? 0) * 0.4)} fill={club.color} stroke={club.color2} strokeWidth={0.4} className="body" />
+            )}
             {id === captain && <text y={0.62} className="dot-captain" fill={club.color2}>C</text>}
             {booked.has(id) && <rect x={0.9} y={-2.6} width={1.1} height={1.5} rx={0.2} className="booked" />}
             {hurt.has(id) && <text x={-2.6} y={0.6} className="dot-hurt">✚</text>}
@@ -1760,7 +1955,7 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   // What players see: a fan in front of them, the way they're running (or
   // towards the goal they attack when standing). Longer with better vision.
   const seers = new Set<string>();
-  if (carrierId) seers.add(carrierId);
+  // (Not for whoever has the ball: only the player picked for orders.)
   if (selected && selected !== "team") seers.add(selected);
   const cones = [...seers].map((id) => {
     const b = view.bodies[id];
@@ -1789,6 +1984,63 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
 
   const flightNow = view.flying ? report.frames[view.reached + 1]?.flight : undefined;
   const lofted = flightNow === "long" || flightNow === "cross";
+  // How high it is: up from where it was struck, highest halfway, down where it lands
+  // (seen from above, a ball in the air looks bigger and its shadow falls further off).
+  let height = 0;
+  if (lofted) {
+    const from = report.frames[view.reached];
+    const to = report.frames[view.reached + 1];
+    if (from && to) {
+      const total = distance(from, to);
+      const done = total > 0.1 ? Math.min(1, distance(from, view.ball) / total) : 1;
+      height = 4 * done * (1 - done) * Math.min(1, total / 30);
+    }
+  }
+  // A shot on its way from distance rises a little.
+  const shotTo = view.flying ? report.frames[view.reached + 1] : undefined;
+  const shotFrom = report.frames[view.reached];
+  const shooting = !!shotTo && !!shotFrom && (["goal", "nogoal", "save"].includes(shotTo.kind ?? "") || (shotTo.kind === "out" && progressFor(shotTo.possession, shotTo.x) >= 99.5));
+  if (shooting && shotFrom) {
+    const total = distance(shotFrom, shotTo!);
+    const gone = distance(shotFrom, view.ball);
+    if (total > 20 && gone > 1) {
+      const done = Math.min(1, gone / total);
+      height = Math.max(height, 4 * done * (1 - done) * 0.35);
+    }
+  }
+
+  // Up for a header as a high ball comes down, and the keeper diving for a save: just after the touch.
+  const touchedRef = useRef({k: -1, at: 0});
+  if (touchedRef.current.k !== view.reached) touchedRef.current = {k: view.reached, at: view.time};
+  const sinceTouch = view.time - touchedRef.current.at;
+  const lastTouch = report.frames[view.reached];
+  const air: Record<string, {lift: number; dive?: number}> = {};
+  if (lastTouch?.playerId && sinceTouch >= 0 && sinceTouch < 0.12) {
+    const who = view.subs?.[view.reached] ?? lastTouch.playerId;
+    const pop = Math.sin((sinceTouch / 0.12) * Math.PI);
+    const prev = report.frames[view.reached - 1];
+    const highBall = (lastTouch.flight === "cross" || lastTouch.flight === "long") && !!prev && distance(prev, lastTouch) > 15;
+    if (highBall && view.bodies[who]) {
+      air[who] = {lift: pop};
+      // The nearest opponent goes up with them.
+      let rival: string | undefined;
+      let best = 5;
+      const theirs = onPitchAt(report, lastTouch.possession === "home" ? "away" : "home", view.time);
+      for (const id of theirs.values()) {
+        const b = view.bodies[id];
+        if (b && distance(b, view.bodies[who]) < best) {
+          best = distance(b, view.bodies[who]);
+          rival = id;
+        }
+      }
+      if (rival) air[rival] = {lift: pop * 0.85};
+    }
+    if (lastTouch.kind === "save" && view.bodies[who]) {
+      const b = view.bodies[who];
+      const prevBall = prev ?? view.ball;
+      air[who] = {lift: pop * 0.6, dive: (Math.atan2((prevBall.y - b.y) * 0.68, (prevBall.x - b.x) * 1.05) * 180) / Math.PI};
+    }
+  }
 
   const scorer = freeze?.kind === "goal" ? game.players[freeze.scorerId ?? ""] : undefined;
   const scoringClub = freeze?.kind === "goal" ? (freeze.side === "home" ? home : away) : undefined;
@@ -1799,6 +2051,26 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   // Closing a live match before the end asks first; yes plays the rest out
   // automatically and closes, just like Finish.
   const close = live && !finished ? () => setConfirmClose(true) : onClose;
+
+  // Pause, play at normal speed, fast-forward (each press a step faster, up to 5×) and to the end: one group.
+  const playControls = (
+    <span className="speed-group play-controls" role="group" aria-label={t("match.speed")}>
+      <button className={!playing ? "chip active" : "chip"} disabled={!!current} title={t("match.pause")} aria-label={t("match.pause")} onClick={() => setPlaying(false)}><ControlIcon kind="pause" /></button>
+      <button className={playing && speed === 1 ? "chip active" : "chip"} disabled={!!current} title={t("match.play")} aria-label={t("match.play")} onClick={() => { setSpeed(1); setPlaying(true); }}><ControlIcon kind="play" /></button>
+      <button
+        className={playing && speed > 1 ? "chip active" : "chip"}
+        disabled={!!current}
+        title={t("match.fastForward")}
+        aria-label={t("match.fastForward")}
+        onClick={() => { setSpeed(playing ? Math.min(MAX_SPEED, speed + 1) : Math.max(2, speed)); setPlaying(true); }}
+      >
+        <ControlIcon kind="forward" />{speed > 1 ? " " + speed + "×" : ""}
+      </button>
+      <button className="chip" title={t("match.skip")} aria-label={t("match.skip")} onClick={() => jump(Infinity)}>
+        <ControlIcon kind="end" /><span className="skip-label"> {t("match.skip")}</span>
+      </button>
+    </span>
+  );
 
   return (
     <Modal wide title={<>{live && <span className="live-badge">{t("match.live")}</span>} {home.name} – {away.name}</>} onClose={close} backdropCloses={!live}>
@@ -1844,19 +2116,25 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
           onDone={() => setShown(null)}
         />
       ) : (
-        <div className="pitch-wrap">
+        <div className={`pitch-wrap ${maxed ? "maxed" : ""}`}>
           <svg className="pitch" viewBox={viewBox} role="img" aria-label={t("match.pitch")}>
-            <Stands home={home} away={away} cheering={(freeze?.kind === "goal" || (freeze?.kind === "fulltime" && decided)) && !replay ? freeze.side : null} boards={(userSide === "away" ? away : home).color} />
+            <Stands home={home} away={away} cheering={(freeze?.kind === "goal" || (freeze?.kind === "fulltime" && decided)) && !replay ? freeze.side : null} boards={(userSide === "away" ? away : home).color} fill={report.crowd?.rate ?? 1} />
             {PITCH}
             <Dugouts home={home} away={away} />
             {(!freeze || replay) && cones}
             {dots("home")}
             {dots("away")}
             {/* A long ball or cross is in the air: bigger, with its shadow further off on the grass. */}
-            <ellipse cx={view.ball.x * 1.05 + (lofted ? 0.9 : 0.25)} cy={view.ball.y * 0.68 + (lofted ? 1.8 : 0.45)} rx={lofted ? 0.8 : 0.95} ry={lofted ? 0.4 : 0.5} className="ball-shadow" />
+            <ellipse cx={view.ball.x * 1.05 + 0.25 + height * 1.6} cy={view.ball.y * 0.68 + 0.45 + height * 3} rx={0.95 - height * 0.3} ry={0.5 - height * 0.15} className="ball-shadow" />
             <g transform={`translate(${view.ball.x * 1.05} ${view.ball.y * 0.68})`}>
-              <Football r={lofted ? 1.4 : 1.05} />
+              <Football r={1.05 + height * 1.1} />
             </g>
+            {/* The net bulges with the goal. */}
+            {freeze?.kind === "goal" && !replay && (
+              <g key={freeze.key} className={`net-hit ${view.ball.x > 50 ? "right" : "left"}`}>
+                <rect x={view.ball.x > 50 ? 104 : -1.8} y={30.34} width={2.8} height={7.32} />
+              </g>
+            )}
           </svg>
 
           {freeze?.kind === "goal" && scoringClub && !replay && (
@@ -1875,6 +2153,11 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
               <button className="btn small replay-skip" onClick={() => setReplay(null)}>⏭ {t("match.replayEnd")}</button>
             </>
           )}
+          {/* Fill the screen like a video, and back. */}
+          <button className="btn small max-btn" onClick={toggleMax} aria-pressed={maxed} title={maxed ? t("match.minimize") : t("match.maximize")} aria-label={maxed ? t("match.minimize") : t("match.maximize")}>
+            <ControlIcon kind={maxed ? "minimize" : "maximize"} />
+          </button>
+          {maxed && !finished && <div className="max-controls">{playControls}</div>}
           <button className="btn small zoom-btn" onClick={toggleZoom} aria-pressed={zoomedIn} title={zoomedIn ? t("match.zoomOut") : t("match.zoomIn")}>
             {zoomedIn ? "🏟️" : "🔍"} {zoomedIn ? t("match.zoomOut") : t("match.zoomIn")}
           </button>
@@ -1888,6 +2171,12 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
             <div className="setup-banner">{tx(`ev.${freeze.sp.kind}`, {team: (freeze.side === "home" ? home : away).short, player: name(freeze.sp.takerId)})}</div>
           )}
           {atHalftime && !live && <div className="setup-banner">{t("ev.halftime")}</div>}
+          {crowdShown && report.crowd && freeze?.kind !== "goal" && (
+            <div className="crowd-banner" role="status">
+              <strong>{t("match.crowd", {fans: report.crowd.fans, pct: Math.round(report.crowd.rate * 100)})}</strong>
+              {report.crowd.rate >= 0.995 && <span>{t("match.soldOut")}</span>}
+            </div>
+          )}
           {freeze?.kind === "fulltime" && (
             <div className="setup-banner">
               🏁 {!decided ? t("match.ftDraw") : t("match.ftWin", {team: (freeze.side === "home" ? home : away).name})}
@@ -1915,8 +2204,8 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
             ))}
           </ul>
           <p className="muted small">{t("match.htHint")}</p>
-          <div className="btn-row">
-            <button className="btn" onClick={() => setSelected("team")}>📋 {t("match.teamTalk")}</button>
+          <div className="btn-row" style={{justifyContent: "flex-end"}}>
+            <button className="btn" onClick={() => setSelected("team")}>📋 {t("match.giveOrders")}</button>
             <button className="btn primary" onClick={startSecondHalf}>▶ {t("match.secondHalf")}</button>
           </div>
         </MatchDialog>
@@ -1976,60 +2265,71 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
           )
         ) : (
           <>
-            {finished ? (
-              <button className="btn ctl" title={t("match.replay")} aria-label={t("match.replay")} onClick={() => jump(0)}>↺</button>
-            ) : (
-              // Pause, play at normal speed, and fast-forward: each press a step faster, up to 5×.
-              <span className="speed-group" role="group" aria-label={t("match.speed")}>
-                <button className={!playing ? "chip active" : "chip"} disabled={!!current} title={t("match.pause")} aria-label={t("match.pause")} onClick={() => setPlaying(false)}><ControlIcon kind="pause" /></button>
-                <button className={playing && speed === 1 ? "chip active" : "chip"} disabled={!!current} title={t("match.play")} aria-label={t("match.play")} onClick={() => { setSpeed(1); setPlaying(true); }}><ControlIcon kind="play" /></button>
-                <button
-                  className={playing && speed > 1 ? "chip active" : "chip"}
-                  disabled={!!current}
-                  title={t("match.fastForward")}
-                  aria-label={t("match.fastForward")}
-                  onClick={() => { setSpeed(playing ? Math.min(MAX_SPEED, speed + 1) : Math.max(2, speed)); setPlaying(true); }}
-                >
-                  <ControlIcon kind="forward" />{speed > 1 ? " " + speed + "×" : ""}
-                </button>
-              </span>
-            )}
+            {finished && <button className="btn ctl" title={t("match.replay")} aria-label={t("match.replay")} onClick={() => jump(0)}>↺</button>}
             {live && !finished && (
-              <>
-                <button className="btn ctl" data-tour="orders" disabled={!!freeze && !atHalftime} onClick={() => setSelected(selected ? null : "team")}>📋 {t("orders.button")}</button>
-                <button
-                  className={live.manualSetPieces ? "chip active" : "chip"}
-                  title={t("match.setPiecesHint")}
-                  data-tour="setpieces"
-                  onClick={() => {
-                    live.manualSetPieces = !live.manualSetPieces;
-                    try {
-                      localStorage.setItem(SET_PIECES_KEY, live.manualSetPieces ? "self" : "auto");
-                    } catch {
-                      // Only remembered for this match.
-                    }
-                    rerender((n) => n + 1);
-                  }}
-                >
-                  🎯 {live.manualSetPieces ? t("match.setPiecesSelf") : t("match.setPiecesAuto")}
+              // The manager: instructions, and whether set pieces and substitutions are yours or the assistant's.
+              <div className="manager-menu" ref={menuRef}>
+                <button className={`btn ctl manager-btn ${menuOpen ? "open" : ""}`} data-tour="orders" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>
+                  <ManagerAvatar look={managerLook} size={26} tie={(userSide === "away" ? away : home).color} />
+                  <span className="manager-btn-label">{t("match.manager")}</span> <span aria-hidden>{menuOpen ? "▲" : "▼"}</span>
                 </button>
-              </>
+                {menuOpen && (
+                  <div className="manager-pop" role="menu">
+                    <button className="manager-item" role="menuitem" disabled={!!freeze && !atHalftime} onClick={() => { setMenuOpen(false); setSelected("team"); }}>
+                      📋 {t("match.giveOrders")}
+                    </button>
+                    <div className="manager-item manager-toggle" data-tour="setpieces">
+                      <span>🎯 {t("match.setPieces")}</span>
+                      <span className="speed-group" role="group" aria-label={t("match.setPieces")}>
+                        {([true, false] as const).map((self) => (
+                          <button key={String(self)} className={live.manualSetPieces === self ? "chip active" : "chip"} onClick={() => {
+                            live.manualSetPieces = self;
+                            try {
+                              localStorage.setItem(SET_PIECES_KEY, self ? "self" : "auto");
+                            } catch {
+                              // Only remembered for this match.
+                            }
+                            rerender((n) => n + 1);
+                          }}>{self ? t("match.self") : t("match.auto")}</button>
+                        ))}
+                      </span>
+                    </div>
+                    <div className="manager-item manager-toggle">
+                      <span>🔁 {t("match.subs")}</span>
+                      <span className="speed-group" role="group" aria-label={t("match.subs")}>
+                        {([true, false] as const).map((self) => (
+                          <button key={String(self)} className={live.manualSubs === self ? "chip active" : "chip"} onClick={() => {
+                            live.manualSubs = self;
+                            try {
+                              localStorage.setItem(SUBS_KEY, self ? "self" : "auto");
+                            } catch {
+                              // Only remembered for this match.
+                            }
+                            rerender((n) => n + 1);
+                          }}>{self ? t("match.self") : t("match.auto")}</button>
+                        ))}
+                      </span>
+                    </div>
+                    <p className="muted small manager-hint">{t("match.managerHint")}</p>
+                  </div>
+                )}
+              </div>
             )}
-            {!finished && (
-              <button className="btn ctl push-right" title={t("match.skip")} aria-label={t("match.skip")} onClick={() => jump(Infinity)}>
-                ⏭<span className="skip-label"> {t("match.skip")}</span>
-              </button>
-            )}
+            {!finished && <span className="ctl-right push-right">{playControls}</span>}
           </>
         )}
       </div>
       {/* What the buttons above do. */}
       {live && !finished && !selected && (
-        <ul className="control-help muted small">
-          <li>📋 {t("orders.hint")}</li>
-          <li>🎯 {t("match.setPiecesHint")}</li>
-          <li>🔍 {t("match.zoomHint")}</li>
-        </ul>
+        <details className="control-help-fold">
+          <summary className="muted small">{t("match.help")}</summary>
+          <ul className="control-help muted small">
+            <li>📋 {t("orders.hint")}</li>
+            <li>🎯 {t("match.setPiecesHint")}</li>
+            <li>🔁 {t("match.subsHint")}</li>
+            <li>🔍 {t("match.zoomHint")}</li>
+          </ul>
+        </details>
       )}
 
       <div className="match-columns">

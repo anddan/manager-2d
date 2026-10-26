@@ -10,6 +10,7 @@ import {FORMATION_IDS, MENTALITIES, type FormationId, type Mentality, type Playe
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
 import {Bar, Card, Flag, FormArrow, Modal, PosBadge, StatusIcons} from "../common";
+import {Avatar} from "../Avatar";
 import {Jersey} from "../Jersey";
 
 /**
@@ -95,6 +96,16 @@ export function Tactics() {
       else if (c.bench.length < BENCH_SIZE && !c.lineup.includes(playerId)) c.bench = [...c.bench, playerId];
     });
 
+  // Everyone out: the starting eleven and the bench.
+  const clearAll = () => {
+    act((g) => {
+      const c = g.clubs[g.userClubId];
+      c.lineup = c.lineup.map(() => "");
+      c.bench = [];
+    });
+    setSelected(null);
+  };
+
   const auto = () =>
     act((g) => {
       const c = g.clubs[g.userClubId];
@@ -119,7 +130,8 @@ export function Tactics() {
       return;
     }
     if (typeof to === "number") {
-      if (to !== fromSlot) assign(playerId, to);
+      // (An empty spot being moved has no player to put anywhere.)
+      if (to !== fromSlot && playerId) assign(playerId, to);
       return;
     }
     // Dropped on a group in the list: onto the bench, or off it to rest (list players only).
@@ -157,8 +169,8 @@ export function Tactics() {
   const notPlaying = squad.filter((p) => !club.lineup.includes(p.id));
   const benched = notPlaying.filter((p) => isAvailable(p) && club.bench.includes(p.id));
   const resting = notPlaying.filter((p) => isAvailable(p) && !club.bench.includes(p.id));
-  // Injured or suspended: can't play, listed last.
-  const out = notPlaying.filter((p) => !isAvailable(p));
+  // Injured or suspended: can't play, listed last (also those still picked in the eleven, so they're easy to find).
+  const out = squad.filter((p) => !isAvailable(p));
 
   const pos = selected !== null ? slots[selected].pos : null;
   // Phones and narrow windows: the list is far below the pitch, so the picker opens as a dialog.
@@ -166,10 +178,38 @@ export function Tactics() {
   const candidates = pos
     ? squad.slice().sort((a, b) => effectiveRating(b, pos) - effectiveRating(a, pos))
     : [];
+  // Whoever is in the chosen spot now (it can be emptied).
+  const inSlot = selected !== null ? game.players[club.lineup[selected] ?? ""] : undefined;
+  const clearSlot = () => {
+    if (selected === null) return;
+    act((g) => {
+      const c = g.clubs[g.userClubId];
+      const lineup = [...c.lineup];
+      lineup[selected] = "";
+      c.lineup = lineup;
+    });
+    setSelected(null);
+  };
+  // A player's profile (their attributes), closing the picker first.
+  const profile = (id: string) => {
+    setSelected(null);
+    openPlayer(id);
+  };
   const candidateList = pos ? (
     <ul className="pick-list">
+      {inSlot && (
+        <li className="pick-row">
+          <button className="pick pick-clear" onClick={clearSlot}>
+            <span aria-hidden>✖</span>
+            <span className="pick-name">{t("tac.clearSlot", {name: listName(inSlot)})}</span>
+          </button>
+          <button className="pick-avatar" title={t("tac.profile")} aria-label={`${t("tac.profile")}: ${listName(inSlot)}`} onClick={() => profile(inSlot.id)}>
+            <Avatar player={inSlot} shirt={club.color} trim={club.color2} size={34} />
+          </button>
+        </li>
+      )}
       {candidates.map((p) => (
-        <li key={p.id}>
+        <li key={p.id} className="pick-row">
           <button className="pick" disabled={!isAvailable(p)} onClick={() => assign(p.id)}>
             <PosBadge pos={p.position} />
             <span className="pick-name"><Flag code={p.nationality} size={15} /> {listName(p)} <StatusIcons player={p} /></span>
@@ -177,6 +217,9 @@ export function Tactics() {
             <FormArrow form={p.form} />
             <span className={familiarity(p, pos) < 1 ? "num warn" : "num strong"}>{Math.round(effectiveRating(p, pos))}</span>
             <Bar value={p.fitness} small />
+          </button>
+          <button className="pick-avatar" title={t("tac.profile")} aria-label={`${t("tac.profile")}: ${listName(p)}`} onClick={() => profile(p.id)}>
+            <Avatar player={p} shirt={club.color} trim={club.color2} size={34} />
           </button>
         </li>
       ))}
@@ -187,7 +230,12 @@ export function Tactics() {
     <div className="grid tactics">
       <Card
         title={<>{t("nav.tactics")} <span className="team-ovr" title={t("tac.teamOvrHint")}>{t("tac.teamOvr")} <strong>{teamOvr(game, club.id)}</strong></span></>}
-        actions={<button className="btn small" data-tour="best-xi" onClick={auto}>{t("tac.auto")}</button>}
+        actions={
+          <>
+            <button className="btn small" onClick={clearAll} disabled={!club.lineup.some(Boolean) && club.bench.length === 0}>{t("tac.clearAll")}</button>
+            <button className="btn small" data-tour="best-xi" onClick={auto}>{t("tac.auto")}</button>
+          </>
+        }
       >
         <div className="tac-pickers">
           <label className="field" data-tour="formation">
@@ -224,23 +272,30 @@ export function Tactics() {
           {slots.map((slot, i) => {
             const p = game.players[club.lineup[i]];
             const bad = !p || p.clubId !== club.id || !isAvailable(p);
+            // Still picked, but injured or banned: shown greyed out with why, not as an empty spot.
+            const out = !!p && p.clubId === club.id && !isAvailable(p);
             return (
               <button
                 key={i}
                 data-slot={i}
-                className={`slot ${selected === i ? "selected" : ""} ${bad ? "empty" : ""} ${drag.over === i ? "drop" : ""}`}
+                className={`slot ${selected === i ? "selected" : ""} ${bad && !out ? "empty" : ""} ${out ? "out" : ""} ${drag.over === i ? "drop" : ""}`}
                 style={spots[i]}
-                onPointerDown={p && !bad ? (e) => drag.start(e, p.id, i, shortName(p)) : undefined}
+                onPointerDown={p && !bad ? (e) => drag.start(e, p.id, i, shortName(p)) : custom && i > 0 ? (e) => drag.start(e, "", i, t(`pos.${slot.pos}`)) : undefined}
                 onClick={() => !drag.justDropped() && setSelected(selected === i ? null : i)}
               >
                 {p && !bad && club.roles?.captain === p.id && <span className="armband" title={t("roles.captain")}>C</span>}
-                {bad ? (
+                {out ? (
+                  <>
+                    <Jersey color={club.color} trim={club.color2} keeper={slot.pos === "GK"} number={i + 1} />
+                    <span className="slot-out" title={p.injuryWeeks > 0 ? t("tac.injured") : t("tac.suspended")}>{p.injuryWeeks > 0 ? "🩹" : "🟥"}</span>
+                  </>
+                ) : bad ? (
                   <span className="slot-empty">+</span>
                 ) : (
                   <Jersey color={club.color} trim={club.color2} keeper={slot.pos === "GK"} number={i + 1} />
                 )}
                 <span className="plate">
-                  <span className="plate-name">{p && !bad ? shortName(p) : t(`pos.${slot.pos}`)}</span>
+                  <span className="plate-name">{p && (!bad || out) ? shortName(p) : t(`pos.${slot.pos}`)}</span>
                   <span className="plate-info">
                     {p && !bad && <Flag code={p.nationality} size={13} />}
                     <span>{t(`pos.${slot.pos}`)}</span>

@@ -41,8 +41,8 @@ export function Squad() {
   const game = useGameState();
   const openPlayer = useGame((s) => s.openPlayer);
   const club = userClub(game);
-  const [sort, setSort] = useState<SortKey>("pos");
-  const [desc, setDesc] = useState(false);
+  const [sort, setSort] = useState<SortKey>("ovr");
+  const [desc, setDesc] = useState(true);
   const players = clubPlayers(game, userClub(game).id).sort((a, b) => {
     const va = sortValue(a, sort);
     const vb = sortValue(b, sort);
@@ -119,6 +119,8 @@ export function Squad() {
   );
 }
 
+const ROLES_OPEN_KEY = "manager2d.rolesOpen";
+
 const ROLE_ICONS: Record<TeamRole, string> = {captain: "©️", penalties: "🎯", freekicks: "🌀", corners: "🚩"};
 
 /** How good a player is at a role, for sorting and showing next to the name. */
@@ -134,8 +136,64 @@ function TeamRolesCard() {
   const act = useGame((s) => s.act);
   const club = userClub(game);
   const squad = clubPlayers(game, club.id);
+  // One role's list open at a time, under its tile.
+  const [open, setOpen] = useState<TeamRole | null>(null);
+  const [all, setAll] = useState(false);
+  const choose = (role: TeamRole, id: string | undefined) => {
+    act((g) => {
+      const c = g.clubs[g.userClubId];
+      c.roles = {...c.roles, [role]: id};
+    });
+    setOpen(null);
+  };
+  // Folded by default (remembered on this device): just who does what.
+  const [shown, setShown] = useState(() => {
+    try {
+      return localStorage.getItem(ROLES_OPEN_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const toggle = () =>
+    setShown((v) => {
+      try {
+        localStorage.setItem(ROLES_OPEN_KEY, v ? "0" : "1");
+      } catch {
+        // Only for now.
+      }
+      return !v;
+    });
+  // Who has each role: the manager's pick, or the best of the starting eleven.
+  const holderOf = (role: TeamRole) => {
+    const picked = club.roles?.[role];
+    if (picked && squad.some((p) => p.id === picked)) return game.players[picked];
+    return squad
+      .filter((p) => (role === "captain" || p.position !== "GK") && club.lineup.includes(p.id))
+      .sort((a, b) => roleSkill(b, role) - roleSkill(a, role))[0];
+  };
   return (
-    <Card title={`🎽 ${t("roles.title")}`}>
+    <Card
+      className="roles-card"
+      title={
+        <button className="card-toggle" aria-expanded={shown} onClick={toggle}>
+          🎽 {t("roles.title")} <span className="card-toggle-arrow" aria-hidden>{shown ? "▲" : "▼"}</span>
+        </button>
+      }
+    >
+      {!shown && (
+        <button className="roles-summary" onClick={toggle}>
+          {TEAM_ROLES.map((role) => {
+            const h = holderOf(role);
+            return (
+              <span key={role} className="roles-summary-item" title={t(`roles.${role}`)}>
+                <span aria-hidden>{ROLE_ICONS[role]}</span> {h ? listName(h) : "–"}
+              </span>
+            );
+          })}
+        </button>
+      )}
+      {shown && (
+      <>
       <p className="muted small">{t("roles.hint")}</p>
       <div className="roles-grid">
         {TEAM_ROLES.map((role) => {
@@ -145,30 +203,58 @@ function TeamRolesCard() {
           // A player who has left the club no longer holds the role.
           const current = squad.some((p) => p.id === club.roles?.[role]) ? club.roles![role]! : "";
           const chosen = current ? game.players[current] : undefined;
+          // Automatic: the best of the starting eleven for it.
+          const auto = options.find((p) => club.lineup.includes(p.id));
+          const holder = chosen ?? auto;
+          const isOpen = open === role;
+          const shown = all ? options : options.slice(0, 6);
           return (
-            <label key={role} className="role-pick">
-              <span className="role-label">{ROLE_ICONS[role]} {t(`roles.${role}`)}</span>
-              <span className="role-select">
-                {chosen && <Avatar player={chosen} shirt={club.color} trim={club.color2} size={30} />}
-                <select
-                  value={current}
-                  onChange={(e) => act((g) => {
-                    const c = g.clubs[g.userClubId];
-                    c.roles = {...c.roles, [role]: e.target.value || undefined};
-                  })}
-                >
-                  <option value="">{t("roles.auto")}</option>
-                  {options.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {listName(p)} · {t(`pos.${p.position}`)} · {roleSkill(p, role)}
-                    </option>
+            <div key={role} className={`role-tile ${isOpen ? "open" : ""}`}>
+              <div className="role-head">
+                <span className="role-icon" aria-hidden>{ROLE_ICONS[role]}</span>
+                <span className="role-label">{t(`roles.${role}`)}</span>
+                <button className="btn small" aria-expanded={isOpen} onClick={() => { setOpen(isOpen ? null : role); setAll(false); }}>
+                  {isOpen ? t("roles.close") : t("roles.change")} {isOpen ? "▲" : "▼"}
+                </button>
+              </div>
+              <div className="role-holder">
+                {holder && <Avatar player={holder} shirt={club.color} trim={club.color2} size={34} />}
+                <div className="role-who">
+                  <strong>{holder ? listName(holder) : "–"}</strong>
+                  <span className="muted small">{chosen ? t("roles.picked") : t("roles.autoShort")}</span>
+                </div>
+                {holder && (
+                  <span className="role-skill">
+                    <span className="num">{roleSkill(holder, role)}</span>
+                    <Bar value={roleSkill(holder, role)} small />
+                  </span>
+                )}
+              </div>
+              {isOpen && (
+                <ul className="role-options">
+                  {shown.map((p) => (
+                    <li key={p.id}>
+                      <button className={`role-option ${current === p.id ? "active" : ""}`} onClick={() => choose(role, p.id)}>
+                        <PosBadge pos={p.position} />
+                        <span className="role-option-name">{listName(p)}{club.lineup.includes(p.id) ? "" : <span className="muted small"> · {t("roles.notStarting")}</span>}</span>
+                        <span className="num">{roleSkill(p, role)}</span>
+                        <Bar value={roleSkill(p, role)} small />
+                      </button>
+                    </li>
                   ))}
-                </select>
-              </span>
-            </label>
+                  {!all && options.length > shown.length && (
+                    <li>
+                      <button className="link small" onClick={() => setAll(true)}>{t("roles.showAll", {n: options.length})}</button>
+                    </li>
+                  )}
+                </ul>
+              )}
+            </div>
           );
         })}
       </div>
+      </>
+      )}
     </Card>
   );
 }

@@ -1,6 +1,7 @@
 // Shared game types. The whole save is one GameState object, kept plain
 // (no classes, no Maps) so it survives JSON and structuredClone.
 import type {Slot} from "./constants";
+import type {StadiumState} from "./stadium";
 import type {Daily} from "./daily";
 import type {Tutorial} from "./tutorial";
 import type {SetPiece, SetPieceInput, SetPieceOutcome} from "./setpieces";
@@ -139,6 +140,11 @@ export interface Club {
   reputation: number;
   capacity: number;
   ticketPrice: number;
+  /** The price is set for each home match (to fill the ground at the best price), moved by `ticketAdjust` percent. */
+  ticketAuto?: boolean;
+  /** The user's stadium, once it's been opened (see stadium.ts). */
+  stadium?: StadiumState;
+  ticketAdjust?: number;
   facilities: number;
   cash: number;
   transferBudget: number;
@@ -178,12 +184,19 @@ export interface Fixture {
   played: boolean;
   homeGoals: number;
   awayGoals: number;
+  /** The crowd, and what their tickets brought the home side (once played). */
+  attendance?: number;
+  gate?: number;
 }
 
 /** A Champions Cup tie: one match, penalties if it's level. */
 export interface CupFixture extends Fixture {
-  /** 0 round of 16, 1 quarter-final, 2 semi-final, 3 final. */
+  /** 0–2 the group matchdays, 3 quarter-finals, 4 semi-finals, 5 the final. */
   stage: number;
+  /** Group stage: which group (0 = A). */
+  group?: number;
+  /** Knockout: place in the bracket, top to bottom (winners of 0 and 1 meet next, and so on). */
+  slot?: number;
   /** Shoot-out score, when it was level after the match. */
   penalties?: [number, number];
   winnerId?: string;
@@ -193,6 +206,8 @@ export interface CupState {
   season: number;
   /** Who's in it this season, user's league first. */
   clubIds: string[];
+  /** The four groups of four (A–D). */
+  groups: string[][];
   fixtures: CupFixture[];
   winnerId?: string;
 }
@@ -277,6 +292,8 @@ export interface MatchReport {
   formations: {home: FormationId; away: FormationId};
   /** The slots each side played in (custom formations included). Missing in old saves. */
   slots?: {home: Slot[]; away: Slot[]};
+  /** The crowd (worked out before kick-off) and the home side's ticket money. Missing in old saves. */
+  crowd?: {fans: number; rate: number; capacity: number; gate: number};
   /** Penalties and free kicks, with where the ball went. Missing in old saves. */
   setPieces?: (SetPiece & SetPieceOutcome)[];
   /**
@@ -342,6 +359,7 @@ export interface IncomingBid {
 
 export const FINANCE_CATEGORIES = [
   "tickets",
+  "matchday",
   "sponsor",
   "prize",
   "sales",
@@ -352,6 +370,7 @@ export const FINANCE_CATEGORIES = [
   "signing",
   "scouting",
   "operations",
+  "construction",
 ] as const;
 export type FinanceCategory = (typeof FINANCE_CATEGORIES)[number];
 export type FinanceLines = Partial<Record<FinanceCategory, number>>;
@@ -427,7 +446,8 @@ export interface GameState {
     season: FinanceLines;
     current: FinanceLines;
   };
-  training: {focus: TrainingFocus; intensity: Intensity};
+  /** `auto`: the assistant plans each week (see trainingPlan); focus and intensity are the manager's own choice otherwise. */
+  training: {focus: TrainingFocus; intensity: Intensity; auto?: boolean};
   monetization: Monetization;
   history: SeasonHistory[];
   nextId: number;

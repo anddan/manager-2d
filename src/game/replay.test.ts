@@ -192,6 +192,26 @@ describe("match replay", () => {
     expect(count("cross")).toBeGreaterThan(5);
   });
 
+  it("puts set-piece shots in the same corner as the close-up (the taker's right is their right)", () => {
+    let checked = 0;
+    for (const r of reports) {
+      for (const sp of r.setPieces ?? []) {
+        if (Math.abs(sp.shot.x) < 0.2) continue;
+        const at = r.frames.findIndex((f) => f.kind === "setpiece" && f.playerId === sp.takerId && Math.ceil(f.minute) === sp.minute);
+        // The shot straight from the kick, or from the corner's cross.
+        const end = r.frames.slice(at + 1, at + 3).find((f) => f.kind === "goal" || f.kind === "save");
+        if (at < 0 || !end) continue;
+        // Attacking towards x = 100 (home), the taker's right is +y; the other way round for away.
+        const across = sp.side === "home" ? end.y - 50 : 50 - end.y;
+        const meant = end.kind === "goal" ? sp.shot.x : sp.dive;
+        if (Math.abs(meant) < 0.2) continue;
+        expect(Math.sign(across)).toBe(Math.sign(meant));
+        checked++;
+      }
+    }
+    expect(checked).toBeGreaterThan(3);
+  });
+
   it("shows every goal", () => {
     for (const r of reports) {
       const inReplay = r.frames.filter((f) => f.kind === "goal").length;

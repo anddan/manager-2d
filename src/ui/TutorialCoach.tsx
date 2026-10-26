@@ -28,7 +28,7 @@ const STEPS: Record<TutorialStep, StepSpec> = {
   play: {target: ".continue"},
   match: {target: ".speed-group", showWhen: ".match-controls", next: true},
   orders: {target: '[data-tour="orders"]', showWhen: '[data-tour="orders"]', next: true},
-  setpieces: {target: '[data-tour="setpieces"]', showWhen: '[data-tour="setpieces"]', next: true},
+  setpieces: {target: '[data-tour="orders"]', showWhen: '[data-tour="orders"]', next: true},
   zoom: {target: ".zoom-btn", showWhen: ".match-controls", next: true},
   talk: {target: ".tt-options", showWhen: ".tt-options"},
   daily: {target: ".daily-tasks", showWhen: ".daily-tasks", next: true},

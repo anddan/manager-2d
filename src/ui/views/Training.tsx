@@ -3,7 +3,7 @@ import {listName, userClub} from "../../game/helpers";
 import {taskProgress} from "../../game/daily";
 import {spendEnergy} from "../../game/monetization";
 import {clubPlayers, overall} from "../../game/ratings";
-import {extraTraining, FOCUS_ATTRIBUTES} from "../../game/training";
+import {extraTraining, FOCUS_ATTRIBUTES, trainingPlan} from "../../game/training";
 import {ATTRIBUTES, INTENSITIES, POSITIONS, TRAINING_FOCUSES, type Attribute, type Intensity, type Player, type TrainingFocus} from "../../game/types";
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
@@ -26,7 +26,23 @@ export function Training() {
   const notify = useGame((s) => s.notify);
   const openPlayer = useGame((s) => s.openPlayer);
   const club = userClub(game);
-  const {focus, intensity} = game.training;
+  const {focus, intensity, auto} = game.training;
+  // What this week's training will be (the assistant's pick on auto).
+  const plan = trainingPlan(game);
+  const mode: "auto" | "rest" | "own" = auto ? "auto" : focus === "recovery" ? "rest" : "own";
+  const setMode = (m: "auto" | "rest" | "own") =>
+    act((g) => {
+      g.training.auto = m === "auto";
+      if (m === "rest") {
+        g.training.focus = "recovery";
+        g.training.intensity = "light";
+      }
+      // Picking it yourself starts from what's on now (not rest).
+      if (m === "own" && g.training.focus === "recovery") {
+        g.training.focus = plan.focus === "recovery" ? "technique" : plan.focus;
+        g.training.intensity = plan.focus === "recovery" ? "normal" : plan.intensity;
+      }
+    });
   const squad = clubPlayers(game, club.id).sort((a, b) => totalChange(b) - totalChange(a));
   const extrasLeft = MAX_EXTRA_TRAININGS - game.monetization.extraTrainingsThisWeek;
 
@@ -63,25 +79,47 @@ export function Training() {
   return (
     <div className="grid">
       <Card title={t("train.programme")}>
-        <div className="tac-pickers">
-          <label className="field">
-            <span>{t("train.focus")}</span>
-            <select value={focus} onChange={(e) => act((g) => { g.training.focus = e.target.value as TrainingFocus; })}>
-              {TRAINING_FOCUSES.map((f) => <option key={f} value={f}>{FOCUS_ICONS[f]} {t(`focus.${f}`)}</option>)}
-            </select>
-          </label>
-          <label className="field">
-            <span>{t("train.intensity")}</span>
-            <select value={intensity} onChange={(e) => act((g) => { g.training.intensity = e.target.value as Intensity; })}>
-              {INTENSITIES.map((i) => <option key={i} value={i}>{t(`intensity.${i}`)}</option>)}
-            </select>
-          </label>
+        {/* One tap: let the assistant plan it, rest, or choose. */}
+        <div className="train-modes" role="radiogroup" aria-label={t("train.programme")}>
+          {(["auto", "rest", "own"] as const).map((m) => (
+            <button key={m} role="radio" aria-checked={mode === m} className={`train-mode ${mode === m ? "active" : ""}`} onClick={() => setMode(m)}>
+              <span className="train-mode-icon" aria-hidden>{m === "auto" ? "🤖" : m === "rest" ? "🛌" : "✋"}</span>
+              <strong>{t(`train.mode.${m}`)}</strong>
+              <small>{t(`train.mode.${m}Hint`)}</small>
+            </button>
+          ))}
         </div>
-        {/* What the chosen focus trains, and what the intensity means. */}
-        <p className="muted small">
-          {FOCUS_ICONS[focus]} {Object.keys(FOCUS_ATTRIBUTES[focus]).map((a) => t(`attr.${a as Attribute}`)).join(", ") || t("train.restores")}
-        </p>
-        <p className="muted small">{t(`intensity.${intensity}Hint`)}</p>
+
+        {mode === "own" && (
+          <>
+            <h4 className="train-sub">{t("train.focus")}</h4>
+            <div className="train-focuses">
+              {TRAINING_FOCUSES.filter((f) => f !== "recovery").map((f) => (
+                <button key={f} className={`train-focus ${focus === f ? "active" : ""}`} aria-pressed={focus === f} onClick={() => act((g) => { g.training.focus = f as TrainingFocus; })}>
+                  <span aria-hidden>{FOCUS_ICONS[f]}</span> {t(`focus.${f}`)}
+                </button>
+              ))}
+            </div>
+            <h4 className="train-sub">{t("train.intensity")}</h4>
+            <div className="speed-group train-intensity" role="group" aria-label={t("train.intensity")}>
+              {INTENSITIES.map((i) => (
+                <button key={i} className={intensity === i ? "chip active" : "chip"} onClick={() => act((g) => { g.training.intensity = i as Intensity; })}>{t(`intensity.${i}`)}</button>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* This week, in words: what it trains and how hard. */}
+        <div className="train-plan">
+          <span className="train-plan-icon" aria-hidden>{FOCUS_ICONS[plan.focus]}</span>
+          <div>
+            <strong>{t("train.thisWeek", {focus: t(`focus.${plan.focus}`), intensity: t(`intensity.${plan.intensity}`)})}</strong>
+            {plan.reason && <div className="small">{t(`train.reason.${plan.reason}`)}</div>}
+            <div className="muted small">
+              {Object.keys(FOCUS_ATTRIBUTES[plan.focus]).map((a) => t(`attr.${a as Attribute}`)).join(", ") || t("train.restores")} · {t(`intensity.${plan.intensity}Hint`)}
+            </div>
+          </div>
+        </div>
       </Card>
 
       <Card title={t("train.extra")}>

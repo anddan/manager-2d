@@ -1,8 +1,9 @@
-// The Champions Cup: 16 clubs from every league, played through the season's
-// cup weeks to a winner, and kept apart from the league.
+// The Champions Cup: 16 clubs from every league, four groups of four and then
+// a knockout, played through the season's cup weeks to a winner, and kept
+// apart from the league.
 import {describe, expect, it} from "vitest";
-import {CUP_FROM_LEAGUE, CUP_SIZE, CUP_WEEKS, SEASON_WEEKS} from "./constants";
-import {shootout, shootoutOver} from "./cup";
+import {CUP_FROM_LEAGUE, CUP_GROUP_DAYS, CUP_GROUPS, CUP_SIZE, CUP_WEEKS, SEASON_WEEKS} from "./constants";
+import {groupTable, shootout, shootoutOver} from "./cup";
 import {newGame} from "./generate";
 import {currentRound, leagueClubs} from "./helpers";
 import {standings} from "./league";
@@ -23,7 +24,17 @@ describe("Champions Cup", () => {
     expect(home).toHaveLength(CUP_FROM_LEAGUE);
     const countries = new Set(cup.clubIds.filter((id) => g.clubs[id].guest).map((id) => g.clubs[id].country));
     expect(countries.size).toBeGreaterThanOrEqual(4);
-    expect(cup.fixtures).toHaveLength(CUP_SIZE / 2);
+    // Four groups of four, everyone playing everyone once: six games a group, two each matchday.
+    expect(cup.groups).toHaveLength(CUP_GROUPS);
+    expect(new Set(cup.groups.flat()).size).toBe(CUP_SIZE);
+    expect(cup.fixtures).toHaveLength(CUP_GROUPS * 6);
+    for (let g = 0; g < CUP_GROUPS; g++) {
+      for (const a of cup.groups[g]) for (const b of cup.groups[g]) {
+        if (a === b) continue;
+        expect(cup.fixtures.filter((f) => f.group === g && ((f.homeId === a && f.awayId === b) || (f.homeId === b && f.awayId === a)))).toHaveLength(1);
+      }
+      for (let day = 0; day < CUP_GROUP_DAYS; day++) expect(cup.fixtures.filter((f) => f.group === g && f.stage === day)).toHaveLength(2);
+    }
     // Guests are not in the league.
     expect(standings(g)).toHaveLength(leagueClubs(g).length);
     expect(standings(g).some((r) => r.club.guest)).toBe(false);
@@ -40,6 +51,7 @@ describe("Champions Cup", () => {
   });
 
   it("is played to a winner over the season, then starts again with new guests", () => {
+    let checkedBracket = false;
     const firstGuests = Object.values(g.clubs).filter((c) => c.guest).map((c) => c.id);
     let cupMatches = 0;
     for (let week = 1; week <= SEASON_WEEKS; week++) {
@@ -50,9 +62,21 @@ describe("Champions Cup", () => {
       cupMatches += g.cup!.fixtures.filter((f) => f.played).length - before;
       if (CUP_WEEKS.includes(week)) expect(g.cup!.fixtures.filter((f) => f.played).length).toBeGreaterThan(before);
       else expect(g.cup!.fixtures.filter((f) => f.played).length).toBe(before);
+      // After the last matchday: the group winners and runners-up, crossed over, in the quarter-finals.
+      if (week === CUP_WEEKS[CUP_GROUP_DAYS - 1]) {
+        const quarters = g.cup!.fixtures.filter((f) => f.stage === CUP_GROUP_DAYS).sort((a, b) => a.slot! - b.slot!);
+        expect(quarters).toHaveLength(4);
+        const top = (group: number, place: number) => groupTable(g, group)[place].clubId;
+        expect([quarters[0].homeId, quarters[0].awayId]).toEqual([top(0, 0), top(1, 1)]);
+        expect([quarters[1].homeId, quarters[1].awayId]).toEqual([top(1, 0), top(0, 1)]);
+        expect([quarters[2].homeId, quarters[2].awayId]).toEqual([top(2, 0), top(3, 1)]);
+        expect([quarters[3].homeId, quarters[3].awayId]).toEqual([top(3, 0), top(2, 1)]);
+        checkedBracket = true;
+      }
     }
-    // 8 + 4 + 2 + 1 matches. (The last week rolled over into a new season and a new cup.)
-    expect(cupMatches).toBe(15);
+    // 24 group games, then 4 + 2 + 1. (The last week rolled over into a new season and a new cup.)
+    expect(cupMatches).toBe(31);
+    expect(checkedBracket).toBe(true);
     expect(g.history[0].season).toBe(g.season - 1);
     // Last season's league is complete; guests never played in it.
     expect(g.fixtures.every((f) => !g.clubs[f.homeId]?.guest && !g.clubs[f.awayId]?.guest)).toBe(true);

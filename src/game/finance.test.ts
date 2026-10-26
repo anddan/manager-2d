@@ -11,11 +11,11 @@ describe("the board", () => {
     const club = g.clubs[g.userClubId];
     club.cash = -50_000_000;
     for (let week = 1; week < DEBT_WARNING_WEEKS * BOARD_WARNINGS; week++) {
-      weeklyFinances(g, new Set());
+      weeklyFinances(g, []);
       expect(g.gameOver).toBeUndefined();
     }
     expect(g.inbox.filter((m) => m.key === "msg.boardWarning")).toHaveLength(BOARD_WARNINGS - 1);
-    weeklyFinances(g, new Set());
+    weeklyFinances(g, []);
     expect(g.gameOver?.reason).toBe("debt");
     // No more weeks once sacked.
     expect(startWeek(g, new Rng(1), Date.now(), {useEnergy: false}).ok).toBe(false);
@@ -25,9 +25,9 @@ describe("the board", () => {
     const g = newGame("Debt", 3, 7);
     const club = g.clubs[g.userClubId];
     club.cash = -50_000_000;
-    for (let week = 0; week < DEBT_WARNING_WEEKS - 1; week++) weeklyFinances(g, new Set());
+    for (let week = 0; week < DEBT_WARNING_WEEKS - 1; week++) weeklyFinances(g, []);
     club.cash = 50_000_000;
-    weeklyFinances(g, new Set());
+    weeklyFinances(g, []);
     expect(g.board).toEqual({debtWeeks: 0, warnings: 0});
   });
 });

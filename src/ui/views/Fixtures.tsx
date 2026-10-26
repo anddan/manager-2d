@@ -1,7 +1,7 @@
 import {useState} from "react";
-import {CUP_FROM_LEAGUE, CUP_WEEKS, SEASON_WEEKS} from "../../game/constants";
+import {CUP_WEEKS, SEASON_WEEKS} from "../../game/constants";
 import {CUP_STAGES, cupAlive} from "../../game/cup";
-import {cupFixturesInStage, currentCupStage, isCupFixture, roundInWeek} from "../../game/helpers";
+import {cupFixturesInStage, isCupFixture, roundInWeek} from "../../game/helpers";
 import type {Fixture} from "../../game/types";
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
@@ -78,40 +78,11 @@ export function Fixtures() {
           {played.map(day)}
         </div>
       </Card>
-      <CupCard />
     </>
   );
 }
 
-/** The Champions Cup: each round so far, and who's through. */
-function CupCard() {
-  const {t} = useT();
-  const game = useGameState();
-  const cup = game.cup;
-  if (!cup) return null;
-  const now = currentCupStage(game);
-  const inIt = cup.clubIds.includes(game.userClubId);
-  return (
-    <Card title={`🏆 ${t("cup.name")}`}>
-      {!inIt && <p className="muted">{t("cup.notIn", {n: CUP_FROM_LEAGUE})}</p>}
-      {cup.winnerId && <p className="cup-winner">{t("cup.winner", {club: game.clubs[cup.winnerId]?.name ?? "?"})}</p>}
-      <div className="fixture-list">
-        {CUP_STAGES.map((key, stage) => {
-          const ties = cup.fixtures.filter((f) => f.stage === stage);
-          if (ties.length === 0) return null;
-          return (
-            <div key={key} className={stage === now ? "round current" : "round"}>
-              <h3>{t(key)} <small className="muted">· {t("cup.week", {week: CUP_WEEKS[stage]})}</small></h3>
-              {ties.map((f) => <FixtureRow key={f.id} f={f} />)}
-            </div>
-          );
-        })}
-      </div>
-    </Card>
-  );
-}
-
-function FixtureRow({f}: {f: Fixture}) {
+export function FixtureRow({f}: {f: Fixture}) {
   const {t} = useT();
   const game = useGameState();
   const watchMatch = useGame((s) => s.watchMatch);
