@@ -1461,11 +1461,12 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   const [, rerender] = useState(0);
   const done = useRef(new Set<string>());
   const skipped = useRef(false);
+  // Zoomed in to start with (the pitch fills the frame), unless the manager chose to see the stands.
   const [zoomedIn, setZoomedIn] = useState(() => {
     try {
-      return localStorage.getItem(ZOOM_KEY) === "1";
+      return localStorage.getItem(ZOOM_KEY) !== "0";
     } catch {
-      return false;
+      return true;
     }
   });
   const viewBox = useZoom(zoomedIn);
