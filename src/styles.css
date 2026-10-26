@@ -1494,3 +1494,7 @@ button.manager-item:hover:not(:disabled) { background: rgb(127 127 127 / 0.1); }
 html:has(.modal-backdrop), body:has(.modal-backdrop) { overflow: hidden; }
 .modal-body { overflow-x: hidden; }
 @media (max-width: 599px) { .modal-backdrop { overflow: hidden; } }
+/* Maximised, the match owns the screen: the dialog's title bar is hidden and nothing behind the
+   pitch can scroll (iOS moves fixed things inside a scrolled box along with it). */
+.modal:has(.pitch-wrap.maxed) .modal-head { visibility: hidden; }
+.modal-body:has(.pitch-wrap.maxed), .modal-backdrop:has(.pitch-wrap.maxed) { overflow: hidden; -webkit-overflow-scrolling: auto; }

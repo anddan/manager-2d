@@ -100,7 +100,8 @@ export function TutorialCoach() {
       const el = document.querySelector(spec.target!);
       if (el || ++tries > 20) {
         clearInterval(id);
-        el?.scrollIntoView({behavior: "smooth", block: "center"});
+        // Not on a maximised match: it fills the screen already, and scrolling the box behind it moves it.
+        if (el && !el.closest(".pitch-wrap.maxed")) el.scrollIntoView({behavior: "smooth", block: "center"});
       }
     }, 150);
     return () => clearInterval(id);
