@@ -7,6 +7,18 @@ export function isAvailable(p: Player): boolean {
   return p.injuryWeeks === 0 && p.suspension === 0;
 }
 
+/** Positions that can stand in for each other when there is nobody in the right one. */
+const NEIGHBOURS: Record<Position, Position[]> = {
+  GK: [],
+  CB: ["FB", "DM"],
+  FB: ["CB", "W"],
+  DM: ["CM", "CB"],
+  CM: ["DM", "AM"],
+  AM: ["CM", "W", "ST"],
+  W: ["AM", "FB", "ST"],
+  ST: ["W", "AM"],
+};
+
 // Fill the hardest slots first so a lone keeper isn't used as a striker.
 const SLOT_ORDER: Position[] = ["GK", "CB", "ST", "DM", "FB", "CM", "AM", "W"];
 
@@ -22,20 +34,31 @@ export function pickBestLineup(
   const order = slots
     .map((slot, i) => ({slot, i}))
     .sort((a, b) => SLOT_ORDER.indexOf(a.slot.pos) - SLOT_ORDER.indexOf(b.slot.pos));
-  for (const {slot, i} of order) {
-    let best: Player | undefined;
-    let bestScore = -1;
-    for (const p of pool) {
-      if (used.has(p.id)) continue;
-      const score = effectiveRating(p, slot.pos);
-      if (score > bestScore) {
-        bestScore = score;
-        best = p;
+  // Three rounds over the whole eleven: players in their own position first, then a neighbouring
+  // one (a centre-back at full-back, a holder in central midfield...), and only then anyone left.
+  // So a midfielder only plays at the back when there is no defender to put there.
+  const fits: ((p: Player, pos: Position) => boolean)[] = [
+    (p, pos) => p.position === pos,
+    (p, pos) => NEIGHBOURS[pos].includes(p.position),
+    () => true,
+  ];
+  for (const fit of fits) {
+    for (const {slot, i} of order) {
+      if (lineup[i]) continue;
+      let best: Player | undefined;
+      let bestScore = -1;
+      for (const p of pool) {
+        if (used.has(p.id) || !fit(p, slot.pos)) continue;
+        const score = effectiveRating(p, slot.pos);
+        if (score > bestScore) {
+          bestScore = score;
+          best = p;
+        }
       }
-    }
-    if (best) {
-      used.add(best.id);
-      lineup[i] = best.id;
+      if (best) {
+        used.add(best.id);
+        lineup[i] = best.id;
+      }
     }
   }
   const rest = pool
