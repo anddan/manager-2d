@@ -180,7 +180,6 @@ function TopBar() {
     if (isMatchWeek && view !== "tactics") {
       setView("tactics");
       window.scrollTo({top: 0});
-      notify("top.checkTeam");
       return;
     }
     const missing = isMatchWeek ? lineupProblems(game, club).length : 0;

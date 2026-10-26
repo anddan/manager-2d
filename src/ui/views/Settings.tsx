@@ -1,10 +1,11 @@
-import {useRef} from "react";
+import {useEffect, useRef, useState} from "react";
 import {parseSave} from "../../game/save";
 import {LANGS, useT, type Lang} from "../../i18n";
 import {useGame, useGameState} from "../../store";
 import {Card} from "../common";
+import {isMuted, onMutedChange, setMuted} from "../sound";
 
-const LANG_NAMES: Record<Lang, string> = {sv: "Svenska", en: "English", es: "Español"};
+const LANG_NAMES: Record<Lang, string> = {sv: "Svenska", en: "English", es: "Español", it: "Italiano", fr: "Français"};
 
 export function Settings() {
   const {t} = useT();
@@ -17,6 +18,8 @@ export function Settings() {
   const act = useGame((s) => s.act);
   const setView = useGame((s) => s.setView);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [soundOff, setSoundOff] = useState(isMuted());
+  useEffect(() => onMutedChange(setSoundOff), []);
 
   const exportSave = () => {
     const blob = new Blob([JSON.stringify(game)], {type: "application/json"});
@@ -37,6 +40,12 @@ export function Settings() {
 
   return (
     <div className="grid">
+      <Card title={`🔊 ${t("sound.title")}`}>
+        <label className="toggle">
+          <input type="checkbox" className="bench-check" checked={!soundOff} onChange={(e) => setMuted(!e.target.checked)} /> {t("sound.label")}
+        </label>
+        <p className="muted small">{t("sound.hint")}</p>
+      </Card>
       <Card title={t("settings.language")}>
         <select className="lang-select" value={lang} onChange={(e) => setLang(e.target.value as Lang)} aria-label={t("settings.language")}>
           {LANGS.map((l) => <option key={l} value={l}>{LANG_NAMES[l]}</option>)}

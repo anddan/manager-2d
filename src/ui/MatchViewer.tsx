@@ -17,18 +17,19 @@
 // Goals stop play for a celebration and a kick-off from the centre spot;
 // penalties, free kicks and corners stop play while the players line up.
 import {memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode} from "react";
+import {createPortal} from "react-dom";
 import {addMessage, findFixture, fullName, isCupFixture, isKnockout, listName, playerName, shortName} from "../game/helpers";
 import {shootoutOver} from "../game/cup";
 import {WIN_VIDEO_DIAMONDS, taskProgress, videoAfterWin} from "../game/daily";
 import {Rng} from "../game/rng";
 import {matchVerdict, PLAYER_TALKS, TEAM_TALKS, teamTalk, type PlayerTalk, type TeamTalk} from "../game/morale";
 import {boardAt, clockLabel, matchLength} from "../game/clock";
-import {FORMATIONS, type Slot} from "../game/constants";
+import {FORMATIONS, type Slot, ENERGY_COST_FORZA} from "../game/constants";
 import {LiveMatch} from "../game/live";
 import {distance, fromSide, kickoffSpot, progressFor, teamSpot, type Point} from "../game/pitch";
 import {effectiveRating, overall, teamOvr} from "../game/ratings";
 import {aerial, cornerAttacker, resolveSetPiece, type SetPiece, type SetPieceInput, type SetPieceOutcome} from "../game/setpieces";
-import {cornerZone} from "../game/match";
+import {cornerZone, FORZA} from "../game/match";
 import {
   INSTRUCTIONS,
   type Club,
@@ -46,10 +47,12 @@ import {useT} from "../i18n";
 import {useGame, useGameState} from "../store";
 import {Avatar, ManagerAvatar, defaultManagerLook} from "./Avatar";
 import {Football} from "./Ball";
+import {spendEnergy} from "../game/monetization";
 import {Bar, Flag, Modal, PosBadge} from "./common";
 import {SetPieceView} from "./SetPieceView";
 import {VideoAd} from "./VideoAd";
-import {diamondBurst} from "./effects";
+import {diamondBurst, energySpent} from "./effects";
+import {chatter, crowd, crowdMurmur, isMuted, kick, onMutedChange, setMuted, whistle} from "./sound";
 
 /** Fast-forward goes up one step per press, to this. */
 const MAX_SPEED = 5;
@@ -83,6 +86,8 @@ const HALFTIME_REPLAY_MS = 3000;
 const SHOUT_MS = 3200;
 const SET_PIECES_KEY = "manager2d.manualSetPieces";
 const SUBS_KEY = "manager2d.manualSubs";
+/** Finishing above this: every shot flies with a tail of fire. */
+const FIRE_FINISHING = 95;
 
 interface Body {
   x: number;
@@ -1103,7 +1108,7 @@ function Shootout({report, seed, userSide, onDone}: {report: MatchReport; seed: 
 }
 
 /** Pause, play and fast-forward, drawn alike (emoji differ between systems). */
-export function ControlIcon({kind}: {kind: "pause" | "play" | "forward" | "end" | "maximize" | "minimize"}) {
+export function ControlIcon({kind}: {kind: "pause" | "play" | "forward" | "end" | "maximize" | "minimize" | "plus" | "minus" | "sound" | "mute"}) {
   return (
     <svg className="ctl-icon" viewBox="0 0 16 16" aria-hidden>
       {kind === "pause" && <path d="M4 3h3v10H4zM9 3h3v10H9z" />}
@@ -1111,6 +1116,11 @@ export function ControlIcon({kind}: {kind: "pause" | "play" | "forward" | "end" 
       {kind === "forward" && <path d="M1.5 3l6.5 5-6.5 5zM8 3l6.5 5L8 13z" />}
       {kind === "end" && <path d="M1.5 3l5.5 5-5.5 5zM7 3l5.5 5L7 13zM12.5 3h2v10h-2z" />}
       {kind === "maximize" && <path d="M2 2h5v2H4v3H2zM9 2h5v5h-2V4H9zM2 9h2v3h3v2H2zM12 9h2v5H9v-2h3z" />}
+      {(kind === "sound" || kind === "mute") && <path d="M2 6h3l4-3.5v11L5 10H2z" />}
+      {kind === "sound" && <path d="M11 5.2a4 4 0 0 1 0 5.6l-1-1a2.6 2.6 0 0 0 0-3.6zM12.8 3.4a6.5 6.5 0 0 1 0 9.2l-1-1a5.1 5.1 0 0 0 0-7.2z" />}
+      {kind === "mute" && <path d="M10.3 6.1l1-1 1.6 1.6 1.6-1.6 1 1-1.6 1.6 1.6 1.6-1 1-1.6-1.6-1.6 1.6-1-1 1.6-1.6z" />}
+      {kind === "plus" && <path d="M7 2h2v5h5v2H9v5H7V9H2V7h5z" />}
+      {kind === "minus" && <path d="M2 7h12v2H2z" />}
       {kind === "minimize" && <path d="M5 2h2v5H2V5h3zM9 2h2v3h3v2H9zM2 9h5v5H5v-3H2zM9 9h5v2h-3v3H9z" />}
     </svg>
   );
@@ -1210,11 +1220,16 @@ export function LiveMatchViewer() {
   const act = useGame((s) => s.act);
   const [live] = useState(() => {
     const m = new LiveMatch(game);
+    // Auto unless the manager chose otherwise.
+    m.manualSetPieces = false;
+    m.manualSubs = false;
     try {
-      m.manualSetPieces = localStorage.getItem(SET_PIECES_KEY) !== "auto";
-      m.manualSubs = localStorage.getItem(SUBS_KEY) !== "auto";
+      const sp = localStorage.getItem(SET_PIECES_KEY);
+      if (sp) m.manualSetPieces = sp === "self";
+      const subs = localStorage.getItem(SUBS_KEY);
+      if (subs) m.manualSubs = subs === "self";
     } catch {
-      // Default: take set pieces yourself.
+      // Defaults only.
     }
     return m;
   });
@@ -1458,6 +1473,17 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   /** Asking whether to leave a live match before the end. */
   const [confirmClose, setConfirmClose] = useState(false);
   const [talking, setTalking] = useState(false);
+  // Sound: on or off (shared with Settings), the crowd's murmur while the match is open,
+  // the whistle at the start.
+  const [muted, setMutedState] = useState(isMuted());
+  useEffect(() => onMutedChange(setMutedState), []);
+  useEffect(() => {
+    const stop = crowdMurmur(report.crowd?.rate ?? 0.8);
+    if (live) whistle("short");
+    return stop;
+    // Once per match screen.
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // The manager's menu under the avatar, and the pitch filling the screen.
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -1795,10 +1821,29 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
     [live, act, report]
   );
 
+  // The pitch on screen: the manager's shout bubble is drawn on the page's top layer, at its bottom
+  // edge, so nothing (an open dialog, the buttons) ever covers it.
+  const pitchRef = useRef<HTMLDivElement>(null);
+
+  // The manager's shouts, one after another (several orders at once are each heard), with a
+  // cartoon "blah-blah" for each. Shorter each when there's a queue behind.
+  const shoutQueue = useRef<Shout[]>([]);
+  const shouting = useRef(false);
+  const nextShout = () => {
+    const s = shoutQueue.current.shift();
+    if (!s) {
+      shouting.current = false;
+      setShouts([]);
+      return;
+    }
+    shouting.current = true;
+    setShouts([s]);
+    chatter(s.text.length);
+    setTimeout(nextShout, shoutQueue.current.length > 0 ? SHOUT_MS * 0.65 : SHOUT_MS);
+  };
   const shout = (playerId: string, text: string) => {
-    const s = {id: performance.now(), playerId, text};
-    setShouts((list) => [...list.slice(-1), s]);
-    setTimeout(() => setShouts((list) => list.filter((x) => x.id !== s.id)), SHOUT_MS);
+    shoutQueue.current.push({id: performance.now() + Math.random(), playerId, text});
+    if (!shouting.current) nextShout();
   };
 
   const give = (cmd: Parameters<LiveMatch["command"]>[0]) => {
@@ -1815,6 +1860,68 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
     give({type: "instruct", playerId, key, level});
     const name = (game.players[playerId] ? shortName(game.players[playerId]) : undefined) ?? "";
     shout(playerId, tx(level === 0 ? "shout.reset" : `shout.${key}${level > 0 ? "+" : "-"}`, {player: name}));
+  };
+
+  // The referee and the crowd at each stop: a roar for a goal (and a whistle if it's ruled out),
+  // a whistle for a set piece, the long whistle at half-time and full time.
+  useEffect(() => {
+    if (!freeze) return;
+    if (freeze.kind === "goal") crowd("goal");
+    else if (freeze.kind === "nogoal") {
+      crowd("goal");
+      const id = setTimeout(() => whistle("short"), 1100);
+      return () => clearTimeout(id);
+    } else if (freeze.kind === "setup") whistle("short");
+    else if (freeze.kind === "halftime" || freeze.kind === "fulltime") whistle("end");
+    return undefined;
+  }, [freeze?.key]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The ball leaving a boot: a thud for a shot, a tap for a pass (at normal speed only, or it's a rattle);
+  // the crowd's "ooh" when the keeper saves or it flies just wide.
+  const flewRef = useRef({reached: -1, flying: false});
+  useEffect(() => {
+    const was = flewRef.current;
+    flewRef.current = {reached: scene.reached, flying: !!scene.flying};
+    if (replay || freeze) return;
+    const next = report.frames[scene.reached + 1];
+    const now = report.frames[scene.reached];
+    if (scene.flying && !was.flying && next) {
+      const shot = ["goal", "nogoal", "save"].includes(next.kind ?? "") || (next.kind === "out" && progressFor(next.possession, next.x) >= 99.5);
+      if (shot) kick("shot");
+      else if (speed === 1 && playing && (next.kind === "pass" || next.kind === "dribble")) kick("pass");
+    }
+    if (scene.reached !== was.reached && now && now.kind === "save") crowd("ooh");
+  }, [scene.reached, scene.flying]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The other side firing up in a big match: the crowd rallies too.
+  const rivalForza = report.events.some((e) => e.note === "forzaRival" && e.minute <= time);
+  useEffect(() => {
+    if (rivalForza) crowd("rally");
+  }, [rivalForza]);
+
+  // "Forza!": a lift for the whole team for a while. Free the first time in a match, then energy each time.
+  const forzas = live ? live.allCommands().filter((c) => c.type === "forza") : [];
+  const forzaFree = forzas.length === 0;
+  // Still going (in the engine's minutes): no second one on top.
+  const forzaOn = !!live && forzas.some((c) => live.nextMinute < c.minute + FORZA.minutes);
+  const forzaUsed = forzaOn;
+  const forzaNote = forzaOn ? t("match.forzaOn") : forzaFree ? t("match.forzaHint") : t("match.forzaCost", {n: ENERGY_COST_FORZA});
+  // Free the first time (🔥); after that it costs energy (⚡), shown flying off the button.
+  const forzaIcon = forzaFree ? "🔥" : "⚡";
+  const forza = (e?: {currentTarget: Element}) => {
+    if (forzaOn) return;
+    if (!forzaFree) {
+      const paid = act((g) => spendEnergy(g.monetization, ENERGY_COST_FORZA, Date.now()));
+      if (!paid) {
+        notify("err.noEnergy", undefined, "error");
+        return;
+      }
+      energySpent(e?.currentTarget, ENERGY_COST_FORZA);
+    }
+    give({type: "forza"});
+    shout("", t("shout.forza"));
+    crowd("rally");
+    setMenuOpen(false);
   };
 
   const instructTeam = (key: InstructionKey, level: InstructionLevel) => {
@@ -1864,6 +1971,9 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   const booked = new Set(events.filter((e) => e.type === "yellow").map((e) => e.playerId));
   const hurt = new Set(events.filter((e) => e.type === "injury").map((e) => e.playerId));
   const shoutedAt = new Set(shouts.map((s) => s.playerId));
+  // "Forza!": the side that got it glows for as long as the lift lasts (its minutes in the engine).
+  const forzaEvent = events.find((e) => e.type === "instruction" && (e.note === "forza" || e.note === "forzaRival") && view.time >= e.minute - 1 && view.time < e.minute - 1 + FORZA.minutes);
+  const forzaSide = forzaEvent?.side;
 
   const name = (id?: string) => {
     const p = id ? game.players[id] : undefined;
@@ -1915,6 +2025,7 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
           )}
           <g transform={`translate(${cx} ${cy})`}>
             {mine && <circle r={4} className="hit" />}
+            {forzaSide === side && <circle r={2.6} className="forza-glow" />}
             {shoutedAt.has(id) && <circle r={3.2} className="shout-ring" />}
             {id === carrierId && <circle r={2.4} className="carrier-ring" />}
             {id === selected && <circle r={2.8} className="selected-ring" />}
@@ -2000,6 +2111,20 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   const shotTo = view.flying ? report.frames[view.reached + 1] : undefined;
   const shotFrom = report.frames[view.reached];
   const shooting = !!shotTo && !!shotFrom && (["goal", "nogoal", "save"].includes(shotTo.kind ?? "") || (shotTo.kind === "out" && progressFor(shotTo.possession, shotTo.x) >= 99.5));
+  // A tail of fire behind the ball, along where it has really been: a fired-up side's shot,
+  // or one from a great finisher (over FIRE_FINISHING), whenever they shoot.
+  const shooterId = shotFrom?.playerId ? view.subs?.[view.reached] ?? shotFrom.playerId : undefined;
+  const greatFinisher = !!shooterId && (game.players[shooterId]?.attrs.finishing ?? 0) > FIRE_FINISHING;
+  const fireShot = shooting && ((!!forzaSide && shotFrom?.possession === forzaSide) || greatFinisher);
+  const fireRef = useRef<{k: number; pts: Point[]}>({k: -1, pts: []});
+  if (fireShot) {
+    const f = fireRef.current;
+    if (f.k !== view.reached) fireRef.current = {k: view.reached, pts: []};
+    const pts = fireRef.current.pts;
+    const last = pts[pts.length - 1];
+    if (!last || distance(last, view.ball) > 0.4) pts.push({x: view.ball.x, y: view.ball.y});
+    if (pts.length > 8) pts.shift();
+  } else if (fireRef.current.pts.length) fireRef.current = {k: -1, pts: []};
   if (shooting && shotFrom) {
     const total = distance(shotFrom, shotTo!);
     const gone = distance(shotFrom, view.ball);
@@ -2035,12 +2160,17 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
       }
       if (rival) air[rival] = {lift: pop * 0.85};
     }
+    if (lastTouch.kind === "tackle" && lastTouch.slide && view.bodies[who] && prev) {
+      const b = view.bodies[who];
+      air[who] = {lift: pop * 0.7, dive: (Math.atan2((prev.y - b.y) * 0.68, (prev.x - b.x) * 1.05) * 180) / Math.PI};
+    }
     if (lastTouch.kind === "save" && view.bodies[who]) {
       const b = view.bodies[who];
       const prevBall = prev ?? view.ball;
       air[who] = {lift: pop * 0.6, dive: (Math.atan2((prevBall.y - b.y) * 0.68, (prevBall.x - b.x) * 1.05) * 180) / Math.PI};
     }
   }
+
 
   const scorer = freeze?.kind === "goal" ? game.players[freeze.scorerId ?? ""] : undefined;
   const scoringClub = freeze?.kind === "goal" ? (freeze.side === "home" ? home : away) : undefined;
@@ -2051,6 +2181,21 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   // Closing a live match before the end asks first; yes plays the rest out
   // automatically and closes, just like Finish.
   const close = live && !finished ? () => setConfirmClose(true) : onClose;
+
+  const shoutBubble = (() => {
+    if (shouts.length === 0 || !userSide || typeof document === "undefined") return null;
+    const r = pitchRef.current?.getBoundingClientRect();
+    if (!r) return null;
+    const bottom = window.innerHeight - r.bottom + (maxed ? 60 : 6);
+    const at = userSide === "home" ? {right: window.innerWidth - (r.left + r.width * 0.48)} : {left: r.left + r.width * 0.52};
+    return createPortal(
+      <div className={`shout shout-top ${userSide}`} role="status" style={{bottom, ...at}}>
+        <span className="shout-manager" aria-hidden><ManagerAvatar look={managerLook} size={40} tie={(userSide === "home" ? home : away).color} /></span>
+        <span className="shout-bubble">📣 {shouts[shouts.length - 1].text}</span>
+      </div>,
+      document.body
+    );
+  })();
 
   // Pause, play at normal speed, fast-forward (each press a step faster, up to 5×) and to the end: one group.
   const playControls = (
@@ -2101,6 +2246,8 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
           }}
         />
       ) : current && live ? (
+        // Maximised, the set piece fills the screen too.
+        <div className={maxed ? "setpiece-max" : undefined}>
         <SetPieceView
           key={current.sp.index}
           sp={current.sp}
@@ -2115,8 +2262,9 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
           onAnswer={answer}
           onDone={() => setShown(null)}
         />
+        </div>
       ) : (
-        <div className={`pitch-wrap ${maxed ? "maxed" : ""}`}>
+        <div className={`pitch-wrap ${maxed ? "maxed" : ""}`} ref={pitchRef}>
           <svg className="pitch" viewBox={viewBox} role="img" aria-label={t("match.pitch")}>
             <Stands home={home} away={away} cheering={(freeze?.kind === "goal" || (freeze?.kind === "fulltime" && decided)) && !replay ? freeze.side : null} boards={(userSide === "away" ? away : home).color} fill={report.crowd?.rate ?? 1} />
             {PITCH}
@@ -2126,7 +2274,16 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
             {dots("away")}
             {/* A long ball or cross is in the air: bigger, with its shadow further off on the grass. */}
             <ellipse cx={view.ball.x * 1.05 + 0.25 + height * 1.6} cy={view.ball.y * 0.68 + 0.45 + height * 3} rx={0.95 - height * 0.3} ry={0.5 - height * 0.15} className="ball-shadow" />
-            <g transform={`translate(${view.ball.x * 1.05} ${view.ball.y * 0.68})`}>
+            {fireShot && fireRef.current.pts.length > 1 && (
+              <g className="fire-tail" aria-hidden>
+                {fireRef.current.pts.slice(1).map((p, i, rest) => {
+                  const a = fireRef.current.pts[i];
+                  const k = (i + 1) / rest.length;
+                  return <line key={i} x1={a.x * 1.05} y1={a.y * 0.68} x2={p.x * 1.05} y2={p.y * 0.68} strokeWidth={0.4 + k * 1.6} stroke={k > 0.6 ? "#fde047" : k > 0.3 ? "#fb923c" : "#ef4444"} opacity={0.25 + k * 0.7} />;
+                })}
+              </g>
+            )}
+            <g transform={`translate(${view.ball.x * 1.05} ${view.ball.y * 0.68})`} className={fireShot ? "ball-fire" : undefined}>
               <Football r={1.05 + height * 1.1} />
             </g>
             {/* The net bulges with the goal. */}
@@ -2157,9 +2314,39 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
           <button className="btn small max-btn" onClick={toggleMax} aria-pressed={maxed} title={maxed ? t("match.minimize") : t("match.maximize")} aria-label={maxed ? t("match.minimize") : t("match.maximize")}>
             <ControlIcon kind={maxed ? "minimize" : "maximize"} />
           </button>
+          {/* Maximised: the score and the clock on the pitch, see-through like the buttons. */}
+          {maxed && (
+            <div className="max-score" aria-live="polite">
+              <span className="crest" style={{background: home.color, color: home.color2}}>{home.short}</span>
+              <strong className="max-score-goals">{score.home} – {score.away}</strong>
+              <span className="crest" style={{background: away.color, color: away.color2}}>{away.short}</span>
+              {shootoutScore && <small>{t("fx.penalties", {h: shootoutScore[0], a: shootoutScore[1]})}</small>}
+              <span className="max-score-clock">{clock}{board > 0 && !atHalftime && !finished ? ` +${board}` : ""}</span>
+            </div>
+          )}
+          {/* Maximised: the score and the clock on the pitch, see-through like the buttons. */}
+          {maxed && (
+            <div className="max-score" aria-live="polite">
+              <span className="crest" style={{background: home.color, color: home.color2}}>{home.short}</span>
+              <strong className="max-score-goals">{score.home} – {score.away}</strong>
+              <span className="crest" style={{background: away.color, color: away.color2}}>{away.short}</span>
+              {shootoutScore && <small>{t("fx.penalties", {h: shootoutScore[0], a: shootoutScore[1]})}</small>}
+              <span className="max-score-clock">{clock}{board > 0 && !atHalftime && !finished ? ` +${board}` : ""}</span>
+            </div>
+          )}
           {maxed && !finished && <div className="max-controls">{playControls}</div>}
-          <button className="btn small zoom-btn" onClick={toggleZoom} aria-pressed={zoomedIn} title={zoomedIn ? t("match.zoomOut") : t("match.zoomIn")}>
-            {zoomedIn ? "🏟️" : "🔍"} {zoomedIn ? t("match.zoomOut") : t("match.zoomIn")}
+          {maxed && live && !finished && (
+            <div className="max-manager">
+              <button className="btn small max-forza" onClick={forza} disabled={forzaUsed} title={forzaNote} aria-label={t("match.forza")}>
+                {forzaIcon}<span className="max-forza-label"> {t("match.forza")}</span>
+              </button>
+              <button className="btn small max-forza" onClick={() => setSelected("team")} disabled={!!freeze && !atHalftime} title={t("match.giveOrders")} aria-label={t("match.giveOrders")}>
+                📋
+              </button>
+            </div>
+          )}
+          <button className="btn small zoom-btn" onClick={toggleZoom} aria-pressed={zoomedIn} title={zoomedIn ? t("match.zoomOut") : t("match.zoomIn")} aria-label={zoomedIn ? t("match.zoomOut") : t("match.zoomIn")}>
+            <ControlIcon kind={zoomedIn ? "minus" : "plus"} />
           </button>
           {freeze?.kind === "nogoal" && !replay && <NoGoalBanner key={freeze.key} reason={report.events.find((e) => e.type === "disallowed" && e.side === freeze.side && e.minute === Math.ceil(freeze.time))?.note} />}
           {freeze?.kind === "restart" && freeze.restart && !replay && (
@@ -2180,12 +2367,6 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
           {freeze?.kind === "fulltime" && (
             <div className="setup-banner">
               🏁 {!decided ? t("match.ftDraw") : t("match.ftWin", {team: (freeze.side === "home" ? home : away).name})}
-            </div>
-          )}
-          {shouts.length > 0 && userSide && (
-            <div className={`shout ${userSide}`} role="status">
-              <span className="shout-manager" aria-hidden><ManagerAvatar look={managerLook} size={40} tie={(userSide === "home" ? home : away).color} /></span>
-              <span className="shout-bubble">📣 {shouts[shouts.length - 1].text}</span>
             </div>
           )}
         </div>
@@ -2278,6 +2459,11 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
                     <button className="manager-item" role="menuitem" disabled={!!freeze && !atHalftime} onClick={() => { setMenuOpen(false); setSelected("team"); }}>
                       📋 {t("match.giveOrders")}
                     </button>
+                    {/* Once a match: the manager fires up the whole team. */}
+                    <button className="manager-item forza-btn" role="menuitem" disabled={forzaUsed} onClick={forza}>
+                      <span>{forzaIcon} {t("match.forza")}</span>
+                      <span className="muted small">{forzaNote}</span>
+                    </button>
                     <div className="manager-item manager-toggle" data-tour="setpieces">
                       <span>🎯 {t("match.setPieces")}</span>
                       <span className="speed-group" role="group" aria-label={t("match.setPieces")}>
@@ -2315,7 +2501,14 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
                 )}
               </div>
             )}
-            {!finished && <span className="ctl-right push-right">{playControls}</span>}
+            {!finished && (
+              <span className="ctl-right push-right">
+                <button className="sound-btn" onClick={() => setMuted(!muted)} aria-pressed={!muted} title={muted ? t("sound.on") : t("sound.off")} aria-label={muted ? t("sound.on") : t("sound.off")}>
+                  <ControlIcon kind={muted ? "mute" : "sound"} />
+                </button>
+                {playControls}
+              </span>
+            )}
           </>
         )}
       </div>
@@ -2327,11 +2520,12 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
             <li>📋 {t("orders.hint")}</li>
             <li>🎯 {t("match.setPiecesHint")}</li>
             <li>🔁 {t("match.subsHint")}</li>
-            <li>🔍 {t("match.zoomHint")}</li>
+            <li>{t("match.zoomHint")}</li>
           </ul>
         </details>
       )}
 
+      {shoutBubble}
       <div className="match-columns">
         {feed}
         {finished && <Summary report={report} />}
@@ -2351,7 +2545,7 @@ function NoGoalBanner({reason}: {reason?: string}) {
   return (
     <div className={ruled ? "goal-banner ruled-out" : "goal-banner"}>
       <strong>{ruled ? `❌ ${t("match.ruledOut")}` : t("match.goal")}</strong>
-      {ruled && reason && <span>🚩 {tx(`reason.${reason}`)}</span>}
+      {ruled && reason && <span>⚠️ {tx(`reason.${reason}`)}</span>}
     </div>
   );
 }

@@ -8,8 +8,8 @@
 // substitutions and instructions can come in) and at every set piece (so the
 // user can take it). simulateMatch runs one straight through.
 import {DIAMONDS_PER_WIN, MAX_SUBS, clubSlots, type Slot} from "./constants";
-import {crowdFor} from "./finance";
-import {book, findFixture} from "./helpers";
+import {crowdFor, matchAppeal} from "./finance";
+import {book, findFixture, isCupFixture, isKnockout} from "./helpers";
 import {isAvailable} from "./lineup";
 import {distance, fromSide, progressFor, teamSpot, type Point} from "./pitch";
 import {FORM_EFFECT, effectiveRating} from "./ratings";
@@ -116,6 +116,23 @@ export interface Team {
   injured: OnPitch[];
   /** Once the manager makes a substitution, the assistant stops making tactical ones. */
   manualSubs: boolean;
+  /** "Forza!" lifts the team until this minute. */
+  forzaUntil: number;
+}
+
+/** "Forza!": how much it lifts the whole team, and for how many minutes. */
+export const FORZA = {boost: 1.2, minutes: 10, onTarget: 0.92, goalBonus: 0.08};
+
+/** A small, stable number from a string (the same string, the same number). */
+function hashString(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+/** The lift from "Forza!" in a minute: the boost while it lasts, otherwise none. */
+export function forzaLift(forzaUntil: number, minute: number): number {
+  return minute < forzaUntil ? FORZA.boost : 1;
 }
 
 function buildTeam(state: GameState, club: Club, side: Side): Team {
@@ -138,6 +155,7 @@ function buildTeam(state: GameState, club: Club, side: Side): Team {
     teamInstructions: {},
     injured: [],
     manualSubs: false,
+    forzaUntil: 0,
   };
 }
 
@@ -151,6 +169,14 @@ function level(team: Team, id: string, key: InstructionKey): InstructionLevel {
 }
 
 /** Product of one effect over a player's instructions; "less" inverts it. */
+/** How hard a side goes in, on average (1 normal; up when told to tackle hard, down when told to hold back). */
+function aggression(team: Team): number {
+  if (team.onPitch.length === 0) return 1;
+  const sum = team.onPitch.reduce((s, o) => s + effect(team, o.id, (e) => e.foul), 0);
+  // A whole team told to go in hard: about twice the fouls.
+  return 1 + (sum / team.onPitch.length - 1) * 0.8;
+}
+
 function effect(team: Team, id: string, pick: (e: (typeof INSTRUCTION_EFFECTS)[InstructionKey]) => number): number {
   let factor = 1;
   for (const [key, lvl] of Object.entries(ordersFor(team, id)) as [InstructionKey, InstructionLevel][]) {
@@ -161,7 +187,7 @@ function effect(team: Team, id: string, pick: (e: (typeof INSTRUCTION_EFFECTS)[I
   return factor;
 }
 
-function lines(state: GameState, team: Team, home: boolean): {def: number; mid: number; att: number; gk: number} {
+function lines(state: GameState, team: Team, home: boolean, minute = 0): {def: number; mid: number; att: number; gk: number} {
   const sums = [0, 0, 0];
   let gk = 20; // An empty goal is nearly hopeless.
   for (const {id, slot} of team.onPitch) {
@@ -172,7 +198,8 @@ function lines(state: GameState, team: Team, home: boolean): {def: number; mid: 
     for (let i = 0; i < 3; i++) sums[i] += rating * w[i] * effect(team, id, (e) => e.line[i]);
   }
   const m = MENTALITY[team.club.mentality];
-  const h = home ? HOME_ADVANTAGE : 1;
+  // Home advantage, and the lift from the manager's "Forza!" while it lasts.
+  const h = (home ? HOME_ADVANTAGE : 1) * forzaLift(team.forzaUntil, minute);
   return {
     def: (sums[0] / LINE_NORM[0]) * m.def * h,
     mid: (sums[1] / LINE_NORM[1]) * h,
@@ -277,7 +304,7 @@ type ShotOutcome =
   | {type: "cleared"; shooterId: string; setPiece: SetPieceShot};
 
 /** Records one touch of the replay. */
-type AddTouch = (kind: TouchKind, id: string | undefined, at: Point, touchSide?: Side, flight?: Frame["flight"]) => void;
+type AddTouch = (kind: TouchKind, id: string | undefined, at: Point, touchSide?: Side, flight?: Frame["flight"]) => Frame;
 
 /** Share of goals ruled out afterwards (offside, a foul in the build-up, handball). */
 const DISALLOWED_CHANCE = 0.07;
@@ -285,12 +312,13 @@ const DISALLOWED_CHANCE = 0.07;
 const ONE_TWO_CHANCE = 0.22;
 /** Share of a minute the build-up to a set piece takes; the kick and what follows get the rest. */
 const LEAD_UP_SHARE = 0.68;
-export const DISALLOW_REASONS = ["offside", "offside", "foul", "handball"] as const;
+// Things the replay can't show to be wrong (unlike offside, where everyone can see the line).
+export const DISALLOW_REASONS = ["foul", "handball", "keeper", "whistle", "highFoot"] as const;
 export type DisallowReason = (typeof DISALLOW_REASONS)[number];
 
 /** Share of minutes without a shot where the ball goes out for a throw-in (in the replay only). */
 /** Of the times the ball is lost in open play, how often it goes out for a throw-in. */
-const THROW_IN_CHANCE = 0.3;
+const THROW_IN_CHANCE = 0.55;
 /** How far up (0–100) a move that creates nothing may get before the defence cuts it out. */
 const DANGER_DEPTH = 74;
 /** A cross or through ball into the box that comes to nothing: how often the keeper claims it. */
@@ -358,6 +386,15 @@ class Replay {
     if (!gk || progressFor(team.side, at.x) > 17 || Math.abs(at.y - 50) > 22) return out;
     const gkSpot = this.spot(team, gk, false);
     return !out || distance(gkSpot, at) < distance(this.spot(team, out, false), at) + 4 ? gk : out;
+  }
+
+  /** Whether a tackle is a slide: now and then, often when told to go in hard, never by the keeper. */
+  private slides(team: Team, id: string | undefined): boolean {
+    if (!id || this.posOf(team, id) === "GK") return false;
+    const hard = level(team, id, "tackling");
+    // Decided from the moment itself, not the dice, so the rest of the replay is drawn as before.
+    const roll = (hashString(id + ":" + this.frames.length) % 1000) / 1000;
+    return roll < (hard > 0 ? 0.55 : hard < 0 ? 0.08 : 0.22);
   }
 
   private keeper(team: Team): string | undefined {
@@ -570,9 +607,11 @@ class Replay {
   private recorder(side: Side): {touches: Frame[]; add: AddTouch} {
     const touches: Frame[] = [];
     const add: AddTouch = (kind, id, at, touchSide = side, flight) => {
-      touches.push({minute: 0, x: at.x, y: at.y, possession: touchSide, playerId: id, kind, ...(flight ? {flight} : {})});
+      const touch: Frame = {minute: 0, x: at.x, y: at.y, possession: touchSide, playerId: id, kind, ...(flight ? {flight} : {})};
+      touches.push(touch);
       this.ball = at;
       if (id) this.carrier = {id, side: touchSide};
+      return touch;
     };
     return {touches, add};
   }
@@ -614,7 +653,9 @@ class Replay {
     }
     // The side that has it now won the ball back: their nearest player.
     if (this.carrier && this.carrier.side !== side) {
-      add("tackle", this.winner(attacking, this.ball), this.jitter(this.ball, 3));
+      const by = this.winner(attacking, this.ball);
+      const won = add("tackle", by, this.jitter(this.ball, 3));
+      if (this.slides(attacking, by)) won.slide = true;
     }
     return this.carrier?.side === side ? this.carrier.id : this.nearest(attacking, this.ball, true);
   }
@@ -665,7 +706,8 @@ class Replay {
     let carrier: string = first;
     const flush = () => (ledUp ? this.flush(minute, touches, LEAD_UP_SHARE, 1) : this.flush(minute, touches));
 
-    let passes = outcome.type === "none" ? this.rng.int(1, 3) : outcome.setPiece ? 0 : this.rng.int(0, 2);
+    // At least two touches in a quiet minute, or the one would be spread over the whole minute (a player standing on the ball).
+    let passes = outcome.type === "none" ? this.rng.int(2, 3) : outcome.setPiece ? 0 : this.rng.int(0, 2);
     // Already camped in their half (not just won it or restarted): the box has filled up for a cross.
     const settled = touches.length === 0 && progressFor(side, this.ball.x) > 45;
     let lastPasser: string | undefined;
@@ -745,6 +787,28 @@ class Replay {
       add("pass", next, this.jitter(this.spot(attacking, next, true), 4));
       lastPasser = carrier;
       carrier = next;
+    }
+
+    // Camped round their box with nothing on: never a quiet minute (the player would stand there
+    // holding the ball). They work it about, short and sideways, looking for a gap: a shift
+    // inside, a lay-off to a mate on the edge, maybe back. Never back out of the danger zone.
+    if (touches.length < 2 && outcome.type === "none" && !turnover && this.inFrontOfGoal(side)) {
+      const near = attacking.onPitch.filter((o) => o.id !== carrier && attacking.slots[o.slot].pos !== "GK");
+      for (let k = touches.length; k < 3; k++) {
+        const depth = progressFor(side, this.ball.x);
+        const width = side === "home" ? this.ball.y : 100 - this.ball.y;
+        if (k % 2 === 1 && near.length > 0) {
+          // A lay-off to the nearest mate, to a spot still on the edge of the box.
+          let to = near[0].id;
+          for (const o of near) if (distance(this.spot(attacking, o.id, true), this.ball) < distance(this.spot(attacking, to, true), this.ball)) to = o.id;
+          const at = fromSide(side, clamp(depth + this.rng.range(-3, 3), DANGER_DEPTH + 1, 84), clamp(width + (width < 50 ? 1 : -1) * this.rng.range(10, 18), 24, 76));
+          add("pass", to, at);
+          carrier = to;
+        } else {
+          const across = (width < 50 ? 1 : -1) * this.rng.range(5, 10);
+          add("dribble", carrier, fromSide(side, clamp(depth + this.rng.range(-2, 2), DANGER_DEPTH + 1, 86), clamp(width + across, 24, 76)));
+        }
+      }
     }
 
     // Won off them: near goal the defence (or the keeper) cuts it out, so no
@@ -884,7 +948,10 @@ class Replay {
     }
     const by = this.winner(defending, this.ball);
     if (last?.kind === "pass" && !fromRestart) won("tackle", by);
-    else add("tackle", by, this.jitter(this.ball, 2), defending.side);
+    else {
+      const tackle = add("tackle", by, this.jitter(this.ball, 2), defending.side);
+      if (this.slides(defending, by)) tackle.slide = true;
+    }
   }
 
   /** Won deep in their own third: cleared long towards a forward, or played out short. */
@@ -960,6 +1027,11 @@ export function createMatch(
   const awayClub = state.clubs[fixture.awayId];
   const home = buildTeam(state, homeClub, "home");
   const away = buildTeam(state, awayClub, "away");
+  // Big matches (the cup knockout, a clash at the top): the manager's opponent may fire their team up
+  // too, once, some time after the hour, if they're not ahead. When is fixed by the match, not the dice.
+  const rival = managed === "home" ? away : managed === "away" ? home : undefined;
+  const bigMatch = isKnockout(fixture) || (!isCupFixture(fixture) && matchAppeal(state, fixture) >= 1.2);
+  const rivalForzaAt = rival && bigMatch ? 55 + (hashString(fixture.id) % 30) : undefined;
   const ctx: SimContext = {state, rng, events: [], ratings: {}, minutes: {}, sentOff: new Set()};
   for (const team of [home, away]) {
     for (const o of team.onPitch) {
@@ -1011,6 +1083,12 @@ export function createMatch(
         const team = teamOf(c.outId);
         const out = team?.onPitch.find((o) => o.id === c.outId) ?? team?.injured.find((o) => o.id === c.outId);
         if (team && out && substitute(ctx, team, out, minute, c.inId)) team.manualSubs = true;
+      } else if (c.type === "forza") {
+        const team = managed === "home" ? home : managed === "away" ? away : undefined;
+        // Not on top of one that's still going; otherwise every shout counts (the energy is paid when it's given).
+        if (!team || minute < team.forzaUntil) continue;
+        team.forzaUntil = minute + FORZA.minutes;
+        ctx.events.push({minute, type: "instruction", side: team.side, note: "forza"});
       } else if (c.type === "instructTeam") {
         const team = managed === "home" ? home : managed === "away" ? away : undefined;
         if (!team) continue;
@@ -1121,8 +1199,15 @@ export function createMatch(
       // A pause point: a live caller can add commands for this minute now.
       yield {type: "minute", minute};
       applyCommands(minute);
-      const h = lines(state, home, true);
-      const a = lines(state, away, false);
+      if (rival && minute === rivalForzaAt && rival.forzaUntil <= minute) {
+        const them = rival === home ? away : home;
+        if (rival.goals <= them.goals) {
+          rival.forzaUntil = minute + FORZA.minutes;
+          ctx.events.push({minute, type: "instruction", side: rival.side, note: "forzaRival"});
+        }
+      }
+      const h = lines(state, home, true, minute);
+      const a = lines(state, away, false, minute);
       const pHome = h.mid ** POSSESSION_POWER / (h.mid ** POSSESSION_POWER + a.mid ** POSSESSION_POWER);
       const attacking: Team = holder;
       const defending = attacking === home ? away : home;
@@ -1141,11 +1226,14 @@ export function createMatch(
           const skill = shotSkill(attacking, shooter);
           attacking.shots++;
           outcome = {type: "missed", shooterId: shooterSlot.id};
-          const pOnTarget = clamp(0.3 + (skill - 50) / 180 + (ratio - 1) * 0.15, 0.15, 0.65);
+          // Fired up ("Forza!"): nearly every shot is on target.
+          const fired = minute < attacking.forzaUntil;
+          const pOnTarget = fired ? FORZA.onTarget : clamp(0.3 + (skill - 50) / 180 + (ratio - 1) * 0.15, 0.15, 0.65);
           if (rng.chance(pOnTarget)) {
             attacking.onTarget++;
             rate(shooterSlot.id, 0.1);
-            const pGoal = clamp(GOAL_BASE + (skill - def.gk) / 150, 0.12, 0.62);
+            // ...and hit hard: a little harder to keep out.
+            const pGoal = clamp(GOAL_BASE + (skill - def.gk) / 150 + (fired ? FORZA.goalBonus : 0), 0.12, 0.7);
             const keeper = defending.onPitch.find((o) => defending.slots[o.slot].pos === "GK");
             const scored = rng.chance(pGoal);
             if (scored && rng.chance(DISALLOWED_CHANCE)) {
@@ -1183,10 +1271,11 @@ export function createMatch(
       const roll = rng.next();
       const cornerRoll = rng.next();
       if (outcome.type === "none") {
-        const pPenalty = PENALTY_RATE * ratio;
+        const rough = aggression(defending);
+        const pPenalty = PENALTY_RATE * ratio * Math.sqrt(rough);
         const kind: SetPieceKind | null =
           roll < pPenalty ? "penalty"
-          : roll < pPenalty + FREEKICK_RATE * ratio ? "freekick"
+          : roll < pPenalty + FREEKICK_RATE * ratio * rough ? "freekick"
           : cornerRoll < CORNER_RATE * Math.sqrt(ratio) ? "corner"
           : null;
         if (kind) outcome = yield* takeSetPiece(kind, minute, attacking, defending);
@@ -1202,9 +1291,12 @@ export function createMatch(
       report.homeGoals = home.goals;
       report.awayGoals = away.goals;
 
-      // Cards: the side without the ball fouls more; told to tackle hard, more still.
-      if (rng.chance(0.04)) {
-        const team = rng.chance(0.65) ? defending : attacking;
+      // Cards: the side without the ball fouls more; told to tackle hard, more still (and more often).
+      const foulsDef = 0.65 * aggression(defending);
+      const foulsAtt = 0.35 * aggression(attacking);
+      if (rng.chance(0.04 * (foulsDef + foulsAtt))) {
+        // The side going in harder is the one more likely to be booked.
+        const team = rng.chance(foulsDef / (foulsDef + foulsAtt)) ? defending : attacking;
         const fouler = pickOnPitch(rng, state, team, FOUL_WEIGHT, (p) => effect(team, p.id, (e) => e.foul));
         if (fouler) {
           const straightRed = rng.chance(0.03);

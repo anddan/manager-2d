@@ -21,7 +21,8 @@ export function ManagerProfile({onClose}: {onClose: () => void}) {
     ...game.history.filter((h) => h.cup === CUP_ROUNDS.length).map((h) => ({season: h.season, key: "trophy.cupShort"})),
   ].sort((a, b) => a.season - b.season);
   const cupText = (cup?: number) => (cup === undefined ? "" : cup === CUP_ROUNDS.length ? t("mgr.cupWon") : tx(CUP_ROUNDS[cup]));
-  const save = () =>
+  // Saved, and the dialog closes.
+  const save = () => {
     act((g) => {
       const c = g.clubs[g.userClubId];
       const name = nick.trim();
@@ -33,6 +34,8 @@ export function ManagerProfile({onClose}: {onClose: () => void}) {
         delete c.officialName;
       }
     });
+    onClose();
+  };
 
   return (
     <Modal title={t("mgr.title")} onClose={onClose}>

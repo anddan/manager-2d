@@ -3,15 +3,17 @@
 import {useGame} from "../store";
 import {en} from "./en";
 import {es} from "./es";
+import {fr} from "./fr";
+import {it} from "./it";
 import {sv} from "./sv";
 
-export const LANGS = ["sv", "en", "es"] as const;
-export type Lang = (typeof LANGS)[number];
+import {LANGS, type Lang} from "./langs";
+export {LANGS, type Lang};
 export type TKey = keyof typeof sv;
 export type Params = Record<string, string | number>;
 
-const DICTS: Record<Lang, Record<TKey, string>> = {sv, en, es};
-const LOCALES: Record<Lang, string> = {sv: "sv-SE", en: "en-GB", es: "es-ES"};
+const DICTS: Record<Lang, Record<TKey, string>> = {sv, en, es, it, fr};
+const LOCALES: Record<Lang, string> = {sv: "sv-SE", en: "en-GB", es: "es-ES", it: "it-IT", fr: "fr-FR"};
 
 export function formatMoney(lang: Lang, n: number): string {
   const big = Math.abs(n) >= 1_000_000;

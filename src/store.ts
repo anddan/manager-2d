@@ -7,7 +7,8 @@ import {newGame} from "./game/generate";
 import {Rng} from "./game/rng";
 import {deleteSave, loadGame, saveGame} from "./game/save";
 import type {GameState, ManagerLook, PlayersGender} from "./game/types";
-import type {Lang, Params} from "./i18n";
+import type {Params} from "./i18n";
+import {LANGS, type Lang} from "./i18n/langs";
 
 export const VIEWS = [
   "overview",
@@ -58,12 +59,13 @@ const LANG_KEY = "manager2d.lang";
 function loadLang(): Lang {
   try {
     const saved = localStorage.getItem(LANG_KEY);
-    if (saved === "sv" || saved === "en" || saved === "es") return saved;
+    if (saved && (LANGS as readonly string[]).includes(saved)) return saved as Lang;
   } catch {
     // Fall through to the browser language.
   }
+  // The browser's language if the game speaks it, otherwise Swedish.
   const nav = typeof navigator !== "undefined" ? navigator.language.slice(0, 2) : "sv";
-  return nav === "es" ? "es" : nav === "en" ? "en" : "sv";
+  return (LANGS as readonly string[]).includes(nav) ? (nav as Lang) : "sv";
 }
 
 export const useGame = create<Store>((set, get) => ({

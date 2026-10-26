@@ -3,7 +3,8 @@
 // their handle) onto a slot to bring them in.
 import {useEffect, useRef, useState, type PointerEvent as ReactPointerEvent} from "react";
 import {BENCH_SIZE, clubSlots, roleAt, type Slot} from "../../game/constants";
-import {listName, shortName, userClub} from "../../game/helpers";
+import {CUP_STAGES} from "../../game/cup";
+import {fixtureWeek, isCupFixture, listName, nextUserFixture, shortName, userClub} from "../../game/helpers";
 import {isAvailable, pickBestLineup} from "../../game/lineup";
 import {clubPlayers, effectiveRating, familiarity, teamOvr} from "../../game/ratings";
 import {FORMATION_IDS, MENTALITIES, type FormationId, type Mentality, type Player} from "../../game/types";
@@ -69,6 +70,9 @@ export function Tactics() {
   const custom = !!club.customSlots;
   const spots = boardSpots(slots);
   const [selected, setSelected] = useState<number | null>(null);
+  // The picker shows only who could come in (not already starting, not injured or banned) unless told
+  // otherwise; starters are moved about by dragging their shirts on the pitch.
+  const [onlyFit, setOnlyFit] = useState(true);
   const squad = clubPlayers(game, club.id);
 
   const assign = (playerId: string, slot = selected) => {
@@ -197,18 +201,29 @@ export function Tactics() {
   };
   const candidateList = pos ? (
     <ul className="pick-list">
+      <li className="pick-filter">
+        <label className="toggle">
+          <input type="checkbox" checked={onlyFit} onChange={(e) => setOnlyFit(e.target.checked)} /> {t("tac.onlyFit")}
+        </label>
+      </li>
       {inSlot && (
         <li className="pick-row">
-          <button className="pick pick-clear" onClick={clearSlot}>
-            <span aria-hidden>✖</span>
-            <span className="pick-name">{t("tac.clearSlot", {name: listName(inSlot)})}</span>
+          {/* The player in the spot, like the rows below (to compare), with ✖ to take them out. */}
+          <button className="pick pick-clear" onClick={clearSlot} title={t("tac.clearSlot", {name: listName(inSlot)})} aria-label={t("tac.clearSlot", {name: listName(inSlot)})}>
+            <PosBadge pos={inSlot.position} />
+            <span className="pick-name"><Flag code={inSlot.nationality} size={15} /> {listName(inSlot)} <StatusIcons player={inSlot} /></span>
+            {/* In the status column, like the other rows: what tapping it does. */}
+            <span className="pick-clear-x small">✖ {t("tac.clearShort")}</span>
+            <FormArrow form={inSlot.form} />
+            <span className={familiarity(inSlot, pos) < 1 ? "num warn" : "num strong"}>{Math.round(effectiveRating(inSlot, pos))}</span>
+            <Bar value={inSlot.fitness} small />
           </button>
           <button className="pick-avatar" title={t("tac.profile")} aria-label={`${t("tac.profile")}: ${listName(inSlot)}`} onClick={() => profile(inSlot.id)}>
             <Avatar player={inSlot} shirt={club.color} trim={club.color2} size={34} />
           </button>
         </li>
       )}
-      {candidates.map((p) => (
+      {candidates.filter((p) => p.id !== inSlot?.id && (!onlyFit || (isAvailable(p) && !club.lineup.includes(p.id)))).map((p) => (
         <li key={p.id} className="pick-row">
           <button className="pick" disabled={!isAvailable(p)} onClick={() => assign(p.id)}>
             <PosBadge pos={p.position} />
@@ -228,6 +243,7 @@ export function Tactics() {
 
   return (
     <div className="grid tactics">
+      <NextMatch />
       <Card
         title={<>{t("nav.tactics")} <span className="team-ovr" title={t("tac.teamOvrHint")}>{t("tac.teamOvr")} <strong>{teamOvr(game, club.id)}</strong></span></>}
         actions={
@@ -423,4 +439,27 @@ function useNarrow(): boolean {
     return () => m.removeEventListener("change", on);
   }, []);
   return narrow;
+}
+
+/** This week's match, on top: who against whom, home or away, and in what. */
+function NextMatch() {
+  const {t} = useT();
+  const game = useGameState();
+  const next = nextUserFixture(game);
+  if (!next || fixtureWeek(next) !== game.week) return null;
+  const home = game.clubs[next.homeId];
+  const away = game.clubs[next.awayId];
+  if (!home || !away) return null;
+  const crest = (c: typeof home) => <span className="crest" style={{background: c.color, color: c.color2}}>{c.short}</span>;
+  return (
+    <div className="next-match span-2" role="status">
+      <span className="next-match-what">
+        {isCupFixture(next) ? `🏆 ${t("cup.name")} · ${t(CUP_STAGES[next.stage])}` : `⚽ ${t("ov.round", {round: next.round})}`}
+      </span>
+      <span className="next-match-teams">
+        {crest(home)} <strong>{home.name}</strong> <span className="muted">–</span> <strong>{away.name}</strong> {crest(away)}
+      </span>
+      <span className="muted small">{next.homeId === game.userClubId ? t("tac.home") : t("tac.away")}</span>
+    </div>
+  );
 }

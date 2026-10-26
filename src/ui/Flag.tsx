@@ -30,7 +30,21 @@ const bands = (colors: string[], vertical = false): ReactNode =>
     )
   );
 
+/** The USA: thirteen stripes and a blue canton with a few stars (they'd be specks at this size). */
+const usa: ReactNode = (
+  <>
+    {Array.from({length: 13}, (_, i) => (
+      <rect key={i} y={(20 / 13) * i} width={30} height={20 / 13 + 0.05} fill={i % 2 === 0 ? "#b22234" : "#ffffff"} />
+    ))}
+    <rect width={12} height={(20 / 13) * 7} fill="#3c3b6e" />
+    {[[2, 2], [6, 2], [10, 2], [4, 5], [8, 5], [2, 8], [6, 8], [10, 8]].map(([x, y], i) => (
+      <circle key={i} cx={x} cy={y} r={0.7} fill="#ffffff" />
+    ))}
+  </>
+);
+
 const FLAGS: Record<string, ReactNode> = {
+  US: usa,
   SE: nordic("#006aa7", "#fecc00", 9, 4),
   NO: nordic("#ba0c2f", "#ffffff", 8, 5, "#00205b"),
   DK: nordic("#c8102e", "#ffffff", 9, 3.4),

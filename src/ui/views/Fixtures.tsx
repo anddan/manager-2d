@@ -67,7 +67,7 @@ export function Fixtures() {
         title={t("nav.fixtures")}
         actions={
           <label className="toggle">
-            <input type="checkbox" checked={onlyMine} onChange={(e) => setOnlyMine(e.target.checked)} /> {t("fx.onlyMine")}
+            <input type="checkbox" className="bench-check" checked={onlyMine} onChange={(e) => setOnlyMine(e.target.checked)} /> {t("fx.onlyMine")}
           </label>
         }
       >

@@ -1077,18 +1077,18 @@ button.pick { grid-template-columns: auto 1fr auto auto auto 60px; }
 .out-row .pick { box-shadow: inset 4px 0 0 var(--bad); background: color-mix(in srgb, var(--bad) 8%, var(--surface)); opacity: 0.75; }
 .control-help { list-style: none; padding: 0; margin: 4px 0 8px; display: grid; gap: 3px; }
 
-/* The bench tick: a round toggle, green with a white tick when on the bench. */
-.bench-check {
-  appearance: none; -webkit-appearance: none; width: 20px; height: 20px; margin: 0; border-radius: 50%;
+/* Every checkbox in the game: a round toggle, green with a white tick when on (the bench, filters, settings…). */
+.bench-check, input[type="checkbox"] {
+  appearance: none; -webkit-appearance: none; flex: none; width: 20px; height: 20px; margin: 0; border-radius: 50%;
   border: 2px solid var(--border); background: var(--surface); cursor: pointer; display: inline-grid; place-items: center;
   transition: background 0.15s, border-color 0.15s;
 }
-.bench-check::after { content: ""; width: 5px; height: 9px; border: solid #fff; border-width: 0 2.5px 2.5px 0; transform: translateY(-1px) rotate(45deg) scale(0); transition: transform 0.15s; }
-.bench-check:checked { background: var(--good); border-color: var(--good); }
-.bench-check:checked::after { transform: translateY(-1px) rotate(45deg) scale(1); }
-.bench-check:hover:not(:disabled) { border-color: var(--good); }
-.bench-check:disabled { opacity: 0.4; cursor: not-allowed; }
-.bench-check:focus-visible { outline: 2px solid var(--good); outline-offset: 2px; }
+.bench-check::after, input[type="checkbox"]::after { content: ""; width: 5px; height: 9px; border: solid #fff; border-width: 0 2.5px 2.5px 0; transform: translateY(-1px) rotate(45deg) scale(0); transition: transform 0.15s; }
+.bench-check:checked, input[type="checkbox"]:checked { background: var(--good); border-color: var(--good); }
+.bench-check:checked::after, input[type="checkbox"]:checked::after { transform: translateY(-1px) rotate(45deg) scale(1); }
+.bench-check:hover:not(:disabled), input[type="checkbox"]:hover:not(:disabled) { border-color: var(--good); }
+.bench-check:disabled, input[type="checkbox"]:disabled { opacity: 0.4; cursor: not-allowed; }
+.bench-check:focus-visible, input[type="checkbox"]:focus-visible { outline: 2px solid var(--good); outline-offset: 2px; }
 /* A group lit up while a player is dragged over it. */
 .pick-group.drop { outline: 2px dashed currentColor; outline-offset: 2px; border-radius: 6px; }
 @media (max-width: 599px) { .match-controls { flex-wrap: wrap; overflow-x: visible; } }
@@ -1173,7 +1173,8 @@ button.pick { grid-template-columns: auto 1fr auto auto auto 60px; }
 .roles-summary-item { white-space: nowrap; }
 
 /* Emptying a spot on the pitch, first in the list. */
-.pick.pick-clear { color: var(--bad, #dc2626); border-style: dashed; }
+.pick.pick-clear { border-style: dashed; }
+.pick-clear-x { color: var(--bad, #dc2626); font-weight: 800; }
 
 /* Champions Cup: the groups side by side, and the knockout bracket. */
 .cup-groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 14px; }
@@ -1279,3 +1280,127 @@ button.manager-item:hover:not(:disabled) { background: rgb(127 127 127 / 0.1); }
   .pitch-wrap.maxed .max-controls { bottom: 6px; }
   .pitch-wrap.maxed .max-btn { bottom: 6px; }
 }
+
+/* Zoom in and out: an icon button, like maximise. */
+.zoom-btn { display: inline-grid; place-items: center; padding: 6px; }
+.zoom-btn .ctl-icon { width: 16px; height: 16px; fill: currentColor; }
+
+/* Tactics: this week's match, on top. */
+.next-match { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 14px; padding: 10px 14px; border-radius: 14px; background: var(--surface, #fff); border: 2px solid var(--accent); box-shadow: var(--shadow); }
+.next-match-what { font-weight: 700; font-size: 0.85rem; }
+.next-match-teams { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
+/* This week's match: no frame, the same soft colour wash as the card headings (on the card's own surface). */
+.next-match {
+  border: 0; border-radius: var(--radius);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 14%, transparent), transparent 60%), var(--surface);
+}
+
+/* "Forza!": the once-a-match rallying cry in the manager's menu. */
+.forza-btn { background: linear-gradient(90deg, rgb(239 68 68 / 0.14), rgb(234 179 8 / 0.14)) !important; }
+.forza-btn > span:first-child { font-weight: 800; letter-spacing: 0.02em; }
+
+
+/* "Forza!": a warm glow round the fired-up team while it lasts. */
+.forza-glow { fill: rgb(251 146 60 / 0.35); stroke: #f97316; stroke-width: 0.35; transform-box: fill-box; transform-origin: center; animation: forza-pulse 0.9s ease-in-out infinite alternate; pointer-events: none; }
+@keyframes forza-pulse { from { transform: scale(0.85); opacity: 0.55; } to { transform: scale(1.2); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .forza-glow { animation: none; } }
+/* Maximised: minimise bottom right, Forza bottom left (see-through, like the other buttons). */
+.pitch-wrap.maxed .max-btn { left: auto; right: 6px; bottom: 6px; }
+.max-forza { position: absolute; left: 6px; bottom: 6px; z-index: 2; background: rgb(11 20 48 / 0.75); color: #fff; border-color: rgb(255 255 255 / 0.25); font-weight: 800; }
+.max-forza:disabled { opacity: 0.45; }
+
+/* Maximised: score and clock top centre, see-through like the buttons. */
+.max-score { position: absolute; top: 6px; left: 50%; transform: translateX(-50%); z-index: 2; display: inline-flex; align-items: center; gap: 8px; padding: 4px 12px; border-radius: 999px; background: rgb(11 20 48 / 0.75); border: 1px solid rgb(255 255 255 / 0.25); color: #fff; white-space: nowrap; pointer-events: none; }
+.max-score .crest { width: 28px; height: 22px; font-size: 0.6rem; }
+.max-score-goals { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+.max-score-clock { padding-left: 8px; border-left: 1px solid rgb(255 255 255 / 0.25); font-variant-numeric: tabular-nums; font-weight: 700; }
+
+/* Maximised: score and clock top centre, see-through like the buttons. */
+.max-score { position: absolute; top: 6px; left: 50%; transform: translateX(-50%); z-index: 2; display: inline-flex; align-items: center; gap: 8px; padding: 4px 12px; border-radius: 999px; background: rgb(11 20 48 / 0.75); border: 1px solid rgb(255 255 255 / 0.25); color: #fff; white-space: nowrap; pointer-events: none; }
+.max-score .crest { width: 28px; height: 22px; font-size: 0.6rem; }
+.max-score-goals { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+.max-score-clock { padding-left: 8px; border-left: 1px solid rgb(255 255 255 / 0.25); font-variant-numeric: tabular-nums; font-weight: 700; }
+/* Maximised: the commentary (free kick, throw-in…) top left, out of the way of the score; the crowd a line below. */
+.pitch-wrap.maxed .setup-banner { top: 6px; left: 6px; right: auto; transform: none; max-width: min(46%, 420px); text-align: left; }
+.pitch-wrap.maxed .crowd-banner { top: 48px; }
+.pitch-wrap.maxed .setup-banner { white-space: normal; border-radius: 12px; background: rgb(11 20 48 / 0.75); border: 1px solid rgb(255 255 255 / 0.25); }
+.pitch-wrap.maxed .setup-banner { white-space: normal; border-radius: 12px; background: rgb(11 20 48 / 0.75); border: 1px solid rgb(255 255 255 / 0.25); }
+
+/* Maximised, bottom left: Forza and instructions side by side. */
+.max-manager { position: absolute; left: 6px; bottom: 6px; z-index: 2; display: flex; gap: 6px; }
+.max-manager .max-forza { position: static; }
+/* Maximised: "to the end" is just its icon, like the other controls. */
+.max-controls .skip-label { display: none; }
+/* Maximised on a narrow screen (a phone held upright): Forza is just its flame. */
+@media (max-width: 560px) { .max-forza-label { display: none; } }
+/* Maximised on a phone: rounded screen corners, a camera notch, the home bar. Keep everything
+   well inside: at least 14px from each edge, more where the phone says its safe area starts. */
+.pitch-wrap.maxed {
+  --edge-t: max(14px, env(safe-area-inset-top));
+  --edge-r: max(14px, env(safe-area-inset-right));
+  --edge-b: max(14px, env(safe-area-inset-bottom));
+  --edge-l: max(14px, env(safe-area-inset-left));
+}
+.pitch-wrap.maxed .zoom-btn { top: var(--edge-t); right: var(--edge-r); }
+.pitch-wrap.maxed .max-btn { right: var(--edge-r); bottom: var(--edge-b); }
+.pitch-wrap.maxed .max-manager { left: var(--edge-l); bottom: var(--edge-b); }
+.pitch-wrap.maxed .max-controls { bottom: var(--edge-b); }
+.pitch-wrap.maxed .max-score { top: var(--edge-t); }
+.pitch-wrap.maxed .setup-banner { top: var(--edge-t); left: var(--edge-l); }
+.pitch-wrap.maxed .crowd-banner { top: calc(var(--edge-t) + 42px); left: var(--edge-l); }
+.pitch-wrap.maxed .pitch { padding: 0 env(safe-area-inset-right) 0 env(safe-area-inset-left); box-sizing: border-box; }
+
+/* Energy spent: smaller, in energy yellow. */
+.burst-text.energy { font-size: 1.3rem; color: #fde047; text-shadow: 0 2px 6px rgb(0 0 0 / 0.6), 0 0 12px #f59e0b; }
+
+/* A fired-up shot: a tail of fire behind the ball, and the ball glowing hot. */
+.fire-tail line { stroke-linecap: round; }
+.ball-fire { filter: drop-shadow(0 0 1.2px #f97316) drop-shadow(0 0 2.5px #ef4444); }
+
+/* Sound on/off beside the play controls: just a small speaker, no frame. */
+.sound-btn { display: inline-grid; place-items: center; width: 32px; padding: 0; border: 0; background: none; color: var(--muted, #64748b); cursor: pointer; }
+.sound-btn:hover { color: var(--ink, inherit); }
+.sound-btn .ctl-icon { width: 18px; height: 18px; fill: currentColor; }
+
+/* A set piece while maximised: full screen too, the goal fitted to the screen's height. */
+.setpiece-max { position: fixed; inset: 0; z-index: 55; display: grid; place-items: center; overflow: auto; background: #0b1220; color: #fff; padding: max(10px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
+.setpiece-max .setpiece { width: min(100%, 900px); }
+.setpiece-max .setpiece-goal { width: auto; max-width: 100%; max-height: calc(100dvh - 110px); margin: 0 auto; display: block; }
+/* A phone on its side: the goal fits the height, nothing to scroll (in the match box or maximised). */
+@media (orientation: landscape) and (max-height: 520px) {
+  .modal-wide .setpiece-goal, .setpiece-max .setpiece-goal { width: auto; max-width: 100%; max-height: calc(100dvh - 96px); margin: 0 auto; display: block; }
+  .setpiece-head { font-size: 0.95rem; }
+  .setpiece p { font-size: 0.85rem; }
+}
+/* A phone on its side: text and players on the left, the goal on the right using the full height. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .setpiece { grid-template-columns: minmax(200px, 34%) 1fr; column-gap: 14px; align-items: start; }
+  .setpiece > * { grid-column: 1; }
+  .setpiece > .setpiece-goal { grid-column: 2; grid-row: 1 / span 8; max-height: calc(100dvh - 24px); }
+  .setpiece .sp-duel { flex-wrap: wrap; gap: 4px 8px; }
+}
+/* Buttons on the dark full-screen set piece: see-through, light text. */
+.setpiece-max .btn:not(.primary) { background: rgb(255 255 255 / 0.12); color: #fff; border-color: rgb(255 255 255 / 0.25); }
+/* This week's match in Tactics: the round and the teams in the same lettering as the card headings ("TAKTIK"). */
+.next-match-what, .next-match-teams strong { font-family: var(--display); font-weight: 800; text-transform: uppercase; letter-spacing: 0.01em; }
+.next-match-what { font-size: 1.1rem; }
+.next-match-teams strong { font-size: 1.25rem; }
+
+/* The manager's shout on the page's top layer, over any dialog or button. */
+.shout.shout-top { position: fixed; z-index: 450; max-width: min(70vw, 520px); }
+/* Club crests: a thin edge so a white crest shows on white (dark inside) and a black one on dark (light outside). */
+.crest { box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.2), 0 0 0 1px rgb(255 255 255 / 0.18); }
+.crest.tiny { box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.3); }
+
+/* This week's match on a phone: one straight line, crest – team – team – crest; long names shortened. */
+.next-match-teams { flex-wrap: nowrap; max-width: 100%; min-width: 0; }
+.next-match-teams strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 599px) {
+  .next-match { flex-direction: column; gap: 4px; padding: 10px 12px; }
+  .next-match-teams { gap: 6px; width: 100%; justify-content: center; }
+  .next-match-teams strong { font-size: 1rem; }
+  .next-match .crest { width: 28px; height: 28px; font-size: 0.6rem; border-radius: 7px; }
+}
+
+/* The picker's filter above the list. */
+.pick-filter { list-style: none; padding: 2px 2px 6px; font-size: 0.85rem; }

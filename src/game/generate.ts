@@ -82,6 +82,14 @@ function makeAttributes(rng: Rng, pos: Position, level: number): Attributes {
   return attrs;
 }
 
+/** The surnames not yet used at the club (all of them if every one is taken, or for a free agent). */
+function freshSurnames(state: GameState, clubId: string | null | undefined, surnames: string[]): string[] {
+  if (!clubId) return surnames;
+  const used = new Set(Object.values(state.players).filter((p) => p.clubId === clubId).map((p) => p.lastName));
+  const fresh = surnames.filter((n) => !used.has(n));
+  return fresh.length > 0 ? fresh : surnames;
+}
+
 export function createPlayer(state: GameState, rng: Rng, spec: PlayerSpec): Player {
   const nationality = pickNationality(state, rng, spec.home);
   const names = NATIONALITIES[nationality];
@@ -94,7 +102,7 @@ export function createPlayer(state: GameState, rng: Rng, spec: PlayerSpec): Play
   const player: Player = {
     id: newId(state, "p"),
     firstName: rng.pick(female ? names.female : names.first),
-    lastName: rng.pick(names.last),
+    lastName: rng.pick(freshSurnames(state, spec.clubId, names.last)),
     age: spec.age,
     ...(female ? {gender: "f" as const} : {}),
     nationality,

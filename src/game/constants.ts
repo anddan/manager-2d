@@ -53,6 +53,8 @@ export const ENERGY_MAX = 9;
 export const ENERGY_REGEN_MS = (9 * 60 + 59) * 1000;
 export const ENERGY_COST_MATCH = 1;
 export const ENERGY_COST_EXTRA_TRAINING = 1;
+/** "Forza!" is free once a match; each one after that costs this. */
+export const ENERGY_COST_FORZA = 1;
 export const MAX_EXTRA_TRAININGS = 2;
 export const DIAMONDS_START = 30;
 export const DIAMONDS_REFILL_COST = 10;

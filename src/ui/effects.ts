@@ -1,4 +1,5 @@
 // Little reward effects, drawn straight into the page (no state to keep).
+import {chime} from "./sound";
 
 /**
  * Diamonds earned: "+N 💎" pops up where they were won and a handful of
@@ -7,6 +8,7 @@
  */
 export function diamondBurst(from: Element | null | undefined, amount: number): void {
   if (typeof document === "undefined" || amount <= 0) return;
+  chime();
   const start = from?.getBoundingClientRect();
   const sx = start ? start.left + start.width / 2 : window.innerWidth / 2;
   const sy = start ? start.top + start.height / 2 : window.innerHeight / 2;
@@ -46,4 +48,17 @@ export function diamondBurst(from: Element | null | undefined, amount: number): 
       setTimeout(() => counter.classList.remove("gem-pulse"), 600);
     }, 750 + count * 55);
   }
+}
+
+/** Energy spent: "−N ⚡" rises from where it was spent and fades. */
+export function energySpent(from: Element | null | undefined, amount: number): void {
+  if (typeof document === "undefined" || amount <= 0) return;
+  const start = from?.getBoundingClientRect();
+  const text = document.createElement("div");
+  text.className = "burst-text energy";
+  text.textContent = `−${amount} ⚡`;
+  text.style.left = `${start ? start.left + start.width / 2 : window.innerWidth / 2}px`;
+  text.style.top = `${start ? start.top : window.innerHeight / 2}px`;
+  document.body.appendChild(text);
+  text.addEventListener("animationend", () => text.remove());
 }

@@ -256,7 +256,9 @@ export type MatchCommand =
   | {minute: number; type: "sub"; outId: string; inId: string}
   | {minute: number; type: "instruct"; playerId: string; key: InstructionKey; level: InstructionLevel}
   /** The same instruction for everyone on the pitch, overriding their own. */
-  | {minute: number; type: "instructTeam"; key: InstructionKey; level: InstructionLevel};
+  | {minute: number; type: "instructTeam"; key: InstructionKey; level: InstructionLevel}
+  /** "Forza!": the manager fires up the whole team (free once a match, then paid for with energy). */
+  | {minute: number; type: "forza"};
 
 export type TouchKind = "kickoff" | "pass" | "dribble" | "tackle" | "setpiece" | "save" | "goal" | "nogoal" | "out" | "goalkick" | "throwin";
 
@@ -274,6 +276,8 @@ export interface Frame {
   kind?: TouchKind;
   /** How a pass travels: into space (through), a long ball or a cross (both in the air). Plain passes go to feet. */
   flight?: "through" | "long" | "cross";
+  /** A tackle won with a slide (drawn stretched out at the ball). */
+  slide?: boolean;
 }
 
 export interface MatchReport {
@@ -424,7 +428,7 @@ export interface GameState {
   playersGender?: PlayersGender;
   userClubId: string;
   leagueName: string;
-  /** Which league (see leagues.ts); missing in older saves, which are Nordligan. */
+  /** Which league (see leagues.ts); missing in older saves, which are Fantasiligan. */
   leagueId?: string;
   season: number;
   /** Week within the season, 1-based. */

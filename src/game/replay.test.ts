@@ -2,7 +2,7 @@
 // teammates, possession changes through a tackle, and every goal is in it.
 import {describe, expect, it} from "vitest";
 import {newGame} from "./generate";
-import {simulateMatch} from "./match";
+import {DISALLOW_REASONS, simulateMatch} from "./match";
 import {Rng} from "./rng";
 
 describe("match replay", () => {
@@ -120,7 +120,7 @@ describe("match replay", () => {
       // The score is the goals that stood; each ruled-out goal is a ball in the net in the replay.
       expect(r.homeGoals + r.awayGoals).toBe(goalEvents.length);
       expect(r.frames.filter((f) => f.kind === "nogoal").length).toBe(disallowed.length);
-      for (const e of disallowed) expect(["offside", "foul", "handball"]).toContain(e.note);
+      for (const e of disallowed) expect(DISALLOW_REASONS as readonly string[]).toContain(e.note);
       goals += goalEvents.length;
       ruledOut += disallowed.length;
     }

@@ -7,7 +7,7 @@ import {ManagerAvatar, defaultManagerLook} from "./Avatar";
 import {FlagIcon} from "./Flag";
 import {ManagerEditor} from "./ManagerEditor";
 
-const LANG_NAMES: Record<Lang, string> = {sv: "Svenska", en: "English", es: "Español"};
+const LANG_NAMES: Record<Lang, string> = {sv: "Svenska", en: "English", es: "Español", it: "Italiano", fr: "Français"};
 
 // Example faces for the men / women / mixed choice, in a plain kit colour.
 const man = (skin: string, hair: string, style: string, beard = "none"): ManagerLook => ({skin, hair, style, beard, glasses: false, suit: "#2563eb"});

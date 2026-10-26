@@ -1,4 +1,4 @@
-// The leagues to play in. Apart from the invented Nordligan, each is modelled
+// The leagues to play in. Apart from the invented Fantasiligan, each is modelled
 // on a real league: its biggest clubs, strongest first, in their colours,
 // with players mostly from that country. Names are close to the real ones but
 // not the same (AC Milan -> FC Milano), since real club and league names are
@@ -135,6 +135,50 @@ export const LEAGUES: League[] = [
       club("Halmstad Blåvitt Syd", "HAL", "#0066b3", "#ffffff"),
       club("Göteborg Makrillarna", "GMA", "#00843d", "#000000"),
       club("Värnamo Småland", "VÄR", "#005baa", "#ffffff"),
+    ],
+  },
+  {
+    id: "fra",
+    name: "Ligue Française",
+    flag: "FR",
+    home: "FR",
+    clubs: [
+      club("Paris Rouge-Bleu", "PRB", "#004170", "#da291c"),
+      club("Marseille Phocéens", "MAR", "#ffffff", "#2faee0"),
+      club("Monaco Princiers", "MON", "#e51b22", "#ffffff"),
+      club("Lille Dogues", "LIL", "#e01e13", "#ffffff"),
+      club("Lyon Gones", "LYO", "#ffffff", "#1b3c8f"),
+      club("Nice Aiglons", "NIC", "#c8102e", "#000000"),
+      club("Lens Sang-et-Or", "LEN", "#ffd700", "#c8102e"),
+      club("Rennes Rouge-et-Noir", "REN", "#e13327", "#000000"),
+      club("Strasbourg Racing", "STR", "#0099d8", "#ffffff"),
+      club("Nantes Canaris", "NAN", "#fbe000", "#00843d"),
+      club("Toulouse Violets", "TOU", "#5b2d8e", "#ffffff"),
+      club("Brest Pirates", "BRE", "#e30613", "#ffffff"),
+      club("Montpellier Pailladins", "MTP", "#f58220", "#1b3c8f"),
+      club("Reims Champenois", "REI", "#e2001a", "#ffffff"),
+    ],
+  },
+  {
+    id: "usa",
+    name: "American Soccer League",
+    flag: "US",
+    home: "US",
+    clubs: [
+      club("Los Angeles Stars", "LAS", "#00245d", "#ffd200"),
+      club("Miami Pink Herons", "MIA", "#f7b5cd", "#231f20"),
+      club("Seattle Rain FC", "SEA", "#5d9741", "#005595"),
+      club("Atlanta Five Stripes", "ATL", "#80000a", "#a19060"),
+      club("New York Bulls", "NYB", "#ed1e36", "#ffffff"),
+      club("Columbus Workers", "CLB", "#fedd00", "#000000"),
+      club("LA Black and Gold", "LAF", "#000000", "#c39e6d"),
+      club("Cincinnati Lions", "CIN", "#f05323", "#263b80"),
+      club("Philadelphia Unity", "PHI", "#071b2c", "#b19b69"),
+      club("Portland Lumberjacks", "POR", "#004812", "#d69a00"),
+      club("Nashville Sound", "NSH", "#ece83a", "#1f1646"),
+      club("Kansas City Sporting", "SKC", "#91b0d5", "#002f65"),
+      club("New England Rebels", "NER", "#0a2240", "#ce0e2d"),
+      club("Austin Oaks", "AUS", "#00b140", "#000000"),
     ],
   },
 ];
