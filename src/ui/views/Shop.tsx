@@ -159,9 +159,8 @@ export function Shop() {
           {PLAYER_PACK_IDS.map((id) => {
             const pack = PLAYER_PACKS[id];
             return (
-              <div key={id} className={`ppack ppack-${id}`}>
-                <strong>{iconize(t(`pack.${id}`))}</strong>
-                <span className="ppack-range">{iconize(t("pack.range", {min: pack.min, max: pack.max}))}</span>
+              <div key={id} className="ppack-offer">
+                <PackArt tier={id} name={t(`pack.${id}`)} range={t("pack.range", {min: pack.min, max: pack.max})} />
                 <button className="ppack-btn" disabled={m.diamonds < pack.price} onClick={() => open(id)}>
                   <Icon name="diamond" size={16} /> {pack.price} · {iconize(t("pack.open"))}
                 </button>
@@ -169,10 +168,8 @@ export function Shop() {
             );
           })}
           {/* The diamond pack: club money, pick one of four. */}
-          <div className="ppack ppack-diamond">
-            <strong><Icon name="diamond" size={18} /> {iconize(t("pack.diamond"))}</strong>
-            <span className="ppack-range">{iconize(t("pack.range", {min: DIAMOND_PACK.min, max: DIAMOND_PACK.max}))}</span>
-            <span className="ppack-note">{iconize(t("pack.diamondNote", {n: DIAMOND_PACK.choices}))}</span>
+          <div className="ppack-offer">
+            <PackArt tier="diamond" name={t("pack.diamond")} range={t("pack.range", {min: DIAMOND_PACK.min, max: DIAMOND_PACK.max})} note={t("pack.diamondNote", {n: DIAMOND_PACK.choices})} />
             {game.packChoice ? (
               <button className="ppack-btn" onClick={() => setChoosing(true)}>{iconize(t("pack.choose"))}</button>
             ) : (
@@ -251,6 +248,29 @@ export function Shop() {
           ))}
         </div>
       </Card>
+    </div>
+  );
+}
+
+/**
+ * A pack as a pack: a foil wrapper in the tier's colours, crimped at both ends, with a moving
+ * shine, a card silhouette with a "?" (who's in it?), the tier and what overall it holds.
+ */
+function PackArt({tier, name, range, note}: {tier: string; name: string; range: string; note?: string}) {
+  return (
+    <div className={`pack-art pack-${tier}`}>
+      <span className="pack-crimp top" aria-hidden />
+      <span className="pack-shine" aria-hidden />
+      <div className="pack-emblem" aria-hidden>
+        <svg viewBox="0 0 40 52" width={44} height={57}>
+          <path d="M6 3 L20 0 L34 3 L37 10 V44 L20 52 L3 44 V10 Z" fill="rgb(255 255 255 / 0.18)" stroke="rgb(255 255 255 / 0.65)" strokeWidth={1.6} />
+          <text x="20" y="34" textAnchor="middle" fontSize="22" fontWeight={900} fill="#fff">?</text>
+        </svg>
+      </div>
+      <strong className="pack-name">{tier === "diamond" ? <><Icon name="diamond" size={16} /> {name}</> : name}</strong>
+      <span className="pack-range">{range}</span>
+      {note && <span className="pack-note">{note}</span>}
+      <span className="pack-crimp bottom" aria-hidden />
     </div>
   );
 }

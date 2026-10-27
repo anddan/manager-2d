@@ -55,6 +55,13 @@ export function PlayerModal({playerId}: {playerId: string}) {
         </div>
       </div>
 
+      {/* The kit (boots, gloves, shin guards) first: the thing changed most often. */}
+      {own && p.clubId === game.userClubId && (
+        <Fold title={<><Icon name="shirt" size={20} /> {iconize(t("gear.equipment"))}</>}>
+          <GearPanel player={p} />
+        </Fold>
+      )}
+
       <div className="player-grid">
         <section>
           <h3>{iconize(t("pl.attributes"))}</h3>
@@ -239,10 +246,6 @@ function OwnActions({player: p}: {player: Player}) {
         </label>
       </div>
       <QuickSale player={p} />
-      </Fold>
-
-      <Fold title={<><Icon name="shirt" size={20} /> {iconize(t("gear.equipment"))}</>}>
-        <GearPanel player={p} />
       </Fold>
 
       <LookEditor player={p} />
