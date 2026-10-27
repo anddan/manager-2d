@@ -1,36 +1,28 @@
 import {useState} from "react";
 import {difficultyAt} from "../game/helpers";
-import {iconize} from "./Icon";
+import {Icon, iconize, type IconName} from "./Icon";
 import {LEAGUES, leagueById} from "../game/leagues";
 import {PLAYERS_GENDERS, type ManagerLook, type PlayersGender} from "../game/types";
-import {LANGS, useT, type Lang} from "../i18n";
+import {useT} from "../i18n";
 import {useGame} from "../store";
 import {ManagerAvatar, defaultManagerLook} from "./Avatar";
 import {FlagIcon} from "./Flag";
 import {ManagerEditor} from "./ManagerEditor";
 
-const LANG_NAMES: Record<Lang, string> = {sv: "Svenska", en: "English", es: "Español", it: "Italiano", fr: "Français"};
+/** The men / women / mixed choice, as an icon each. */
+const GENDER_ICONS: Record<PlayersGender, IconName> = {men: "male", women: "female", mix: "mixed"};
 
-// Example faces for the men / women / mixed choice, in a plain kit colour.
-const man = (skin: string, hair: string, style: string, beard = "none"): ManagerLook => ({skin, hair, style, beard, glasses: false, suit: "#2563eb"});
-const woman = (skin: string, hair: string, style: string): ManagerLook => ({skin, hair, style, beard: "none", glasses: false, suit: "#db2777", lashes: true});
-const SAMPLES: Record<PlayersGender, ManagerLook[]> = {
-  men: [man("#ebbd9c", "#3b2618", "short", "stubble"), man("#8a5638", "#1c1714", "buzz")],
-  women: [woman("#f6d5bd", "#e3c27a", "ponytail"), woman("#b37a52", "#1c1714", "braids")],
-  mix: [woman("#d49c74", "#6b4226", "bob"), man("#f6d5bd", "#b8863b", "sidepart")],
-};
-
-/** First screen: language, manager name and look, who plays, the league and the club. */
+/** First screen: manager name and look, who plays, the league and the club. */
 export function NewGame() {
   const {t} = useT();
-  const lang = useGame((s) => s.lang);
-  const setLang = useGame((s) => s.setLang);
   const start = useGame((s) => s.start);
   const [name, setName] = useState("");
   const [look, setLook] = useState<ManagerLook>(() => defaultManagerLook(String(Math.random())));
   const [club, setClub] = useState(6);
   const [gender, setGender] = useState<PlayersGender>("men");
   const [leagueId, setLeagueId] = useState(LEAGUES[0].id);
+  const [editLook, setEditLook] = useState(false);
+  const [leaguesOpen, setLeaguesOpen] = useState(false);
   const league = leagueById(leagueId);
 
   const difficulty = difficultyAt;
@@ -38,47 +30,61 @@ export function NewGame() {
   return (
     <main className="welcome">
       <div className="welcome-card">
-        <p className="eyebrow">{league.name}</p>
         <h1>⚽ Forza Manager</h1>
         <p className="muted">{iconize(t("new.intro"))}</p>
 
-        <select className="lang-select" value={lang} onChange={(e) => setLang(e.target.value as Lang)} aria-label={t("settings.language")}>
-          {LANGS.map((l) => <option key={l} value={l}>{LANG_NAMES[l]}</option>)}
-        </select>
-
         <h3>{iconize(t("new.yourManager"))}</h3>
-        <label className="field">
-          <span>{iconize(t("new.managerName"))}</span>
-          <input value={name} maxLength={30} onChange={(e) => setName(e.target.value)} placeholder={t("new.namePlaceholder")} />
-        </label>
-        <ManagerEditor look={look} onChange={setLook} />
+        {/* The name, with the face beside it; the look editor only when asked for. */}
+        <div className="new-manager">
+          {!editLook && <ManagerAvatar look={look} size={64} />}
+          <label className="field">
+            <span>{iconize(t("new.managerName"))}</span>
+            <input value={name} maxLength={30} onChange={(e) => setName(e.target.value)} placeholder={t("new.namePlaceholder")} />
+          </label>
+        </div>
+        {editLook ? (
+          <ManagerEditor look={look} onChange={setLook} />
+        ) : (
+          <button type="button" className="btn small" onClick={() => setEditLook(true)}><Icon name="palette" size={16} /> {iconize(t("new.editLook"))}</button>
+        )}
 
         <h3>{iconize(t("new.players"))}</h3>
         <div className="gender-pick" role="radiogroup" aria-label={t("new.players")}>
           {PLAYERS_GENDERS.map((g) => (
             <button key={g} type="button" role="radio" aria-checked={g === gender} className={g === gender ? "gender-option active" : "gender-option"} onClick={() => setGender(g)}>
-              <span className="gender-faces">
-                {SAMPLES[g].map((s, i) => (
-                  <ManagerAvatar key={i} look={s} size={40} tie="transparent" />
-                ))}
-              </span>
+              <Icon name={GENDER_ICONS[g]} size={30} />
               <strong>{iconize(t(`new.gender.${g}`))}</strong>
             </button>
           ))}
         </div>
 
         <h3>{iconize(t("new.pickLeague"))}</h3>
-        <div className="league-pick" role="radiogroup" aria-label={t("new.pickLeague")}>
-          {LEAGUES.map((l) => (
-            <button key={l.id} type="button" role="radio" aria-checked={l.id === leagueId} className={l.id === leagueId ? "league-option active" : "league-option"} onClick={() => setLeagueId(l.id)}>
-              <FlagIcon code={l.flag} size={26} />
-              <strong>{l.name}</strong>
-              <span className="league-crests" aria-hidden>
-                {l.clubs.slice(0, 4).map((c) => <span key={c.short} className="crest tiny" style={{background: c.color, borderColor: c.color2}} />)}
-              </span>
-            </button>
-          ))}
-        </div>
+        {/* The league chosen; tap to fold out the others. */}
+        <button type="button" className={leaguesOpen ? "league-option league-current open" : "league-option league-current"} aria-expanded={leaguesOpen} onClick={() => setLeaguesOpen(!leaguesOpen)}>
+          <FlagIcon code={league.flag} size={26} />
+          <strong>{league.name}</strong>
+          <Icon name="chevron" size={20} />
+        </button>
+        {leaguesOpen && (
+          <div className="league-pick" role="radiogroup" aria-label={t("new.pickLeague")}>
+            {LEAGUES.map((l) => (
+              <button
+                key={l.id}
+                type="button"
+                role="radio"
+                aria-checked={l.id === leagueId}
+                className={l.id === leagueId ? "league-option active" : "league-option"}
+                onClick={() => {
+                  setLeagueId(l.id);
+                  setLeaguesOpen(false);
+                }}
+              >
+                <FlagIcon code={l.flag} size={26} />
+                <strong>{l.name}</strong>
+              </button>
+            ))}
+          </div>
+        )}
 
         <fieldset className="club-pick">
           <legend>{iconize(t("new.pickClub"))}</legend>

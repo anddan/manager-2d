@@ -13,10 +13,15 @@ const SKIN_WEIGHTS: Record<string, number[]> = {
   south: [10, 26, 30, 16, 11, 7],
   BR: [8, 15, 22, 22, 18, 15],
   NG: [0, 0, 4, 14, 36, 46],
+  asia: [22, 40, 28, 8, 2, 0],
+  maghreb: [6, 18, 34, 28, 11, 3],
 };
 const REGION: Record<string, keyof typeof SKIN_WEIGHTS> = {
   SE: "north", NO: "north", DK: "north", FI: "north", DE: "north", NL: "north", GB: "north",
   ES: "south", FR: "south", IT: "south", AR: "south", BR: "BR", NG: "NG",
+  PT: "south", BE: "north", HR: "north", PL: "north", CH: "north", AT: "north", IS: "north", RS: "north",
+  TR: "south", UY: "south", CO: "BR", MX: "south", JP: "asia", KR: "asia", MA: "maghreb",
+  SN: "NG", GH: "NG", CI: "NG", CM: "NG",
 };
 export const HAIR = ["#1c1714", "#3b2618", "#6b4226", "#b8863b", "#e3c27a", "#a8471f", "#9ca3af"];
 /** Men's styles; the order matters, players' looks are picked from it. */

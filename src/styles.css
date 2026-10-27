@@ -756,15 +756,18 @@ button.pick { grid-template-columns: auto 1fr auto auto auto 60px; }
 .zone-tag:hover rect { fill: rgb(11 20 48 / 0.95); }
 
 /* League picker */
-.league-pick { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 6px 0 12px; }
+.league-current { width: 100%; margin: 6px 0; border-color: var(--accent); }
+.league-current .icon:last-child { margin-left: auto; transition: transform 0.2s; }
+.league-current.open .icon:last-child { transform: rotate(180deg); }
+.league-pick { display: grid; grid-template-columns: 1fr; gap: 6px; margin: 6px 0 12px; }
 .league-option {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 8px 10px; cursor: pointer; text-align: left;
+  display: flex; align-items: center; gap: 8px; padding: 10px; cursor: pointer; text-align: left;
   border: 2px solid var(--border); border-radius: 12px; background: var(--surface-2);
 }
 .league-option strong { font-size: 0.9rem; line-height: 1.2; }
 .league-option.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-.league-crests { display: flex; gap: 3px; }
-.league-crests .crest.tiny { width: 12px; height: 12px; border: 2px solid; }
+.new-manager { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+.new-manager .field { flex: 1; min-width: 0; margin: 0; }
 
 /* Nickname on the player profile */
 .nickname { display: flex; align-items: flex-end; gap: 6px; flex-wrap: wrap; }
