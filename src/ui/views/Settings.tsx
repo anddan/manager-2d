@@ -1,9 +1,10 @@
 import {useEffect, useRef, useState} from "react";
+import {Icon, iconize} from "../Icon";
 import {TUTORIAL_VERSION} from "../../game/tutorial";
 import {parseSave} from "../../game/save";
 import {LANGS, useT, type Lang} from "../../i18n";
 import {useGame, useGameState} from "../../store";
-import {Card} from "../common";
+import {Card, Hint} from "../common";
 import {isMuted, onMutedChange, setMuted} from "../sound";
 import {BUILD_ID, checkForUpdate} from "../updates";
 
@@ -48,9 +49,9 @@ export function Settings() {
 
   return (
     <div className="grid">
-      <Card title={`ℹ️ ${t("version.title")}`}>
+      <Card title={<><Icon name="info" size={20} /> {iconize(t("version.title"))}</>}>
         <dl className="kv">
-          <dt>{t("version.built")}</dt>
+          <dt>{iconize(t("version.built"))}</dt>
           <dd><strong>{builtAt}</strong></dd>
         </dl>
         <div className="btn-row">
@@ -68,33 +69,33 @@ export function Settings() {
             🔄 {checking ? t("version.checking") : t("version.check")}
           </button>
         </div>
-        <p className="muted small">{t("version.hint")}</p>
+        <Hint>{iconize(t("version.hint"))}</Hint>
       </Card>
-      <Card title={`🔊 ${t("sound.title")}`}>
+      <Card title={<><Icon name="sound" size={20} /> {iconize(t("sound.title"))}</>}>
         <label className="toggle">
-          <input type="checkbox" className="bench-check" checked={!soundOff} onChange={(e) => setMuted(!e.target.checked)} /> {t("sound.label")}
+          <input type="checkbox" className="bench-check" checked={!soundOff} onChange={(e) => setMuted(!e.target.checked)} /> {iconize(t("sound.label"))}
         </label>
-        <p className="muted small">{t("sound.hint")}</p>
+        <Hint>{iconize(t("sound.hint"))}</Hint>
       </Card>
       <Card title={t("settings.language")}>
         <select className="lang-select" value={lang} onChange={(e) => setLang(e.target.value as Lang)} aria-label={t("settings.language")}>
           {LANGS.map((l) => <option key={l} value={l}>{LANG_NAMES[l]}</option>)}
         </select>
       </Card>
-      <Card title={`🧭 ${t("settings.tour")}`}>
-        <button className="btn" onClick={() => { act((g) => { g.tutorial = {step: 0, firstMatch: true, v: TUTORIAL_VERSION}; }); setView("overview"); }}>{t("settings.tour")}</button>
+      <Card title={<><Icon name="compass" size={20} /> {iconize(t("settings.tour"))}</>}>
+        <button className="btn" onClick={() => { act((g) => { g.tutorial = {step: 0, firstMatch: true, v: TUTORIAL_VERSION}; }); setView("overview"); }}>{iconize(t("settings.tour"))}</button>
       </Card>
       <Card title={t("settings.save")}>
-        <p className="muted">{t("settings.saveHint")}</p>
+        <Hint>{iconize(t("settings.saveHint"))}</Hint>
         <div className="btn-row wrap">
-          <button className="btn" onClick={exportSave}>⬇️ {t("settings.export")}</button>
-          <button className="btn" onClick={() => fileRef.current?.click()}>⬆️ {t("settings.import")}</button>
+          <button className="btn" onClick={exportSave}><Icon name="download" size={18} /> {iconize(t("settings.export"))}</button>
+          <button className="btn" onClick={() => fileRef.current?.click()}><Icon name="upload" size={18} /> {iconize(t("settings.import"))}</button>
           <input ref={fileRef} type="file" accept="application/json" hidden onChange={(e) => e.target.files?.[0] && importSave(e.target.files[0])} />
         </div>
       </Card>
       <Card title={t("settings.newGame")}>
-        <p className="muted">{t("settings.newGameHint")}</p>
-        <button className="btn danger" onClick={() => window.confirm(t("settings.confirmNew")) && quit()}>{t("settings.newGame")}</button>
+        <p className="muted">{iconize(t("settings.newGameHint"))}</p>
+        <button className="btn danger" onClick={() => window.confirm(t("settings.confirmNew")) && quit()}>{iconize(t("settings.newGame"))}</button>
       </Card>
     </div>
   );

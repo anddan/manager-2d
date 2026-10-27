@@ -1,4 +1,5 @@
 // Today's three tasks, their diamonds, and the bonus pack for doing all three.
+import {Icon, iconize, type IconName} from "./Icon";
 import {useState} from "react";
 import {STREAK_PACKS, dayBefore, ENERGY_VIDEOS_PER_DAY, TASKS, claimDailyBonus, claimTask, taskDone, taskProgress, videoForEnergy, type TaskKind} from "../game/daily";
 import type {PlayerPackId} from "../game/packs";
@@ -9,7 +10,7 @@ import {VideoAd} from "./VideoAd";
 import {PackReveal} from "./PackReveal";
 import {diamondBurst} from "./effects";
 
-const ICONS: Record<TaskKind, string> = {win: "🏆", goals: "⚽", order: "📣", talk: "🗣️", train: "🏋️", pack: "🎁", video: "🎬"};
+const ICONS: Record<TaskKind, IconName> = {win: "trophy", goals: "ball", order: "megaphone", talk: "chat", train: "dumbbell", pack: "gift", video: "video"};
 
 export const today = () => new Date().toISOString().slice(0, 10);
 
@@ -49,8 +50,8 @@ export function DailyTasks() {
   // All done for today: folded up behind a tick, to open again if wanted.
   if (daily.bonusClaimed && !open) {
     return (
-      <Card title={<>📋 {t("daily.title")}{streak > 0 && <span className="daily-streak">🔥 {t("daily.streak", {n: streak})}</span>} <span className="daily-tick">✓</span></>} className="span-2 daily-folded" actions={<button className="btn small" onClick={() => setOpen(true)}>{t("daily.show")}</button>}>
-        <p className="muted small">{t("daily.allDone")}</p>
+      <Card title={<><Icon name="clipboard" size={18} /> {iconize(t("daily.title"))}{streak > 0 && <span className="daily-streak"><Icon name="fire" size={18} /> {iconize(t("daily.streak", {n: streak}))}</span>} <span className="daily-tick">✓</span></>} className="span-2 daily-folded" actions={<button className="btn small" onClick={() => setOpen(true)}>{iconize(t("daily.show"))}</button>}>
+        <p className="muted small">{iconize(t("daily.allDone"))}</p>
         {/* The bonus pack just claimed folds the card; its reveal still shows. */}
         {bonusPlayer && <PackReveal playerId={bonusPlayer.id} pack={bonusPlayer.pack} onClose={() => setBonusPlayer(null)} />}
       </Card>
@@ -59,9 +60,9 @@ export function DailyTasks() {
 
   return (
     <Card
-      title={<>📋 {t("daily.title")}{streak > 0 && <span className="daily-streak">🔥 {t("daily.streak", {n: streak})}</span>}{daily.bonusClaimed && <span className="daily-tick">✓</span>}</>}
+      title={<><Icon name="clipboard" size={18} /> {iconize(t("daily.title"))}{streak > 0 && <span className="daily-streak"><Icon name="fire" size={18} /> {iconize(t("daily.streak", {n: streak}))}</span>}{daily.bonusClaimed && <span className="daily-tick">✓</span>}</>}
       className="span-2"
-      actions={daily.bonusClaimed ? <button className="btn small" onClick={() => setOpen(false)}>{t("daily.hide")}</button> : undefined}
+      actions={daily.bonusClaimed ? <button className="btn small" onClick={() => setOpen(false)}>{iconize(t("daily.hide"))}</button> : undefined}
     >
       <ul className="daily-tasks">
         {daily.tasks.map((task, i) => {
@@ -69,47 +70,47 @@ export function DailyTasks() {
           const done = taskDone(task);
           return (
             <li key={task.kind} className={task.claimed ? "daily-task claimed" : "daily-task"}>
-              <span className="daily-icon" aria-hidden>{ICONS[task.kind]}</span>
+              <span className="daily-icon" aria-hidden><Icon name={ICONS[task.kind]} size={24} /></span>
               <span className="daily-text">
-                {tx(`daily.task.${task.kind}`, {n: goal.target})}
+                {iconize(tx(`daily.task.${task.kind}`, {n: goal.target}))}
                 <span className="daily-bar"><span style={{width: `${(task.progress / goal.target) * 100}%`}} /></span>
                 <small className="muted">{task.progress}/{goal.target}</small>
               </span>
               {task.claimed ? (
                 <span className="daily-done">✓</span>
               ) : done ? (
-                <button className="btn primary small" onClick={(e) => claim(i, e.currentTarget)}>{t("daily.claim", {n: goal.reward})}</button>
+                <button className="btn primary small" onClick={(e) => claim(i, e.currentTarget)}>{iconize(t("daily.claim", {n: goal.reward}))}</button>
               ) : task.kind === "video" ? (
-                <button className="btn small" onClick={() => setWatching(true)}>🎬 {t("daily.watch")}</button>
+                <button className="btn small" onClick={() => setWatching(true)}><Icon name="video" size={18} /> {iconize(t("daily.watch"))}</button>
               ) : (
-                <span className="daily-reward">💎 {goal.reward}</span>
+                <span className="daily-reward"><Icon name="diamond" size={16} /> {goal.reward}</span>
               )}
             </li>
           );
         })}
       </ul>
       <div className="daily-bonus">
-        <span>🎁 {daily.bonusClaimed ? t("daily.bonusDone") : t("daily.bonus")}</span>
-        {!daily.bonusClaimed && <button className="btn primary small" disabled={!allClaimed} onClick={bonus}>{t("daily.bonusClaim")}</button>}
+        <span><Icon name="gift" size={18} /> {daily.bonusClaimed ? t("daily.bonusDone") : t("daily.bonus")}</span>
+        {!daily.bonusClaimed && <button className="btn primary small" disabled={!allClaimed} onClick={bonus}>{iconize(t("daily.bonusClaim"))}</button>}
       </div>
       {/* The streak ladder: what keeping it going can bring, and how far to the next step. */}
       <div className="streak-ladder">
         {[...STREAK_PACKS].reverse().map((s) => (
           <div key={s.pack} className={`streak-step ppack-${s.pack} ${streak >= s.days ? "reached" : ""}`}>
-            <strong>{streak >= s.days ? "✓ " : ""}{t("daily.streakDays", {n: s.days})}</strong>
-            <span>{t("daily.streakChance", {pct: Math.round(s.chance * 100), pack: t(`pack.${s.pack}`)})}</span>
+            <strong>{streak >= s.days ? "✓ " : ""}{iconize(t("daily.streakDays", {n: s.days}))}</strong>
+            <span>{iconize(t("daily.streakChance", {pct: Math.round(s.chance * 100), pack: t(`pack.${s.pack}`)}))}</span>
           </div>
         ))}
       </div>
       {(() => {
         const next = [...STREAK_PACKS].reverse().find((s) => streak < s.days);
         return next ? (
-          <p className="streak-next">🔥 {t("daily.streakNext", {n: next.days - streak, pack: t(`pack.${next.pack}`)})}</p>
+          <p className="streak-next"><Icon name="fire" size={18} /> {iconize(t("daily.streakNext", {n: next.days - streak, pack: t(`pack.${next.pack}`)}))}</p>
         ) : (
-          <p className="streak-next">🔥 {t("daily.streakMax")}</p>
+          <p className="streak-next"><Icon name="fire" size={18} /> {iconize(t("daily.streakMax"))}</p>
         );
       })()}
-      <p className="muted small">{t("daily.videos", {n: ENERGY_VIDEOS_PER_DAY - daily.energyVideos})}</p>
+      <p className="muted small">{iconize(t("daily.videos", {n: ENERGY_VIDEOS_PER_DAY - daily.energyVideos}))}</p>
       {watching && <VideoAd onReward={watched} onClose={() => setWatching(false)} />}
       {bonusPlayer && <PackReveal playerId={bonusPlayer.id} pack={bonusPlayer.pack} onClose={() => setBonusPlayer(null)} />}
     </Card>

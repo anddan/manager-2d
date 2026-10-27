@@ -1,7 +1,8 @@
 // Small building blocks shared by the screens.
+import {Icon, iconize} from "./Icon";
 import {GearPicture} from "./Gear";
 import {wornGear} from "../game/gear";
-import {useEffect, useState, type ReactNode} from "react";
+import {useEffect, useRef, useState, type ReactNode} from "react";
 import {createPortal} from "react-dom";
 import {listName} from "../game/helpers";
 import {overall} from "../game/ratings";
@@ -22,6 +23,40 @@ export function Card({title, actions, children, className = ""}: {title?: ReactN
       )}
       {children}
     </section>
+  );
+}
+
+/**
+ * A card's explanation, behind an (i) at the right end of the card's heading row (moved there
+ * from wherever it's written in the card): tapped, it opens in a small dialog. Keeps pages short.
+ * A card without a heading has it at its top right.
+ */
+export function Hint({children}: {children: ReactNode}) {
+  const {t} = useT();
+  const [open, setOpen] = useState(false);
+  const anchor = useRef<HTMLSpanElement>(null);
+  const [head, setHead] = useState<Element | null>(null);
+  useEffect(() => {
+    setHead(anchor.current?.closest(".card")?.querySelector(":scope > .card-head") ?? null);
+  }, []);
+  const button = (
+    <button className={head ? "hint-btn in-head" : "hint-btn"} onClick={() => setOpen(true)} aria-label={t("common.howItWorks")} title={t("common.howItWorks")}>
+      <Icon name="info" size={20} />
+    </button>
+  );
+  return (
+    <>
+      <span ref={anchor} hidden />
+      {head ? createPortal(button, head) : button}
+      {open && (
+        <Modal compact title={t("common.howItWorks")} onClose={() => setOpen(false)}>
+          <div className="hint-text">{children}</div>
+          <div className="btn-row dialog-actions">
+            <button className="btn primary" onClick={() => setOpen(false)}>{iconize(t("common.ok"))}</button>
+          </div>
+        </Modal>
+      )}
+    </>
   );
 }
 
@@ -69,7 +104,7 @@ export function Face({value}: {value: number}) {
 
 export function PosBadge({pos}: {pos: Position}) {
   const {t} = useT();
-  return <span className={`pos pos-${pos}`}>{t(`pos.${pos}`)}</span>;
+  return <span className={`pos pos-${pos}`}>{iconize(t(`pos.${pos}`))}</span>;
 }
 
 /** Flag with the country's name as tooltip; `named` also writes the name out. */

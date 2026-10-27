@@ -1,4 +1,5 @@
 import {ENERGY_COST_EXTRA_TRAINING, MAX_EXTRA_TRAININGS} from "../../game/constants";
+import {Icon, type IconName, iconize} from "../Icon";
 import {listName, userClub} from "../../game/helpers";
 import {taskProgress} from "../../game/daily";
 import {spendEnergy} from "../../game/monetization";
@@ -7,13 +8,14 @@ import {extraTraining, FOCUS_ATTRIBUTES, trainingPlan} from "../../game/training
 import {ATTRIBUTES, INTENSITIES, POSITIONS, TRAINING_FOCUSES, type Attribute, type Intensity, type Player, type TrainingFocus} from "../../game/types";
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
-import {Bar, Card, Delta, PosBadge, SortTh, sortRows, useSort} from "../common";
+import {Bar, Card, Delta, PosBadge, SortTh, sortRows, useSort, Hint} from "../common";
 
 type TrainingSort = "pos" | "name" | "age" | "ovr" | "fitness" | "change" | "focus";
 
-const FOCUS_ICONS: Record<string, string> = {
-  attack: "🎯", defense: "🛡️", passing: "🔀", physical: "💪", conditioning: "🏃", technique: "✨", goalkeeping: "🧤", recovery: "🛌",
+const FOCUS_ICONS: Record<string, IconName> = {
+  attack: "target", defense: "shield", passing: "swap", physical: "dumbbell", conditioning: "run", technique: "sparkle", goalkeeping: "glove", recovery: "moon",
 };
+const MODE_ICONS = {auto: "sparkle", rest: "moon", own: "target"} as const;
 
 function totalChange(p: Player): number {
   return Object.values(p.weeklyChange).reduce((s, v) => s + (v ?? 0), 0);
@@ -80,30 +82,30 @@ export function Training() {
     <div className="grid">
       <Card title={t("train.programme")}>
         {/* One tap: let the assistant plan it, rest, or choose. */}
-        <div className="train-modes" role="radiogroup" aria-label={t("train.programme")}>
+        <div className="real-tabs" role="tablist" aria-label={t("train.programme")}>
           {(["auto", "rest", "own"] as const).map((m) => (
-            <button key={m} role="radio" aria-checked={mode === m} className={`train-mode ${mode === m ? "active" : ""}`} onClick={() => setMode(m)}>
-              <span className="train-mode-icon" aria-hidden>{m === "auto" ? "🤖" : m === "rest" ? "🛌" : "✋"}</span>
-              <strong>{t(`train.mode.${m}`)}</strong>
-              <small>{t(`train.mode.${m}Hint`)}</small>
+            <button key={m} role="tab" aria-selected={mode === m} className={mode === m ? "real-tab active" : "real-tab"} onClick={() => setMode(m)}>
+              <Icon name={MODE_ICONS[m]} size={18} />
+              <span>{iconize(t(`train.mode.${m}`))}</span>
             </button>
           ))}
         </div>
+        <p className="muted small">{iconize(t(`train.mode.${mode}Hint`))}</p>
 
         {mode === "own" && (
           <>
-            <h4 className="train-sub">{t("train.focus")}</h4>
+            <h4 className="train-sub">{iconize(t("train.focus"))}</h4>
             <div className="train-focuses">
               {TRAINING_FOCUSES.filter((f) => f !== "recovery").map((f) => (
                 <button key={f} className={`train-focus ${focus === f ? "active" : ""}`} aria-pressed={focus === f} onClick={() => act((g) => { g.training.focus = f as TrainingFocus; })}>
-                  <span aria-hidden>{FOCUS_ICONS[f]}</span> {t(`focus.${f}`)}
+                  <Icon name={FOCUS_ICONS[f]} size={18} /> {iconize(t(`focus.${f}`))}
                 </button>
               ))}
             </div>
-            <h4 className="train-sub">{t("train.intensity")}</h4>
+            <h4 className="train-sub">{iconize(t("train.intensity"))}</h4>
             <div className="speed-group train-intensity" role="group" aria-label={t("train.intensity")}>
               {INTENSITIES.map((i) => (
-                <button key={i} className={intensity === i ? "chip active" : "chip"} onClick={() => act((g) => { g.training.intensity = i as Intensity; })}>{t(`intensity.${i}`)}</button>
+                <button key={i} className={intensity === i ? "chip active" : "chip"} onClick={() => act((g) => { g.training.intensity = i as Intensity; })}>{iconize(t(`intensity.${i}`))}</button>
               ))}
             </div>
           </>
@@ -111,20 +113,20 @@ export function Training() {
 
         {/* This week, in words: what it trains and how hard. */}
         <div className="train-plan">
-          <span className="train-plan-icon" aria-hidden>{FOCUS_ICONS[plan.focus]}</span>
+          <span className="train-plan-icon" aria-hidden><Icon name={FOCUS_ICONS[plan.focus]} size={26} /></span>
           <div>
-            <strong>{t("train.thisWeek", {focus: t(`focus.${plan.focus}`), intensity: t(`intensity.${plan.intensity}`)})}</strong>
-            {plan.reason && <div className="small">{t(`train.reason.${plan.reason}`)}</div>}
+            <strong>{iconize(t("train.thisWeek", {focus: t(`focus.${plan.focus}`), intensity: t(`intensity.${plan.intensity}`)}))}</strong>
+            {plan.reason && <div className="small">{iconize(t(`train.reason.${plan.reason}`))}</div>}
             <div className="muted small">
-              {Object.keys(FOCUS_ATTRIBUTES[plan.focus]).map((a) => t(`attr.${a as Attribute}`)).join(", ") || t("train.restores")} · {t(`intensity.${plan.intensity}Hint`)}
+              {Object.keys(FOCUS_ATTRIBUTES[plan.focus]).map((a) => t(`attr.${a as Attribute}`)).join(", ") || t("train.restores")} · {iconize(t(`intensity.${plan.intensity}Hint`))}
             </div>
           </div>
         </div>
       </Card>
 
       <Card title={t("train.extra")}>
-        <p className="muted">{t("train.extraHint", {cost: ENERGY_COST_EXTRA_TRAINING, left: extrasLeft})}</p>
-        <button className="btn primary" disabled={extrasLeft <= 0} onClick={extra}>⚡ {t("train.extraButton")}</button>
+        <Hint>{iconize(t("train.extraHint", {cost: ENERGY_COST_EXTRA_TRAINING, left: extrasLeft}))}</Hint>
+        <button className="btn primary" disabled={extrasLeft <= 0} onClick={extra}><Icon name="bolt" size={18} /> {iconize(t("train.extraButton"))}</button>
       </Card>
 
       <Card title={t("train.lastWeek")} className="span-2">
@@ -133,7 +135,7 @@ export function Training() {
             <thead>
               <tr>
                 {th("pos", t("col.pos"), false)}{th("name", t("col.name"), false)}{th("age", t("col.age"), false)}{th("ovr", t("col.ovr"), true, t("col.ovrHint"))}
-                {th("fitness", t("col.fitness"))}{th("change", t("train.change"))}<th>{t("train.biggest")}</th>{th("focus", t("pl.individualFocus"), false)}
+                {th("fitness", t("col.fitness"))}{th("change", t("train.change"))}<th>{iconize(t("train.biggest"))}</th>{th("focus", t("pl.individualFocus"), false)}
               </tr>
             </thead>
             <tbody>
@@ -149,7 +151,7 @@ export function Training() {
                     <td><Delta value={totalChange(p)} digits={2} /></td>
                     <td className="small">
                       {changes.slice(0, 2).map((c) => (
-                        <span key={c.a} className="change-tag">{t(`attr.${c.a}`)} <Delta value={c.d} digits={2} /></span>
+                        <span key={c.a} className="change-tag">{iconize(t(`attr.${c.a}`))} <Delta value={c.d} digits={2} /></span>
                       ))}
                     </td>
                     <td>
@@ -159,7 +161,7 @@ export function Training() {
                         onChange={(e) => act((g) => { g.players[p.id].individualFocus = (e.target.value || null) as Attribute | null; })}
                       >
                         <option value="">–</option>
-                        {ATTRIBUTES.map((a) => <option key={a} value={a}>{t(`attr.${a}`)}</option>)}
+                        {ATTRIBUTES.map((a) => <option key={a} value={a}>{iconize(t(`attr.${a}`))}</option>)}
                       </select>
                     </td>
                   </tr>

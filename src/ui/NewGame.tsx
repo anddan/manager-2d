@@ -1,4 +1,5 @@
 import {useState} from "react";
+import {iconize} from "./Icon";
 import {LEAGUES, leagueById} from "../game/leagues";
 import {PLAYERS_GENDERS, type ManagerLook, type PlayersGender} from "../game/types";
 import {LANGS, useT, type Lang} from "../i18n";
@@ -38,20 +39,20 @@ export function NewGame() {
       <div className="welcome-card">
         <p className="eyebrow">{league.name}</p>
         <h1>⚽ Forza Manager</h1>
-        <p className="muted">{t("new.intro")}</p>
+        <p className="muted">{iconize(t("new.intro"))}</p>
 
         <select className="lang-select" value={lang} onChange={(e) => setLang(e.target.value as Lang)} aria-label={t("settings.language")}>
           {LANGS.map((l) => <option key={l} value={l}>{LANG_NAMES[l]}</option>)}
         </select>
 
-        <h3>{t("new.yourManager")}</h3>
+        <h3>{iconize(t("new.yourManager"))}</h3>
         <label className="field">
-          <span>{t("new.managerName")}</span>
+          <span>{iconize(t("new.managerName"))}</span>
           <input value={name} maxLength={30} onChange={(e) => setName(e.target.value)} placeholder={t("new.namePlaceholder")} />
         </label>
         <ManagerEditor look={look} onChange={setLook} />
 
-        <h3>{t("new.players")}</h3>
+        <h3>{iconize(t("new.players"))}</h3>
         <div className="gender-pick" role="radiogroup" aria-label={t("new.players")}>
           {PLAYERS_GENDERS.map((g) => (
             <button key={g} type="button" role="radio" aria-checked={g === gender} className={g === gender ? "gender-option active" : "gender-option"} onClick={() => setGender(g)}>
@@ -60,12 +61,12 @@ export function NewGame() {
                   <ManagerAvatar key={i} look={s} size={40} tie="transparent" />
                 ))}
               </span>
-              <strong>{t(`new.gender.${g}`)}</strong>
+              <strong>{iconize(t(`new.gender.${g}`))}</strong>
             </button>
           ))}
         </div>
 
-        <h3>{t("new.pickLeague")}</h3>
+        <h3>{iconize(t("new.pickLeague"))}</h3>
         <div className="league-pick" role="radiogroup" aria-label={t("new.pickLeague")}>
           {LEAGUES.map((l) => (
             <button key={l.id} type="button" role="radio" aria-checked={l.id === leagueId} className={l.id === leagueId ? "league-option active" : "league-option"} onClick={() => setLeagueId(l.id)}>
@@ -79,19 +80,19 @@ export function NewGame() {
         </div>
 
         <fieldset className="club-pick">
-          <legend>{t("new.pickClub")}</legend>
+          <legend>{iconize(t("new.pickClub"))}</legend>
           {league.clubs.map((c, i) => (
             <label key={c.name} className={i === club ? "club-option selected" : "club-option"}>
               <input type="radio" name="club" checked={i === club} onChange={() => setClub(i)} />
               <span className="crest" style={{background: c.color, color: c.color2}}>{c.short}</span>
               <span className="club-option-name">{c.name}</span>
-              <span className={`difficulty ${difficulty(i)}`}>{t(`new.difficulty.${difficulty(i)}`)}</span>
+              <span className={`difficulty ${difficulty(i)}`}>{iconize(t(`new.difficulty.${difficulty(i)}`))}</span>
             </label>
           ))}
         </fieldset>
 
         <button className="btn primary big" onClick={() => start(name.trim() || t("new.defaultName"), club, look, gender, leagueId)}>
-          {t("new.start")} ▶
+          {iconize(t("new.start"))} ▶
         </button>
       </div>
     </main>

@@ -1,6 +1,7 @@
 // The guide for new players: the assistant manager points at the next thing to
 // do, with the button or area to use highlighted. Some steps move on by
 // themselves once it's done (open Tactics, pick the best XI, a match starts…).
+import {iconize} from "./Icon";
 import {useEffect, useLayoutEffect, useState, type ReactNode} from "react";
 import {TUTORIAL_STEPS, tutorialNext, tutorialSkip, type TutorialStep} from "../game/tutorial";
 import {ENERGY_COST_FORZA} from "../game/constants";
@@ -13,7 +14,7 @@ import {ManagerAvatar, defaultManagerLook} from "./Avatar";
 import {ControlIcon} from "./MatchViewer";
 
 interface StepSpec {
-  /** What to highlight (and put the bubble next to). */
+  /** What to highlight (and put the bubble next to). "nav:<page>": that page in the menu (see findTarget). */
   target?: string;
   /** Only shown while this is on the page (the step waits otherwise). */
   showWhen?: string;
@@ -25,7 +26,7 @@ interface StepSpec {
 
 const STEPS: Record<TutorialStep, StepSpec> = {
   welcome: {next: true},
-  tactics: {target: '[data-tour="nav-tactics"]'},
+  tactics: {target: "nav:tactics"},
   bestXI: {target: '[data-tour="best-xi"]', showWhen: '[data-tour="best-xi"]', onClick: true},
   lineup: {target: ".pitch-board", showWhen: ".pitch-board", next: true},
   formation: {target: '[data-tour="formation"]', showWhen: '[data-tour="formation"]', next: true},
@@ -37,20 +38,31 @@ const STEPS: Record<TutorialStep, StepSpec> = {
   forza: {target: '[data-tour="orders"]', showWhen: '[data-tour="orders"]', next: true},
   talk: {target: ".match-dialog:has(.tt-options)", showWhen: ".tt-options"},
   // After the match: back to the overview in the menu, where the last step is.
-  toOverview: {target: '[data-tour="nav-overview"]', showWhen: "body:not(:has(.modal-backdrop))"},
+  toOverview: {target: "nav:overview", showWhen: "body:not(:has(.modal-backdrop))"},
   daily: {target: ".daily-tasks", showWhen: ".daily-tasks", next: true},
   // Tapping the manager opens the profile, where the club's name, initials and colours are changed.
   club: {target: ".topbar-manager", next: true, onClick: true},
   // Waits for the profile to be closed again.
-  names: {target: '[data-tour="nav-squad"]', showWhen: "body:not(:has(.modal-backdrop))", next: true},
+  names: {target: "nav:squad", showWhen: "body:not(:has(.modal-backdrop))", next: true},
   // The present: to the Shop, pick up free boots, to the kit room, give them to a player.
-  kit: {target: '[data-tour="nav-shop"]'},
+  kit: {target: "nav:shop"},
   kitBuy: {target: ".gear-offer.free .ppack-btn", showWhen: ".gear-offer.free"},
-  kitBag: {target: '[data-tour="nav-storage"]'},
+  kitBag: {target: "nav:storage"},
   kitGive: {target: ".storage-actions .btn.primary", showWhen: ".storage-actions .btn.primary", onClick: true},
   // In the picker: the best player for them, at the top (the rest greyed out).
   kitPick: {target: ".give-picker .pick-row:first-child .pick", showWhen: ".give-picker", onClick: true},
 };
+
+/**
+ * What a step points at. A page in the menu ("nav:tactics") is its button in the popped-out
+ * arc or in the tabs on top of the page when one shows, else the group in the bar holding it.
+ */
+function findTarget(target: string): Element | null {
+  if (!target.startsWith("nav:")) return document.querySelector(target);
+  const page = target.slice(4);
+  const shown = [...document.querySelectorAll(`[data-tour="nav-${page}"]`)].find((e) => e.getBoundingClientRect().width > 0);
+  return shown ?? document.querySelector(`[data-nav-views~="${page}"]`);
+}
 
 /** The pause / play / fast-forward symbols in a text, drawn as the match's own buttons. */
 const ICONS: Record<string, "pause" | "play" | "forward"> = {"⏸": "pause", "▶": "play", "⏩": "forward"};
@@ -107,7 +119,7 @@ export function TutorialCoach() {
     const track = () => {
       const shown = !spec.showWhen || !!document.querySelector(spec.showWhen);
       setPresent(shown);
-      const el = spec.target ? document.querySelector(spec.target) : null;
+      const el = spec.target ? findTarget(spec.target) : null;
       document.querySelectorAll(".tour-target").forEach((e) => e !== el && e.classList.remove("tour-target"));
       if (el && shown) {
         el.classList.add("tour-target");
@@ -128,7 +140,7 @@ export function TutorialCoach() {
     if (!spec?.target) return;
     let tries = 0;
     const id = setInterval(() => {
-      const el = document.querySelector(spec.target!);
+      const el = findTarget(spec.target!);
       if (el || ++tries > 20) {
         clearInterval(id);
         // Not on a maximised match: it fills the screen already, and scrolling the box behind it moves it.
@@ -167,12 +179,12 @@ export function TutorialCoach() {
     <div className={`tour-bubble ${rect ? "" : "centred"}`} style={style} role="dialog" aria-live="polite">
       <div className="tour-head">
         <ManagerAvatar look={look} size={36} tie="#16a34a" />
-        <strong>{t("tour.coach")}</strong>
+        <strong>{iconize(t("tour.coach"))}</strong>
         <span className="tour-count">{stepIndex + 1}/{TUTORIAL_STEPS.length}</span>
       </div>
       <p>{withIcons(t(stepText(game, step, view), {name: game.managerName, pct: Math.round((FORZA.boost - 1) * 100), minutes: FORZA.minutes, energy: ENERGY_COST_FORZA, ...weekParams(game)}))}</p>
       <div className="tour-actions">
-        <button className="btn small" onClick={() => act((g) => tutorialSkip(g))}>{t("tour.skip")}</button>
+        <button className="btn small" onClick={() => act((g) => tutorialSkip(g))}>{iconize(t("tour.skip"))}</button>
         {spec.next && (
           <button className="btn primary small" onClick={() => act((g) => tutorialNext(g, step))}>
             {stepIndex === TUTORIAL_STEPS.length - 1 ? t("tour.done") : t("tour.next")}

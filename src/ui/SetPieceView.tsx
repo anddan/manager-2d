@@ -7,6 +7,7 @@
 // taker runs up and strikes, the ball curls in flight, the wall jumps and the
 // keeper launches towards where they guessed.
 // Corners: tap the zone the cross should go to; each zone shows who goes up.
+import {iconize} from "./Icon";
 import {useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode} from "react";
 import {shortName} from "../game/helpers";
 import {
@@ -280,7 +281,7 @@ function ShotView({sp, role, taker, keeper, defenders, shooters, keepers, outcom
     <div className="setpiece">
       <div className="setpiece-head">
         <strong>{title}</strong>
-        {!outcome && <span className="clock">{t("sp.seconds", {s: left})}</span>}
+        {!outcome && <span className="clock">{iconize(t("sp.seconds", {s: left}))}</span>}
       </div>
       <div className="sp-duel">
         <span className="sp-duelist">
@@ -396,16 +397,16 @@ function ShotView({sp, role, taker, keeper, defenders, shooters, keepers, outcom
         <g transform={`translate(${takerAt.x} ${takerAt.y}) scale(1.05)`} opacity={!outcome && ours && drag ? 0.55 : 1}>
           <Figure look={takerLook} kit={shooters.color} trim={shooters.color2} facing="back" pose={takerPose} name={shortName(taker)} number={NUMBERS[taker.position]} />
         </g>
-        {goalNow && <text x={CENTER} y={8} className="sp-goal-flash">{t("match.goal")}</text>}
+        {goalNow && <text x={CENTER} y={8} className="sp-goal-flash">{iconize(t("match.goal"))}</text>}
       </svg>
 
       {outcome && showResult ? (
-        <p className={`sp-result sp-${outcome.result}`}>{t(`sp.result.${outcome.result}`)}</p>
+        <p className={`sp-result sp-${outcome.result}`}>{iconize(t(`sp.result.${outcome.result}`))}</p>
       ) : outcome ? (
         <p className="sp-result">&nbsp;</p>
       ) : (
         <div className="btn-row">
-          <button className="btn" onClick={() => onAnswer(null)}>{t("sp.auto")}</button>
+          <button className="btn" onClick={() => onAnswer(null)}>{iconize(t("sp.auto"))}</button>
         </div>
       )}
     </div>
@@ -584,10 +585,10 @@ function CornerView({sp, taker, attackers = [], defenders = [], keeper, shooters
   return (
     <div className="setpiece">
       <div className="setpiece-head">
-        <strong>{t("sp.cornerUs")}</strong>
-        {!outcome && <span className="clock">{t("sp.seconds", {s: left})}</span>}
+        <strong>{iconize(t("sp.cornerUs"))}</strong>
+        {!outcome && <span className="clock">{iconize(t("sp.seconds", {s: left}))}</span>}
       </div>
-      <p className="muted small">{t("sp.cornerHint", {name: shortName(taker)})}</p>
+      <p className="muted small">{iconize(t("sp.cornerHint", {name: shortName(taker)}))}</p>
       <svg className="setpiece-goal corner" viewBox="0 0 120 75" role="img" aria-label={t("sp.cornerUs")}>
         <defs>
           <linearGradient id="corner-stand" x1="0" y1="0" x2="0" y2="1">
@@ -657,7 +658,7 @@ function CornerView({sp, taker, attackers = [], defenders = [], keeper, shooters
             return (
               <g key={`l${z}`} className="zone-tag" onClick={() => pick(z)}>
                 <rect x={at.x - 9} y={labelY - 3.2} width={18} height={6.2} rx={1.2} />
-                <text x={at.x} y={labelY - 0.4} className="zone-label">{t(`sp.zone.${z}`)}</text>
+                <text x={at.x} y={labelY - 0.4} className="zone-label">{iconize(t(`sp.zone.${z}`))}</text>
                 <text x={at.x} y={labelY + 2.3} className="zone-player">{(who ? shortName(who) : undefined) ?? "?"}</text>
               </g>
             );
@@ -673,17 +674,17 @@ function CornerView({sp, taker, attackers = [], defenders = [], keeper, shooters
         <g transform={`translate(${ball.x} ${ball.y}) rotate(${spin})`}>
           <Football r={ball.r} />
         </g>
-        {goalNow && <text x={C_CENTER} y={9} className="sp-goal-flash">{t("match.goal")}</text>}
+        {goalNow && <text x={C_CENTER} y={9} className="sp-goal-flash">{iconize(t("match.goal"))}</text>}
       </svg>
       {outcome && showResult ? (
         <p className={`sp-result sp-${outcome.result}`}>
-          {t(`sp.result.${outcome.result}`)} {header && outcome.result !== "cleared" && <small className="muted">({shortName(header)})</small>}
+          {iconize(t(`sp.result.${outcome.result}`))} {header && outcome.result !== "cleared" && <small className="muted">({shortName(header)})</small>}
         </p>
       ) : outcome ? (
         <p className="sp-result">&nbsp;</p>
       ) : (
         <div className="btn-row">
-          <button className="btn" onClick={() => onAnswer(null)}>{t("sp.auto")}</button>
+          <button className="btn" onClick={() => onAnswer(null)}>{iconize(t("sp.auto"))}</button>
         </div>
       )}
     </div>

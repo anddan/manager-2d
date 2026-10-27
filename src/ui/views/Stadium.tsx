@@ -1,5 +1,6 @@
 // The stadium, seen from above: tap a stand (or the kiosks, or the shop) to see
 // what the next level gives and build it. Locked until the league is won.
+import {Icon, iconize} from "../Icon";
 import {useState} from "react";
 import {
   KIOSK_SPEND,
@@ -34,12 +35,12 @@ export function Stadium() {
     const best = game.history.length ? Math.min(...game.history.map((h) => h.userPosition)) : undefined;
     const preview: StadiumState = {stands: {north: 0, south: 0, west: 0, east: 0}, kiosks: 0, shop: 0, base: club.capacity};
     return (
-      <Card title={`🏟️ ${t("stadium.lockedTitle")}`}>
+      <Card title={<><Icon name="stadium" size={20} /> {iconize(t("stadium.lockedTitle"))}</>}>
         <div className="stadium-locked">
           <StadiumDrawing st={preview} color={club.color} trim={club.color2} />
           <div className="stadium-lock-badge" aria-hidden>🔒</div>
         </div>
-        <p>{t("stadium.lockedText")}</p>
+        <p>{iconize(t("stadium.lockedText"))}</p>
         <p className="muted small">{best !== undefined ? t("stadium.bestFinish", {place: best}) : t("stadium.noFinish")}</p>
       </Card>
     );
@@ -67,18 +68,18 @@ function StadiumBuilder() {
   const partName = (part: StadiumPart) => t(`stadium.part.${part}` as TKey);
   return (
     <div className="grid">
-      <Card title={`🏟️ ${t("stadium.title")}`}>
+      <Card title={<><Icon name="stadium" size={20} /> {iconize(t("stadium.title"))}</>}>
         <StadiumDrawing st={st} color={club.color} trim={club.color2} picked={picked} onPick={setPicked} />
         <dl className="kv">
-          <dt>{t("stadium.capacity")}</dt><dd><strong>{t("stadium.seats", {n: stadiumCapacity(st)})}</strong></dd>
+          <dt>{iconize(t("stadium.capacity"))}</dt><dd><strong>{iconize(t("stadium.seats", {n: stadiumCapacity(st)}))}</strong></dd>
         </dl>
-        {st.project && <p className="stadium-project">{t("stadium.building", {part: `stadium.part.${st.project.part}`, weeks: st.project.weeksLeft})}</p>}
-        {st.kiosks > 0 && <p className="muted small">{t("stadium.kiosksNow", {spend: KIOSK_SPEND * st.kiosks})}</p>}
-        {st.shop > 0 && <p className="muted small">{t("stadium.shopNow", {weekly: SHOP_WEEKLY[st.shop]})}</p>}
+        {st.project && <p className="stadium-project">{iconize(t("stadium.building", {part: `stadium.part.${st.project.part}`, weeks: st.project.weeksLeft}))}</p>}
+        {st.kiosks > 0 && <p className="muted small">{iconize(t("stadium.kiosksNow", {spend: KIOSK_SPEND * st.kiosks}))}</p>}
+        {st.shop > 0 && <p className="muted small">{iconize(t("stadium.shopNow", {weekly: SHOP_WEEKLY[st.shop]}))}</p>}
       </Card>
 
       <Card title={picked ? partName(picked) : t("stadium.title")}>
-        {!picked && <p className="muted">{t("stadium.pick")}</p>}
+        {!picked && <p className="muted">{iconize(t("stadium.pick"))}</p>}
         <ul className="stadium-parts">
           {([...STANDS, "kiosks", "shop"] as StadiumPart[]).map((part) => {
             const level = partLevel(st, part);
@@ -102,13 +103,13 @@ function StadiumBuilder() {
                 </button>
                 {open && (
                   <div className="stadium-part-body">
-                    <p className="small">{t("stadium.level", {level, max})}{cost !== undefined && <> · {gain}</>}</p>
+                    <p className="small">{iconize(t("stadium.level", {level, max}))}{cost !== undefined && <> · {gain}</>}</p>
                     {cost === undefined ? (
-                      <p className="strong">{t("stadium.maxed")}</p>
+                      <p className="strong">{iconize(t("stadium.maxed"))}</p>
                     ) : (
                       <>
                         <button className="btn primary" disabled={!!st.project || club.cash < cost} onClick={() => build(part)}>
-                          🏗️ {t("stadium.build", {cost})}
+                          <Icon name="hammer" size={18} /> {iconize(t("stadium.build", {cost}))}
                         </button>
                         <p className="muted small">{st.project ? t("stadium.busy") : club.cash < cost ? t("stadium.noMoney") : t("stadium.buildTime", {weeks: buildWeeks(part)})}</p>
                       </>

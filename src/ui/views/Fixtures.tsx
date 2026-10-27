@@ -1,4 +1,6 @@
 import {useState} from "react";
+import type {ReactNode} from "react";
+import {Icon, iconize} from "../Icon";
 import {CUP_WEEKS, SEASON_WEEKS} from "../../game/constants";
 import {CUP_STAGES, cupAlive} from "../../game/cup";
 import {cupFixturesInStage, isCupFixture, roundInWeek} from "../../game/helpers";
@@ -11,7 +13,7 @@ import {FlagIcon} from "../Flag";
 /** One week in the calendar: a league round or a Champions Cup round. */
 interface Matchday {
   week: number;
-  title: string;
+  title: ReactNode;
   fixtures: Fixture[];
   /** A cup round not drawn yet, that the user is still in. */
   toBeDrawn?: boolean;
@@ -39,7 +41,7 @@ export function Fixtures() {
       const all = cupFixturesInStage(game, stage);
       days.push({
         week,
-        title: `🏆 ${t("cup.name")} · ${t(CUP_STAGES[stage])}`,
+        title: <><Icon name="trophy" size={18} /> {iconize(t("cup.name"))} · {iconize(t(CUP_STAGES[stage]))}</>,
         fixtures: all.filter((f) => !onlyMine || mine(f)),
         toBeDrawn: all.length === 0 && inCup,
       });
@@ -53,10 +55,10 @@ export function Fixtures() {
   const day = (d: Matchday) => (
     <div key={d.week} className={d === next ? "round current" : "round"}>
       <h3>
-        {d.title} <small className="muted">· {t("cup.week", {week: d.week})}</small>
+        {d.title} <small className="muted">· {iconize(t("cup.week", {week: d.week}))}</small>
         {d === next && <span className="next-tag">{d.week === game.week ? t("fx.thisWeek") : t("fx.next")}</span>}
       </h3>
-      {d.toBeDrawn && d.fixtures.length === 0 && <p className="muted small">{t("fx.toBeDrawn")}</p>}
+      {d.toBeDrawn && d.fixtures.length === 0 && <p className="muted small">{iconize(t("fx.toBeDrawn"))}</p>}
       {d.fixtures.map((f) => <FixtureRow key={f.id} f={f} />)}
     </div>
   );
@@ -67,14 +69,14 @@ export function Fixtures() {
         title={t("nav.fixtures")}
         actions={
           <label className="toggle">
-            <input type="checkbox" className="bench-check" checked={onlyMine} onChange={(e) => setOnlyMine(e.target.checked)} /> {t("fx.onlyMine")}
+            <input type="checkbox" className="bench-check" checked={onlyMine} onChange={(e) => setOnlyMine(e.target.checked)} /> {iconize(t("fx.onlyMine"))}
           </label>
         }
       >
         <div className="fixture-list">
-          {upcoming.length === 0 && <p className="muted">{t("fx.seasonDone")}</p>}
+          {upcoming.length === 0 && <p className="muted">{iconize(t("fx.seasonDone"))}</p>}
           {upcoming.map(day)}
-          {played.length > 0 && <h4 className="fx-divider">{t("fx.played")}</h4>}
+          {played.length > 0 && <h4 className="fx-divider">{iconize(t("fx.played"))}</h4>}
           {played.map(day)}
         </div>
       </Card>
@@ -102,7 +104,7 @@ export function FixtureRow({f}: {f: Fixture}) {
       <span className="fx-team home">{flag(home)} {home.name} <span className="crest tiny" style={{background: home.color}} /></span>
       <span className={`fx-score ${result ? `form-${result}` : ""}`}>
         {f.played ? `${f.homeGoals} – ${f.awayGoals}` : "–"}
-        {cup?.penalties && <small className="fx-pens">{t("fx.penalties", {h: cup.penalties[0], a: cup.penalties[1]})}</small>}
+        {cup?.penalties && <small className="fx-pens">{iconize(t("fx.penalties", {h: cup.penalties[0], a: cup.penalties[1]}))}</small>}
       </span>
       <span className="fx-team away"><span className="crest tiny" style={{background: away.color}} /> {away.name} {flag(away)}</span>
       {report && <button className="btn small" onClick={() => watchMatch(f.id)}>▶</button>}

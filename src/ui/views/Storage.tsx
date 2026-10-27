@@ -1,5 +1,6 @@
 // The kit room: boots and gloves in the bag (put one on a player straight from
 // here), and who is wearing what (take it off again).
+import {Icon, iconize} from "../Icon";
 import {useState} from "react";
 import {GEAR_ICON, gearResale, sellGear, equipGear, gearFits, gearIn, gearSlot, unequipGear, wornGear, type GearItem, type GearSlot} from "../../game/gear";
 import {effectiveRating} from "../../game/ratings";
@@ -8,7 +9,7 @@ import {listName} from "../../game/helpers";
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
 import {Avatar} from "../Avatar";
-import {Bar, Card, Empty, Flag, FormArrow, Modal, PosBadge, StatusIcons} from "../common";
+import {Bar, Card, Empty, Flag, FormArrow, Modal, PosBadge, StatusIcons, Hint} from "../common";
 import {GearCard, GearPicture} from "../Gear";
 
 export function Storage() {
@@ -47,18 +48,18 @@ export function Storage() {
 
   return (
     <div className="grid">
-      <Card title={`👟 ${t("storage.bag", {n: bag.length})}`} className="span-2" actions={<button className="btn small" onClick={() => setView("shop")}>🛒 {t("nav.shop")}</button>}>
-        <p className="muted small">{t("storage.hint")}</p>
+      <Card title={<><Icon name="boot" size={20} /> {iconize(t("storage.bag", {n: bag.length}))}</>} className="span-2" actions={<button className="btn small" onClick={() => setView("shop")}><Icon name="cart" size={18} /> {iconize(t("nav.shop"))}</button>}>
+        <Hint>{iconize(t("storage.hint"))}</Hint>
         {bag.length === 0 ? (
-          <Empty>{t("storage.empty")}</Empty>
+          <Empty>{iconize(t("storage.empty"))}</Empty>
         ) : (
           <div className="gear-cards">
             {bag.map((item, i) => (
               <div key={i} className="gear-offer">
                 <GearCard item={item} />
                 <div className="btn-row storage-actions">
-                  <button className="btn primary small" onClick={() => setGiving(i)}>{GEAR_ICON[item.kind]} {t("storage.give")}</button>
-                  <button className="btn small" onClick={() => setSelling(i)}>💰 {t("storage.sell")}</button>
+                  <button className="btn primary small" onClick={() => setGiving(i)}>{GEAR_ICON[item.kind]} {iconize(t("storage.give"))}</button>
+                  <button className="btn small" onClick={() => setSelling(i)}><Icon name="coins" size={18} /> {iconize(t("storage.sell"))}</button>
                 </div>
               </div>
             ))}
@@ -73,33 +74,33 @@ export function Storage() {
       )}
 
       {sellingItem && (
-        <Modal compact title={`💰 ${t("storage.sellTitle")}`} onClose={() => setSelling(null)}>
+        <Modal compact title={<><Icon name="coins" size={20} /> {iconize(t("storage.sellTitle"))}</>} onClose={() => setSelling(null)}>
           <div className="storage-sell">
             <GearCard item={sellingItem} small />
-            <p>{t("storage.sellText", {item: `${t(`gear.kind.${sellingItem.kind}`)} · ${t(`gear.tier.${sellingItem.tier}`)}`, price: resale(sellingItem)})}</p>
+            <p>{iconize(t("storage.sellText", {item: `${t(`gear.kind.${sellingItem.kind}`)} · ${t(`gear.tier.${sellingItem.tier}`)}`, price: resale(sellingItem)}))}</p>
           </div>
           <div className="btn-row dialog-actions">
-            <button className="btn" onClick={() => setSelling(null)}>{t("common.cancel")}</button>
-            <button className="btn primary" onClick={sell}>{t("storage.sellYes", {price: resale(sellingItem)})}</button>
+            <button className="btn" onClick={() => setSelling(null)}>{iconize(t("common.cancel"))}</button>
+            <button className="btn primary" onClick={sell}>{iconize(t("storage.sellYes", {price: resale(sellingItem)}))}</button>
           </div>
         </Modal>
       )}
 
-      <Card title={`🏃 ${t("storage.wearing", {n: wearing.length})}`} className="span-2">
+      <Card title={<><Icon name="run" size={20} /> {iconize(t("storage.wearing", {n: wearing.length}))}</>} className="span-2">
         {wearing.length === 0 ? (
-          <Empty>{t("storage.nobody")}</Empty>
+          <Empty>{iconize(t("storage.nobody"))}</Empty>
         ) : (
           <ul className="plain-list storage-list">
             {wearing.map(({player: p, slot, item}) => (
               <li key={p.id + slot} className="storage-row">
                 <GearPicture item={item} size={item.kind === "gloves" ? 26 : item.kind === "shin" ? 20 : 38} />
                 <span className="storage-what">
-                  <strong>{t(`gear.kind.${item.kind}`)} · {t(`gear.tier.${item.tier}`)}</strong>
+                  <strong>{iconize(t(`gear.kind.${item.kind}`))} · {iconize(t(`gear.tier.${item.tier}`))}</strong>
                   <button className="link" onClick={() => openPlayer(p.id)}>
                     <PosBadge pos={p.position} /> {listName(p)}
                   </button>
                 </span>
-                <button className="btn small" onClick={() => act((g) => unequipGear(g, p.id, slot))}>{t("gear.takeOff")}</button>
+                <button className="btn small" onClick={() => act((g) => unequipGear(g, p.id, slot))}>{iconize(t("gear.takeOff"))}</button>
               </li>
             ))}
           </ul>
@@ -124,7 +125,7 @@ function GivePicker({item, squad, onPick}: {item: GearItem; squad: Player[]; onP
   const fits = squad
     .filter((p) => gearFits(p, item.kind))
     .sort((a, b) => lifts(b) - lifts(a) || effectiveRating(b, b.position) - effectiveRating(a, a.position));
-  if (fits.length === 0) return <Empty>{t("storage.nobodyFits")}</Empty>;
+  if (fits.length === 0) return <Empty>{iconize(t("storage.nobodyFits"))}</Empty>;
   return (
     <ul className="pick-list give-picker">
       {fits.map((p) => {

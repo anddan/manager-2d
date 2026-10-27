@@ -1,4 +1,5 @@
 import {CUP_STAGES} from "../../game/cup";
+import {Icon, iconize} from "../Icon";
 import {BoardWarningBanner} from "../BoardWarning";
 import {isCupFixture, nextUserFixture, userClub} from "../../game/helpers";
 import {leaguePosition, standings} from "../../game/league";
@@ -32,24 +33,24 @@ export function Overview() {
         {next ? (
           <div className="ov-next">
             {/* What it is first, a little bigger: the cup round or the league round. */}
-            <div className="ov-next-what">{isCupFixture(next) ? `🏆 ${t("cup.name")} · ${t(CUP_STAGES[next.stage])}` : t("ov.round", {round: next.round})}</div>
+            <div className="ov-next-what">{isCupFixture(next) ? <><Icon name="trophy" size={20} /> {iconize(t("cup.name"))} · {iconize(t(CUP_STAGES[next.stage]))}</> : t("ov.round", {round: next.round})}</div>
             <Team id={next.homeId} />
             <span className="vs">–</span>
             <Team id={next.awayId} />
             <p className="muted">
-              {next.homeId === club.id ? t("ov.home") : t("ov.away")} · {t(matchup(teamOvr(game, club.id) - teamOvr(game, next.homeId === club.id ? next.awayId : next.homeId)))}
+              {next.homeId === club.id ? t("ov.home") : t("ov.away")} · {iconize(t(matchup(teamOvr(game, club.id) - teamOvr(game, next.homeId === club.id ? next.awayId : next.homeId))))}
             </p>
-            <button className="btn" onClick={() => setView("tactics")}>📋 {t("nav.tactics")}</button>
+            <button className="btn" onClick={() => setView("tactics")}><Icon name="clipboard" size={18} /> {iconize(t("nav.tactics"))}</button>
           </div>
         ) : (
-          <Empty>{t("ov.noMatch")}</Empty>
+          <Empty>{iconize(t("ov.noMatch"))}</Empty>
         )}
       </Card>
 
-      <Card title={t("ov.league")} actions={<button className="btn small" onClick={() => setView("table")}>{t("common.more")}</button>}>
+      <Card title={t("ov.league")} actions={<button className="btn small" onClick={() => setView("table")}>{iconize(t("common.more"))}</button>}>
         <div className="big-number">{position}<small>/{table.length}</small></div>
-        <p className="muted">{t("ov.record", {w: row.won, d: row.drawn, l: row.lost, pts: row.points})}</p>
-        <div className="form-row">{row.form.map((f, i) => <span key={i} className={`form-dot form-${f}`}>{tx(`form.${f}`)}</span>)}</div>
+        <p className="muted">{iconize(t("ov.record", {w: row.won, d: row.drawn, l: row.lost, pts: row.points}))}</p>
+        <div className="form-row">{row.form.map((f, i) => <span key={i} className={`form-dot form-${f}`}>{iconize(tx(`form.${f}`))}</span>)}</div>
       </Card>
 
       <Card title={t("ov.lastMatch")}>
@@ -58,23 +59,23 @@ export function Overview() {
             <p className="score-line">
               {game.clubs[lastReport.homeId].name} <strong>{lastReport.homeGoals} – {lastReport.awayGoals}</strong> {game.clubs[lastReport.awayId].name}
             </p>
-            <button className="btn small" onClick={() => watchMatch(lastReport.fixtureId)}>▶ {t("fx.watch")}</button>
+            <button className="btn small" onClick={() => watchMatch(lastReport.fixtureId)}><Icon name="play" size={18} /> {iconize(t("fx.watch"))}</button>
           </div>
         ) : (
-          <Empty>{t("ov.noMatchYet")}</Empty>
+          <Empty>{iconize(t("ov.noMatchYet"))}</Empty>
         )}
       </Card>
 
-      <Card title={t("ov.economy")} actions={<button className="btn small" onClick={() => setView("finance")}>{t("common.more")}</button>}>
+      <Card title={t("ov.economy")} actions={<button className="btn small" onClick={() => setView("finance")}>{iconize(t("common.more"))}</button>}>
         <dl className="kv">
-          <dt>{t("fin.cash")}</dt><dd>{money(club.cash)}</dd>
-          <dt>{t("fin.transferBudget")}</dt><dd>{money(club.transferBudget)}</dd>
-          <dt>{t("fin.wageBill")}</dt><dd className={bill > club.wageBudget ? "neg" : ""}>{money(bill)} / {money(club.wageBudget)}</dd>
+          <dt>{iconize(t("fin.cash"))}</dt><dd>{money(club.cash)}</dd>
+          <dt>{iconize(t("fin.transferBudget"))}</dt><dd>{money(club.transferBudget)}</dd>
+          <dt>{iconize(t("fin.wageBill"))}</dt><dd className={bill > club.wageBudget ? "neg" : ""}>{money(bill)} / {money(club.wageBudget)}</dd>
         </dl>
       </Card>
 
       <Card title={t("ov.unavailable")}>
-        {injured.length === 0 ? <Empty>{t("ov.allFit")}</Empty> : (
+        {injured.length === 0 ? <Empty>{iconize(t("ov.allFit"))}</Empty> : (
           <ul className="plain-list">
             {injured.map((p) => (
               <li key={p.id}>
@@ -87,14 +88,14 @@ export function Overview() {
       </Card>
 
       <Card title={t("ov.mood")}>
-        {unhappy.length === 0 ? <Empty>{t("ov.allHappy")}</Empty> : (
+        {unhappy.length === 0 ? <Empty>{iconize(t("ov.allHappy"))}</Empty> : (
           <ul className="plain-list">
             {unhappy.slice(0, 6).map((p) => (
               <li key={p.id}><Face value={p.happiness} /> <PlayerLink player={p} /></li>
             ))}
           </ul>
         )}
-        <p className="muted small">{t("ov.squadSize", {n: squad.length})}</p>
+        <p className="muted small">{iconize(t("ov.squadSize", {n: squad.length}))}</p>
       </Card>
     </div>
   );
@@ -113,7 +114,7 @@ function Team({id}: {id: string}) {
     <div className="team">
       <span className="crest big" style={{background: c.color, color: c.color2}}>{c.short}</span>
       <span>{c.name}</span>
-      <span className="team-ovr">{t("tac.teamOvr")} <strong>{teamOvr(game, id)}</strong></span>
+      <span className="team-ovr">{iconize(t("tac.teamOvr"))} <strong>{teamOvr(game, id)}</strong></span>
     </div>
   );
 }

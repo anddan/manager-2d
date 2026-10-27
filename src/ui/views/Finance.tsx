@@ -1,11 +1,12 @@
 import {TICKET_ADJUST, TICKET_PRICE, crowdFor, fairPrice, operatingCost, sumLines} from "../../game/finance";
+import {Icon, iconize} from "../Icon";
 import {BoardWarningBanner} from "../BoardWarning";
 import {fixtureWeek, userClub} from "../../game/helpers";
 import {wageBill} from "../../game/ratings";
 import {FINANCE_CATEGORIES, type FinanceLines} from "../../game/types";
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
-import {Card, Empty, Modal, NumberInput} from "../common";
+import {Card, Empty, Modal, NumberInput, Hint} from "../common";
 import {loanLeft, loanOffers, repayLoan, takeLoan} from "../../game/loans";
 import {useState} from "react";
 
@@ -44,24 +45,24 @@ export function Finance() {
       <BoardWarningBanner />
       <Card title={t("fin.overview")}>
         <dl className="kv">
-          <dt>{t("fin.cash")}</dt><dd className={club.cash < 0 ? "neg" : ""}>{money(club.cash)}</dd>
-          <dt>{t("fin.transferBudget")}</dt><dd>{money(club.transferBudget)}</dd>
-          <dt>{t("fin.wageBudget")}</dt><dd>{money(club.wageBudget)} {t("common.perWeek")}</dd>
-          <dt>{t("fin.wageBill")}</dt><dd className={bill > club.wageBudget ? "neg" : ""}>{money(bill)} {t("common.perWeek")}</dd>
+          <dt>{iconize(t("fin.cash"))}</dt><dd className={club.cash < 0 ? "neg" : ""}>{money(club.cash)}</dd>
+          <dt>{iconize(t("fin.transferBudget"))}</dt><dd>{money(club.transferBudget)}</dd>
+          <dt>{iconize(t("fin.wageBudget"))}</dt><dd>{money(club.wageBudget)} {iconize(t("common.perWeek"))}</dd>
+          <dt>{iconize(t("fin.wageBill"))}</dt><dd className={bill > club.wageBudget ? "neg" : ""}>{money(bill)} {iconize(t("common.perWeek"))}</dd>
         </dl>
       </Card>
 
       <Card title={t("fin.stadium")}>
         <dl className="kv">
-          <dt>{t("fin.capacity")}</dt><dd>{club.capacity.toLocaleString()}</dd>
-          <dt>{t("fin.priceMode")}</dt>
+          <dt>{iconize(t("fin.capacity"))}</dt><dd>{club.capacity.toLocaleString()}</dd>
+          <dt>{iconize(t("fin.priceMode"))}</dt>
           <dd>
             <button className={`switch ${club.ticketAuto ? "on" : ""}`} role="switch" aria-checked={!!club.ticketAuto} onClick={toggleAuto}>
               <span className="switch-track" aria-hidden><span className="switch-knob" /></span>
               {club.ticketAuto ? t("fin.priceAuto") : t("fin.priceManual")}
             </button>
           </dd>
-          <dt>{t("fin.ticketPrice")}</dt>
+          <dt>{iconize(t("fin.ticketPrice"))}</dt>
           {club.ticketAuto ? (
             <dd className="price-stepper">
               <button className="btn small" aria-label={t("fin.priceDown")} disabled={adjust <= TICKET_ADJUST.min} onClick={() => setAdjust(adjust - TICKET_ADJUST.step)}>▼</button>
@@ -78,27 +79,27 @@ export function Finance() {
               <button className="btn small" aria-label={t("fin.priceUp")} disabled={club.ticketPrice >= TICKET_PRICE.max} onClick={() => setPrice(club.ticketPrice + 1)}>▲</button>
             </dd>
           )}
-          {nextHome && <dt>{t("fin.nextHome")}</dt>}
+          {nextHome && <dt>{iconize(t("fin.nextHome"))}</dt>}
           {nextHome && (
             <dd>
-              {t("fin.vsOpponent", {opponent: game.clubs[nextHome.awayId].name})}
-              {crowd.appeal >= 1.3 && <span className="big-match"> ⭐ {t("fin.bigMatch")}</span>}
+              {iconize(t("fin.vsOpponent", {opponent: game.clubs[nextHome.awayId].name}))}
+              {crowd.appeal >= 1.3 && <span className="big-match"> <Icon name="star" size={18} /> {iconize(t("fin.bigMatch"))}</span>}
             </dd>
           )}
-          <dt>{t("fin.attendance")}</dt>
+          <dt>{iconize(t("fin.attendance"))}</dt>
           <dd className={crowd.rate >= 0.995 ? "pos-num" : crowd.rate < 0.6 ? "neg" : ""}>
-            {t("fin.crowd", {fans: crowd.fans, pct: Math.round(crowd.rate * 100)})}{crowd.rate >= 0.995 ? ` · ${t("match.soldOut")}` : ""}
+            {iconize(t("fin.crowd", {fans: crowd.fans, pct: Math.round(crowd.rate * 100)}))}{crowd.rate >= 0.995 ? ` · ${t("match.soldOut")}` : ""}
           </dd>
-          <dt>{t("fin.perHomeGame")}</dt><dd>{money(crowd.fans * crowd.price)}</dd>
-          <dt>{t("fin.fairPrice")}</dt><dd>{money(fair)}</dd>
-          <dt>{t("fin.sponsor")}</dt><dd>{money(club.sponsorWeekly)} {t("common.perWeek")}</dd>
-          <dt>{t("fin.operations")}</dt><dd>{money(-operatingCost(club))} {t("common.perWeek")}</dd>
+          <dt>{iconize(t("fin.perHomeGame"))}</dt><dd>{money(crowd.fans * crowd.price)}</dd>
+          <dt>{iconize(t("fin.fairPrice"))}</dt><dd>{money(fair)}</dd>
+          <dt>{iconize(t("fin.sponsor"))}</dt><dd>{money(club.sponsorWeekly)} {iconize(t("common.perWeek"))}</dd>
+          <dt>{iconize(t("fin.operations"))}</dt><dd>{money(-operatingCost(club))} {iconize(t("common.perWeek"))}</dd>
         </dl>
-        <p className="muted small">{club.ticketAuto && <>{t("fin.autoHint")} </>}{t("fin.crowdHint")}</p>
+        <p className="muted small">{club.ticketAuto && <>{iconize(t("fin.autoHint"))} </>}{iconize(t("fin.crowdHint"))}</p>
       </Card>
 
       <Card title={last ? t("fin.lastWeek", {week: last.week}) : t("fin.lastWeekEmpty")}>
-        {last ? <Lines lines={last.lines} /> : <Empty>{t("fin.noReport")}</Empty>}
+        {last ? <Lines lines={last.lines} /> : <Empty>{iconize(t("fin.noReport"))}</Empty>}
       </Card>
 
       <Card title={t("fin.season", {season: game.season})}>
@@ -111,7 +112,7 @@ export function Finance() {
         <Card title={t("fin.installments")}>
           <ul className="plain-list">
             {club.installments.map((i, n) => (
-              <li key={n}>{t("fin.installmentRow", {club: game.clubs[i.toClubId].name, amount: i.amount, weeks: i.weeksLeft})}</li>
+              <li key={n}>{iconize(t("fin.installmentRow", {club: game.clubs[i.toClubId].name, amount: i.amount, weeks: i.weeksLeft}))}</li>
             ))}
           </ul>
         </Card>
@@ -121,7 +122,7 @@ export function Finance() {
         <div className="table-wrap">
           <table className="table">
             <thead>
-              <tr><th>{t("fin.week")}</th><th>{t("fin.income")}</th><th>{t("fin.expenses")}</th><th>{t("fin.net")}</th></tr>
+              <tr><th>{iconize(t("fin.week"))}</th><th>{iconize(t("fin.income"))}</th><th>{iconize(t("fin.expenses"))}</th><th>{iconize(t("fin.net"))}</th></tr>
             </thead>
             <tbody>
               {game.finance.weeks.map((w) => {
@@ -166,38 +167,38 @@ function Loans() {
     if (err) notify(err, undefined, "error");
   };
   return (
-    <Card title={`🏦 ${t("loan.title")}`}>
+    <Card title={<><Icon name="bank" size={20} /> {iconize(t("loan.title"))}</>}>
       {loan ? (
         <>
           <dl className="kv">
-            <dt>{t("loan.current")}</dt><dd>{money(loan.amount)}</dd>
-            <dt>{t("loan.weekly")}</dt><dd className="neg">{money(-loan.weekly)} {t("common.perWeek")}</dd>
-            <dt>{t("loan.weeksLeft")}</dt><dd>{loan.weeksLeft}</dd>
-            <dt>{t("loan.left")}</dt><dd>{money(left)}</dd>
+            <dt>{iconize(t("loan.current"))}</dt><dd>{money(loan.amount)}</dd>
+            <dt>{iconize(t("loan.weekly"))}</dt><dd className="neg">{money(-loan.weekly)} {iconize(t("common.perWeek"))}</dd>
+            <dt>{iconize(t("loan.weeksLeft"))}</dt><dd>{loan.weeksLeft}</dd>
+            <dt>{iconize(t("loan.left"))}</dt><dd>{money(left)}</dd>
           </dl>
           <div className="btn-row">
-            <button className="btn" disabled={club.cash < left} onClick={repay}>{t("loan.repay", {left})}</button>
+            <button className="btn" disabled={club.cash < left} onClick={repay}>{iconize(t("loan.repay", {left}))}</button>
           </div>
         </>
       ) : (
         <>
-          <p className="muted small">{t("loan.hint")}</p>
+          <Hint>{iconize(t("loan.hint"))}</Hint>
           <div className="loan-offers">
             {offers.map((o) => (
               <button key={o.index} className="loan-offer" onClick={() => setAsking(o.index)}>
-                <strong>{t("loan.offer", {amount: o.amount})}</strong>
-                <small className="muted">{t("loan.terms", {weekly: o.weekly, weeks: o.weeks, total: o.total})}</small>
+                <strong>{iconize(t("loan.offer", {amount: o.amount}))}</strong>
+                <small className="muted">{iconize(t("loan.terms", {weekly: o.weekly, weeks: o.weeks, total: o.total}))}</small>
               </button>
             ))}
           </div>
         </>
       )}
       {offer && (
-        <Modal compact title={`🏦 ${t("loan.confirmTitle")}`} onClose={() => setAsking(null)}>
-          <p>{t("loan.confirmText", {amount: offer.amount, weekly: offer.weekly, weeks: offer.weeks, total: offer.total})}</p>
+        <Modal compact title={<><Icon name="bank" size={20} /> {iconize(t("loan.confirmTitle"))}</>} onClose={() => setAsking(null)}>
+          <p>{iconize(t("loan.confirmText", {amount: offer.amount, weekly: offer.weekly, weeks: offer.weeks, total: offer.total}))}</p>
           <div className="btn-row dialog-actions">
-            <button className="btn" onClick={() => setAsking(null)}>{t("common.cancel")}</button>
-            <button className="btn primary" onClick={take}>{t("loan.take")}</button>
+            <button className="btn" onClick={() => setAsking(null)}>{iconize(t("common.cancel"))}</button>
+            <button className="btn primary" onClick={take}>{iconize(t("loan.take"))}</button>
           </div>
         </Modal>
       )}
@@ -209,17 +210,17 @@ function Lines({lines}: {lines: FinanceLines}) {
   const {t, money} = useT();
   const s = sumLines(lines);
   const rows = FINANCE_CATEGORIES.filter((c) => lines[c]);
-  if (rows.length === 0) return <Empty>{t("fin.noReport")}</Empty>;
+  if (rows.length === 0) return <Empty>{iconize(t("fin.noReport"))}</Empty>;
   return (
     <dl className="kv">
       {rows.map((c) => (
         <div key={c} className="kv-row">
-          <dt>{t(`cat.${c}`)}</dt>
+          <dt>{iconize(t(`cat.${c}`))}</dt>
           <dd className={(lines[c] ?? 0) >= 0 ? "pos-num" : "neg"}>{money(lines[c] ?? 0)}</dd>
         </div>
       ))}
       <div className="kv-row total">
-        <dt>{t("fin.net")}</dt>
+        <dt>{iconize(t("fin.net"))}</dt>
         <dd className={s.net >= 0 ? "pos-num" : "neg"}>{money(s.net)}</dd>
       </div>
     </dl>

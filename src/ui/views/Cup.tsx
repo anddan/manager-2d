@@ -1,6 +1,7 @@
 // The Champions Cup: the four groups (tables and games), and the knockout
 // bracket from the quarter-finals to the final. Before the knockout the
 // bracket shows who would meet (winner of group A against runner-up of B…).
+import {Icon, iconize} from "../Icon";
 import {useState} from "react";
 import {CUP_FROM_LEAGUE, CUP_GROUP_DAYS, CUP_WEEKS} from "../../game/constants";
 import {CUP_STAGES, GROUP_NAMES, groupTable} from "../../game/cup";
@@ -8,7 +9,7 @@ import {currentCupStage} from "../../game/helpers";
 import type {CupFixture} from "../../game/types";
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
-import {Card, Empty} from "../common";
+import {Card, Empty, Hint} from "../common";
 import {FlagIcon} from "../Flag";
 import {FixtureRow} from "./Fixtures";
 
@@ -26,8 +27,8 @@ export function Cup() {
   const cup = game.cup;
   if (!cup || !cup.groups) {
     return (
-      <Card title={`🏆 ${t("cup.name")}`}>
-        <Empty>{t("cup.notIn", {n: CUP_FROM_LEAGUE})}</Empty>
+      <Card title={<><Icon name="trophy" size={20} /> {iconize(t("cup.name"))}</>}>
+        <Empty>{iconize(t("cup.notIn", {n: CUP_FROM_LEAGUE}))}</Empty>
       </Card>
     );
   }
@@ -38,13 +39,13 @@ export function Cup() {
   return (
     <div className="grid">
       {!inIt && (
-        <Card title={`🏆 ${t("cup.name")}`} className="span-2">
-          <p className="muted">{t("cup.notIn", {n: CUP_FROM_LEAGUE})}</p>
+        <Card title={<><Icon name="trophy" size={20} /> {iconize(t("cup.name"))}</>} className="span-2">
+          <p className="muted">{iconize(t("cup.notIn", {n: CUP_FROM_LEAGUE}))}</p>
         </Card>
       )}
       {cup.winnerId && (
         <Card className="span-2">
-          <p className="cup-winner">{t("cup.winner", {club: game.clubs[cup.winnerId]?.name ?? "?"})}</p>
+          <p className="cup-winner">{iconize(t("cup.winner", {club: game.clubs[cup.winnerId]?.name ?? "?"}))}</p>
         </Card>
       )}
       {/* What's being played now comes first. */}
@@ -63,17 +64,17 @@ function Groups() {
   const [onlyOurs, setOnlyOurs] = useState(true);
   return (
     <Card
-      title={`🏆 ${t("cup.groups")}`}
+      title={<><Icon name="trophy" size={20} /> {iconize(t("cup.groups"))}</>}
       className="span-2"
       actions={
         ours >= 0 ? (
           <label className="toggle">
-            <input type="checkbox" checked={onlyOurs} onChange={(e) => setOnlyOurs(e.target.checked)} /> {t("cup.onlyOurs")}
+            <input type="checkbox" checked={onlyOurs} onChange={(e) => setOnlyOurs(e.target.checked)} /> {iconize(t("cup.onlyOurs"))}
           </label>
         ) : undefined
       }
     >
-      <p className="muted small">{t("cup.groupHint")}</p>
+      <Hint>{iconize(t("cup.groupHint"))}</Hint>
       <div className="cup-groups">
         {cup.groups.map((ids, g) => {
           if (onlyOurs && ours >= 0 && g !== ours) return null;
@@ -82,13 +83,13 @@ function Groups() {
           const games = cup.fixtures.filter((f) => f.group === g).sort((a, b) => a.stage - b.stage);
           return (
             <section key={g} className={`cup-group ${mine ? "mine" : ""}`}>
-              <h3>{t("cup.groupName", {group: GROUP_NAMES[g]})}</h3>
+              <h3>{iconize(t("cup.groupName", {group: GROUP_NAMES[g]}))}</h3>
               <table className="table compact">
                 <thead>
                   <tr>
-                    <th>#</th><th>{t("col.name")}</th>
-                    <th className="num">{t("cup.colP")}</th><th className="num">{t("cup.colW")}</th><th className="num">{t("cup.colD")}</th><th className="num">{t("cup.colL")}</th>
-                    <th className="num">{t("cup.colGD")}</th><th className="num">{t("cup.colPts")}</th>
+                    <th>#</th><th>{iconize(t("col.name"))}</th>
+                    <th className="num">{iconize(t("cup.colP"))}</th><th className="num">{iconize(t("cup.colW"))}</th><th className="num">{iconize(t("cup.colD"))}</th><th className="num">{iconize(t("cup.colL"))}</th>
+                    <th className="num">{iconize(t("cup.colGD"))}</th><th className="num">{iconize(t("cup.colPts"))}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -112,7 +113,7 @@ function Groups() {
               <div className="cup-group-games">
                 {[0, 1, 2].map((day) => (
                   <div key={day} className={day === now ? "round current" : "round"}>
-                    <h4>{t(CUP_STAGES[day])} <small className="muted">· {t("cup.week", {week: CUP_WEEKS[day]})}</small></h4>
+                    <h4>{iconize(t(CUP_STAGES[day]))} <small className="muted">· {iconize(t("cup.week", {week: CUP_WEEKS[day]}))}</small></h4>
                     {games.filter((f) => f.stage === day).map((f) => <FixtureRow key={f.id} f={f} />)}
                   </div>
                 ))}
@@ -147,11 +148,11 @@ function Bracket() {
     return [t("cup.winnerOf", {stage: prev, n: slot * 2 + 1}), t("cup.winnerOf", {stage: prev, n: slot * 2 + 2})];
   };
   return (
-    <Card title={`🏆 ${t("cup.bracket")}`} className="span-2">
+    <Card title={<><Icon name="trophy" size={20} /> {iconize(t("cup.bracket"))}</>} className="span-2">
       <div className="bracket">
         {rounds.map(({stage, slots}) => (
           <div key={stage} className="bracket-round">
-            <h4>{t(CUP_STAGES[stage])} <small className="muted">· {t("cup.week", {week: CUP_WEEKS[stage]})}</small></h4>
+            <h4>{iconize(t(CUP_STAGES[stage]))} <small className="muted">· {iconize(t("cup.week", {week: CUP_WEEKS[stage]}))}</small></h4>
             <div className="bracket-ties">
               {slots.map((f, i) => (f ? <Tie key={f.id} f={f} /> : <TieTbd key={i} labels={placeholder(stage, i)} />))}
             </div>
@@ -161,7 +162,7 @@ function Bracket() {
           <h4>🏆</h4>
           <div className="bracket-ties">
             <div className={`bracket-tie champion ${cup.winnerId ? "" : "tbd"}`}>
-              {cup.winnerId && game.clubs[cup.winnerId] ? <TeamLine id={cup.winnerId} winner /> : <span className="muted">{t("cup.tbd")}</span>}
+              {cup.winnerId && game.clubs[cup.winnerId] ? <TeamLine id={cup.winnerId} winner /> : <span className="muted">{iconize(t("cup.tbd"))}</span>}
             </div>
           </div>
         </div>

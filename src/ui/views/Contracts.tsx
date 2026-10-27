@@ -1,9 +1,10 @@
 import {startNegotiation} from "../../game/contracts";
+import {Icon, iconize} from "../Icon";
 import {listName, shortName, userClub} from "../../game/helpers";
 import {clubPlayers, expectedWage, overall, wageBill} from "../../game/ratings";
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
-import {Bar, Card, Face, PosBadge, SortTh, sortRows, useSort} from "../common";
+import {Bar, Card, Face, PosBadge, SortTh, sortRows, useSort, Hint} from "../common";
 import {POSITIONS, SQUAD_ROLES, type Player} from "../../game/types";
 
 type ContractSort = "pos" | "name" | "age" | "ovr" | "wage" | "market" | "contract" | "role" | "happiness";
@@ -49,8 +50,8 @@ export function Contracts() {
       <Card title={t("con.wageBudget")}>
         {/* The bar shows headroom: full means plenty left, empty means at or over budget. */}
         <Bar value={Math.max(0, 100 - (bill / Math.max(1, club.wageBudget)) * 100) * 5} label={t("con.headroom")} />
-        <p>{t("con.billOfBudget", {bill, budget: club.wageBudget})}</p>
-        <p className="muted small">{t("con.hint")}</p>
+        <p>{iconize(t("con.billOfBudget", {bill, budget: club.wageBudget}))}</p>
+        <Hint>{iconize(t("con.hint"))}</Hint>
       </Card>
       <Card title={t("nav.contracts")} className="span-2">
         <div className="table-wrap">
@@ -73,9 +74,9 @@ export function Contracts() {
                     <td className="num">{money(p.contract.wage)}</td>
                     <td className="num muted">{money(expectedWage(p))}</td>
                     <td className="num">{p.contract.expiresSeason}{expiring && " ⚠️"}</td>
-                    <td>{t(`role.${p.contract.role}`)}</td>
+                    <td>{iconize(t(`role.${p.contract.role}`))}</td>
                     <td><Face value={p.happiness} /></td>
-                    <td><button className="btn small" onClick={() => negotiate(p.id)}>✍️ {t("con.negotiate")}</button></td>
+                    <td><button className="btn small" onClick={() => negotiate(p.id)}><Icon name="pen" size={18} /> {iconize(t("con.negotiate"))}</button></td>
                   </tr>
                 );
               })}

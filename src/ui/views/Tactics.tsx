@@ -1,6 +1,7 @@
 // Lineup and tactics. Tap a slot on the pitch, then a player to put there; or
 // drag a shirt onto another slot and they swap, or a player from the list (by
 // their handle) onto a slot to bring them in.
+import {Icon, iconize} from "../Icon";
 import {useEffect, useRef, useState, type PointerEvent as ReactPointerEvent} from "react";
 import {BENCH_SIZE, clubSlots, roleAt, type Slot} from "../../game/constants";
 import {CUP_STAGES} from "../../game/cup";
@@ -10,7 +11,7 @@ import {clubPlayers, effectiveRating, familiarity, teamOvr} from "../../game/rat
 import {FORMATION_IDS, MENTALITIES, type FormationId, type Mentality, type Player} from "../../game/types";
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
-import {Bar, Card, Flag, FormArrow, Modal, PosBadge, StatusIcons} from "../common";
+import {Bar, Card, Flag, FormArrow, Modal, PosBadge, StatusIcons, Hint} from "../common";
 import {Avatar} from "../Avatar";
 import {Jersey} from "../Jersey";
 import {GearPicture} from "../Gear";
@@ -204,7 +205,7 @@ export function Tactics() {
     <ul className="pick-list">
       <li className="pick-filter">
         <label className="toggle">
-          <input type="checkbox" checked={onlyFit} onChange={(e) => setOnlyFit(e.target.checked)} /> {t("tac.onlyFit")}
+          <input type="checkbox" checked={onlyFit} onChange={(e) => setOnlyFit(e.target.checked)} /> {iconize(t("tac.onlyFit"))}
         </label>
       </li>
       {inSlot && (
@@ -214,7 +215,7 @@ export function Tactics() {
             <PosBadge pos={inSlot.position} />
             <span className="pick-name"><Flag code={inSlot.nationality} size={15} /> {listName(inSlot)} <StatusIcons player={inSlot} /></span>
             {/* In the status column, like the other rows: what tapping it does. */}
-            <span className="pick-clear-x small">✖ {t("tac.clearShort")}</span>
+            <span className="pick-clear-x small"><Icon name="close" size={18} /> {iconize(t("tac.clearShort"))}</span>
             <FormArrow form={inSlot.form} />
             <span className={familiarity(inSlot, pos) < 1 ? "num warn" : "num strong"}>{Math.round(effectiveRating(inSlot, pos))}</span>
             <Bar value={inSlot.fitness} small />
@@ -246,17 +247,17 @@ export function Tactics() {
     <div className="grid tactics">
       <NextMatch />
       <Card
-        title={<>{t("nav.tactics")} <span className="team-ovr" title={t("tac.teamOvrHint")}>{t("tac.teamOvr")} <strong>{teamOvr(game, club.id)}</strong></span></>}
+        title={<>{iconize(t("nav.tactics"))} <span className="team-ovr" title={t("tac.teamOvrHint")}>{iconize(t("tac.teamOvr"))} <strong>{teamOvr(game, club.id)}</strong></span></>}
         actions={
           <>
-            <button className="btn small" onClick={clearAll} disabled={!club.lineup.some(Boolean) && club.bench.length === 0}>{t("tac.clearAll")}</button>
-            <button className="btn small" data-tour="best-xi" onClick={auto}>{t("tac.auto")}</button>
+            <button className="btn small" onClick={clearAll} disabled={!club.lineup.some(Boolean) && club.bench.length === 0}>{iconize(t("tac.clearAll"))}</button>
+            <button className="btn small" data-tour="best-xi" onClick={auto}>{iconize(t("tac.auto"))}</button>
           </>
         }
       >
         <div className="tac-pickers">
           <label className="field" data-tour="formation">
-            <span>{t("tac.formation")}</span>
+            <span>{iconize(t("tac.formation"))}</span>
             <select
               value={custom ? "custom" : club.formation}
               onChange={(e) =>
@@ -272,17 +273,17 @@ export function Tactics() {
               }
             >
               {FORMATION_IDS.map((f) => <option key={f} value={f}>{f}</option>)}
-              <option value="custom">{t("tac.custom")}</option>
+              <option value="custom">{iconize(t("tac.custom"))}</option>
             </select>
           </label>
           <label className="field">
-            <span>{t("tac.mentality")}</span>
+            <span>{iconize(t("tac.mentality"))}</span>
             <select value={club.mentality} onChange={(e) => act((g) => { g.clubs[g.userClubId].mentality = e.target.value as Mentality; })}>
-              {MENTALITIES.map((m) => <option key={m} value={m}>{t(`tac.${m}`)}</option>)}
+              {MENTALITIES.map((m) => <option key={m} value={m}>{iconize(t(`tac.${m}`))}</option>)}
             </select>
           </label>
         </div>
-        <p className="muted small">{t(`tac.${club.mentality}Hint`)}</p>
+        <p className="muted small">{iconize(t(`tac.${club.mentality}Hint`))}</p>
 
         <div className={`pitch-board ${custom ? "custom" : ""}`} data-free={custom ? "" : undefined} role="group" aria-label={t("tac.pitch")}>
           <div className="pitch-lines" aria-hidden />
@@ -321,7 +322,7 @@ export function Tactics() {
                   <span className="plate-name">{p && (!bad || out) ? shortName(p) : t(`pos.${slot.pos}`)}</span>
                   <span className="plate-info">
                     {p && !bad && <Flag code={p.nationality} size={13} />}
-                    <span>{t(`pos.${slot.pos}`)}</span>
+                    <span>{iconize(t(`pos.${slot.pos}`))}</span>
                     {p && !bad && <strong>{Math.round(effectiveRating(p, slot.pos))}</strong>}
                     {p && !bad && <FormArrow form={p.form} size={12} />}
                   </span>
@@ -330,7 +331,7 @@ export function Tactics() {
             );
           })}
         </div>
-        <p className="muted small">{t(custom ? "tac.customHint" : "tac.dragHint")}</p>
+        <p className="muted small">{iconize(t(custom ? "tac.customHint" : "tac.dragHint"))}</p>
       </Card>
       {drag.ghost && <div className="drag-ghost" style={{left: drag.ghost.x, top: drag.ghost.y}}>{drag.ghost.label}</div>}
 
@@ -345,13 +346,13 @@ export function Tactics() {
           candidateList
         ) : (
           <>
-            <p className="muted small">{t("tac.benchHint")}</p>
+            <Hint>{iconize(t("tac.benchHint"))}</Hint>
             <ul className="pick-list">
-              <li className={`pick-group bench-head ${typeof drag.over === "object" && drag.over !== null && "zone" in drag.over && drag.over.zone === "bench" ? "drop" : ""}`} data-zone="bench">🪑 {t("tac.benchGroup", {n: benched.length, max: BENCH_SIZE})}</li>
+              <li className={`pick-group bench-head ${typeof drag.over === "object" && drag.over !== null && "zone" in drag.over && drag.over.zone === "bench" ? "drop" : ""}`} data-zone="bench"><Icon name="bench" size={18} /> {iconize(t("tac.benchGroup", {n: benched.length, max: BENCH_SIZE}))}</li>
               {benched.map((p) => row(p, true))}
-              <li className={`pick-group rest-head ${typeof drag.over === "object" && drag.over !== null && "zone" in drag.over && drag.over.zone === "rest" ? "drop" : ""}`} data-zone="rest">💤 {t("tac.restGroup", {n: resting.length})}</li>
+              <li className={`pick-group rest-head ${typeof drag.over === "object" && drag.over !== null && "zone" in drag.over && drag.over.zone === "rest" ? "drop" : ""}`} data-zone="rest"><Icon name="moon" size={18} /> {iconize(t("tac.restGroup", {n: resting.length}))}</li>
               {resting.map((p) => row(p, false))}
-              {out.length > 0 && <li className="pick-group out-head">🩹 {t("tac.outGroup", {n: out.length})}</li>}
+              {out.length > 0 && <li className="pick-group out-head"><Icon name="medical" size={18} /> {iconize(t("tac.outGroup", {n: out.length}))}</li>}
               {out.map((p) => row(p, club.bench.includes(p.id)))}
             </ul>
           </>
@@ -461,12 +462,13 @@ function NextMatch() {
   return (
     <div className="next-match span-2" role="status">
       <span className="next-match-what">
-        {isCupFixture(next) ? `🏆 ${t("cup.name")} · ${t(CUP_STAGES[next.stage])}` : `⚽ ${t("ov.round", {round: next.round})}`}
+        {isCupFixture(next) ? <><Icon name="trophy" size={18} /> {iconize(t("cup.name"))} · {iconize(t(CUP_STAGES[next.stage]))}</> : <><Icon name="ball" size={18} /> {iconize(t("ov.round", {round: next.round}))}</>}
+        {/* Home or away, on the same line. */}
+        <span className="next-match-where"> · {next.homeId === game.userClubId ? t("tac.home") : t("tac.away")}</span>
       </span>
       <span className="next-match-teams">
         {crest(home)} <strong>{home.name}</strong> <span className="muted">–</span> <strong>{away.name}</strong> {crest(away)}
       </span>
-      <span className="muted small">{next.homeId === game.userClubId ? t("tac.home") : t("tac.away")}</span>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 // Game over: the board has sacked the manager. They walk away down the
 // tunnel, seen from behind, carrying their things in a box.
+import {iconize} from "./Icon";
 import {useT} from "../i18n";
 import {useGame, useGameState} from "../store";
 import {defaultManagerLook} from "./Avatar";
@@ -52,10 +53,10 @@ export function GameOver() {
         <text x={100} y={30} className="go-text">GAME OVER</text>
       </svg>
       <div className="game-over-body">
-        <h1>{t("go.title")}</h1>
-        <p>{t("go.reason", {name: game.managerName, club: club.name, cash: money(club.cash)})}</p>
-        <p className="muted">{t("go.summary", {seasons, season: game.gameOver?.season ?? game.season, week: game.gameOver?.week ?? game.week})}</p>
-        <button className="btn primary big" onClick={quit}>{t("go.newGame")} ▶</button>
+        <h1>{iconize(t("go.title"))}</h1>
+        <p>{iconize(t("go.reason", {name: game.managerName, club: club.name, cash: money(club.cash)}))}</p>
+        <p className="muted">{iconize(t("go.summary", {seasons, season: game.gameOver?.season ?? game.season, week: game.gameOver?.week ?? game.week}))}</p>
+        <button className="btn primary big" onClick={quit}>{iconize(t("go.newGame"))} ▶</button>
       </div>
     </div>
   );

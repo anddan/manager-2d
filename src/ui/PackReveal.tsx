@@ -2,6 +2,7 @@
 // position, overall, name, then the picture and skills), as in the shop.
 // Also used for the free bronze pack from the daily tasks. Once shown, the new player
 // can be looked at in their profile, or sold straight away.
+import {Icon, iconize} from "./Icon";
 import {useEffect, useState} from "react";
 import {fullName} from "../game/helpers";
 import type {PlayerPackId} from "../game/packs";
@@ -27,26 +28,26 @@ export function PackReveal({playerId, pack, onClose}: {playerId: string; pack: P
   const player = game.players[playerId];
   if (!player) return null;
   return (
-    <Modal title={`🎁 ${t(`pack.${pack}`)}`} onClose={onClose}>
+    <Modal title={<><Icon name="gift" size={20} /> {iconize(t(`pack.${pack}`))}</>} onClose={onClose}>
       <div className="pack-reveal">
         <div className="pack-flip">
           <PlayerCard game={game} player={player} reveal stage={stage} />
         </div>
         {stage >= 6 ? (
           <>
-            <h3 className="pack-got">{t("pack.got", {name: fullName(player)})}</h3>
+            <h3 className="pack-got">{iconize(t("pack.got", {name: fullName(player)}))}</h3>
             {selling ? (
               <QuickSale player={player} onSold={onClose} />
             ) : (
               <div className="btn-row pack-actions">
-                <button className="btn" onClick={() => { onClose(); openPlayer(player.id); }}>👤 {t("pack.profile")}</button>
-                <button className="btn" onClick={() => setSelling(true)}>💸 {t("pack.sell")}</button>
-                <button className="btn primary" onClick={onClose}>{t("pack.great")}</button>
+                <button className="btn" onClick={() => { onClose(); openPlayer(player.id); }}><Icon name="user" size={18} /> {iconize(t("pack.profile"))}</button>
+                <button className="btn" onClick={() => setSelling(true)}><Icon name="coins" size={18} /> {iconize(t("pack.sell"))}</button>
+                <button className="btn primary" onClick={onClose}>{iconize(t("pack.great"))}</button>
               </div>
             )}
           </>
         ) : (
-          <button className="btn" onClick={() => setStage(6)}>{t("pack.showAll")}</button>
+          <button className="btn" onClick={() => setStage(6)}>{iconize(t("pack.showAll"))}</button>
         )}
       </div>
     </Modal>

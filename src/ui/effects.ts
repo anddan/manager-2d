@@ -2,10 +2,15 @@
 import {chime} from "./sound";
 
 /**
- * Diamonds earned: "+N 💎" pops up where they were won and a handful of
+ * Diamonds earned: "+N" with a diamond pops up where they were won and a handful of
  * diamonds fly to the diamond count in the top bar (or the top-right corner
  * when it's hidden, on phones), which then gives a pulse.
  */
+/** The line icons (as in the menus) drawn in the effects, which are made outside React. */
+const svg = (paths: string) => `<svg class="icon" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+const DIAMOND_SVG = svg(`<path d="M6 4h12l3 5-9 11L3 9l3-5Z" /><path d="M3 9h18M9 4l3 16M15 4l-3 16" />`);
+const BOLT_SVG = svg(`<path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" />`);
+
 export function diamondBurst(from: Element | null | undefined, amount: number): void {
   if (typeof document === "undefined" || amount <= 0) return;
   chime();
@@ -20,7 +25,7 @@ export function diamondBurst(from: Element | null | undefined, amount: number): 
 
   const text = document.createElement("div");
   text.className = "burst-text";
-  text.textContent = `+${amount} 💎`;
+  text.innerHTML = `+${amount} ${DIAMOND_SVG}`;
   text.style.left = `${sx}px`;
   text.style.top = `${sy}px`;
   document.body.appendChild(text);
@@ -31,7 +36,7 @@ export function diamondBurst(from: Element | null | undefined, amount: number): 
   for (let i = 0; i < count; i++) {
     const gem = document.createElement("div");
     gem.className = "burst-gem";
-    gem.textContent = "💎";
+    gem.innerHTML = DIAMOND_SVG;
     gem.style.left = `${sx}px`;
     gem.style.top = `${sy}px`;
     // Out in a little fan first, then off to the counter.
@@ -50,13 +55,13 @@ export function diamondBurst(from: Element | null | undefined, amount: number): 
   }
 }
 
-/** Energy spent: "−N ⚡" rises from where it was spent and fades. */
+/** Energy spent: "−N" with a bolt rises from where it was spent and fades. */
 export function energySpent(from: Element | null | undefined, amount: number): void {
   if (typeof document === "undefined" || amount <= 0) return;
   const start = from?.getBoundingClientRect();
   const text = document.createElement("div");
   text.className = "burst-text energy";
-  text.textContent = `−${amount} ⚡`;
+  text.innerHTML = `−${amount} ${BOLT_SVG}`;
   text.style.left = `${start ? start.left + start.width / 2 : window.innerWidth / 2}px`;
   text.style.top = `${start ? start.top : window.innerHeight / 2}px`;
   document.body.appendChild(text);

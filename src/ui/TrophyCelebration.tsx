@@ -1,5 +1,6 @@
 // A trophy won: the whole team on the podium, the captain lifting it, and
 // confetti in the club's colours. Shown once per trophy.
+import {Icon, iconize} from "./Icon";
 import {useMemo} from "react";
 import {useT} from "../i18n";
 import {useGame, useGameState} from "../store";
@@ -31,7 +32,7 @@ export function TrophyCelebration() {
   return (
     <div className="trophy-overlay" role="dialog" aria-label={t(next.kind === "cup" ? "trophy.cup" : "trophy.league", {season: next.season})}>
       <Confetti colors={colors} />
-      <h1 className="trophy-title">🏆 {t(next.kind === "cup" ? "trophy.cup" : "trophy.league", {season: next.season})}</h1>
+      <h1 className="trophy-title"><Icon name="trophy" size={18} /> {iconize(t(next.kind === "cup" ? "trophy.cup" : "trophy.league", {season: next.season}))}</h1>
       <svg className="trophy-scene" viewBox={`0 0 ${width} 92`}>
         <rect x={0} y={0} width={width} height={92} fill="#0b1324" />
         <rect x={0} y={62} width={width} height={30} fill="#166534" />
@@ -60,8 +61,8 @@ export function TrophyCelebration() {
           );
         })}
       </svg>
-      <p className="trophy-text">{t(next.kind === "cup" ? "trophy.cupText" : "trophy.leagueText", {club: club.name})}</p>
-      <button className="btn primary big" onClick={done}>{t("trophy.continue")} ▶</button>
+      <p className="trophy-text">{iconize(t(next.kind === "cup" ? "trophy.cupText" : "trophy.leagueText", {club: club.name}))}</p>
+      <button className="btn primary big" onClick={done}>{iconize(t("trophy.continue"))} ▶</button>
     </div>
   );
 }

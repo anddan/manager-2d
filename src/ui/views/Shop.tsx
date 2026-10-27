@@ -1,4 +1,5 @@
 // Energy, diamonds and the (mock) shop.
+import {Icon, iconize} from "../Icon";
 import {useEffect, useRef, useState} from "react";
 import {
   DIAMOND_PACKS,
@@ -19,7 +20,7 @@ import {exchangeDiamonds, grantMoneyPack, grantPack, mockPaymentProvider, refill
 import {DIAMOND_PACK, PLAYER_PACKS, PLAYER_PACK_IDS, openDiamondPack, openPack, pickFromPack, type PlayerPackId} from "../../game/packs";
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
-import {Card, Modal} from "../common";
+import {Card, Modal, Hint} from "../common";
 import {ENERGY_VIDEOS_PER_DAY, videoForEnergy} from "../../game/daily";
 import {today} from "../DailyTasks";
 import {VideoAd} from "../VideoAd";
@@ -123,62 +124,60 @@ export function Shop() {
     <div className="grid">
       {/* The balance, big and clear, at the top of the shop. */}
       <div className="shop-balance span-2">
-        <span className="shop-balance-label">{t("shop.yourDiamonds")}</span>
-        <strong>💎 {num(m.diamonds)}</strong>
+        <span className="shop-balance-label">{iconize(t("shop.yourDiamonds"))}</span>
+        <strong><Icon name="diamond" size={22} /> {num(m.diamonds)}</strong>
       </div>
-      <Card title={`⚡ ${t("shop.energy")}`}>
-        <div className="energy-meter" aria-label={`${m.energy}/${ENERGY_MAX}`}>
-          {Array.from({length: ENERGY_MAX}, (_, i) => <span key={i} className={i < m.energy ? "pip on" : "pip"}>⚡</span>)}
-        </div>
-        <p className="muted">{t("shop.energyHint", {time: Math.round(ENERGY_REGEN_MS / 60_000), match: ENERGY_COST_MATCH, training: ENERGY_COST_EXTRA_TRAINING})}</p>
+      <Card title={<><Icon name="bolt" size={20} /> {iconize(t("shop.energy"))}</>}>
+        <div className="energy-count"><Icon name="bolt" size={26} /> <strong>{m.energy}/{ENERGY_MAX}</strong></div>
+        <Hint>{iconize(t("shop.energyHint", {time: Math.round(ENERGY_REGEN_MS / 60_000), match: ENERGY_COST_MATCH, training: ENERGY_COST_EXTRA_TRAINING}))}</Hint>
         <div className="btn-row wrap">
-          <button className="btn primary" disabled={m.energy >= ENERGY_MAX} onClick={refill}>💎 {t("shop.refill", {cost: DIAMONDS_REFILL_COST})}</button>
+          <button className="btn primary" disabled={m.energy >= ENERGY_MAX} onClick={refill}><Icon name="diamond" size={18} /> {iconize(t("shop.refill", {cost: DIAMONDS_REFILL_COST}))}</button>
           {/* A video for one energy point, a few times a day. */}
           <button className="btn" disabled={m.energy >= ENERGY_MAX || videosLeft <= 0} onClick={() => setWatching(true)}>
-            🎬 {t("video.energy")} <small className="muted">({t("video.left", {n: videosLeft})})</small>
+            <Icon name="video" size={18} /> {iconize(t("video.energy"))} <small className="muted">({t("video.left", {n: videosLeft})})</small>
           </button>
         </div>
         {watching && <VideoAd onReward={energyVideo} onClose={() => setWatching(false)} />}
       </Card>
 
-      <Card title={`👟 ${t("gear.title")}`} className="span-2">
+      <Card title={<><Icon name="boot" size={20} /> {iconize(t("gear.title"))}</>} className="span-2">
         <GearShop />
       </Card>
 
-      <Card title={`💎 ${t("shop.diamonds")}`}>
-        <p className="muted">{t("shop.earnHint", {win: DIAMONDS_PER_WIN, daily: DIAMONDS_DAILY_BONUS, champion: DIAMONDS_SEASON.champion})}</p>
-        <h3>{t("shop.exchange")}</h3>
-        <p className="muted small">{t("shop.exchangeHint", {diamonds: EXCHANGE.diamonds, money: EXCHANGE.money, left: EXCHANGE.maxPerSeason - m.exchangesThisSeason})}</p>
+      <Card title={<><Icon name="diamond" size={20} /> {iconize(t("shop.diamonds"))}</>}>
+        <Hint>{iconize(t("shop.earnHint", {win: DIAMONDS_PER_WIN, daily: DIAMONDS_DAILY_BONUS, champion: DIAMONDS_SEASON.champion}))}</Hint>
+        <h3>{iconize(t("shop.exchange"))}</h3>
+        <p className="muted small">{iconize(t("shop.exchangeHint", {diamonds: EXCHANGE.diamonds, money: EXCHANGE.money, left: EXCHANGE.maxPerSeason - m.exchangesThisSeason}))}</p>
         <button className="btn" disabled={m.exchangesThisSeason >= EXCHANGE.maxPerSeason} onClick={exchange}>
-          💎 {EXCHANGE.diamonds} → 💰
+          <Icon name="diamond" size={16} /> {EXCHANGE.diamonds} → <Icon name="coins" size={16} />
         </button>
       </Card>
 
-      <Card title={`🎁 ${t("pack.title")}`} className="span-2">
-        <p className="muted">{t("pack.hint")}</p>
+      <Card title={<><Icon name="gift" size={20} /> {iconize(t("pack.title"))}</>} className="span-2">
+        <Hint>{iconize(t("pack.hint"))}</Hint>
         <div className="ppacks">
           {PLAYER_PACK_IDS.map((id) => {
             const pack = PLAYER_PACKS[id];
             return (
               <div key={id} className={`ppack ppack-${id}`}>
-                <strong>{t(`pack.${id}`)}</strong>
-                <span className="ppack-range">{t("pack.range", {min: pack.min, max: pack.max})}</span>
+                <strong>{iconize(t(`pack.${id}`))}</strong>
+                <span className="ppack-range">{iconize(t("pack.range", {min: pack.min, max: pack.max}))}</span>
                 <button className="ppack-btn" disabled={m.diamonds < pack.price} onClick={() => open(id)}>
-                  💎 {pack.price} · {t("pack.open")}
+                  <Icon name="diamond" size={16} /> {pack.price} · {iconize(t("pack.open"))}
                 </button>
               </div>
             );
           })}
           {/* The diamond pack: club money, pick one of four. */}
           <div className="ppack ppack-diamond">
-            <strong>💠 {t("pack.diamond")}</strong>
-            <span className="ppack-range">{t("pack.range", {min: DIAMOND_PACK.min, max: DIAMOND_PACK.max})}</span>
-            <span className="ppack-note">{t("pack.diamondNote", {n: DIAMOND_PACK.choices})}</span>
+            <strong><Icon name="diamond" size={18} /> {iconize(t("pack.diamond"))}</strong>
+            <span className="ppack-range">{iconize(t("pack.range", {min: DIAMOND_PACK.min, max: DIAMOND_PACK.max}))}</span>
+            <span className="ppack-note">{iconize(t("pack.diamondNote", {n: DIAMOND_PACK.choices}))}</span>
             {game.packChoice ? (
-              <button className="ppack-btn" onClick={() => setChoosing(true)}>{t("pack.choose")}</button>
+              <button className="ppack-btn" onClick={() => setChoosing(true)}>{iconize(t("pack.choose"))}</button>
             ) : (
               <button className="ppack-btn" disabled={game.clubs[game.userClubId].cash < DIAMOND_PACK.price} onClick={openDiamond}>
-                💰 {money(DIAMOND_PACK.price)} · {t("pack.open")}
+                <Icon name="coins" size={16} /> {money(DIAMOND_PACK.price)} · {iconize(t("pack.open"))}
               </button>
             )}
           </div>
@@ -187,49 +186,49 @@ export function Shop() {
       {opened && <PackReveal playerId={opened.playerId} pack={opened.pack} onClose={() => setOpened(null)} />}
 
       {choosing && choices.length > 0 && (
-        <Modal wide title={`💠 ${t("pack.diamond")}`} onClose={() => setChoosing(false)}>
-          <p className="muted">{t("pack.pickHint", {n: choices.length})}</p>
+        <Modal wide title={<><Icon name="diamond" size={20} /> {iconize(t("pack.diamond"))}</>} onClose={() => setChoosing(false)}>
+          <p className="muted">{iconize(t("pack.pickHint", {n: choices.length}))}</p>
           <div className="pack-choices">
             {choices.map((p, i) => (
               <div key={p.id} className="pack-choice" ref={(el) => { cardRefs.current[i] = el; }}>
                 <PlayerCard game={game} player={p} reveal stage={cardStage(i)} forClubId={game.userClubId} />
-                {allShown && <button className="btn primary" onClick={() => pick(p.id)}>{t("pack.pick", {name: fullName(p)})}</button>}
+                {allShown && <button className="btn primary" onClick={() => pick(p.id)}>{iconize(t("pack.pick", {name: fullName(p)}))}</button>}
               </div>
             ))}
           </div>
           {!allShown && (
             <div className="btn-row dialog-actions">
-              <button className="btn" onClick={() => setSeq(choices.length * 6)}>{t("pack.showAll")}</button>
+              <button className="btn" onClick={() => setSeq(choices.length * 6)}>{iconize(t("pack.showAll"))}</button>
             </div>
           )}
         </Modal>
       )}
 
-      <Card title={`⭐ ${t("shop.legend")}`} className="span-2">
+      <Card title={<><Icon name="star" size={20} /> {iconize(t("shop.legend"))}</>} className="span-2">
         <div className="legend">
           <PlayerCard game={game} player={legend} reveal />
           <div className="legend-info">
             <h3>{fullName(legend)}</h3>
-            <p className="muted">{t("shop.legendHint", {price: LEGEND_PRICE_DIAMONDS})}</p>
+            <p className="muted">{iconize(t("shop.legendHint", {price: LEGEND_PRICE_DIAMONDS}))}</p>
             {owned ? (
-              <p className="callout good">✅ {t("shop.legendOwned")}</p>
+              <p className="callout good"><Icon name="check" size={18} /> {iconize(t("shop.legendOwned"))}</p>
             ) : (
               <button className="btn primary big" disabled={m.diamonds < LEGEND_PRICE_DIAMONDS} onClick={buyLeon}>
-                💎 {LEGEND_PRICE_DIAMONDS} · {t("shop.legendBuy")}
+                <Icon name="diamond" size={16} /> {LEGEND_PRICE_DIAMONDS} · {iconize(t("shop.legendBuy"))}
               </button>
             )}
-            {!owned && m.diamonds < LEGEND_PRICE_DIAMONDS && <p className="muted small">{t("shop.legendNeed", {n: LEGEND_PRICE_DIAMONDS - m.diamonds})}</p>}
+            {!owned && m.diamonds < LEGEND_PRICE_DIAMONDS && <p className="muted small">{iconize(t("shop.legendNeed", {n: LEGEND_PRICE_DIAMONDS - m.diamonds}))}</p>}
           </div>
         </div>
       </Card>
 
-      <Card title={`💰 ${t("shop.buyMoney")}`} className="span-2">
-        <p className="muted small">{t("shop.buyMoneyHint")}</p>
+      <Card title={<><Icon name="coins" size={20} /> {iconize(t("shop.buyMoney"))}</>} className="span-2">
+        <p className="muted small">{iconize(t("shop.buyMoneyHint"))}</p>
         <div className="packs">
           {MONEY_PACKS.map((pack) => (
             <div key={pack.id} className="pack">
-              <div className="pack-amount">💰 {money(pack.money)}</div>
-              {pack.bonus > 0 && <div className="pack-bonus">+{money(pack.bonus)} {t("shop.bonus")}</div>}
+              <div className="pack-amount"><Icon name="coins" size={22} /> {money(pack.money)}</div>
+              {pack.bonus > 0 && <div className="pack-bonus">+{money(pack.bonus)} {iconize(t("shop.bonus"))}</div>}
               <button className="btn primary" disabled={buying !== null} onClick={() => buyMoney(pack.id, pack.priceEur)}>
                 {buying === pack.id ? "…" : price(pack.priceEur)}
               </button>
@@ -238,13 +237,13 @@ export function Shop() {
         </div>
       </Card>
 
-      <Card title={`🛒 ${t("shop.buy")}`} className="span-2">
-        <p className="callout">{t("shop.mockNotice")}</p>
+      <Card title={<><Icon name="cart" size={20} /> {iconize(t("shop.buy"))}</>} className="span-2">
+        <p className="callout">{iconize(t("shop.mockNotice"))}</p>
         <div className="packs">
           {DIAMOND_PACKS.map((pack) => (
             <div key={pack.id} className="pack">
-              <div className="pack-amount">💎 {pack.diamonds}</div>
-              {pack.bonus > 0 && <div className="pack-bonus">+{pack.bonus} {t("shop.bonus")}</div>}
+              <div className="pack-amount"><Icon name="diamond" size={22} /> {pack.diamonds}</div>
+              {pack.bonus > 0 && <div className="pack-bonus">+{pack.bonus} {iconize(t("shop.bonus"))}</div>}
               <button className="btn primary" disabled={buying !== null} onClick={() => buy(pack.id, pack.priceEur)}>
                 {buying === pack.id ? "…" : price(pack.priceEur)}
               </button>

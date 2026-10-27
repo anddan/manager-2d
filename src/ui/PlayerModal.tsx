@@ -1,5 +1,6 @@
 // Player details. Own players: condition, mood, talks, focus, listing.
 // Others: scouting, bids, loans and free-agent offers.
+import {Icon, iconize} from "./Icon";
 import {useState, type ReactNode} from "react";
 import {profileName, shortName} from "../game/helpers";
 import {DIAMONDS_SCOUT_COST, SCOUT_COST} from "../game/constants";
@@ -44,11 +45,11 @@ export function PlayerModal({playerId}: {playerId: string}) {
         <PlayerCard game={game} player={p} />
         <div className="player-head">
           <dl className="pm-facts">
-            <div className="pm-fact"><dt>{t("pl.position")}</dt><dd><PosBadge pos={p.position} /></dd></div>
-            <div className="pm-fact" title={t("col.ovrHint")}><dt>{t("col.ovr")}</dt><dd className="strong"><Ovr game={game} player={p} /></dd></div>
-            <div className="pm-fact"><dt>{t("pl.nation")}</dt><dd><Flag code={p.nationality} named size={18} /></dd></div>
-            <div className="pm-fact"><dt>{t("col.age")}</dt><dd>{t("pl.age", {age: p.age})}</dd></div>
-            <div className="pm-fact wide"><dt>{t("pl.club")}</dt><dd>{club ? club.name : t("pl.freeAgent")}</dd></div>
+            <div className="pm-fact"><dt>{iconize(t("pl.position"))}</dt><dd><PosBadge pos={p.position} /></dd></div>
+            <div className="pm-fact" title={t("col.ovrHint")}><dt>{iconize(t("col.ovr"))}</dt><dd className="strong"><Ovr game={game} player={p} /></dd></div>
+            <div className="pm-fact"><dt>{iconize(t("pl.nation"))}</dt><dd><Flag code={p.nationality} named size={18} /></dd></div>
+            <div className="pm-fact"><dt>{iconize(t("col.age"))}</dt><dd>{iconize(t("pl.age", {age: p.age}))}</dd></div>
+            <div className="pm-fact wide"><dt>{iconize(t("pl.club"))}</dt><dd>{club ? club.name : t("pl.freeAgent")}</dd></div>
           </dl>
           {own && <Nickname key={p.id} player={p} />}
         </div>
@@ -56,15 +57,15 @@ export function PlayerModal({playerId}: {playerId: string}) {
 
       <div className="player-grid">
         <section>
-          <h3>{t("pl.attributes")}</h3>
+          <h3>{iconize(t("pl.attributes"))}</h3>
           <table className="attr-table">
             <thead>
-              <tr><th /><th /><th title={t("pl.lastWeek")}>{t("pl.week")}</th><th title={t("pl.thisSeason")}>{t("pl.season")}</th></tr>
+              <tr><th /><th /><th title={t("pl.lastWeek")}>{iconize(t("pl.week"))}</th><th title={t("pl.thisSeason")}>{iconize(t("pl.season"))}</th></tr>
             </thead>
             <tbody>
               {ATTRIBUTES.map((a) => (
                 <tr key={a}>
-                  <td>{t(`attr.${a}`)}</td>
+                  <td>{iconize(t(`attr.${a}`))}</td>
                   <td className="num strong">{known ? Math.round(p.attrs[a]) : "?"}{known && gear[a] ? <small className="gear-plus"> +{gear[a]}</small> : null}</td>
                   <td>{known && <Delta value={p.weeklyChange[a]} digits={2} />}</td>
                   <td>{known && <Delta value={p.attrs[a] - p.seasonStartAttrs[a]} />}</td>
@@ -76,13 +77,13 @@ export function PlayerModal({playerId}: {playerId: string}) {
 
         <section>
           {own && <Condition player={p} />}
-          <Fold title={`📊 ${t("pl.stats")}`}>
+          <Fold title={<><Icon name="chart" size={20} /> {iconize(t("pl.stats"))}</>}>
             <dl className="kv">
-              <dt>{t("pl.apps")}</dt><dd>{p.stats.apps} ({p.stats.starts})</dd>
-              <dt>{t("pl.goals")}</dt><dd>{p.stats.goals}</dd>
-              <dt>{t("pl.assists")}</dt><dd>{p.stats.assists}</dd>
-              <dt>{t("pl.cards")}</dt><dd>🟨 {p.stats.yellow} 🟥 {p.stats.red}</dd>
-              <dt>{t("pl.avgRating")}</dt><dd>{p.stats.apps ? (p.stats.ratingSum / p.stats.apps).toFixed(2) : "–"}</dd>
+              <dt>{iconize(t("pl.apps"))}</dt><dd>{p.stats.apps} ({p.stats.starts})</dd>
+              <dt>{iconize(t("pl.goals"))}</dt><dd>{p.stats.goals}</dd>
+              <dt>{iconize(t("pl.assists"))}</dt><dd>{p.stats.assists}</dd>
+              <dt>{iconize(t("pl.cards"))}</dt><dd>🟨 {p.stats.yellow} 🟥 {p.stats.red}</dd>
+              <dt>{iconize(t("pl.avgRating"))}</dt><dd>{p.stats.apps ? (p.stats.ratingSum / p.stats.apps).toFixed(2) : "–"}</dd>
             </dl>
           </Fold>
           <ContractInfo player={p} />
@@ -114,11 +115,11 @@ function Nickname({player: p}: {player: Player}) {
       }}
     >
       <label>
-        <span>✏️ {t("pl.nickname")}</span>
+        <span><Icon name="pen" size={18} /> {iconize(t("pl.nickname"))}</span>
         <input value={value} maxLength={20} placeholder={p.lastName} onChange={(e) => setValue(e.target.value)} onBlur={() => save(value)} />
       </label>
       {p.nickname && (
-        <button type="button" className="btn small" onClick={() => { setValue(""); save(""); }}>{t("pl.nicknameClear")}</button>
+        <button type="button" className="btn small" onClick={() => { setValue(""); save(""); }}>{iconize(t("pl.nicknameClear"))}</button>
       )}
     </form>
   );
@@ -130,20 +131,20 @@ function Condition({player: p}: {player: Player}) {
   const factors = happinessFactors(game, p);
   return (
     <>
-      <h3>{t("pl.condition")}</h3>
+      <h3>{iconize(t("pl.condition"))}</h3>
       <dl className="kv bars">
-        <dt>{t("col.form")}</dt><dd><FormArrow form={p.form} size={20} /></dd>
-        <dt>{t("col.fitness")}</dt><dd><Bar value={p.fitness} /></dd>
-        <dt>{t("pl.morale")}</dt><dd><Bar value={p.morale} /></dd>
-        <dt>{t("pl.sharpness")}</dt><dd><Bar value={p.sharpness} /></dd>
-        <dt>{t("col.happiness")}</dt><dd><Bar value={p.happiness} /> <Face value={p.happiness} /></dd>
-        <dt>{t("pl.relation")}</dt><dd><Bar value={p.relation} /></dd>
+        <dt>{iconize(t("col.form"))}</dt><dd><FormArrow form={p.form} size={20} /></dd>
+        <dt>{iconize(t("col.fitness"))}</dt><dd><Bar value={p.fitness} /></dd>
+        <dt>{iconize(t("pl.morale"))}</dt><dd><Bar value={p.morale} /></dd>
+        <dt>{iconize(t("pl.sharpness"))}</dt><dd><Bar value={p.sharpness} /></dd>
+        <dt>{iconize(t("col.happiness"))}</dt><dd><Bar value={p.happiness} /> <Face value={p.happiness} /></dd>
+        <dt>{iconize(t("pl.relation"))}</dt><dd><Bar value={p.relation} /></dd>
       </dl>
       {factors.length > 0 && (
         <ul className="factors">
           {factors.map((f) => (
             <li key={f.key} className={f.value >= 0 ? "pos-factor" : "neg-factor"}>
-              {f.value > 0 ? "+" : ""}{f.value} {tx(`happy.${f.key}`)}
+              {f.value > 0 ? "+" : ""}{f.value} {iconize(tx(`happy.${f.key}`))}
             </li>
           ))}
         </ul>
@@ -158,14 +159,14 @@ function ContractInfo({player: p}: {player: Player}) {
   if (!p.clubId) return null;
   const known = isKnown(game, p);
   return (
-    <Fold title={`📝 ${t("pl.contract")}`}>
+    <Fold title={<><Icon name="pen" size={20} /> {iconize(t("pl.contract"))}</>}>
       <dl className="kv">
-        <dt>{t("col.value")}</dt><dd>{money(p.value)}</dd>
-        {known && <><dt>{t("col.wage")}</dt><dd>{money(p.contract.wage)} {t("common.perWeek")}</dd></>}
-        <dt>{t("pl.expires")}</dt><dd>{p.contract.expiresSeason}</dd>
-        {known && <><dt>{t("col.role")}</dt><dd>{t(`role.${p.contract.role}`)}</dd></>}
-        {known && p.contract.releaseClause !== null && <><dt>{t("pl.releaseClause")}</dt><dd>{money(p.contract.releaseClause)}</dd></>}
-        {p.loan && <><dt>{t("pl.loan")}</dt><dd>{game.clubs[p.loan.parentClubId].name} → {game.clubs[p.clubId].name}</dd></>}
+        <dt>{iconize(t("col.value"))}</dt><dd>{money(p.value)}</dd>
+        {known && <><dt>{iconize(t("col.wage"))}</dt><dd>{money(p.contract.wage)} {iconize(t("common.perWeek"))}</dd></>}
+        <dt>{iconize(t("pl.expires"))}</dt><dd>{p.contract.expiresSeason}</dd>
+        {known && <><dt>{iconize(t("col.role"))}</dt><dd>{iconize(t(`role.${p.contract.role}`))}</dd></>}
+        {known && p.contract.releaseClause !== null && <><dt>{iconize(t("pl.releaseClause"))}</dt><dd>{money(p.contract.releaseClause)}</dd></>}
+        {p.loan && <><dt>{iconize(t("pl.loan"))}</dt><dd>{game.clubs[p.loan.parentClubId].name} → {game.clubs[p.clubId].name}</dd></>}
       </dl>
     </Fold>
   );
@@ -177,7 +178,7 @@ function OwnActions({player: p}: {player: Player}) {
   const act = useGame((s) => s.act);
   const notify = useGame((s) => s.notify);
   const setNegotiation = useGame((s) => s.setNegotiation);
-  if (p.loan && p.clubId !== game.userClubId) return <p className="muted">{t("pl.awayOnLoan")}</p>;
+  if (p.loan && p.clubId !== game.userClubId) return <p className="muted">{iconize(t("pl.awayOnLoan"))}</p>;
   const talkedThisWeek = game.absWeek - p.lastTalkWeek < 1;
 
   const talk = (kind: (typeof TALKS)[number]) => {
@@ -195,52 +196,52 @@ function OwnActions({player: p}: {player: Player}) {
     <div className="actions-panel">
       {p.wantsToLeave && !p.transferListed && (
         <div className="callout warn">
-          <p>{t("pl.wantsOut", {name: shortName(p)})}</p>
-          <button className="btn" onClick={() => act((g) => answerTransferRequest(g, p.id, true))}>{t("pl.acceptRequest")}</button>
-          <button className="btn" onClick={() => act((g) => answerTransferRequest(g, p.id, false))}>{t("pl.rejectRequest")}</button>
+          <p>{iconize(t("pl.wantsOut", {name: shortName(p)}))}</p>
+          <button className="btn" onClick={() => act((g) => answerTransferRequest(g, p.id, true))}>{iconize(t("pl.acceptRequest"))}</button>
+          <button className="btn" onClick={() => act((g) => answerTransferRequest(g, p.id, false))}>{iconize(t("pl.rejectRequest"))}</button>
         </div>
       )}
-      <Fold title={`💬 ${t("pl.talk")}`}>
+      <Fold title={<><Icon name="chat" size={20} /> {iconize(t("pl.talk"))}</>}>
       <div className="btn-row">
         {TALKS.map((k) => (
-          <button key={k} className="btn" disabled={talkedThisWeek} onClick={() => talk(k)}>{t(`talk.${k}`)}</button>
+          <button key={k} className="btn" disabled={talkedThisWeek} onClick={() => talk(k)}>{iconize(t(`talk.${k}`))}</button>
         ))}
-        <button className="btn" onClick={negotiate}>✍️ {t("pl.discussContract")}</button>
+        <button className="btn" onClick={negotiate}><Icon name="pen" size={18} /> {iconize(t("pl.discussContract"))}</button>
       </div>
-      {talkedThisWeek && <p className="muted small">{tx("talk.tooSoon")}</p>}
+      {talkedThisWeek && <p className="muted small">{iconize(tx("talk.tooSoon"))}</p>}
       {game.promises.filter((pr) => pr.playerId === p.id).map((pr) => (
-        <p key={pr.id} className="muted small">🤝 {t("pl.promiseStatus", {starts: pr.starts, required: pr.requiredStarts, left: pr.matchesLeft})}</p>
+        <p key={pr.id} className="muted small"><Icon name="handshake" size={18} /> {iconize(t("pl.promiseStatus", {starts: pr.starts, required: pr.requiredStarts, left: pr.matchesLeft}))}</p>
       ))}
       </Fold>
 
-      <Fold title={`📈 ${t("pl.development")}`}>
+      <Fold title={<><Icon name="trend" size={20} /> {iconize(t("pl.development"))}</>}>
       <label className="field inline">
-        <span>{t("pl.individualFocus")}</span>
+        <span>{iconize(t("pl.individualFocus"))}</span>
         <select
           value={p.individualFocus ?? ""}
           onChange={(e) => act((g) => { g.players[p.id].individualFocus = (e.target.value || null) as Player["individualFocus"]; })}
         >
-          <option value="">{t("common.none")}</option>
-          {ATTRIBUTES.map((a) => <option key={a} value={a}>{t(`attr.${a}`)}</option>)}
+          <option value="">{iconize(t("common.none"))}</option>
+          {ATTRIBUTES.map((a) => <option key={a} value={a}>{iconize(t(`attr.${a}`))}</option>)}
         </select>
       </label>
       </Fold>
 
-      <Fold title={`🏷️ ${t("pl.market")}`}>
+      <Fold title={<><Icon name="tag" size={20} /> {iconize(t("pl.market"))}</>}>
       <div className="btn-row">
         <label className="toggle">
           <input type="checkbox" checked={p.transferListed} onChange={(e) => act((g) => { g.players[p.id].transferListed = e.target.checked; })} />
-          {t("pl.transferList")}
+          {iconize(t("pl.transferList"))}
         </label>
         <label className="toggle">
           <input type="checkbox" checked={p.loanListed} onChange={(e) => act((g) => { g.players[p.id].loanListed = e.target.checked; })} />
-          {t("pl.loanList")}
+          {iconize(t("pl.loanList"))}
         </label>
       </div>
       <QuickSale player={p} />
       </Fold>
 
-      <Fold title={`🎽 ${t("gear.equipment")}`}>
+      <Fold title={<><Icon name="shirt" size={20} /> {iconize(t("gear.equipment"))}</>}>
         <GearPanel player={p} />
       </Fold>
 
@@ -250,7 +251,7 @@ function OwnActions({player: p}: {player: Player}) {
 }
 
 /** A heading that folds its part of the profile open and shut (shut to start with). */
-function Fold({title, children, open = false}: {title: string; children: ReactNode; open?: boolean}) {
+function Fold({title, children, open = false}: {title: ReactNode; children: ReactNode; open?: boolean}) {
   return (
     <details className="pm-fold" open={open}>
       <summary><h3>{title}</h3></summary>
@@ -273,10 +274,10 @@ function LookEditor({player: p}: {player: Player}) {
       g.players[p.id].look = {skin: look.skin, hair: look.hair, style: look.style, beard: look.beard, eyes: look.eyes, glasses: look.glasses, lashes: look.lashes};
     });
   return (
-    <Fold title={`🎨 ${t("pl.look")}`}>
+    <Fold title={<><Icon name="palette" size={20} /> {iconize(t("pl.look"))}</>}>
       <ManagerEditor look={editableLook(p)} onChange={set} draw={draw} noSuit />
       {p.look && (
-        <button className="btn small" onClick={() => act((g) => { delete g.players[p.id].look; })}>↩️ {t("pl.lookReset")}</button>
+        <button className="btn small" onClick={() => act((g) => { delete g.players[p.id].look; })}><Icon name="undo" size={18} /> {iconize(t("pl.lookReset"))}</button>
       )}
     </Fold>
   );
@@ -293,7 +294,7 @@ export function QuickSale({player: p, onSold}: {player: Player; onSold?: () => v
   const [sure, setSure] = useState(false);
   if (p.clubId !== game.userClubId || p.loan) return null;
   const offer = quickSaleOffer(game, p.id);
-  if (!offer) return <p className="muted small">{t("pl.noBuyer")}</p>;
+  if (!offer) return <p className="muted small">{iconize(t("pl.noBuyer"))}</p>;
   const club = game.clubs[offer.clubId].name;
   const sell = () => {
     const err = act((g) => quickSell(g, p.id));
@@ -304,14 +305,14 @@ export function QuickSale({player: p, onSold}: {player: Player; onSold?: () => v
   };
   return (
     <div className="quick-sale">
-      <p className="muted small">{t("pl.quickSaleHint", {club, fee: money(offer.fee)})}</p>
+      <p className="muted small">{iconize(t("pl.quickSaleHint", {club, fee: money(offer.fee)}))}</p>
       {sure ? (
         <div className="btn-row dialog-actions">
-          <button className="btn" onClick={() => setSure(false)}>{t("common.cancel")}</button>
-          <button className="btn primary" onClick={sell}>{t("pl.quickSaleYes", {fee: money(offer.fee)})}</button>
+          <button className="btn" onClick={() => setSure(false)}>{iconize(t("common.cancel"))}</button>
+          <button className="btn primary" onClick={sell}>{iconize(t("pl.quickSaleYes", {fee: money(offer.fee)}))}</button>
         </div>
       ) : (
-        <button className="btn" onClick={() => setSure(true)}>💸 {t("pl.quickSale")}</button>
+        <button className="btn" onClick={() => setSure(true)}><Icon name="coins" size={18} /> {iconize(t("pl.quickSale"))}</button>
       )}
     </div>
   );
@@ -373,70 +374,70 @@ function MarketActions({player: p}: {player: Player}) {
 
   return (
     <div className="actions-panel">
-      <h3>{t("pl.scouting")}</h3>
+      <h3>{iconize(t("pl.scouting"))}</h3>
       {known ? (
-        <p className="muted">✅ {t("pl.scouted")}</p>
+        <p className="muted"><Icon name="check" size={18} /> {iconize(t("pl.scouted"))}</p>
       ) : (
         <div className="btn-row">
           <button className="btn" disabled={scouting} onClick={() => scout(false)}>
             🔍 {scouting ? t("pl.scoutingNow") : t("pl.scout", {cost: SCOUT_COST})}
           </button>
-          <button className="btn" onClick={() => scout(true)}>⚡ {t("pl.scoutInstant", {cost: DIAMONDS_SCOUT_COST})}</button>
+          <button className="btn" onClick={() => scout(true)}><Icon name="bolt" size={18} /> {iconize(t("pl.scoutInstant", {cost: DIAMONDS_SCOUT_COST}))}</button>
         </div>
       )}
 
       {!p.clubId ? (
         <>
-          <h3>{t("pl.freeAgent")}</h3>
-          <button className="btn primary" onClick={() => toContract(0)}>✍️ {t("pl.offerContract")}</button>
+          <h3>{iconize(t("pl.freeAgent"))}</h3>
+          <button className="btn primary" onClick={() => toContract(0)}><Icon name="pen" size={18} /> {iconize(t("pl.offerContract"))}</button>
         </>
       ) : (
         <>
-          <h3>{t("pl.makeBid")}</h3>
-          <p className="muted">{t("pl.askingHint", {price: asking})} · {t("fin.transferBudget")}: {money(user.transferBudget)}</p>
+          <h3>{iconize(t("pl.makeBid"))}</h3>
+          <p className="muted">{iconize(t("pl.askingHint", {price: asking}))} · {iconize(t("fin.transferBudget"))}: {money(user.transferBudget)}</p>
           <div className="form-grid">
             <label className="field">
-              <span>{t("pl.fee")}</span>
+              <span>{iconize(t("pl.fee"))}</span>
               <NumberInput step={10_000} value={fee} onChange={setFee} />
             </label>
             <label className="field">
-              <span>{t("pl.upfront")}</span>
+              <span>{iconize(t("pl.upfront"))}</span>
               <select value={upfront} onChange={(e) => setUpfront(Number(e.target.value))}>
                 {UPFRONT.map((u) => <option key={u} value={u}>{Math.round(u * 100)} %</option>)}
               </select>
             </label>
             {upfront < 1 && (
               <label className="field">
-                <span>{t("pl.installments")}</span>
+                <span>{iconize(t("pl.installments"))}</span>
                 <select value={weeks} onChange={(e) => setWeeks(Number(e.target.value))}>
-                  {INSTALLMENTS.filter((w) => w > 0).map((w) => <option key={w} value={w}>{t("pl.weeks", {n: w})}</option>)}
+                  {INSTALLMENTS.filter((w) => w > 0).map((w) => <option key={w} value={w}>{iconize(t("pl.weeks", {n: w}))}</option>)}
                 </select>
               </label>
             )}
           </div>
-          {overBudget && <p className="callout error">{t("pl.overTransferBudget")}</p>}
+          {overBudget && <p className="callout error">{iconize(t("pl.overTransferBudget"))}</p>}
           <div className="btn-row">
-            <button className="btn primary" disabled={overBudget || fee <= 0} onClick={() => bid(fee)}>{t("pl.sendBid")} ({money(fee)})</button>
+            <button className="btn primary" disabled={overBudget || fee <= 0} onClick={() => bid(fee)}>{iconize(t("pl.sendBid"))} ({money(fee)})</button>
           </div>
           {result?.status === "counter" && (
             <div className="callout">
-              <p>{t("pl.counter", {club: game.clubs[p.clubId].name, fee: result.fee})}</p>
+              <p>{iconize(t("pl.counter", {club: game.clubs[p.clubId].name, fee: result.fee}))}</p>
               <button className="btn" disabled={result.fee > user.transferBudget} onClick={() => { setFee(result.fee); bid(result.fee); }}>
-                {t("pl.acceptCounter")}
+                {iconize(t("pl.acceptCounter"))}
               </button>
             </div>
           )}
-          {result?.status === "rejected" && <p className="callout error">{tx(result.reason)}</p>}
-          {result?.status === "accepted" && <p className="callout good">{t("pl.bidAccepted")}</p>}
+          {result?.status === "rejected" && <p className="callout error">{iconize(tx(result.reason))}</p>}
+          {result?.status === "accepted" && <p className="callout good">{iconize(t("pl.bidAccepted"))}</p>}
 
-          <h3>{t("pl.loanIn")}</h3>
+          <h3>{iconize(t("pl.loanIn"))}</h3>
           <div className="btn-row">
             <select value={wageShare} onChange={(e) => setWageShare(Number(e.target.value))} aria-label={t("pl.wageShare")}>
-              {[0.25, 0.5, 0.75, 1].map((s) => <option key={s} value={s}>{t("pl.payWage", {pct: Math.round(s * 100)})}</option>)}
+              {[0.25, 0.5, 0.75, 1].map((s) => <option key={s} value={s}>{iconize(t("pl.payWage", {pct: Math.round(s * 100)}))}</option>)}
             </select>
-            <button className="btn" disabled={!!p.loan} onClick={loan}>🔁 {t("pl.requestLoan")}</button>
+            <button className="btn" disabled={!!p.loan} onClick={loan}><Icon name="swap" size={18} /> {iconize(t("pl.requestLoan"))}</button>
           </div>
-          <p className="muted small">{t("pl.loanHint")}</p>
+          <p className="muted small">{iconize(t("pl.loanHint"))}</p>
         </>
       )}
     </div>

@@ -1,4 +1,5 @@
 import {listName} from "../../game/helpers";
+import {iconize} from "../Icon";
 import {standings} from "../../game/league";
 import type {GameState, Player} from "../../game/types";
 import {useT, type TKey} from "../../i18n";
@@ -21,7 +22,7 @@ function Leaders({title, players, value, show}: {title: TKey; players: Player[];
   return (
     <Card title={t(title)}>
       {players.length === 0 ? (
-        <p className="muted">{t("tbl.noneYet")}</p>
+        <p className="muted">{iconize(t("tbl.noneYet"))}</p>
       ) : (
         <table className="table leaders">
           <tbody>
@@ -58,15 +59,15 @@ export function Table() {
           <table className="table league">
             <thead>
               <tr>
-                <th>#</th><th>{t("tbl.club")}</th>
-                <th title={t("tbl.playedLong")}>{t("tbl.played")}</th>
-                <th title={t("tbl.wonLong")}>{t("tbl.won")}</th>
-                <th title={t("tbl.drawnLong")}>{t("tbl.drawn")}</th>
-                <th title={t("tbl.lostLong")}>{t("tbl.lost")}</th>
-                <th>{t("tbl.goals")}</th>
-                <th title={t("tbl.gdLong")}>{t("tbl.gd")}</th>
-                <th>{t("tbl.points")}</th>
-                <th>{t("tbl.form")}</th>
+                <th>#</th><th>{iconize(t("tbl.club"))}</th>
+                <th title={t("tbl.playedLong")}>{iconize(t("tbl.played"))}</th>
+                <th title={t("tbl.wonLong")}>{iconize(t("tbl.won"))}</th>
+                <th title={t("tbl.drawnLong")}>{iconize(t("tbl.drawn"))}</th>
+                <th title={t("tbl.lostLong")}>{iconize(t("tbl.lost"))}</th>
+                <th>{iconize(t("tbl.goals"))}</th>
+                <th title={t("tbl.gdLong")}>{iconize(t("tbl.gd"))}</th>
+                <th>{iconize(t("tbl.points"))}</th>
+                <th>{iconize(t("tbl.form"))}</th>
               </tr>
             </thead>
             <tbody>
@@ -81,7 +82,7 @@ export function Table() {
                   <td className="num">{r.goalsFor}:{r.goalsAgainst}</td>
                   <td className="num">{r.goalsFor - r.goalsAgainst > 0 ? "+" : ""}{r.goalsFor - r.goalsAgainst}</td>
                   <td className="num strong">{r.points}</td>
-                  <td><div className="form-row">{r.form.map((f, j) => <span key={j} className={`form-dot form-${f}`}>{tx(`form.${f}`)}</span>)}</div></td>
+                  <td><div className="form-row">{r.form.map((f, j) => <span key={j} className={`form-dot form-${f}`}>{iconize(tx(`form.${f}`))}</span>)}</div></td>
                 </tr>
               ))}
             </tbody>
@@ -101,7 +102,7 @@ export function Table() {
         <Card title={t("tbl.history")}>
           <ul className="plain-list">
             {game.history.slice().reverse().map((h) => (
-              <li key={h.season}>{t("tbl.historyRow", {season: h.season, champion: game.clubs[h.championId]?.name ?? "?", position: h.userPosition})}</li>
+              <li key={h.season}>{iconize(t("tbl.historyRow", {season: h.season, champion: game.clubs[h.championId]?.name ?? "?", position: h.userPosition}))}</li>
             ))}
           </ul>
         </Card>

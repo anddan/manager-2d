@@ -1,5 +1,6 @@
 // Contract negotiation with a player's agent: renewals, transfers and free
 // agents. Offers above the wage budget need an explicit confirmation.
+import {Icon, iconize} from "./Icon";
 import {useState} from "react";
 import {fullName, shortName} from "../game/helpers";
 import {evaluateOffer, signContract, wageBudgetCheck, type ContractOffer} from "../game/contracts";
@@ -52,20 +53,20 @@ export function ContractModal() {
 
   const numberField = (key: "wage" | "signingBonus" | "goalBonus" | "appearanceBonus", step: number) => (
     <label className="field">
-      <span>{t(`neg.${key}`)} <small className="muted">({t("neg.asks")} {money(neg.demand[key])})</small></span>
+      <span>{iconize(t(`neg.${key}`))} <small className="muted">({t("neg.asks")} {money(neg.demand[key])})</small></span>
       <NumberInput step={step} value={offer[key]} onChange={(n) => set(key, n)} />
     </label>
   );
 
   return (
-    <Modal title={`✍️ ${t(`neg.title.${neg.kind}`)}: ${fullName(p)}`} onClose={close}>
-      {neg.fee > 0 && <p className="muted">{t("neg.agreedFee", {fee: neg.fee})}</p>}
-      <p className="muted">{t("neg.intro", {round: neg.round + 1})}</p>
+    <Modal title={<><Icon name="pen" size={20} /> {iconize(t(`neg.title.${neg.kind}`))}: {fullName(p)}</>} onClose={close}>
+      {neg.fee > 0 && <p className="muted">{iconize(t("neg.agreedFee", {fee: neg.fee}))}</p>}
+      <p className="muted">{iconize(t("neg.intro", {round: neg.round + 1}))}</p>
       {reply && <p className="callout">{reply}</p>}
       <div className="form-grid">
         {numberField("wage", 50)}
         <label className="field">
-          <span>{t("neg.years")} <small className="muted">({t("neg.asks")} {neg.demand.years})</small></span>
+          <span>{iconize(t("neg.years"))} <small className="muted">({t("neg.asks")} {neg.demand.years})</small></span>
           <select value={offer.years} onChange={(e) => set("years", Number(e.target.value))}>
             {[1, 2, 3, 4, 5].map((y) => <option key={y} value={y}>{y}</option>)}
           </select>
@@ -74,15 +75,15 @@ export function ContractModal() {
         {numberField("goalBonus", 50)}
         {numberField("appearanceBonus", 50)}
         <label className="field">
-          <span>{t("col.role")} <small className="muted">({t("neg.asks")} {t(`role.${neg.demand.role}`)})</small></span>
+          <span>{iconize(t("col.role"))} <small className="muted">({t("neg.asks")} {iconize(t(`role.${neg.demand.role}`))})</small></span>
           <select value={offer.role} onChange={(e) => set("role", e.target.value as SquadRole)}>
-            {SQUAD_ROLES.map((r) => <option key={r} value={r}>{t(`role.${r}`)}</option>)}
+            {SQUAD_ROLES.map((r) => <option key={r} value={r}>{iconize(t(`role.${r}`))}</option>)}
           </select>
         </label>
         <label className="field">
           <span>
             <input type="checkbox" checked={offer.releaseClause !== null} onChange={(e) => set("releaseClause", e.target.checked ? Math.round(p.value * 2 / 10_000) * 10_000 : null)} />{" "}
-            {t("pl.releaseClause")}
+            {iconize(t("pl.releaseClause"))}
           </span>
           {offer.releaseClause !== null && (
             <NumberInput step={50_000} value={offer.releaseClause} onChange={(n) => set("releaseClause", n)} />
@@ -91,19 +92,19 @@ export function ContractModal() {
       </div>
 
       <p className={budget.over ? "callout error" : "muted"}>
-        {t("neg.wageBill", {after: budget.after, budget: budget.budget})}
+        {iconize(t("neg.wageBill", {after: budget.after, budget: budget.budget}))}
       </p>
       {budget.over && (
         <label className="toggle warn">
           <input type="checkbox" checked={confirmOver} onChange={(e) => setConfirmOver(e.target.checked)} />
-          {t("neg.confirmOver")}
+          {iconize(t("neg.confirmOver"))}
         </label>
       )}
       <div className="btn-row dialog-actions">
-        <button className="btn" onClick={close}>{t("common.cancel")}</button>
-        <button className="btn primary" disabled={budget.over && !confirmOver} onClick={submit}>{t("neg.send")}</button>
+        <button className="btn" onClick={close}>{iconize(t("common.cancel"))}</button>
+        <button className="btn primary" disabled={budget.over && !confirmOver} onClick={submit}>{iconize(t("neg.send"))}</button>
       </div>
-      <p className="muted small">{tx("neg.hint")}</p>
+      <p className="muted small">{iconize(tx("neg.hint"))}</p>
     </Modal>
   );
 }

@@ -16,6 +16,7 @@
 // stamina, so quick players visibly get there first. Sprinting players leave a trail.
 // Goals stop play for a celebration and a kick-off from the centre spot;
 // penalties, free kicks and corners stop play while the players line up.
+import {Icon, iconize, type IconName} from "./Icon";
 import {memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode} from "react";
 import {createPortal} from "react-dom";
 import {addMessage, findFixture, fullName, isCupFixture, isKnockout, listName, playerName, shortName} from "../game/helpers";
@@ -49,7 +50,7 @@ import {useGame, useGameState} from "../store";
 import {Avatar, ManagerAvatar, defaultManagerLook} from "./Avatar";
 import {Football} from "./Ball";
 import {spendEnergy} from "../game/monetization";
-import {Bar, Flag, Modal, PosBadge} from "./common";
+import {Bar, Flag, Modal, PosBadge, Hint} from "./common";
 import {SetPieceView} from "./SetPieceView";
 import {VideoAd} from "./VideoAd";
 import {diamondBurst, energySpent} from "./effects";
@@ -1087,13 +1088,13 @@ function Shootout({report, seed, userSide, onDone}: {report: MatchReport; seed: 
   return (
     <div className="shootout">
       <div className="shootout-head">
-        <strong>⚽ {t("so.title")}</strong>
+        <strong><Icon name="ball" size={18} /> {iconize(t("so.title"))}</strong>
         <span className="shootout-score">{home.short} {score[0]} – {score[1]} {away.short}</span>
       </div>
       {dots("home")}
       {dots("away")}
       {over ? (
-        <p className="shootout-result">{t((score[0] > score[1]) === (userSide === "home") ? "so.won" : "so.lost", {h: score[0], a: score[1]})}</p>
+        <p className="shootout-result">{iconize(t((score[0] > score[1]) === (userSide === "home") ? "so.won" : "so.lost", {h: score[0], a: score[1]}))}</p>
       ) : taker ? (
         <SetPieceView
           key={k}
@@ -1343,20 +1344,42 @@ function TeamTalkDialog({report, onDone}: {report: MatchReport; onDone: (words?:
   const played = Object.entries(report.ratings)
     .filter(([id]) => game.players[id]?.clubId === game.userClubId && (report.lineups[side].includes(id) || report.events.some((e) => e.type === "sub" && e.otherId === id)))
     .sort((a, b) => b[1] - a[1]);
-  const icons: Record<TeamTalk, string> = {praise: "👏", calm: "🧘", demand: "💪", disappointed: "😠"};
+  const icons: Record<TeamTalk, IconName> = {praise: "star", calm: "target", demand: "fire", disappointed: "warn"};
   return (
-    <MatchDialog title={`🗣️ ${t("tt.title")}`} onClose={() => onDone()}>
-      <p className="tt-verdict">{tx(`tt.verdict.${verdict.result}.${verdict.how}`)}</p>
+    <MatchDialog title={<><Icon name="megaphone" size={20} /> {iconize(t("tt.title"))}</>} onClose={() => onDone()}>
+      {/* The verdict, and what each talk does behind the (i) (no text on the choices). */}
+      <div className="tt-verdict-row">
+        <p className="tt-verdict">{iconize(tx(`tt.verdict.${verdict.result}.${verdict.how}`))}</p>
+        <Hint>
+          <dl className="tt-help">
+            {TEAM_TALKS.map((k) => (
+              <div key={k}>
+                <dt><Icon name={icons[k]} size={16} /> {iconize(tx(`tt.talk.${k}`))}</dt>
+                <dd>{iconize(tx(`tt.talk.${k}.desc`))}</dd>
+              </div>
+            ))}
+          </dl>
+          {/* How the words work on the players (as morale.ts counts it). */}
+          <details className="tt-help-more">
+            <summary><h4 className="tt-help-title">{iconize(t("tt.help.title"))}</h4></summary>
+          <ul className="tt-help-list">
+            {(["morale", "happiness", "relation", "right", "wrong", "tough", "repeat", "bench", "single"] as const).map((k) => (
+              <li key={k}>{iconize(t(`tt.help.${k}`))}</li>
+            ))}
+          </ul>
+          </details>
+        </Hint>
+      </div>
       <div className="tt-options">
         {TEAM_TALKS.map((k) => (
           <button key={k} className={`tt-option ${talk === k ? "active" : ""}`} onClick={() => setTalk(k)}>
-            <strong>{icons[k]} {tx(`tt.talk.${k}`)}</strong>
-            <small>{tx(`tt.talk.${k}.desc`)}</small>
+            <Icon name={icons[k]} size={24} />
+            <strong>{iconize(tx(`tt.talk.${k}`))}</strong>
           </button>
         ))}
       </div>
       <details className="tt-fold" open={!!single}>
-      <summary><h4>{t("tt.onePlayer")}</h4></summary>
+      <summary><h4>{iconize(t("tt.onePlayer"))}</h4></summary>
       <div className="tt-players">
         {played.map(([id, rating]) => {
           const p = game.players[id];
@@ -1375,8 +1398,8 @@ function TeamTalkDialog({report, onDone}: {report: MatchReport; onDone: (words?:
       </div>
       </details>
       <div className="btn-row dialog-actions">
-        <button className="btn" onClick={() => onDone()}>{t("tt.skip")}</button>
-        <button className="btn primary" disabled={!talk} onClick={() => talk && onDone({talk, ...(single ? {single} : {})})}>{t("tt.say")} ▶</button>
+        <button className="btn" onClick={() => onDone()}>{iconize(t("tt.skip"))}</button>
+        <button className="btn primary" disabled={!talk} onClick={() => talk && onDone({talk, ...(single ? {single} : {})})}>{iconize(t("tt.say"))} <Icon name="play" size={16} /></button>
       </div>
     </MatchDialog>
   );
@@ -1971,7 +1994,7 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   const forzaUsed = forzaOn;
   const forzaNote = forzaOn ? t("match.forzaOn") : forzaFree ? t("match.forzaHint") : t("match.forzaCost", {n: ENERGY_COST_FORZA});
   // Free the first time (🔥); after that it costs energy (⚡), shown flying off the button.
-  const forzaIcon = forzaFree ? "🔥" : "⚡";
+  const forzaIcon = <Icon name={forzaFree ? "fire" : "bolt"} size={18} />;
   const forza = (e?: {currentTarget: Element}) => {
     if (forzaOn) return;
     if (!forzaFree) {
@@ -2298,20 +2321,20 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
         <ControlIcon kind="forward" />{speed > 1 ? " " + speed + "×" : ""}
       </button>
       <button className="chip" title={t("match.skip")} aria-label={t("match.skip")} onClick={() => jump(Infinity)}>
-        <ControlIcon kind="end" /><span className="skip-label"> {t("match.skip")}</span>
+        <ControlIcon kind="end" /><span className="skip-label"> {iconize(t("match.skip"))}</span>
       </button>
     </span>
   );
 
   return (
-    <Modal wide title={<>{live && <span className="live-badge">{t("match.live")}</span>} {home.name} – {away.name}</>} onClose={close} backdropCloses={!live}>
+    <Modal wide title={<>{live && <span className="live-badge">{iconize(t("match.live"))}</span>} {home.name} – {away.name}</>} onClose={close} backdropCloses={!live}>
       <div className="scoreboard">
-        {live && <span className="team-ovr" title={t("tac.teamOvrHint")}>{t("tac.teamOvr")} <strong>{teamOvr(game, home.id)}</strong></span>}
+        {live && <span className="team-ovr" title={t("tac.teamOvrHint")}>{iconize(t("tac.teamOvr"))} <strong>{teamOvr(game, home.id)}</strong></span>}
         <span className="crest" style={{background: home.color, color: home.color2}}>{home.short}</span>
         <span className="score">{score.home} – {score.away}</span>
-        {shootoutScore && <small className="score-pens">{t("fx.penalties", {h: shootoutScore[0], a: shootoutScore[1]})}</small>}
+        {shootoutScore && <small className="score-pens">{iconize(t("fx.penalties", {h: shootoutScore[0], a: shootoutScore[1]}))}</small>}
         <span className="crest" style={{background: away.color, color: away.color2}}>{away.short}</span>
-        {live && <span className="team-ovr" title={t("tac.teamOvrHint")}>{t("tac.teamOvr")} <strong>{teamOvr(game, away.id)}</strong></span>}
+        {live && <span className="team-ovr" title={t("tac.teamOvrHint")}>{iconize(t("tac.teamOvr"))} <strong>{teamOvr(game, away.id)}</strong></span>}
         <span className="clock">{clock}</span>
         {board > 0 && !atHalftime && !finished && (
           <span className="board" title={t("match.added", {n: board})}>+{board}</span>
@@ -2384,16 +2407,16 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
             <>
               <Confetti key={freeze.key} colors={[scoringClub.color, scoringClub.color2, "#fde047", "#ffffff"]} />
               <div className="goal-banner">
-                <strong>{t("match.goal")}</strong>
+                <strong>{iconize(t("match.goal"))}</strong>
                 {scorer && <span>{fullName(scorer)}</span>}
               </div>
-              <button className="btn replay-btn" onClick={() => startReplay(freeze.time)}>🎥 {t("match.replayGoal")}</button>
+              <button className="btn replay-btn" onClick={() => startReplay(freeze.time)}><Icon name="video" size={18} /> {iconize(t("match.replayGoal"))}</button>
             </>
           )}
           {replay && (
             <>
-              <div className="replay-badge" aria-live="polite">🎥 {t("match.replayBadge")}</div>
-              <button className="btn small replay-skip" onClick={() => setReplay(null)}>⏭ {t("match.replayEnd")}</button>
+              <div className="replay-badge" aria-live="polite"><Icon name="video" size={18} /> {iconize(t("match.replayBadge"))}</div>
+              <button className="btn small replay-skip" onClick={() => setReplay(null)}><Icon name="skip" size={18} /> {iconize(t("match.replayEnd"))}</button>
             </>
           )}
           {/* Fill the screen like a video, and back. */}
@@ -2406,7 +2429,7 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
               <span className="crest" style={{background: home.color, color: home.color2}}>{home.short}</span>
               <strong className="max-score-goals">{score.home} – {score.away}</strong>
               <span className="crest" style={{background: away.color, color: away.color2}}>{away.short}</span>
-              {shootoutScore && <small>{t("fx.penalties", {h: shootoutScore[0], a: shootoutScore[1]})}</small>}
+              {shootoutScore && <small>{iconize(t("fx.penalties", {h: shootoutScore[0], a: shootoutScore[1]}))}</small>}
               <span className="max-score-clock">{clock}{board > 0 && !atHalftime && !finished ? ` +${board}` : ""}</span>
             </div>
           )}
@@ -2416,7 +2439,7 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
               <span className="crest" style={{background: home.color, color: home.color2}}>{home.short}</span>
               <strong className="max-score-goals">{score.home} – {score.away}</strong>
               <span className="crest" style={{background: away.color, color: away.color2}}>{away.short}</span>
-              {shootoutScore && <small>{t("fx.penalties", {h: shootoutScore[0], a: shootoutScore[1]})}</small>}
+              {shootoutScore && <small>{iconize(t("fx.penalties", {h: shootoutScore[0], a: shootoutScore[1]}))}</small>}
               <span className="max-score-clock">{clock}{board > 0 && !atHalftime && !finished ? ` +${board}` : ""}</span>
             </div>
           )}
@@ -2424,7 +2447,7 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
           {maxed && live && !finished && (
             <div className="max-manager">
               <button className="btn small max-forza" onClick={forza} disabled={forzaUsed} title={forzaNote} aria-label={t("match.forza")}>
-                {forzaIcon}<span className="max-forza-label"> {t("match.forza")}</span>
+                {forzaIcon}<span className="max-forza-label"> {iconize(t("match.forza"))}</span>
               </button>
               <button className="btn small max-forza" onClick={() => setSelected("team")} disabled={!!freeze && !atHalftime} title={t("match.giveOrders")} aria-label={t("match.giveOrders")}>
                 📋
@@ -2437,17 +2460,17 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
           {freeze?.kind === "nogoal" && !replay && <NoGoalBanner key={freeze.key} reason={report.events.find((e) => e.type === "disallowed" && e.side === freeze.side && e.minute === Math.ceil(freeze.time))?.note} />}
           {freeze?.kind === "restart" && freeze.restart && !replay && (
             <div className="setup-banner">
-              {freeze.restart.kind === "goalkick" ? "🥅" : "🤾"} {t(freeze.restart.kind === "goalkick" ? "match.goalKick" : "match.throwIn", {team: (freeze.side === "home" ? home : away).short, player: name(freeze.restart.playerId)})}
+              {freeze.restart.kind === "goalkick" ? "🥅" : "🤾"} {iconize(t(freeze.restart.kind === "goalkick" ? "match.goalKick" : "match.throwIn", {team: (freeze.side === "home" ? home : away).short, player: name(freeze.restart.playerId)}))}
             </div>
           )}
           {freeze?.kind === "setup" && freeze.sp && (
-            <div className="setup-banner">{tx(`ev.${freeze.sp.kind}`, {team: (freeze.side === "home" ? home : away).short, player: name(freeze.sp.takerId)})}</div>
+            <div className="setup-banner">{iconize(tx(`ev.${freeze.sp.kind}`, {team: (freeze.side === "home" ? home : away).short, player: name(freeze.sp.takerId)}))}</div>
           )}
-          {atHalftime && !live && <div className="setup-banner">{t("ev.halftime")}</div>}
+          {atHalftime && !live && <div className="setup-banner">{iconize(t("ev.halftime"))}</div>}
           {crowdShown && report.crowd && freeze?.kind !== "goal" && (
             <div className="crowd-banner" role="status">
-              <strong>{t("match.crowd", {fans: report.crowd.fans, pct: Math.round(report.crowd.rate * 100)})}</strong>
-              {report.crowd.rate >= 0.995 && <span>{t("match.soldOut")}</span>}
+              <strong>{iconize(t("match.crowd", {fans: report.crowd.fans, pct: Math.round(report.crowd.rate * 100)}))}</strong>
+              {report.crowd.rate >= 0.995 && <span>{iconize(t("match.soldOut"))}</span>}
             </div>
           )}
           {freeze?.kind === "fulltime" && (
@@ -2459,7 +2482,7 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
       )}
 
       {live && atHalftime && !selected && !replay && (
-        <MatchDialog title={`☕ ${t("match.halftime")}`} onClose={startSecondHalf}>
+        <MatchDialog title={<><Icon name="coffee" size={20} /> {iconize(t("match.halftime"))}</>} onClose={startSecondHalf}>
           <div className="ht-score">
             <span className="crest" style={{background: home.color, color: home.color2}}>{home.short}</span>
             <strong>{score.home} – {score.away}</strong>
@@ -2470,10 +2493,10 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
               <li key={i}>⚽ {clockLabel(report, e.minute)} {name(e.playerId)} ({e.side === "home" ? home.short : away.short})</li>
             ))}
           </ul>
-          <p className="muted small">{t("match.htHint")}</p>
+          <p className="muted small">{iconize(t("match.htHint"))}</p>
           <div className="btn-row dialog-actions">
-            <button className="btn" onClick={() => setSelected("team")}>📋 {t("match.giveOrders")}</button>
-            <button className="btn primary" onClick={startSecondHalf}>▶ {t("match.secondHalf")}</button>
+            <button className="btn" onClick={() => setSelected("team")}><Icon name="clipboard" size={18} /> {iconize(t("match.giveOrders"))}</button>
+            <button className="btn primary" onClick={startSecondHalf}><Icon name="play" size={18} /> {iconize(t("match.secondHalf"))}</button>
           </div>
         </MatchDialog>
       )}
@@ -2491,11 +2514,11 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
       )}
       {talking && onFinish && <TeamTalkDialog report={report} onDone={(words) => { setTalking(false); onFinish(words); }} />}
       {confirmClose && (
-        <MatchDialog title={`⏹ ${t("match.closeTitle")}`} onClose={() => setConfirmClose(false)}>
-          <p>{t("match.closeText")}</p>
+        <MatchDialog title={<><Icon name="stop" size={20} /> {iconize(t("match.closeTitle"))}</>} onClose={() => setConfirmClose(false)}>
+          <p>{iconize(t("match.closeText"))}</p>
           <div className="btn-row dialog-actions">
-            <button className="btn" onClick={() => setConfirmClose(false)}>{t("match.closeNo")}</button>
-            <button className="btn primary" onClick={onClose}>{t("match.closeYes")}</button>
+            <button className="btn" onClick={() => setConfirmClose(false)}>{iconize(t("match.closeNo"))}</button>
+            <button className="btn primary" onClick={onClose}>{iconize(t("match.closeYes"))}</button>
           </div>
         </MatchDialog>
       )}
@@ -2505,7 +2528,7 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
       )}
 
       {live && selected && !finished && !current && !injuryStop && (
-        <MatchDialog title={`📋 ${t("orders.title")}`} onClose={() => setSelected(null)}>
+        <MatchDialog title={<><Icon name="clipboard" size={20} /> {iconize(t("orders.title"))}</>} onClose={() => setSelected(null)}>
           <OrdersPanel
             live={live}
             target={selected}
@@ -2525,9 +2548,9 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
             <>
               {/* Won: a video for bonus diamonds, once per match. */}
               {wonIt && game.daily?.winVideoFixture !== report.fixtureId && (
-                <button className="btn push-right" onClick={() => setWatchingAd(true)}>🎬 {t("video.win", {n: WIN_VIDEO_DIAMONDS})}</button>
+                <button className="btn push-right" onClick={() => setWatchingAd(true)}><Icon name="video" size={18} /> {iconize(t("video.win", {n: WIN_VIDEO_DIAMONDS}))}</button>
               )}
-              <button className={wonIt && game.daily?.winVideoFixture !== report.fixtureId ? "btn primary" : "btn primary push-right"} onClick={() => setTalking(true)}>{t("match.finish")} ▶</button>
+              <button className={wonIt && game.daily?.winVideoFixture !== report.fixtureId ? "btn primary" : "btn primary push-right"} onClick={() => setTalking(true)}>{iconize(t("match.finish"))} ▶</button>
             </>
           )
         ) : (
@@ -2538,20 +2561,20 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
               <div className="manager-menu" ref={menuRef}>
                 <button className={`btn ctl manager-btn ${menuOpen ? "open" : ""}`} data-tour="orders" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>
                   <ManagerAvatar look={managerLook} size={26} tie={(userSide === "away" ? away : home).color} />
-                  <span className="manager-btn-label">{t("match.manager")}</span> <span aria-hidden>{menuOpen ? "▲" : "▼"}</span>
+                  <span className="manager-btn-label">{iconize(t("match.manager"))}</span> <span aria-hidden>{menuOpen ? "▲" : "▼"}</span>
                 </button>
                 {menuOpen && (
                   <div className="manager-pop" role="menu">
                     <button className="manager-item" role="menuitem" disabled={!!freeze && !atHalftime} onClick={() => { setMenuOpen(false); setSelected("team"); }}>
-                      📋 {t("match.giveOrders")}
+                      <Icon name="clipboard" size={18} /> {iconize(t("match.giveOrders"))}
                     </button>
                     {/* Once a match: the manager fires up the whole team. */}
                     <button className="manager-item forza-btn" role="menuitem" disabled={forzaUsed} onClick={forza}>
-                      <span>{forzaIcon} {t("match.forza")}</span>
+                      <span>{forzaIcon} {iconize(t("match.forza"))}</span>
                       <span className="muted small">{forzaNote}</span>
                     </button>
                     <div className="manager-item manager-toggle" data-tour="setpieces">
-                      <span>🎯 {t("match.setPieces")}</span>
+                      <span><Icon name="target" size={18} /> {iconize(t("match.setPieces"))}</span>
                       <span className="speed-group" role="group" aria-label={t("match.setPieces")}>
                         {([true, false] as const).map((self) => (
                           <button key={String(self)} className={live.manualSetPieces === self ? "chip active" : "chip"} onClick={() => {
@@ -2567,7 +2590,7 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
                       </span>
                     </div>
                     <div className="manager-item manager-toggle">
-                      <span>🔁 {t("match.subs")}</span>
+                      <span><Icon name="swap" size={18} /> {iconize(t("match.subs"))}</span>
                       <span className="speed-group" role="group" aria-label={t("match.subs")}>
                         {([true, false] as const).map((self) => (
                           <button key={String(self)} className={live.manualSubs === self ? "chip active" : "chip"} onClick={() => {
@@ -2582,7 +2605,7 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
                         ))}
                       </span>
                     </div>
-                    <p className="muted small manager-hint">{t("match.managerHint")}</p>
+                    <p className="muted small manager-hint">{iconize(t("match.managerHint"))}</p>
                   </div>
                 )}
               </div>
@@ -2601,12 +2624,12 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
       {/* What the buttons above do. */}
       {live && !finished && !selected && (
         <details className="control-help-fold">
-          <summary className="muted small">{t("match.help")}</summary>
+          <summary className="muted small">{iconize(t("match.help"))}</summary>
           <ul className="control-help muted small">
-            <li>📋 {t("orders.hint")}</li>
-            <li>🎯 {t("match.setPiecesHint")}</li>
-            <li>🔁 {t("match.subsHint")}</li>
-            <li>{t("match.zoomHint")}</li>
+            <li><Icon name="clipboard" size={18} /> {iconize(t("orders.hint"))}</li>
+            <li><Icon name="target" size={18} /> {iconize(t("match.setPiecesHint"))}</li>
+            <li><Icon name="swap" size={18} /> {iconize(t("match.subsHint"))}</li>
+            <li>{iconize(t("match.zoomHint"))}</li>
           </ul>
         </details>
       )}
@@ -2631,7 +2654,7 @@ function NoGoalBanner({reason}: {reason?: string}) {
   return (
     <div className={ruled ? "goal-banner ruled-out" : "goal-banner"}>
       <strong>{ruled ? `❌ ${t("match.ruledOut")}` : t("match.goal")}</strong>
-      {ruled && reason && <span>⚠️ {tx(`reason.${reason}`)}</span>}
+      {ruled && reason && <span><Icon name="warn" size={18} /> {iconize(tx(`reason.${reason}`))}</span>}
     </div>
   );
 }
@@ -2702,7 +2725,7 @@ function InstructionGrid({value, disabled, onPick, keeper}: {value: (key: Instru
         const current = value(key);
         return (
           <div key={key} className={current === 0 ? "order-row" : "order-row changed"}>
-            <span className="order-label">{keeper ? "🧤" : INSTRUCTION_ICONS[key]} {tx(base(key))}</span>
+            <span className="order-label">{keeper ? "🧤" : INSTRUCTION_ICONS[key]} {iconize(tx(base(key)))}</span>
             <div className="order-chips">
               {([-1, 0, 1] as const).map((lvl) => (
                 <button
@@ -2716,7 +2739,7 @@ function InstructionGrid({value, disabled, onPick, keeper}: {value: (key: Instru
                 </button>
               ))}
             </div>
-            <p className="order-desc">{tx(`${base(key)}.${levelName(current)}.desc`)}</p>
+            <p className="order-desc">{iconize(tx(`${base(key)}.${levelName(current)}.desc`))}</p>
           </div>
         );
       })}
@@ -2760,8 +2783,8 @@ function InjuryDialog({live, playerId, pos, onPick}: {live: LiveMatch; playerId:
         <header className="injury-head">
           {p && <Avatar player={p} shirt={club.color} trim={club.color2} size={64} mood={10} />}
           <div>
-            <h3>🩹 {t("match.injuryTitle", {player: p ? `${fullName(p)}` : "?"})}</h3>
-            <p className="muted small">{t("match.injuryHint", {pos: t(`pos.${pos}`)})} · {t("orders.subsLeft", {n: subsLeft})}</p>
+            <h3><Icon name="medical" size={18} /> {iconize(t("match.injuryTitle", {player: p ? `${fullName(p)}` : "?"}))}</h3>
+            <p className="muted small">{iconize(t("match.injuryHint", {pos: t(`pos.${pos}`)}))} · {iconize(t("orders.subsLeft", {n: subsLeft}))}</p>
           </div>
         </header>
         <BenchList live={live} pos={pos} onPick={onPick} recommend />
@@ -2808,7 +2831,7 @@ function OrdersPanel({
       <div className="target-strip" role="tablist" aria-label={t("orders.who")}>
         <button role="tab" aria-selected={target === "team"} className={target === "team" ? "target active" : "target"} onClick={() => onTarget("team")}>
           <span className="target-icon" aria-hidden>👥</span>
-          <span className="target-name">{t("orders.teamTitle")}</span>
+          <span className="target-name">{iconize(t("orders.teamTitle"))}</span>
           {teamTold && <span className="target-told" aria-hidden>📣</span>}
         </button>
         {team.onPitch.map((o) => {
@@ -2819,7 +2842,7 @@ function OrdersPanel({
             <button key={o.id} role="tab" aria-selected={target === o.id} className={target === o.id ? "target active" : "target"} onClick={() => onTarget(o.id)}>
               <Avatar player={p} shirt={club.color} trim={club.color2} size={34} />
               <span className="target-name">{shortName(p)}</span>
-              <span className="target-pos">{t(`pos.${team.slots[o.slot].pos}`)}{booked.has(o.id) ? " 🟨" : ""}</span>
+              <span className="target-pos">{iconize(t(`pos.${team.slots[o.slot].pos}`))}{booked.has(o.id) ? " 🟨" : ""}</span>
               {told && <span className="target-told" aria-hidden>📣</span>}
             </button>
           );
@@ -2828,7 +2851,7 @@ function OrdersPanel({
 
       {target === "team" ? (
         <>
-          <p className="orders-intro">{t("orders.teamHint")}</p>
+          <p className="orders-intro">{iconize(t("orders.teamHint"))}</p>
           <InstructionGrid value={(key) => live.teamLevel(key)} onPick={onTeamInstruct} />
         </>
       ) : (
@@ -2837,7 +2860,7 @@ function OrdersPanel({
 
       <div className="btn-row">
         <span className="muted small">{subsLeft > 0 ? t("orders.subsLeft", {n: subsLeft}) : t("orders.noSubs")}</span>
-        <button className="btn primary push-right" onClick={onClose}>{t("orders.done")}</button>
+        <button className="btn primary push-right" onClick={onClose}>{iconize(t("orders.done"))}</button>
       </div>
     </div>
   );
@@ -2880,7 +2903,7 @@ function PlayerOrders({
           <span className="orders-meta">
             <PosBadge pos={slot ? team.slots[slot.slot].pos : p.position} />
             <Flag code={p.nationality} />
-            {booked && <span className="booked-tag">🟨 {t("orders.booked")}</span>}
+            {booked && <span className="booked-tag">🟨 {iconize(t("orders.booked"))}</span>}
           </span>
         </div>
         <span className="orders-fitness" title={t("col.fitness")}>⚡ <Bar value={p.fitness} small label={t("col.fitness")} /></span>
@@ -2888,20 +2911,20 @@ function PlayerOrders({
 
       {picking ? (
         <>
-          <h3>{t("orders.pickSub")}</h3>
+          <h3>{iconize(t("orders.pickSub"))}</h3>
           <BenchList live={live} pos={slot ? team.slots[slot.slot].pos : undefined} onPick={(id) => onSub(playerId, id)} />
-          <button className="btn small" onClick={() => setPicking(false)}>{t("common.cancel")}</button>
+          <button className="btn small" onClick={() => setPicking(false)}>{iconize(t("common.cancel"))}</button>
         </>
       ) : (
         <>
-          <p className="orders-intro">{t("orders.playerHint", {name: shortName(p)})}</p>
+          <p className="orders-intro">{iconize(t("orders.playerHint", {name: shortName(p)}))}</p>
           <InstructionGrid keeper={(slot ? team.slots[slot.slot].pos : p.position) === "GK"} value={(key) => live.level(playerId, key)} disabled={!onPitch} onPick={(key, lvl) => onInstruct(playerId, key, lvl)} />
           <div className="btn-row">
             {comingOff ? (
-              <span className="muted small">🔁 {t("orders.subPending")}</span>
+              <span className="muted small"><Icon name="swap" size={18} /> {iconize(t("orders.subPending"))}</span>
             ) : (
               <button className="btn" disabled={subsLeft <= 0 || !onPitch || benchLeft === 0} onClick={() => setPicking(true)}>
-                🔁 {t("orders.sub")}
+                <Icon name="swap" size={18} /> {iconize(t("orders.sub"))}
               </button>
             )}
           </div>
@@ -2936,9 +2959,9 @@ function Summary({report}: {report: MatchReport}) {
   return (
     <div className="summary">
       <dl className="kv">
-        <dt>{t("match.possession")}</dt><dd>{report.possessionHome}% – {100 - report.possessionHome}%</dd>
-        <dt>{t("match.shots")}</dt><dd>{report.shots[0]} – {report.shots[1]}</dd>
-        <dt>{t("match.onTarget")}</dt><dd>{report.onTarget[0]} – {report.onTarget[1]}</dd>
+        <dt>{iconize(t("match.possession"))}</dt><dd>{report.possessionHome}% – {100 - report.possessionHome}%</dd>
+        <dt>{iconize(t("match.shots"))}</dt><dd>{report.shots[0]} – {report.shots[1]}</dd>
+        <dt>{iconize(t("match.onTarget"))}</dt><dd>{report.onTarget[0]} – {report.onTarget[1]}</dd>
       </dl>
       <div className="ratings">
         {[report.homeId, report.awayId].map((clubId) => (

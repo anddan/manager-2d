@@ -1,5 +1,6 @@
 // Picks how the manager looks: skin, hair, eyes, beard, glasses and suit. Styles
 // and beards are shown as little faces rather than words.
+import {Icon, iconize} from "./Icon";
 import type {ReactNode} from "react";
 import type {ManagerLook} from "../game/types";
 import {useT} from "../i18n";
@@ -59,7 +60,7 @@ export function ManagerEditor({look, onChange, draw = inSuit, noSuit = false}: {
     <div className="manager-editor">
       <div className="manager-preview">
         {draw(look, 112)}
-        <button type="button" className="btn small" onClick={random}>🎲 {t("look.random")}</button>
+        <button type="button" className="btn small" onClick={random}><Icon name="dice" size={18} /> {iconize(t("look.random"))}</button>
       </div>
       <div className="look-controls">
         <Swatches colors={SKIN} value={look.skin} label={t("look.skin")} onPick={(skin) => set({skin})} />
@@ -70,10 +71,10 @@ export function ManagerEditor({look, onChange, draw = inSuit, noSuit = false}: {
         {!noSuit && <Swatches colors={SUITS} value={look.suit} label={t("look.suit")} onPick={(suit) => set({suit})} />}
         <div className="btn-row">
           <label className="toggle">
-            <input type="checkbox" checked={look.glasses} onChange={(e) => set({glasses: e.target.checked})} /> {t("look.glasses")}
+            <input type="checkbox" checked={look.glasses} onChange={(e) => set({glasses: e.target.checked})} /> {iconize(t("look.glasses"))}
           </label>
           <label className="toggle">
-            <input type="checkbox" checked={!!look.lashes} onChange={(e) => set({lashes: e.target.checked})} /> {t("look.lashes")}
+            <input type="checkbox" checked={!!look.lashes} onChange={(e) => set({lashes: e.target.checked})} /> {iconize(t("look.lashes"))}
           </label>
         </div>
       </div>

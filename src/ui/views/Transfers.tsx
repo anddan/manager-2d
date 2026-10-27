@@ -1,10 +1,11 @@
 import {useState} from "react";
+import {Icon, iconize} from "../Icon";
 import {fullName, listName, shortName, userClub} from "../../game/helpers";
 import {askingPrice, estimatedOverall, respondToBid} from "../../game/transfers";
 import {POSITIONS, type Position} from "../../game/types";
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
-import {Card, Empty, Flag, NumberInput, Ovr, PosBadge, SortTh, StatusIcons, Tabs, sortRows, useSort} from "../common";
+import {Card, Empty, Flag, NumberInput, Ovr, PosBadge, SortTh, StatusIcons, Tabs, sortRows, useSort, Hint} from "../common";
 
 type SearchSort = "pos" | "name" | "age" | "ovr" | "club" | "price" | "contract";
 
@@ -21,10 +22,10 @@ export function Transfers() {
         value={tab}
         onChange={setTab}
         options={[
-          {id: "search", label: `🔍 ${t("tr.search")}`},
-          {id: "bids", label: `📨 ${t("tr.bids")}${bids ? ` (${bids})` : ""}`},
-          {id: "listed", label: `🏷️ ${t("tr.listed")}`},
-          {id: "scouting", label: `🔭 ${t("tr.scouting")}`},
+          {id: "search", label: <><Icon name="search" size={18} /> {iconize(t("tr.search"))}</>},
+          {id: "bids", label: <><Icon name="inbox" size={18} /> {iconize(t("tr.bids"))}{bids ? ` (${bids})` : ""}</>},
+          {id: "listed", label: <><Icon name="tag" size={18} /> {iconize(t("tr.listed"))}</>},
+          {id: "scouting", label: <><Icon name="eye" size={18} /> {iconize(t("tr.scouting"))}</>},
         ]}
       />
       {tab === "search" && <Search />}
@@ -76,34 +77,34 @@ function Search() {
     <>
       <div className="filters">
         <label className="field">
-          <span>{t("col.pos")}</span>
+          <span>{iconize(t("col.pos"))}</span>
           <select value={pos} onChange={(e) => setPos(e.target.value as Position | "")}>
-            <option value="">{t("common.all")}</option>
-            {POSITIONS.map((p) => <option key={p} value={p}>{t(`pos.${p}`)}</option>)}
+            <option value="">{iconize(t("common.all"))}</option>
+            {POSITIONS.map((p) => <option key={p} value={p}>{iconize(t(`pos.${p}`))}</option>)}
           </select>
         </label>
         <label className="field">
-          <span>{t("tr.maxAge")}</span>
+          <span>{iconize(t("tr.maxAge"))}</span>
           <NumberInput max={40} value={maxAge} onChange={setMaxAge} />
         </label>
         <label className="field">
-          <span>{t("tr.minOvr")}</span>
+          <span>{iconize(t("tr.minOvr"))}</span>
           <NumberInput max={99} value={minOvr} onChange={setMinOvr} />
         </label>
         <label className="field">
-          <span>{t("tr.maxPrice")}</span>
+          <span>{iconize(t("tr.maxPrice"))}</span>
           <NumberInput step={100_000} value={maxPrice} onChange={setMaxPrice} placeholder="0 = ∞" />
         </label>
         <label className="field">
-          <span>{t("tr.source")}</span>
+          <span>{iconize(t("tr.source"))}</span>
           <select value={source} onChange={(e) => setSource(e.target.value as typeof source)}>
-            <option value="all">{t("common.all")}</option>
-            <option value="free">{t("tr.freeAgents")}</option>
-            <option value="listed">{t("tr.onlyListed")}</option>
+            <option value="all">{iconize(t("common.all"))}</option>
+            <option value="free">{iconize(t("tr.freeAgents"))}</option>
+            <option value="listed">{iconize(t("tr.onlyListed"))}</option>
           </select>
         </label>
       </div>
-      <p className="muted small">{t("tr.searchHint", {budget: userClub(game).transferBudget})}</p>
+      <Hint>{iconize(t("tr.searchHint", {budget: userClub(game).transferBudget}))}</Hint>
       <div className="table-wrap">
         <table className="table">
           <thead>
@@ -127,7 +128,7 @@ function Search() {
           </tbody>
         </table>
       </div>
-      {results.length === 0 && <Empty>{t("tr.noResults")}</Empty>}
+      {results.length === 0 && <Empty>{iconize(t("tr.noResults"))}</Empty>}
     </>
   );
 }
@@ -141,7 +142,7 @@ export function BidCard({bidId}: {bidId: string}) {
   const openPlayer = useGame((s) => s.openPlayer);
   const bid = game.incomingBids.find((b) => b.id === bidId);
   const [counter, setCounter] = useState(() => (bid ? Math.round((bid.fee * 1.25) / 10_000) * 10_000 : 0));
-  if (!bid) return <p className="muted small">{t("tr.bidClosed")}</p>;
+  if (!bid) return <p className="muted small">{iconize(t("tr.bidClosed"))}</p>;
   const p = game.players[bid.playerId];
   const club = game.clubs[bid.fromClubId];
   const respond = (action: "accept" | "reject" | "counter") => {
@@ -157,16 +158,16 @@ export function BidCard({bidId}: {bidId: string}) {
         {!bid.loan && <span className="muted"> ({t("col.value")} {money(p.value)})</span>}
       </p>
       <div className="btn-row wrap">
-        <button className="btn primary" onClick={() => respond("accept")}>{t("tr.accept")}</button>
-        <button className="btn" onClick={() => respond("reject")}>{t("tr.reject")}</button>
+        <button className="btn primary" onClick={() => respond("accept")}>{iconize(t("tr.accept"))}</button>
+        <button className="btn" onClick={() => respond("reject")}>{iconize(t("tr.reject"))}</button>
         {!bid.loan && (
           <>
             <span className="small-input"><NumberInput step={10_000} value={counter} onChange={setCounter} ariaLabel={t("tr.counterAmount")} /></span>
-            <button className="btn" onClick={() => respond("counter")}>{t("tr.counter")}</button>
+            <button className="btn" onClick={() => respond("counter")}>{iconize(t("tr.counter"))}</button>
           </>
         )}
       </div>
-      <p className="muted small">{tx("tr.expires", {weeks: Math.max(0, bid.expiresWeek - game.absWeek)})}</p>
+      <p className="muted small">{iconize(tx("tr.expires", {weeks: Math.max(0, bid.expiresWeek - game.absWeek)}))}</p>
     </div>
   );
 }
@@ -174,7 +175,7 @@ export function BidCard({bidId}: {bidId: string}) {
 function Bids() {
   const {t} = useT();
   const game = useGameState();
-  if (game.incomingBids.length === 0) return <Empty>{t("tr.noBids")}</Empty>;
+  if (game.incomingBids.length === 0) return <Empty>{iconize(t("tr.noBids"))}</Empty>;
   return <div className="stack">{game.incomingBids.map((b) => <BidCard key={b.id} bidId={b.id} />)}</div>;
 }
 
@@ -183,13 +184,13 @@ function Listed() {
   const game = useGameState();
   const openPlayer = useGame((s) => s.openPlayer);
   const listed = Object.values(game.players).filter((p) => p.clubId === game.userClubId && (p.transferListed || p.loanListed));
-  if (listed.length === 0) return <Empty>{t("tr.noneListed")}</Empty>;
+  if (listed.length === 0) return <Empty>{iconize(t("tr.noneListed"))}</Empty>;
   return (
     <ul className="plain-list">
       {listed.map((p) => (
         <li key={p.id}>
           <button className="link" onClick={() => openPlayer(p.id)}>{fullName(p)}</button>{" "}
-          <span className="muted">{p.transferListed ? `🏷️ ${money(askingPrice(game, p))}` : ""} {p.loanListed ? `🔁 ${t("status.loanListed")}` : ""}</span>
+          <span className="muted">{p.transferListed ? `🏷️ ${money(askingPrice(game, p))}` : ""} {p.loanListed ? <><Icon name="swap" size={16} /> {iconize(t("status.loanListed"))}</> : ""}</span>
         </li>
       ))}
     </ul>
@@ -206,19 +207,19 @@ function Scouting() {
     .sort((a, b) => b.week - a.week);
   return (
     <>
-      <h3>{t("tr.inProgress")}</h3>
-      {game.scoutQueue.length === 0 ? <Empty>{t("tr.noScouting")}</Empty> : (
+      <h3>{iconize(t("tr.inProgress"))}</h3>
+      {game.scoutQueue.length === 0 ? <Empty>{iconize(t("tr.noScouting"))}</Empty> : (
         <ul className="plain-list">
           {game.scoutQueue.map((id) => game.players[id] && <li key={id}>🔭 {fullName(game.players[id])}</li>)}
         </ul>
       )}
-      <h3>{t("tr.reports")}</h3>
-      {scouted.length === 0 ? <Empty>{t("tr.noReports")}</Empty> : (
+      <h3>{iconize(t("tr.reports"))}</h3>
+      {scouted.length === 0 ? <Empty>{iconize(t("tr.noReports"))}</Empty> : (
         <ul className="plain-list">
           {scouted.map(({p}) => (
             <li key={p.id}>
               <PosBadge pos={p.position} /> <button className="link" onClick={() => openPlayer(p.id)}>{fullName(p)}</button>{" "}
-              <span className="muted">{t("col.ovr")} <Ovr game={game} player={p} /> · {p.clubId ? game.clubs[p.clubId].short : t("tr.free")}</span>
+              <span className="muted">{iconize(t("col.ovr"))} <Ovr game={game} player={p} /> · {p.clubId ? game.clubs[p.clubId].short : t("tr.free")}</span>
             </li>
           ))}
         </ul>

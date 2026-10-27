@@ -1,5 +1,6 @@
 // Collectible-style player card: tier by overall, cartoon portrait, six key
 // attributes. Unscouted players show an estimated overall and question marks.
+import {Icon, iconize} from "./Icon";
 import {overall} from "../game/ratings";
 import {shortName} from "../game/helpers";
 import {isKnown} from "../game/transfers";
@@ -7,6 +8,7 @@ import type {Attribute, GameState, Player} from "../game/types";
 import {useT} from "../i18n";
 import {Flag, estimatedOvr} from "./common";
 import {Avatar} from "./Avatar";
+import {GearPicture} from "./Gear";
 
 const OUTFIELD: Attribute[] = ["pace", "finishing", "passing", "technique", "defending", "physical"];
 const KEEPER: Attribute[] = ["goalkeeping", "vision", "passing", "physical", "pace", "stamina"];
@@ -42,7 +44,7 @@ export function PlayerCard({game, player, reveal, stage, forClubId}: {game: Game
       <div className="fut-top">
         <div className="fut-rating">
           <span className={(known ? "fut-ovr" : "fut-ovr estimated") + step(4)} title={known ? undefined : t("pl.estimated")}>{ovr}</span>
-          <span className={"fut-pos" + step(3)}>{t(`pos.${player.position}`)}</span>
+          <span className={"fut-pos" + step(3)}>{iconize(t(`pos.${player.position}`))}</span>
           <span className={"fut-flag" + step(2)}><Flag code={player.nationality} size={24} /></span>
           {club && (
             <span className={"fut-crest" + step(1)} style={{background: club.color, color: club.color2}}>{club.short}</span>
@@ -57,13 +59,18 @@ export function PlayerCard({game, player, reveal, stage, forClubId}: {game: Game
           />
         </div>
       </div>
-      <div className={"fut-name" + step(5)}>{shortName(player)}</div>
-      {talent && <div className={"fut-badge" + step(6)}>✨ {t("card.talent")}</div>}
+      {/* The name, with the kit worn either side: boots (or gloves) left, shin guards right. */}
+      <div className={"fut-name" + step(5)}>
+        <span className="fut-kit">{player.gear && <GearPicture item={player.gear} size={player.gear.kind === "gloves" ? 16 : 24} />}</span>
+        <span className="fut-name-text">{shortName(player)}</span>
+        <span className="fut-kit">{player.shin && <GearPicture item={player.shin} size={16} />}</span>
+      </div>
+      {talent && <div className={"fut-badge" + step(6)}><Icon name="sparkle" size={18} /> {iconize(t("card.talent"))}</div>}
       <div className={"fut-stats" + step(6)}>
         {attrs.map((a) => (
           <div key={a} className="fut-stat">
             <strong>{known ? Math.round(player.attrs[a]) : "?"}</strong>
-            <span>{t(`card.${a}`)}</span>
+            <span>{iconize(t(`card.${a}`))}</span>
           </div>
         ))}
       </div>

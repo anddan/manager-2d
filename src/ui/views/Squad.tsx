@@ -1,4 +1,5 @@
 import {useState} from "react";
+import {Icon, iconize} from "../Icon";
 import {fullName, listName, shortName, userClub} from "../../game/helpers";
 import {clubPlayers, overall} from "../../game/ratings";
 import {takerSkill} from "../../game/setpieces";
@@ -6,7 +7,7 @@ import {POSITIONS, TEAM_ROLES, type Player, type TeamRole} from "../../game/type
 import {useT, type TKey} from "../../i18n";
 import {useGame, useGameState} from "../../store";
 import {Avatar} from "../Avatar";
-import {Bar, Card, Face, Flag, FormArrow, PosBadge, StatusIcons} from "../common";
+import {Bar, Card, Face, Flag, FormArrow, PosBadge, StatusIcons, Hint} from "../common";
 
 type SortKey = "pos" | "name" | "age" | "ovr" | "form" | "fitness" | "happiness" | "value" | "wage";
 
@@ -71,12 +72,12 @@ export function Squad() {
               {COLUMNS.map((c) => (
                 <th key={c.key} title={c.key === "ovr" ? t("col.ovrHint") : undefined}>
                   <button className="th-btn" onClick={() => onSort(c.key)}>
-                    {t(c.label)}{sort === c.key ? (desc ? " ▼" : " ▲") : ""}
+                    {iconize(t(c.label))}{sort === c.key ? (desc ? " ▼" : " ▲") : ""}
                   </button>
                 </th>
               ))}
-              <th>{t("col.contract")}</th>
-              <th>{t("col.role")}</th>
+              <th>{iconize(t("col.contract"))}</th>
+              <th>{iconize(t("col.role"))}</th>
             </tr>
           </thead>
           <tbody>
@@ -95,7 +96,7 @@ export function Squad() {
                 <td className="num">{money(p.value)}</td>
                 <td className="num">{money(p.contract.wage)}</td>
                 <td className="num">{p.contract.expiresSeason}</td>
-                <td>{t(`role.${p.contract.role}`)}</td>
+                <td>{iconize(t(`role.${p.contract.role}`))}</td>
               </tr>
             ))}
           </tbody>
@@ -103,7 +104,7 @@ export function Squad() {
       </div>
       {loanedOut.length > 0 && (
         <>
-          <h3>{t("squad.loanedOut")}</h3>
+          <h3>{iconize(t("squad.loanedOut"))}</h3>
           <ul className="plain-list">
             {loanedOut.map((p) => (
               <li key={p.id}>
@@ -176,7 +177,7 @@ function TeamRolesCard() {
       className="roles-card"
       title={
         <button className="card-toggle" aria-expanded={shown} onClick={toggle}>
-          🎽 {t("roles.title")} <span className="card-toggle-arrow" aria-hidden>{shown ? "▲" : "▼"}</span>
+          <Icon name="shirt" size={18} /> {iconize(t("roles.title"))} <span className="card-toggle-arrow" aria-hidden>{shown ? "▲" : "▼"}</span>
         </button>
       }
     >
@@ -194,7 +195,7 @@ function TeamRolesCard() {
       )}
       {shown && (
       <>
-      <p className="muted small">{t("roles.hint")}</p>
+      <Hint>{iconize(t("roles.hint"))}</Hint>
       <div className="roles-grid">
         {TEAM_ROLES.map((role) => {
           const options = squad
@@ -212,7 +213,7 @@ function TeamRolesCard() {
             <div key={role} className={`role-tile ${isOpen ? "open" : ""}`}>
               <div className="role-head">
                 <span className="role-icon" aria-hidden>{ROLE_ICONS[role]}</span>
-                <span className="role-label">{t(`roles.${role}`)}</span>
+                <span className="role-label">{iconize(t(`roles.${role}`))}</span>
                 <button className="btn small" aria-expanded={isOpen} onClick={() => { setOpen(isOpen ? null : role); setAll(false); }}>
                   {isOpen ? t("roles.close") : t("roles.change")} {isOpen ? "▲" : "▼"}
                 </button>
@@ -236,7 +237,7 @@ function TeamRolesCard() {
                     <li key={p.id}>
                       <button className={`role-option ${current === p.id ? "active" : ""}`} onClick={() => choose(role, p.id)}>
                         <PosBadge pos={p.position} />
-                        <span className="role-option-name">{listName(p)}{club.lineup.includes(p.id) ? "" : <span className="muted small"> · {t("roles.notStarting")}</span>}</span>
+                        <span className="role-option-name">{listName(p)}{club.lineup.includes(p.id) ? "" : <span className="muted small"> · {iconize(t("roles.notStarting"))}</span>}</span>
                         <span className="num">{roleSkill(p, role)}</span>
                         <Bar value={roleSkill(p, role)} small />
                       </button>
@@ -244,7 +245,7 @@ function TeamRolesCard() {
                   ))}
                   {!all && options.length > shown.length && (
                     <li>
-                      <button className="link small" onClick={() => setAll(true)}>{t("roles.showAll", {n: options.length})}</button>
+                      <button className="link small" onClick={() => setAll(true)}>{iconize(t("roles.showAll", {n: options.length}))}</button>
                     </li>
                   )}
                 </ul>

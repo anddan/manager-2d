@@ -1,6 +1,8 @@
 // Boots and gloves in the UI: each pair as a card (basic, silver, gold or special, like
 // the player cards) with a picture and what it gives; the shop's rack to buy from; and
 // the part of a player's profile where they're put on and taken off.
+import {Icon, iconize} from "./Icon";
+import {Hint} from "./common";
 import {useState} from "react";
 import {GEAR_ATTRS, GEAR_KIND_COLOR, GEAR_KINDS, SHIN_PROTECT, gearIn, gearSlot, type GearSlot, GEAR_PRICE, GEAR_TIERS, buyGear, equipGear, gearBonus, gearFits, unequipGear, type GearItem, type GearKind, type GearTier} from "../game/gear";
 import type {Attribute, Player} from "../game/types";
@@ -91,22 +93,22 @@ export function GearCard({item, small}: {item: GearItem; small?: boolean}) {
       <div className="fut-top">
         <div className="fut-rating">
           <span className="fut-ovr">+{bonus[0][1]}</span>
-          <span className="fut-pos">{t(`gear.tier.${item.tier}`)}</span>
+          <span className="fut-pos">{iconize(t(`gear.tier.${item.tier}`))}</span>
         </div>
         <div className="fut-portrait"><GearPicture item={item} size={item.kind === "gloves" ? (small ? 40 : 58) : item.kind === "shin" ? (small ? 36 : 50) : small ? 58 : 84} /></div>
       </div>
-      <div className="fut-name">{t(`gear.kind.${item.kind}`)}</div>
+      <div className="fut-name">{iconize(t(`gear.kind.${item.kind}`))}</div>
       <div className="gear-card-stats">
         {bonus.map(([a, n]) => (
           <div key={a} className="fut-stat">
             <strong>+{n}</strong>
-            <span>{t(`attr.${a}`)}</span>
+            <span>{iconize(t(`attr.${a}`))}</span>
           </div>
         ))}
         {item.kind === "shin" && (
           <div className="fut-stat">
             <strong className="nowrap">−{Math.round(SHIN_PROTECT[item.tier] * 100)}&nbsp;%</strong>
-            <span>{t("gear.injuries")}</span>
+            <span>{iconize(t("gear.injuries"))}</span>
           </div>
         )}
       </div>
@@ -136,18 +138,18 @@ export function GearShop() {
   };
   return (
     <>
-      <p className="muted">{t("gear.hint")}</p>
+      <Hint>{iconize(t("gear.hint"))}</Hint>
       <div className="gear-kinds" role="tablist">
         {GEAR_KINDS.map((k) => (
           <button key={k} role="tab" aria-selected={k === kind} className={k === kind ? "gear-kind-tab on" : "gear-kind-tab"} onClick={() => setKind(k)}>
             <GearPicture item={{kind: k, tier: "common"}} size={k === "shin" ? 24 : 34} />
-            <span>{t(`gear.kind.${k}`)}</span>
+            <span>{iconize(t(`gear.kind.${k}`))}</span>
           </button>
         ))}
       </div>
       <p className="muted small">
-        {t("gear.lifts", {attrs: GEAR_ATTRS[kind].map((a) => t(`attr.${a}`)).join(", ")})} ·{" "}
-        <button className="link" onClick={() => setView("storage")}>👟 {t("gear.inBag", {n: game.gearBag?.length ?? 0})}</button>
+        {iconize(t("gear.lifts", {attrs: GEAR_ATTRS[kind].map((a) => t(`attr.${a}`)).join(", ")}))} ·{" "}
+        <button className="link" onClick={() => setView("storage")}><Icon name="boot" size={18} /> {iconize(t("gear.inBag", {n: game.gearBag?.length ?? 0}))}</button>
       </p>
       <div className="gear-cards">
         {GEAR_TIERS.map((tier) => {
@@ -158,7 +160,7 @@ export function GearShop() {
             <div key={tier} className={gift ? "gear-offer free" : "gear-offer"}>
               <GearCard item={{kind, tier}} />
               <button className="ppack-btn" disabled={!afford} onClick={() => buy({kind, tier})}>
-                {gift ? `🎁 ${t("gear.free")}` : `${price.diamonds ? `💎 ${price.diamonds}` : `💰 ${money(price.money ?? 0)}`} · ${t("gear.buy")}`}
+                {gift ? <><Icon name="gift" size={18} /> {iconize(t("gear.free"))}</> : `${price.diamonds ? `💎 ${price.diamonds}` : `💰 ${money(price.money ?? 0)}`} · ${t("gear.buy")}`}
               </button>
             </div>
           );
@@ -190,26 +192,26 @@ function GearSlotPanel({player: p, slot}: {player: Player; slot: GearSlot}) {
     const err = act((g) => equipGear(g, p.id, i));
     if (err) notify(err, undefined, "error");
   };
-  const title = slot === "shin" ? `🦵 ${t("gear.kind.shin")}` : gloves ? `🧤 ${t("gear.gloves")}` : `👟 ${t("gear.boots")}`;
+  const title = slot === "shin" ? <><Icon name="shin" size={18} /> {iconize(t("gear.kind.shin"))}</> : gloves ? <><Icon name="glove" size={18} /> {iconize(t("gear.gloves"))}</> : <><Icon name="boot" size={18} /> {iconize(t("gear.boots"))}</>;
   return (
     <section className="gear-slot">
       <h4>{title}</h4>
       {worn ? (
         <div className="gear-offer">
           <GearCard item={worn} small />
-          <button className="btn small" onClick={() => act((g) => unequipGear(g, p.id, slot))}>{t("gear.takeOff")}</button>
+          <button className="btn small" onClick={() => act((g) => unequipGear(g, p.id, slot))}>{iconize(t("gear.takeOff"))}</button>
         </div>
       ) : (
-        <p className="muted small">{t(slot === "shin" ? "gear.noneShin" : gloves ? "gear.noneGloves" : "gear.noneBoots")}</p>
+        <p className="muted small">{iconize(t(slot === "shin" ? "gear.noneShin" : gloves ? "gear.noneGloves" : "gear.noneBoots"))}</p>
       )}
       {bag.length > 0 && (
         <>
-          <h4 className="muted small">👟 {t("gear.bag")}</h4>
+          <h4 className="muted small"><Icon name="boot" size={18} /> {iconize(t("gear.bag"))}</h4>
           <div className="gear-cards">
             {bag.map(({item, i}) => (
               <div key={i} className="gear-offer">
                 <GearCard item={item} small />
-                <button className="btn small primary" onClick={() => putOn(i)}>{t("gear.putOn")}</button>
+                <button className="btn small primary" onClick={() => putOn(i)}>{iconize(t("gear.putOn"))}</button>
               </div>
             ))}
           </div>

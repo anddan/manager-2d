@@ -1,6 +1,7 @@
 // The manager's profile: who they are and what they've won. The manager's name
 // can be changed here, the club given a nickname (the way players can: shown
 // everywhere, with the real name kept alongside in brackets here) and its colours.
+import {Icon, iconize} from "./Icon";
 import {useState} from "react";
 import {CUP_ROUNDS} from "../game/cup";
 import {leaguePosition} from "../game/league";
@@ -51,7 +52,7 @@ export function ManagerProfile({onClose}: {onClose: () => void}) {
   return (
     <Modal title={t("mgr.title")} onClose={onClose}>
       <section className="mgr-section">
-      <h3 className="mgr-section-title">👔 {t("mgr.sectionManager")}</h3>
+      <h3 className="mgr-section-title"><Icon name="user" size={18} /> {iconize(t("mgr.sectionManager"))}</h3>
       <div className="mgr-head">
         <ManagerAvatar look={game.managerLook ?? defaultManagerLook(game.managerName)} size={84} tie={color} />
         <div>
@@ -60,27 +61,27 @@ export function ManagerProfile({onClose}: {onClose: () => void}) {
         </div>
       </div>
 
-      <h4>✏️ {t("mgr.managerName")}</h4>
+      <h4><Icon name="pen" size={18} /> {iconize(t("mgr.managerName"))}</h4>
       <input className="input mgr-input" value={managerName} maxLength={30} placeholder={game.managerName} onChange={(e) => setManagerName(e.target.value)} />
 
-      <h4>🏆 {t("mgr.trophies")}</h4>
+      <h4><Icon name="trophy" size={18} /> {iconize(t("mgr.trophies"))}</h4>
       {trophies.length === 0 ? (
-        <p className="muted">{t("mgr.noTrophies")}</p>
+        <p className="muted">{iconize(t("mgr.noTrophies"))}</p>
       ) : (
         <ul className="mgr-trophies">
-          {trophies.map((tr, i) => <li key={i}>🏆 {tx(tr.key, {season: tr.season})}</li>)}
+          {trophies.map((tr, i) => <li key={i}><Icon name="trophy" size={18} /> {iconize(tx(tr.key, {season: tr.season}))}</li>)}
         </ul>
       )}
 
-      <h4>📜 {t("mgr.career")}</h4>
+      <h4><Icon name="list" size={18} /> {iconize(t("mgr.career"))}</h4>
       <ul className="mgr-career">
         <li>
-          <strong>{game.season}</strong> {t("mgr.now", {position: leaguePosition(game, club.id)})}
+          <strong>{game.season}</strong> {iconize(t("mgr.now", {position: leaguePosition(game, club.id)}))}
         </li>
         {[...game.history].reverse().map((h) => (
           <li key={h.season}>
-            <strong>{h.season}</strong> {t("mgr.position", {position: h.userPosition})}
-            {h.cup !== undefined && <> · {t("cup.name")}: {cupText(h.cup)}</>}
+            <strong>{h.season}</strong> {iconize(t("mgr.position", {position: h.userPosition}))}
+            {h.cup !== undefined && <> · {iconize(t("cup.name"))}: {cupText(h.cup)}</>}
           </li>
         ))}
       </ul>
@@ -89,15 +90,15 @@ export function ManagerProfile({onClose}: {onClose: () => void}) {
 
       {/* The club: its nickname, initials and colours. */}
       <section className="mgr-section">
-      <h3 className="mgr-section-title">🏟️ {t("mgr.sectionClub")}</h3>
-      <h4>✏️ {t("mgr.clubNick")}</h4>
-      <p className="muted small">{t("mgr.clubNickHint", {name: official})}</p>
+      <h3 className="mgr-section-title"><Icon name="stadium" size={18} /> {iconize(t("mgr.sectionClub"))}</h3>
+      <h4><Icon name="pen" size={18} /> {iconize(t("mgr.clubNick"))}</h4>
+      <p className="muted small">{iconize(t("mgr.clubNickHint", {name: official}))}</p>
       <input className="input mgr-input" value={nick} maxLength={30} placeholder={official} onChange={(e) => setNick(e.target.value)} />
 
-      <h4>🔤 {t("mgr.initials")}</h4>
+      <h4><Icon name="text" size={18} /> {iconize(t("mgr.initials"))}</h4>
       <input className="input mgr-initials" value={short} maxLength={3} placeholder={club.short} onChange={(e) => setShort(e.target.value.toUpperCase())} aria-label={t("mgr.initials")} />
 
-      <h4>🎨 {t("mgr.colors")}</h4>
+      <h4><Icon name="palette" size={18} /> {iconize(t("mgr.colors"))}</h4>
       <div className="mgr-colors">
         <span className="crest big" style={{background: color, color: color2}} aria-hidden>{short.trim().toUpperCase() || club.short}</span>
         <div className="mgr-swatch-rows">
@@ -109,8 +110,8 @@ export function ManagerProfile({onClose}: {onClose: () => void}) {
 
       {/* Always in view at the bottom of the dialog, however far it's scrolled. */}
       <div className="btn-row dialog-actions mgr-actions">
-        <button className="btn" onClick={onClose}>{t("common.cancel")}</button>
-        <button className="btn primary" onClick={save}>{t("mgr.save")}</button>
+        <button className="btn" onClick={onClose}>{iconize(t("common.cancel"))}</button>
+        <button className="btn primary" onClick={save}>{iconize(t("mgr.save"))}</button>
       </div>
     </Modal>
   );

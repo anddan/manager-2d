@@ -1,16 +1,15 @@
-/* Forza Manager. A fantasy-league look: deep navy chrome, signal-yellow
-   highlights, bold condensed headings and shirts with name plates on the
-   pitch. Dark by default, light when the system asks for it.
-   Layout: sidebar on desktop, bottom nav on mobile. */
+/* Forza Manager. Deep navy with bright blue: rounded blue-grey cards, white line icons
+   that turn blue when chosen, pill tabs, and a bottom bar with a round play button in
+   the middle. Bold condensed headings and shirts with name plates on the pitch. Always dark. */
 :root {
-  --bg: #0a1020;
-  --surface: #121a2e;
-  --surface-2: #1a2440;
-  --border: #26324f;
-  --text: #eef2fb;
-  --muted: #95a1bd;
-  --accent: #ffd400;
-  --accent-ink: #111827;
+  --bg: #071226;
+  --surface: #0f1f3b;
+  --surface-2: #152a4d;
+  --border: #1f3a63;
+  --text: #eef4ff;
+  --muted: #8ea3c4;
+  --accent: #1e9bff;
+  --accent-ink: #ffffff;
   /* The top bar's pills: its navy with a touch of white. */
   --btn-navy: #1e2741;
   --btn-navy-hover: #283352;
@@ -18,8 +17,8 @@
   --btn-gold: #d4a017;
   --btn-gold-ink: #fcd34d;
   /* Accent used as text or a thin line, readable on the surface. */
-  --accent-text: #ffd400;
-  --chrome: #0b1430;
+  --accent-text: #5cb8ff;
+  --chrome: #0a1830;
   --chrome-ink: #ffffff;
   --good: #22c55e;
   --mid: #f59e0b;
@@ -28,25 +27,10 @@
   --grass-2: #287a3e;
   --plate: #ffffff;
   --plate-ink: #0b1430;
-  --radius: 12px;
+  --radius: 18px;
   --shadow: 0 6px 24px rgb(0 0 0 / 0.3);
   --display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
   color-scheme: dark;
-}
-@media (prefers-color-scheme: light) {
-  :root {
-    --bg: #eef1f6;
-    --surface: #ffffff;
-    --surface-2: #f3f5f9;
-    --border: #dbe1ec;
-    --text: #0b1430;
-    --muted: #5b6684;
-    --accent: #ffd400;
-    --accent-ink: #111827;
-    --accent-text: #8a6d00;
-    --shadow: 0 6px 24px rgb(11 20 48 / 0.08);
-    color-scheme: light;
-  }
 }
 
 * { box-sizing: border-box; }
@@ -1626,3 +1610,223 @@ html:has(.modal-backdrop), body:has(.modal-backdrop) { overflow: hidden; }
 .tour-shade { position: fixed; z-index: 390; background: rgb(2 6 23 / 0.5); pointer-events: auto; }
 .pack-actions { justify-content: center; }
 .pack-reveal .quick-sale { text-align: center; } .pack-reveal .quick-sale .dialog-actions { justify-content: center; }
+
+/* ===== The new navigation and look ===== */
+body { background: radial-gradient(120% 60% at 50% 0%, #10264a 0%, var(--bg) 60%) fixed, var(--bg); }
+.app { display: block; }
+.main { min-height: 100vh; }
+.content { padding-bottom: 130px; }
+.topbar { border-bottom: 1px solid rgb(255 255 255 / 0.06); background: rgb(7 18 38 / 0.85); backdrop-filter: blur(10px); }
+.card { border-radius: var(--radius); background: linear-gradient(180deg, #11234299, #0d1c36), var(--surface); border-color: #1d3760; }
+.icon { display: block; flex: none; }
+
+/* The bottom bar: two groups, the round play button, two groups. */
+.nav {
+  position: fixed; left: 50%; bottom: 0; transform: translateX(-50%); top: auto; z-index: 30;
+  width: min(560px, 100%); height: auto; display: grid; grid-template-columns: 1fr 1fr 92px 1fr 1fr; align-items: end;
+  padding: 8px 8px calc(8px + env(safe-area-inset-bottom)); gap: 0; overflow: visible;
+  background: rgb(8 20 42 / 0.94); backdrop-filter: blur(12px); border: 1px solid rgb(255 255 255 / 0.06); border-bottom: 0;
+  border-radius: 22px 22px 0 0; box-shadow: 0 -8px 30px rgb(0 0 0 / 0.35); flex-direction: row;
+}
+.nav .nav-item {
+  display: grid; justify-items: center; gap: 3px; padding: 6px 4px; border: 0; background: none; color: #fff; opacity: 0.92;
+  font-size: 0.72rem; font-weight: 600; border-radius: 12px; cursor: pointer; position: relative; min-width: 0; box-shadow: none;
+}
+.nav .nav-item:hover { background: rgb(255 255 255 / 0.05); }
+.nav .nav-item.active, .nav .nav-item.open { color: var(--accent); opacity: 1; background: none; box-shadow: none; }
+.nav .badge { position: absolute; top: 0; right: calc(50% - 22px); margin: 0; }
+.nav-play { display: grid; justify-items: center; gap: 3px; position: relative; }
+.play-circle {
+  width: 66px; height: 66px; border-radius: 50%; border: 4px solid #0a1830; margin-top: -34px; display: grid; place-items: center; cursor: pointer;
+  background: radial-gradient(circle at 35% 30%, #4fb3ff, var(--accent) 55%, #0b6fd6); color: #fff;
+  box-shadow: 0 0 0 1px rgb(30 155 255 / 0.5), 0 8px 24px rgb(30 155 255 / 0.55);
+  transition: transform 0.15s;
+}
+.play-circle:hover { transform: scale(1.05); }
+.play-circle:active { transform: scale(0.95); }
+.play-circle.match { background: radial-gradient(circle at 35% 30%, #6ee7a8, #16a34a 55%, #0f7a37); box-shadow: 0 0 0 1px rgb(34 197 94 / 0.5), 0 8px 24px rgb(34 197 94 / 0.5); }
+.nav-play-label { font-size: 0.68rem; font-weight: 700; color: #fff; white-space: nowrap; }
+
+/* A group's pages, popped out in an arc over the bar. */
+.nav-arc-backdrop { position: fixed; inset: 0; z-index: 29; background: rgb(2 8 20 / 0.55); backdrop-filter: blur(2px); animation: fade-in 0.15s ease-out; }
+.nav-arc { position: fixed; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom)); width: 0; height: 0; }
+.arc-item {
+  position: absolute; left: -36px; top: -40px; width: 72px; display: grid; justify-items: center; gap: 4px;
+  border: 0; background: none; color: #fff; cursor: pointer; font: inherit; animation: arc-pop 0.22s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+.arc-circle {
+  width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; color: #fff;
+  background: linear-gradient(180deg, #1b3561, #12264a); border: 1px solid rgb(255 255 255 / 0.12); box-shadow: 0 6px 18px rgb(0 0 0 / 0.45);
+}
+.arc-item.active .arc-circle { background: var(--accent); border-color: transparent; box-shadow: 0 6px 18px rgb(30 155 255 / 0.55); }
+.arc-label { font-size: 0.72rem; font-weight: 700; text-shadow: 0 1px 3px rgb(0 0 0 / 0.8); white-space: nowrap; }
+.arc-item .badge { position: absolute; top: -2px; right: 6px; margin: 0; }
+@keyframes arc-pop { from { opacity: 0; scale: 0.3; } to { opacity: 1; scale: 1; } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .arc-item, .nav-arc-backdrop { animation: none; } }
+
+/* The group's pages on top of the page, as pill tabs. */
+.group-tabs { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 10px; margin-bottom: 4px; scrollbar-width: none; }
+.group-tabs::-webkit-scrollbar { display: none; }
+.pill-tab {
+  display: inline-flex; align-items: center; gap: 6px; flex: none; padding: 8px 16px; border-radius: 999px; cursor: pointer; font: inherit;
+  font-weight: 700; font-size: 0.85rem; color: #fff; background: rgb(255 255 255 / 0.03); border: 1.5px solid rgb(255 255 255 / 0.22); position: relative;
+}
+.pill-tab.active { background: var(--accent); border-color: var(--accent); box-shadow: 0 4px 14px rgb(30 155 255 / 0.4); }
+.pill-tab .badge { margin-left: 2px; }
+.nav-play .play-circle { grid-area: auto; padding: 0; }
+
+/* A card's explanation behind an (i) at its top right. */
+.card { position: relative; }
+.hint-btn {
+  position: absolute; top: 12px; right: 12px; z-index: 1; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center;
+  border: 1px solid rgb(255 255 255 / 0.18); background: rgb(255 255 255 / 0.05); color: #fff; cursor: pointer; padding: 0;
+}
+.hint-btn:hover { color: var(--accent); border-color: var(--accent); }
+.card:has(.hint-btn) > .card-head { padding-right: 44px; }
+.hint-text { line-height: 1.5; }
+/* Buttons like the picture: the main one bright blue, the others outlined pills. */
+.btn { border-radius: 999px; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 4px 14px rgb(30 155 255 / 0.35); }
+.btn.primary:hover:not(:disabled) { background: #3aa9ff; border-color: #3aa9ff; }
+
+/* Line icons beside words in headings, tabs and buttons. */
+h2, h3, .modal-head h2 { display: flex; align-items: center; gap: 8px; }
+.btn, .tab, .pill-tab, .link, .ppack-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.icon { flex: none; }
+
+/* Tabs inside a page look like the pill tabs on top. */
+.tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 10px; border: 0; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tabs .tab {
+  flex: none; padding: 7px 14px; border-radius: 999px; border: 1.5px solid rgb(255 255 255 / 0.22); background: rgb(255 255 255 / 0.03);
+  color: #fff; font-weight: 700; font-size: 0.85rem; cursor: pointer;
+}
+.tabs .tab.active { background: var(--accent); border-color: var(--accent); box-shadow: 0 4px 14px rgb(30 155 255 / 0.4); }
+/* A card with an (i) but no heading: room at the top for it, so it never sits on the content. */
+.card:has(> .hint-btn):not(:has(> .card-head)) { padding-top: 54px; }
+
+/* Sub-tabs under a tab (the squad and their contracts; finances and the arena). */
+.sub-tabs { display: flex; gap: 6px; margin: -2px 0 10px; }
+.sub-tab {
+  display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: 999px; border: 0; cursor: pointer; font: inherit;
+  font-size: 0.8rem; font-weight: 700; color: var(--muted); background: rgb(255 255 255 / 0.05);
+}
+.sub-tab.active { color: #fff; background: rgb(30 155 255 / 0.25); box-shadow: inset 0 0 0 1px rgb(30 155 255 / 0.6); }
+
+/* The top bar in the new look: outlined pills with white icons, the crest rounded, a gear for Settings. */
+.topbar { background: rgb(7 18 38 / 0.88); border-bottom: 1px solid rgb(255 255 255 / 0.06); }
+.topbar .chip {
+  display: inline-flex; align-items: center; gap: 5px; background: rgb(255 255 255 / 0.03); border: 1.5px solid rgb(255 255 255 / 0.18);
+  color: #fff; font-weight: 700;
+}
+.topbar .chip .icon { color: var(--accent-text); }
+.topbar .crest { border-radius: 12px; }
+.topbar-club small { color: var(--muted); }
+.icon-round {
+  width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; flex: none; cursor: pointer; padding: 0;
+  border: 1.5px solid rgb(255 255 255 / 0.18); background: rgb(255 255 255 / 0.03); color: #fff;
+}
+.icon-round.active, .icon-round:hover { color: var(--accent); border-color: var(--accent); }
+.topbar-diamonds { display: none !important; }
+@media (max-width: 599px) {
+  .topbar { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "club manager gear" "stats stats stats"; }
+  .topbar .icon-round { grid-area: gear; }
+  .topbar-stats { gap: 6px; }
+}
+.icon { display: inline-block; vertical-align: -0.18em; }
+
+/* Real tabs: a full-width row, the chosen one underlined in blue (sub-pages, Training's modes). */
+.real-tabs { display: flex; border-bottom: 1px solid rgb(255 255 255 / 0.12); margin: 0 0 12px; }
+.real-tab {
+  flex: 1 1 0; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 6px;
+  border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; background: none; color: var(--muted); font: inherit;
+  font-weight: 700; font-size: 0.9rem; cursor: pointer; white-space: nowrap;
+}
+.real-tab:hover { color: #fff; }
+.real-tab.active { color: #fff; border-bottom-color: var(--accent); }
+.real-tab.active .icon { color: var(--accent); }
+.content > .real-tabs { margin-bottom: 14px; }
+
+/* The (i): a plain icon, centred on the card's heading row. */
+.hint-btn { top: 13px; right: 12px; width: 30px; height: 30px; border: 0; background: none; color: var(--muted); }
+.hint-btn:hover { color: var(--accent); background: none; }
+
+/* Rows wider than the screen scroll sideways with a thin, quiet bar (and drag with the mouse). */
+.group-tabs, .tabs, .gear-kinds, .table-wrap { scrollbar-width: thin; scrollbar-color: rgb(255 255 255 / 0.18) transparent; cursor: grab; }
+.table-wrap { cursor: auto; }
+.group-tabs::-webkit-scrollbar, .tabs::-webkit-scrollbar, .gear-kinds::-webkit-scrollbar, .table-wrap::-webkit-scrollbar { display: block; height: 4px; }
+.group-tabs::-webkit-scrollbar-thumb, .tabs::-webkit-scrollbar-thumb, .gear-kinds::-webkit-scrollbar-thumb, .table-wrap::-webkit-scrollbar-thumb { background: rgb(255 255 255 / 0.18); border-radius: 999px; }
+.group-tabs::-webkit-scrollbar-track, .tabs::-webkit-scrollbar-track, .gear-kinds::-webkit-scrollbar-track, .table-wrap::-webkit-scrollbar-track { background: transparent; }
+.group-tabs, .tabs { padding-bottom: 8px; }
+
+/* Energy as a number. */
+.energy-count { display: flex; align-items: center; gap: 8px; font-size: 1.6rem; margin: 2px 0 10px; }
+.energy-count .icon { color: var(--accent-text); }
+.inbox-kind { color: var(--accent-text); display: inline-flex; }
+.train-plan-icon { color: var(--accent-text); display: inline-flex; }
+.next-match-where { color: var(--muted); font-weight: 600; text-transform: none; font-family: inherit; font-size: 0.85rem; }
+/* The shop and daily tasks with line icons: blue on the dark cards. */
+.daily-icon { color: var(--accent-text); display: inline-grid; place-items: center; }
+.daily-reward .icon, .pack-amount .icon, .shop-balance .icon { color: var(--accent-text); }
+.pack-amount { display: inline-flex; align-items: center; gap: 6px; }
+/* The bursts (+diamonds, −energy) in the new colours, with the line icons. */
+.burst-text { display: inline-flex; align-items: center; gap: 4px; color: #fff; text-shadow: 0 2px 6px rgb(0 0 0 / 0.6), 0 0 12px rgb(30 155 255 / 0.8); }
+.burst-text .icon, .burst-gem .icon { color: #5cb8ff; vertical-align: middle; }
+.burst-text.energy { color: #fff; text-shadow: 0 2px 6px rgb(0 0 0 / 0.6), 0 0 12px rgb(30 155 255 / 0.8); }
+.burst-gem { color: #5cb8ff; }
+
+/* The (i) in the heading row: centred on it, at its right end (after any buttons). */
+.card-head .hint-btn.in-head { position: static; margin-left: auto; flex: none; width: 30px; height: 30px; margin-right: -6px; }
+.card-head .card-actions + .hint-btn.in-head { margin-left: 4px; }
+.card:has(.hint-btn) > .card-head { padding-right: 14px; }
+
+/* The manager in the top bar: the round ringed style of the gear beside it. */
+.topbar-manager { background: none; padding: 0; border-radius: 50%; }
+.topbar-manager .avatar { border-radius: 50%; background: rgb(255 255 255 / 0.03); box-shadow: inset 0 0 0 1.5px rgb(255 255 255 / 0.18); width: 38px; height: 38px; }
+.topbar-manager:hover .avatar { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.card-head .hint-btn.in-head { width: 26px; height: 26px; margin-block: -2px; }
+/* After the match: the choices as icon tiles; what they do behind the (i) by the verdict. */
+.tt-verdict-row { display: flex; align-items: flex-start; gap: 8px; }
+.tt-verdict-row .tt-verdict { flex: 1; margin: 0 0 10px; }
+.tt-verdict-row .hint-btn { position: static; flex: none; width: 28px; height: 28px; margin-top: -3px; }
+.tt-option { justify-items: center; text-align: center; gap: 6px; padding: 14px 8px; }
+.tt-option .icon { color: var(--accent-text); }
+.tt-option.active .icon { color: #fff; }
+.tt-help { display: grid; gap: 10px; margin: 0; }
+.tt-help dt { display: flex; align-items: center; gap: 6px; font-weight: 700; }
+.tt-help dt .icon { color: var(--accent-text); }
+.tt-help dd { margin: 2px 0 0 22px; color: var(--muted); }
+.max-forza .icon, .forza-btn .icon { color: #fff; }
+/* Softer glow on the chosen tab and the blue buttons (it reached the edges). */
+.pill-tab.active, .tabs .tab.active { box-shadow: 0 2px 8px rgb(30 155 255 / 0.22); }
+.btn.primary { box-shadow: 0 2px 8px rgb(30 155 255 / 0.2); }
+.tt-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* After the match: smaller choice tiles. */
+.tt-option { padding: 8px 6px; gap: 3px; font-size: 0.85rem; }
+.tt-option .icon { width: 20px; height: 20px; }
+.tt-options { gap: 6px; }
+/* The card's name row with the kit worn either side. */
+.fut-name { display: grid; grid-template-columns: 26px minmax(0, 1fr) 26px; align-items: center; gap: 4px; }
+.fut-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fut-kit { display: grid; place-items: center; }
+.fut-kit .gear-picture { display: block; filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.35)); }
+/* After the match: each choice a slim row, icon beside the words, one under the other. */
+.tt-options { grid-template-columns: 1fr; gap: 6px; }
+.tt-option { display: flex; align-items: center; justify-content: flex-start; gap: 10px; padding: 7px 12px; text-align: left; font-size: 0.85rem; border-radius: 10px; }
+.tt-option .icon { width: 18px; height: 18px; }
+
+.tt-help-title { margin: 14px 0 6px; }
+.tt-help-list { margin: 0; padding-left: 18px; display: grid; gap: 6px; color: var(--muted); }
+.tt-help-list li::marker { color: var(--accent-text); }
+/* "How it works on the players", folded away until opened. */
+.tt-help-more { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 6px; }
+.tt-help-more > summary { cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; }
+.tt-help-more > summary::-webkit-details-marker { display: none; }
+.tt-help-more > summary::after { content: "▼"; font-size: 0.7rem; opacity: 0.6; }
+.tt-help-more[open] > summary::after { content: "▲"; }
+.tt-help-more .tt-help-title { margin: 6px 0; }
+.tt-help-more .tt-help-list { margin-top: 6px; }
+/* "Forza!": the same blue glow as everything else (not orange). */
+.forza-glow { fill: rgb(30 155 255 / 0.32); stroke: #5cb8ff; }
+.forza-btn { background: linear-gradient(90deg, rgb(30 155 255 / 0.18), rgb(30 155 255 / 0.06)) !important; }
