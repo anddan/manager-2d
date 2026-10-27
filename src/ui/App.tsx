@@ -33,6 +33,7 @@ import {Shop} from "./views/Shop";
 import {Squad} from "./views/Squad";
 import {Table} from "./views/Table";
 import {Cup} from "./views/Cup";
+import {FriendCup} from "./views/FriendCup";
 import {Stadium} from "./views/Stadium";
 import {Tactics} from "./views/Tactics";
 import {Training} from "./views/Training";
@@ -48,6 +49,7 @@ const ICONS: Record<View, IconName> = {
   fixtures: "calendar",
   table: "list",
   cup: "trophy",
+  friends: "handshake",
   stadium: "stadium",
   transfers: "swap",
   contracts: "pen",
@@ -65,7 +67,7 @@ const NAV_GROUPS: {id: "home" | "team" | "matches" | "club"; icon: IconName; vie
   {id: "club", icon: "shield", views: ["finance", "transfers", "shop", "settings"]},
 ];
 /** Pages shown as a sub-tab of another (three tabs fit a phone): Contracts under Squad, Arena under Finance. */
-const SUB_PAGES: Partial<Record<View, View[]>> = {squad: ["squad", "contracts"], finance: ["finance", "stadium"]};
+const SUB_PAGES: Partial<Record<View, View[]>> = {squad: ["squad", "contracts"], finance: ["finance", "stadium"], cup: ["cup", "friends"]};
 /** The tab a page sits under (itself, or the page it's a sub-tab of). */
 const tabOf = (v: View): View => (Object.entries(SUB_PAGES).find(([, subs]) => subs!.includes(v))?.[0] as View | undefined) ?? v;
 /** The group a page is in. */
@@ -82,6 +84,7 @@ const SCREENS: Record<View, () => React.JSX.Element> = {
   fixtures: Fixtures,
   table: Table,
   cup: Cup,
+  friends: FriendCup,
   stadium: Stadium,
   transfers: Transfers,
   contracts: Contracts,
@@ -156,8 +159,17 @@ function Game() {
 /** Unread mail and daily rewards to collect, shown as a number on a page (and its group). */
 function useBadges(): Partial<Record<View, number>> {
   const game = useGameState();
-  return {inbox: game.inbox.filter((m) => !m.read).length, overview: dailyToCollect(game.daily)};
+  return {
+    inbox: game.inbox.filter((m) => !m.read).length,
+    overview: dailyToCollect(game.daily),
+    // Kit bought but not put on anyone yet.
+    storage: game.gearBag?.length ?? 0,
+  };
 }
+
+/** Pages whose number is a reminder rather than something waiting (shown in blue, not red). */
+const BLUE_BADGES: View[] = ["storage"];
+const badgeClass = (v: View) => (BLUE_BADGES.includes(v) ? "badge blue" : "badge");
 
 /**
  * The bar at the bottom: two groups, the round play button, two groups. Tapping a group
@@ -171,7 +183,8 @@ function Nav() {
   const [open, setOpen] = useState<string | null>(null);
   const group = NAV_GROUPS.find((g) => g.id === open);
   const current = groupOf(view);
-  const count = (g: (typeof NAV_GROUPS)[number]) => groupPages(g).reduce((n, v) => n + (badges[v] ?? 0), 0);
+  // A group's number: what's waiting (red) first, else the reminders (blue).
+  const count = (g: (typeof NAV_GROUPS)[number], blue: boolean) => groupPages(g).filter((v) => BLUE_BADGES.includes(v) === blue).reduce((n, v) => n + (badges[v] ?? 0), 0);
   const groupButton = (g: (typeof NAV_GROUPS)[number]) => (
     <button
       key={g.id}
@@ -182,7 +195,7 @@ function Nav() {
     >
       <Icon name={g.icon} />
       <span className="nav-label">{iconize(t(`nav.group.${g.id}`))}</span>
-      {count(g) > 0 && <span className="badge">{count(g)}</span>}
+      {count(g, false) > 0 ? <span className="badge">{count(g, false)}</span> : count(g, true) > 0 && <span className="badge blue">{count(g, true)}</span>}
     </button>
   );
   return (
@@ -208,7 +221,7 @@ function Nav() {
                 >
                   <span className="arc-circle"><Icon name={ICONS[v]} /></span>
                   <span className="arc-label">{iconize(t(`nav.${v}`))}</span>
-                  {(badges[v] ?? 0) > 0 && <span className="badge">{badges[v]}</span>}
+                  {(badges[v] ?? 0) > 0 && <span className={badgeClass(v)}>{badges[v]}</span>}
                 </button>
               );
             })}
@@ -249,7 +262,7 @@ function GroupTabs() {
           <button key={v} role="tab" aria-selected={v === tab} data-tour={`nav-${v}`} className={v === tab ? "pill-tab active" : "pill-tab"} onClick={() => setView(v)}>
             <Icon name={ICONS[v]} size={18} />
             <span>{iconize(t(`nav.${v}`))}</span>
-            {(badges[v] ?? 0) > 0 && <span className="badge">{badges[v]}</span>}
+            {(badges[v] ?? 0) > 0 && <span className={badgeClass(v)}>{badges[v]}</span>}
           </button>
         ))}
       </div>

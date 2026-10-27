@@ -20,6 +20,7 @@ export const VIEWS = [
   "fixtures",
   "table",
   "cup",
+  "friends",
   "stadium",
   "transfers",
   "contracts",
