@@ -43,6 +43,9 @@ import {
   deviceId,
   fetchTeam,
   joinCup,
+  loadSeen,
+  matchKey,
+  saveSeen,
   leaveCup,
   myCupCode,
   playNextRound,
@@ -520,25 +523,4 @@ function TeamView({code, member, sentAt, onClose}: {code: string; member: string
       {buying && <OfferDialog code={code} seller={member} player={buying} onClose={() => { setBuying(null); setCard(null); }} />}
     </Modal>
   );
-}
-
-/** A match's key among the seen ones: the cup, the round and its place in the round. */
-function matchKey(code: string, round: number, i: number): string {
-  return `${code}:${round}:${i}`;
-}
-const SEEN_KEY = "manager2d.friendSeen";
-function loadSeen(): Set<string> {
-  try {
-    return new Set(JSON.parse(localStorage.getItem(SEEN_KEY) ?? "[]") as string[]);
-  } catch {
-    return new Set();
-  }
-}
-function saveSeen(seen: Set<string>): Set<string> {
-  try {
-    localStorage.setItem(SEEN_KEY, JSON.stringify([...seen]));
-  } catch {
-    // Only for this visit then.
-  }
-  return seen;
 }

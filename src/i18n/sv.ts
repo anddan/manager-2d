@@ -72,6 +72,7 @@ export const sv = {
   "sale.gone": "Spelaren är redan såld.",
   "sale.own": "Det är din egen spelare.",
   "sale.bought": "{name} har kommit till din klubb!",
+  "sale.boughtTitle": "Ny spelare!",
   "sale.mine": "Till salu",
   "sale.mineHint": "Ge koden till en kompis. Pengarna kommer när spelaren är köpt.",
   "sale.sold": "{name} såldes för {price:money}!",

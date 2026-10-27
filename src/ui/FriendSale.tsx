@@ -11,7 +11,9 @@ import {useGame, useGameState} from "../store";
 import {Card, Hint, Modal} from "./common";
 import {diamondBurst, moneyBurst} from "./effects";
 import {Icon, iconize} from "./Icon";
+import {PackReveal} from "./PackReveal";
 import {PlayerCard} from "./PlayerCard";
+import {chime} from "./sound";
 import {buySale, cancelSale, clearSale, createSale, deviceId, fetchSale, watchSale, type SaleDoc} from "./friendCupApi";
 
 const fail = (e: unknown): TKey => (e instanceof Error && /^(friends|trade|sale)\./.test(e.message) ? (e.message as TKey) : "friends.err.offline");
@@ -104,6 +106,8 @@ export function CodeSales() {
   const [code, setCode] = useState("");
   const [sale, setSale] = useState<SaleDoc | null>(null);
   const [busy, setBusy] = useState(false);
+  // The player just bought, being revealed.
+  const [arrived, setArrived] = useState<string | null>(null);
   const mine = Object.entries(game.friendSales ?? {});
 
   const look = async () => {
@@ -128,11 +132,14 @@ export function CodeSales() {
     try {
       const bought = await buySale(s.code);
       if (!bought) throw new Error("sale.gone");
-      act((g) => {
-        if (!settleOnce(g, `sale:${s.code}`)) return;
+      const id = act((g) => {
+        if (!settleOnce(g, `sale:${s.code}`)) return null;
         tradePay(g, bought.currency ?? "money", -bought.price);
-        takeIn(g, JSON.parse(bought.player) as Player);
+        return takeIn(g, JSON.parse(bought.player) as Player);
       });
+      chime();
+      // The new player shown as from a pack: the card bit by bit.
+      if (id) setArrived(id);
       notify("sale.bought", {name: bought.playerName}, "good");
       setSale(null);
       setCode("");
@@ -189,6 +196,7 @@ export function CodeSales() {
           </ul>
         </section>
       )}
+      {arrived && <PackReveal playerId={arrived} title={<><Icon name="handshake" size={20} /> {iconize(t("sale.boughtTitle"))}</>} onClose={() => setArrived(null)} />}
       {sale && shown && (
         <Modal title={iconize(t("sale.buyTitle"))} compact onClose={() => setSale(null)}>
           <div className="friends-card">

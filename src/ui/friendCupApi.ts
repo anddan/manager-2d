@@ -59,6 +59,8 @@ export interface FriendRoundDoc {
 
 const DEVICE_KEY = "manager2d.deviceId";
 const CUP_KEY = "manager2d.friendCup";
+/** Fired when this device joins or leaves a cup, or sees a match (the menu's number follows). */
+export const CUP_EVENT = "manager2d.friendCup";
 
 /** This device's id in cups (made up once, kept in the browser). */
 let device: string | null = null;
@@ -93,6 +95,7 @@ export function setMyCupCode(code: string | null): void {
   try {
     if (code) localStorage.setItem(CUP_KEY, code);
     else localStorage.removeItem(CUP_KEY);
+    window.dispatchEvent(new Event(CUP_EVENT));
   } catch {
     // Only for this visit then.
   }
@@ -356,4 +359,26 @@ export function watchCup(
     onSnapshot(collection(d, "cups", code, "teams"), (s) => on.sent(Object.fromEntries(s.docs.map((x) => [x.id, (x.data() as {sentAt: number}).sentAt]))), on.error),
   ];
   return () => stops.forEach((stop) => stop());
+}
+
+/** A match's key among the seen ones: the cup, the round and its place in the round. */
+export function matchKey(code: string, round: number, i: number): string {
+  return `${code}:${round}:${i}`;
+}
+const SEEN_KEY = "manager2d.friendSeen";
+export function loadSeen(): Set<string> {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(SEEN_KEY) ?? "[]") as string[]);
+  } catch {
+    return new Set();
+  }
+}
+export function saveSeen(seen: Set<string>): Set<string> {
+  try {
+    localStorage.setItem(SEEN_KEY, JSON.stringify([...seen]));
+    window.dispatchEvent(new Event(CUP_EVENT));
+  } catch {
+    // Only for this visit then.
+  }
+  return seen;
 }

@@ -40,6 +40,7 @@ import {Training} from "./views/Training";
 import {Transfers} from "./views/Transfers";
 import {Storage} from "./views/Storage";
 import {CodeSalesPage, FriendSalesWatcher} from "./FriendSale";
+import {useFriendCupBadge} from "./friendCupBadge";
 
 const ICONS: Record<View, IconName> = {
   overview: "home",
@@ -163,6 +164,7 @@ function Game() {
 /** Unread mail and daily rewards to collect, shown as a number on a page (and its group). */
 function useBadges(): Partial<Record<View, number>> {
   const game = useGameState();
+  const friends = useFriendCupBadge();
   return {
     inbox: game.inbox.filter((m) => !m.read).length,
     overview: dailyToCollect(game.daily),
@@ -170,6 +172,8 @@ function useBadges(): Partial<Record<View, number>> {
     storage: game.gearBag?.length ?? 0,
     // Players up for sale to a friend with a code, waiting to be bought.
     codes: Object.keys(game.friendSales ?? {}).length,
+    // Things to do in the friends' cup: offers to answer, matches to see, prizes, rounds to play.
+    friends,
   };
 }
 
@@ -268,7 +272,11 @@ function GroupTabs() {
           <button key={v} role="tab" aria-selected={v === tab} data-tour={`nav-${v}`} className={v === tab ? "pill-tab active" : "pill-tab"} onClick={() => setView(v)}>
             <Icon name={ICONS[v]} size={18} />
             <span>{iconize(t(`nav.${v}`))}</span>
-            {(badges[v] ?? 0) > 0 && <span className={badgeClass(v)}>{badges[v]}</span>}
+            {/* The tab counts its sub-pages too (red: to do, blue: reminders). */}
+            {[false, true].map((blue) => {
+              const n = (SUB_PAGES[v] ?? [v]).filter((p) => BLUE_BADGES.includes(p) === blue).reduce((k, p) => k + (badges[p] ?? 0), 0);
+              return n > 0 ? <span key={String(blue)} className={blue ? "badge blue" : "badge"}>{n}</span> : null;
+            })}
           </button>
         ))}
       </div>
@@ -279,6 +287,7 @@ function GroupTabs() {
             <button key={v} role="tab" aria-selected={v === view} data-tour={`nav-${v}`} className={v === view ? "real-tab active" : "real-tab"} onClick={() => setView(v)}>
               <Icon name={ICONS[v]} size={18} />
               <span>{iconize(t(`nav.${v}`))}</span>
+              {(badges[v] ?? 0) > 0 && <span className={badgeClass(v)}>{badges[v]}</span>}
             </button>
           ))}
         </div>

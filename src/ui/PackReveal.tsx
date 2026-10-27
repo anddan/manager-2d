@@ -1,9 +1,9 @@
 // A pack being opened: the new player's card shown bit by bit (club, flag,
 // position, overall, name, then the picture and skills), as in the shop.
-// Also used for the free bronze pack from the daily tasks. Once shown, the new player
+// Also used for the free bronze pack from the daily tasks, and a player bought from a friend. Once shown, the new player
 // can be looked at in their profile, or sold straight away.
 import {Icon, iconize} from "./Icon";
-import {useEffect, useState} from "react";
+import {useEffect, useState, type ReactNode} from "react";
 import {fullName} from "../game/helpers";
 import type {PlayerPackId} from "../game/packs";
 import {useT} from "../i18n";
@@ -12,7 +12,7 @@ import {Modal} from "./common";
 import {PlayerCard} from "./PlayerCard";
 import {QuickSale} from "./PlayerModal";
 
-export function PackReveal({playerId, pack, onClose}: {playerId: string; pack: PlayerPackId; onClose: () => void}) {
+export function PackReveal({playerId, pack, title, onClose}: {playerId: string; pack?: PlayerPackId; title?: ReactNode; onClose: () => void}) {
   const {t} = useT();
   const game = useGameState();
   const openPlayer = useGame((s) => s.openPlayer);
@@ -28,7 +28,7 @@ export function PackReveal({playerId, pack, onClose}: {playerId: string; pack: P
   const player = game.players[playerId];
   if (!player) return null;
   return (
-    <Modal title={<><Icon name="gift" size={20} /> {iconize(t(`pack.${pack}`))}</>} onClose={onClose}>
+    <Modal title={title ?? <><Icon name="gift" size={20} /> {iconize(t(`pack.${pack ?? "bronze"}`))}</>} onClose={onClose}>
       <div className="pack-reveal">
         <div className="pack-flip">
           <PlayerCard game={game} player={player} reveal stage={stage} />

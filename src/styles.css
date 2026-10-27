@@ -1762,6 +1762,7 @@ h2, h3, .modal-head h2 { display: flex; align-items: center; gap: 8px; }
   font-weight: 700; font-size: 0.9rem; cursor: pointer; white-space: nowrap;
 }
 .real-tab:hover { color: #fff; }
+.real-tab .badge, .pill-tab .badge { margin-left: 4px; position: static; }
 .real-tab.active { color: #fff; border-bottom-color: var(--accent); }
 .real-tab.active .icon { color: var(--accent); }
 .content > .real-tabs { margin-bottom: 14px; }

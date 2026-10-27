@@ -71,6 +71,7 @@ export const en: Record<keyof typeof sv, string> = {
   "sale.gone": "The player has already been sold.",
   "sale.own": "That's your own player.",
   "sale.bought": "{name} has joined your club!",
+  "sale.boughtTitle": "New player!",
   "sale.mine": "For sale",
   "sale.mineHint": "Give the code to a friend. The money comes when the player is bought.",
   "sale.sold": "{name} was sold for {price:money}!",
