@@ -907,8 +907,16 @@ class Replay {
       } else {
         add(outcome.shooterId === carrier ? "dribble" : "pass", outcome.shooterId, box, side, outcome.shooterId === carrier ? undefined : finalBall);
       }
+      // Aimed where the goal is open: mostly the far side from where it was hit (the keeper
+      // covers the near post), now and then the near post. In the attacking view, width 50 is
+      // the middle of the goal and the posts are at about 44.6 and 55.4.
+      const farLow = shotWidth > 50;
+      const near = this.rng.chance(0.25);
+      const low = near ? !farLow : farLow;
+      const corner = low ? this.rng.range(45.2, 47.5) : this.rng.range(52.5, 54.8);
+      const reach = low ? this.rng.range(45.8, 48.8) : this.rng.range(51.2, 54.2);
       if (outcome.type === "goal") {
-        add("goal", undefined, fromSide(side, 100, this.rng.range(45, 55)));
+        add("goal", undefined, fromSide(side, 100, corner));
         this.carrier = null;
         this.restart = {side: defending.side, kind: "kickoff"};
       } else if (outcome.type === "disallowed") {
@@ -917,7 +925,8 @@ class Replay {
         this.carrier = null;
         this.restart = {side: defending.side, kind: "goalKick"};
       } else if (outcome.type === "saved") {
-        add("save", outcome.keeperId, fromSide(side, 97, this.rng.range(42, 58)), defending.side);
+        // The keeper gets across to it.
+        add("save", outcome.keeperId, fromSide(side, 97, reach), defending.side);
         // Held: the keeper plays it out next.
         this.restart = {side: defending.side, kind: "keeper"};
       } else {

@@ -2,7 +2,7 @@ import {useEffect, useState, useRef} from "react";
 import {ENERGY_COST_MATCH} from "../game/constants";
 import {energySpent} from "./effects";
 import {Icon, type IconName, iconize} from "./Icon";
-import {clubSlots, ENERGY_MAX} from "../game/constants";
+import {clubSlots, ENERGY_MAX, MIN_PLAYERS} from "../game/constants";
 import {fixtureWeek, nextUserFixture, userClub} from "../game/helpers";
 import {lineupProblems, pickBestLineup} from "../game/lineup";
 import {Modal} from "./common";
@@ -62,13 +62,13 @@ const NAV_GROUPS: {id: "home" | "team" | "matches" | "club"; icon: IconName; vie
   {id: "home", icon: "home", views: ["overview", "inbox", "storage"]},
   {id: "team", icon: "users", views: ["squad", "tactics", "training"]},
   {id: "matches", icon: "ball", views: ["fixtures", "table", "cup"]},
-  {id: "club", icon: "shield", views: ["finance", "transfers", "shop"]},
+  {id: "club", icon: "shield", views: ["finance", "transfers", "shop", "settings"]},
 ];
 /** Pages shown as a sub-tab of another (three tabs fit a phone): Contracts under Squad, Arena under Finance. */
 const SUB_PAGES: Partial<Record<View, View[]>> = {squad: ["squad", "contracts"], finance: ["finance", "stadium"]};
 /** The tab a page sits under (itself, or the page it's a sub-tab of). */
 const tabOf = (v: View): View => (Object.entries(SUB_PAGES).find(([, subs]) => subs!.includes(v))?.[0] as View | undefined) ?? v;
-/** The group a page is in; none for Settings (a gear in the top bar). */
+/** The group a page is in. */
 const groupOf = (v: View) => NAV_GROUPS.find((g) => g.views.includes(tabOf(v)));
 /** Every page a group holds, sub-tabs too (for the guide to find a page's group). */
 const groupPages = (g: (typeof NAV_GROUPS)[number]) => g.views.flatMap((v) => SUB_PAGES[v] ?? [v]);
@@ -191,9 +191,9 @@ function Nav() {
       {group && (
         <div className="nav-arc-backdrop" onClick={() => setOpen(null)}>
           <div className="nav-arc" style={{"--n": group.views.length} as React.CSSProperties}>
-            {group.views.map((v, i) => {
+            {groupPages(group).map((v, i, pages) => {
               // Spread evenly over an arc above the bar, from left to right.
-              const n = group.views.length;
+              const n = pages.length;
               const angle = n === 1 ? 90 : 160 - (140 * i) / (n - 1);
               const r = n > 3 ? 128 : 104;
               const x = Math.cos((angle * Math.PI) / 180) * r;
@@ -202,7 +202,7 @@ function Nav() {
                 <button
                   key={v}
                   data-tour={`nav-${v}`}
-                  className={v === tabOf(view) ? "arc-item active" : "arc-item"}
+                  className={v === view ? "arc-item active" : "arc-item"}
                   style={{transform: `translate(${x.toFixed(0)}px, ${y.toFixed(0)}px)`, animationDelay: `${i * 30}ms`}}
                   onClick={(e) => { e.stopPropagation(); setView(v); setOpen(null); window.scrollTo({top: 0}); }}
                 >
@@ -244,7 +244,8 @@ function GroupTabs() {
   return (
     <>
       <div className="group-tabs" role="tablist" ref={row}>
-        {group.views.map((v) => (
+        {/* Settings is reached from the Club menu only, not a tab of its own. */}
+        {group.views.filter((v) => v !== "settings").map((v) => (
           <button key={v} role="tab" aria-selected={v === tab} data-tour={`nav-${v}`} className={v === tab ? "pill-tab active" : "pill-tab"} onClick={() => setView(v)}>
             <Icon name={ICONS[v]} size={18} />
             <span>{iconize(t(`nav.${v}`))}</span>
@@ -325,11 +326,15 @@ function PlayButton() {
   // A match week: first to the team in Tactics (blue play); there, ready to kick off (green ball).
   const kickOff = isMatchWeek && view === "tactics";
   const label = kickOff ? t("top.playMatch") : isMatchWeek ? t("top.toTactics") : t("top.nextWeek");
+  // Who can play in the line-up as it stands, and whether that's too few to start.
+  const fielded = clubSlots(club).length - gaps;
+  const tooFew = gaps > 0 && fielded < MIN_PLAYERS;
   return (
     <div className="nav-play">
       {gaps > 0 && (
         <Modal compact title={<><Icon name="warn" size={20} /> {iconize(t("top.gapsTitle"))}</>} onClose={() => setGaps(0)}>
-          <p>{iconize(t("top.gapsText", {n: gaps, total: clubSlots(club).length}))}</p>
+          {/* Gaps are filled before kick-off; fewer than the minimum who can play is said plainly. */}
+          <p>{iconize(tooFew ? t("top.tooFew", {n: fielded, min: MIN_PLAYERS}) : t("top.gapsText", {n: gaps, total: clubSlots(club).length}))}</p>
           <div className="btn-row dialog-actions">
             <button className="btn" onClick={() => setGaps(0)}>{iconize(t("top.gapsBack"))}</button>
             <button className="btn primary" onClick={bestAndPlay}>{iconize(t("top.gapsBest"))}</button>
@@ -357,7 +362,6 @@ function TopBar() {
   const {t, money} = useT();
   const game = useGameState();
   const setView = useGame((s) => s.setView);
-  const view = useGame((s) => s.view);
   const now = useNow(1000);
   const [profile, setProfile] = useState(false);
   const club = userClub(game);
@@ -390,9 +394,6 @@ function TopBar() {
         </button>
         <button className="chip" onClick={() => setView("shop")} title={t("shop.diamonds")}><Icon name="diamond" size={16} /> {m.diamonds}</button>
       </div>
-      <button className={view === "settings" ? "icon-round active" : "icon-round"} data-tour="nav-settings" onClick={() => setView("settings")} title={t("nav.settings")} aria-label={t("nav.settings")}>
-        <Icon name="settings" size={20} />
-      </button>
     </header>
   );
 }

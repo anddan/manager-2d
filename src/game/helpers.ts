@@ -118,3 +118,14 @@ export function playerName(state: GameState, id: string): string {
   const p = state.players[id];
   return p ? fullName(p) : "?";
 }
+
+export type Difficulty = "easy" | "medium" | "hard";
+/** How hard a start a club in the list is: the first few are the strongest. */
+export function difficultyAt(index: number): Difficulty {
+  return index < 3 ? "easy" : index < 9 ? "medium" : "hard";
+}
+/** How hard the manager chose to start: from their club's place in the list they picked from. */
+export function difficulty(state: GameState): Difficulty {
+  const ids = Object.keys(state.clubs).filter((id) => !state.clubs[id].guest);
+  return difficultyAt(Math.max(0, ids.indexOf(state.userClubId)));
+}

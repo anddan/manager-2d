@@ -159,7 +159,7 @@ function Bracket() {
           </div>
         ))}
         <div className="bracket-round bracket-champion">
-          <h4>🏆</h4>
+          <h4><Icon name="trophy" size={20} /></h4>
           <div className="bracket-ties">
             <div className={`bracket-tie champion ${cup.winnerId ? "" : "tbd"}`}>
               {cup.winnerId && game.clubs[cup.winnerId] ? <TeamLine id={cup.winnerId} winner /> : <span className="muted">{iconize(t("cup.tbd"))}</span>}

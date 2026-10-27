@@ -107,7 +107,7 @@ export function FixtureRow({f}: {f: Fixture}) {
         {cup?.penalties && <small className="fx-pens">{iconize(t("fx.penalties", {h: cup.penalties[0], a: cup.penalties[1]}))}</small>}
       </span>
       <span className="fx-team away"><span className="crest tiny" style={{background: away.color}} /> {away.name} {flag(away)}</span>
-      {report && <button className="btn small" onClick={() => watchMatch(f.id)}>▶</button>}
+      {report && <button className="btn small" onClick={() => watchMatch(f.id)}><Icon name="play" size={14} /></button>}
     </div>
   );
 }

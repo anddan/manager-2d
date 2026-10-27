@@ -66,7 +66,7 @@ export function Settings() {
               if (found === "match") notify("version.afterMatch");
             }}
           >
-            🔄 {checking ? t("version.checking") : t("version.check")}
+            <Icon name="swap" size={18} /> {checking ? t("version.checking") : t("version.check")}
           </button>
         </div>
         <Hint>{iconize(t("version.hint"))}</Hint>

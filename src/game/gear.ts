@@ -149,3 +149,14 @@ export function unequipGear(state: GameState, playerId: string, slot?: GearSlot)
     delete p.shin;
   }
 }
+
+/** The bag with pieces alike (same kind and tier) together: each once, how many, and where the first one is. */
+export function groupBag(bag: GearItem[]): {item: GearItem; index: number; count: number}[] {
+  const groups: {item: GearItem; index: number; count: number}[] = [];
+  bag.forEach((item, index) => {
+    const same = groups.find((x) => x.item.kind === item.kind && x.item.tier === item.tier);
+    if (same) same.count++;
+    else groups.push({item, index, count: 1});
+  });
+  return groups;
+}

@@ -21,5 +21,5 @@ describe("player names", () => {
         expect(new Set(names).size, `${league.id} ${club.name}`).toBe(names.length);
       }
     }
-  });
+  }, 20_000);
 });

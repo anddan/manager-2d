@@ -148,11 +148,12 @@ export function teamOvr(state: GameState, clubId: string): number {
   const ratings = club.lineup
     .map((id, i) => {
       const p = state.players[id];
-      return p && p.clubId === clubId && slots[i] ? ratingAt(p, slots[i].pos) * familiarity(p, slots[i].pos) : null;
+      // As shown on each player in the line-up: today's rating there (form, fitness, kit…).
+      return p && p.clubId === clubId && slots[i] ? effectiveRating(p, slots[i].pos) : null;
     })
     .filter((r): r is number => r !== null);
-  if (ratings.length < slots.length) return Math.round(clubStrength(state, clubId));
-  return Math.round(ratings.reduce((s, n) => s + n, 0) / ratings.length);
+  // The players picked, on average (none picked: 0).
+  return ratings.length ? Math.round(ratings.reduce((s, n) => s + n, 0) / ratings.length) : 0;
 }
 
 /** Club standing compared to the rest, used for attendance and transfer pull. */

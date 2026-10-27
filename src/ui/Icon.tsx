@@ -5,7 +5,7 @@ import type {ReactNode} from "react";
 export type IconName =
   | "home" | "mail" | "users" | "clipboard" | "dumbbell" | "calendar" | "list" | "trophy" | "stadium"
   | "swap" | "pen" | "wallet" | "boot" | "diamond" | "settings" | "play" | "ball" | "shield" | "info" | "close"
-  | "warn" | "fire" | "video" | "gift" | "shin" | "glove" | "dice" | "user" | "text" | "palette" | "megaphone" | "skip" | "coffee" | "stop" | "target" | "star" | "sparkle" | "chart" | "chat" | "handshake" | "trend" | "tag" | "shirt" | "undo" | "check" | "bolt" | "bank" | "sound" | "compass" | "download" | "upload" | "cart" | "hammer" | "run" | "bench" | "moon" | "search" | "inbox" | "eye" | "coins" | "medical" | "plane" | "clip" | "lock" | "flag";
+  | "warn" | "fire" | "video" | "gift" | "shin" | "glove" | "dice" | "user" | "text" | "palette" | "megaphone" | "skip" | "coffee" | "stop" | "target" | "star" | "sparkle" | "chart" | "chat" | "handshake" | "trend" | "tag" | "shirt" | "undo" | "check" | "bolt" | "bank" | "sound" | "compass" | "download" | "upload" | "cart" | "hammer" | "run" | "bench" | "moon" | "search" | "inbox" | "eye" | "coins" | "medical" | "plane" | "clip" | "lock" | "flag" | "updown" | "plus";
 
 const PATHS: Record<IconName, ReactNode> = {
   home: <><path d="M3 11 12 4l9 7" /><path d="M5 10v10h14V10" /><path d="M10 20v-6h4v6" /></>,
@@ -73,6 +73,8 @@ const PATHS: Record<IconName, ReactNode> = {
   clip: <path d="M8 12V7a4 4 0 0 1 8 0v9a6 6 0 0 1-12 0V9" />,
   lock: <><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></>,
   flag: <><path d="M5 21V4" /><path d="M5 4h12l-2 4 2 4H5" /></>,
+  updown: <><path d="M12 3v18M7 8l5-5 5 5M7 16l5 5 5-5" /></>,
+  plus: <path d="M12 5v14M5 12h14" />,
 };
 
 export function Icon({name, size = 22}: {name: IconName; size?: number}) {

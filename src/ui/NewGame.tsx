@@ -1,4 +1,5 @@
 import {useState} from "react";
+import {difficultyAt} from "../game/helpers";
 import {iconize} from "./Icon";
 import {LEAGUES, leagueById} from "../game/leagues";
 import {PLAYERS_GENDERS, type ManagerLook, type PlayersGender} from "../game/types";
@@ -32,7 +33,7 @@ export function NewGame() {
   const [leagueId, setLeagueId] = useState(LEAGUES[0].id);
   const league = leagueById(leagueId);
 
-  const difficulty = (i: number) => (i < 3 ? "easy" : i < 9 ? "medium" : "hard");
+  const difficulty = difficultyAt;
 
   return (
     <main className="welcome">

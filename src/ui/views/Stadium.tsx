@@ -25,7 +25,7 @@ import {userClub} from "../../game/helpers";
 import type {TKey} from "../../i18n";
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
-import {Card} from "../common";
+import {Card, Hint} from "../common";
 
 export function Stadium() {
   const {t} = useT();
@@ -40,6 +40,7 @@ export function Stadium() {
           <StadiumDrawing st={preview} color={club.color} trim={club.color2} />
           <div className="stadium-lock-badge" aria-hidden>🔒</div>
         </div>
+        <Hint><StadiumHelp /></Hint>
         <p>{iconize(t("stadium.lockedText"))}</p>
         <p className="muted small">{best !== undefined ? t("stadium.bestFinish", {place: best}) : t("stadium.noFinish")}</p>
       </Card>
@@ -69,6 +70,7 @@ function StadiumBuilder() {
   return (
     <div className="grid">
       <Card title={<><Icon name="stadium" size={20} /> {iconize(t("stadium.title"))}</>}>
+        <Hint><StadiumHelp /></Hint>
         <StadiumDrawing st={st} color={club.color} trim={club.color2} picked={picked} onPick={setPicked} />
         <dl className="kv">
           <dt>{iconize(t("stadium.capacity"))}</dt><dd><strong>{iconize(t("stadium.seats", {n: stadiumCapacity(st)}))}</strong></dd>
@@ -194,5 +196,23 @@ function StadiumDrawing({st, color, trim, picked, onPick}: {st: StadiumState; co
       </g>
       {st.project && !isStand(st.project.part) && <text x={outer.x + outer.w / 2} y={outer.y + 10} textAnchor="middle" fontSize={9}>🏗️</text>}
     </svg>
+  );
+}
+
+/** What each part of the stadium does, and how it shows in home matches. */
+function StadiumHelp() {
+  const {t} = useT();
+  return (
+    <>
+      <p>{iconize(t("stadium.help.intro"))}</p>
+      <dl className="tt-help">
+        {(["stands", "kiosks", "shop", "match"] as const).map((k) => (
+          <div key={k}>
+            <dt><Icon name={k === "stands" ? "stadium" : k === "kiosks" ? "coins" : k === "shop" ? "shirt" : "ball"} size={16} /> {iconize(t(`stadium.help.${k}.title`))}</dt>
+            <dd>{iconize(t(`stadium.help.${k}`))}</dd>
+          </div>
+        ))}
+      </dl>
+    </>
   );
 }

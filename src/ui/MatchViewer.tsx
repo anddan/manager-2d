@@ -16,14 +16,15 @@
 // stamina, so quick players visibly get there first. Sprinting players leave a trail.
 // Goals stop play for a celebration and a kick-off from the centre spot;
 // penalties, free kicks and corners stop play while the players line up.
+import {STAND_MAX} from "../game/stadium";
 import {Icon, iconize, type IconName} from "./Icon";
 import {memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode} from "react";
 import {createPortal} from "react-dom";
-import {addMessage, findFixture, fullName, isCupFixture, isKnockout, listName, playerName, shortName} from "../game/helpers";
+import {addMessage, findFixture, fullName, isCupFixture, isKnockout, listName, playerName, shortName, difficulty} from "../game/helpers";
 import {shootoutOver} from "../game/cup";
 import {WIN_VIDEO_DIAMONDS, taskProgress, videoAfterWin} from "../game/daily";
 import {Rng} from "../game/rng";
-import {matchVerdict, PLAYER_TALKS, TEAM_TALKS, teamTalk, type PlayerTalk, type TeamTalk} from "../game/morale";
+import {matchVerdict, PLAYER_TALKS, TEAM_TALKS, talkFit, teamTalk, type PlayerTalk, type TeamTalk} from "../game/morale";
 import {boardAt, clockLabel, matchLength} from "../game/clock";
 import {FORMATIONS, type Slot, ENERGY_COST_FORZA} from "../game/constants";
 import {LiveMatch} from "../game/live";
@@ -1000,12 +1001,58 @@ const PITCH = (
 
 /** What the camera shows: the whole stadium, or just the pitch. Same shape, so the view doesn't resize. */
 const VIEW_STADIUM = {x: -12, y: -4.85, w: 128, h: 77.7};
+
+/** The levels each stand of a stadium is built to (none: an unbuilt ground). */
+type StandLevels = {north: number; south: number; west: number; east: number};
+const NO_STANDS: StandLevels = {north: 0, south: 0, west: 0, east: 0};
+/** Room between rows (long sides) and columns (ends) of fans, in pitch units. */
+const ROW_GAP = 1.6;
+const COL_GAP = 1.8;
+
+/**
+ * Where a stadium's stands are: rows of fans on the long sides (north on top, south below),
+ * columns at the ends (west, east), one more per level built, each further out; and the box
+ * round it all.
+ */
+function standLayout(levels: StandLevels) {
+  const out = (count: number, front: number, step: number) => Array.from({length: count}, (_, i) => front + step * i);
+  const north = out(2 + levels.north, -2.4, -ROW_GAP);
+  const south = out(2 + levels.south, 70.4, ROW_GAP);
+  const west = out(3 + levels.west, -6, -COL_GAP);
+  const east = out(3 + levels.east, 111, COL_GAP);
+  // Fully built: the oval outer wall goes round it all, so the box takes it in too.
+  const full = levels.north >= STAND_MAX && levels.south >= STAND_MAX && levels.west >= STAND_MAX && levels.east >= STAND_MAX;
+  const wall = full ? 3.2 : 0;
+  const box = {
+    left: west[west.length - 1] - 1.4 - wall,
+    right: east[east.length - 1] + 1.4 + wall,
+    top: north[north.length - 1] - 1.4 - wall,
+    bottom: south[south.length - 1] + 1.4 + wall,
+  };
+  return {north, south, west, east, box, full, wall};
+}
+
+/** The zoomed-out view for a stadium: all of it, at least the usual view, in the usual shape. */
+function stadiumView(levels: StandLevels): {x: number; y: number; w: number; h: number} {
+  const {box} = standLayout(levels);
+  const left = Math.min(VIEW_STADIUM.x, box.left);
+  const top = Math.min(VIEW_STADIUM.y, box.top);
+  const right = Math.max(VIEW_STADIUM.x + VIEW_STADIUM.w, box.right);
+  const bottom = Math.max(VIEW_STADIUM.y + VIEW_STADIUM.h, box.bottom);
+  let w = right - left;
+  let h = bottom - top;
+  const shape = VIEW_STADIUM.w / VIEW_STADIUM.h;
+  // Keep the shape: widen the narrow way, centred.
+  if (w / h > shape) h = w / shape;
+  else w = h * shape;
+  return {x: (left + right) / 2 - w / 2, y: (top + bottom) / 2 - h / 2, w, h};
+}
 const VIEW_PITCH = {x: -3.5, y: 0, w: 112, h: 68};
 const ZOOM_KEY = "manager2d.zoomedIn";
 
 /** Eases the SVG view box between the stadium and pitch views. */
-function useZoom(zoomedIn: boolean): string {
-  const target = zoomedIn ? VIEW_PITCH : VIEW_STADIUM;
+function useZoom(zoomedIn: boolean, stadium = VIEW_STADIUM): string {
+  const target = zoomedIn ? VIEW_PITCH : stadium;
   const [box, setBox] = useState(target);
   const boxRef = useRef(box);
   boxRef.current = box;
@@ -1184,10 +1231,87 @@ interface BannerSpot {
 }
 
 /** Where a club's fans hold up their banner: somewhere along the end behind their goal, from the club's id (the same every match). */
-function bannerSpots(id: string, side: Side): BannerSpot[] {
+function bannerSpots(id: string, side: Side, x: number, count = 1): BannerSpot[] {
   const rng = new Rng(hashString(id + ":banners"));
   const home = side === "home";
-  return [{x: home ? -8 : 113, y: rng.range(10, 58), rotate: home ? -90 : 90}];
+  // Spread along the end, each in its own stretch of it, somewhere in that stretch.
+  const span = 48 / count;
+  return Array.from({length: count}, (_, i) => ({x, y: 10 + i * span + rng.range(span * 0.2, span * 0.8), rotate: home ? -90 : 90}));
+}
+
+/** The ground's corners, just outside the pitch, and the turn that faces a stall's front to the pitch
+ * (straight: the top ones face down, the bottom ones up).
+ * As on the Arena page: the kiosks top left, top right, bottom right (in that order), the shop bottom left. */
+/** The corners at the back of the stands (they move out as the ground grows), and the turn that
+ * faces a stall's front to the pitch: top left, top right, bottom right for the kiosks (in that
+ * order), bottom left for the shop. */
+function corners(layout: ReturnType<typeof standLayout>): {kiosks: [number, number, number][]; shop: [number, number, number]} {
+  // A little in from the very back, so they cover only the last rows and stay in sight; inside
+  // the oval wall's rounded corners when the ground is fully built.
+  const inX = 2.6 + (layout.full ? 4.5 : 0);
+  const inY = 3 + (layout.full ? 3.2 : 0);
+  const left = layout.west[layout.west.length - 1] + inX;
+  const right = layout.east[layout.east.length - 1] - inX;
+  const top = layout.north[layout.north.length - 1] + inY;
+  const bottom = layout.south[layout.south.length - 1] - inY;
+  // The shop keeps to its corner, cut by the oval wall when there is one (see the clip).
+  const shopLeft = layout.west[layout.west.length - 1] + 2.6 + (layout.full ? 2.4 : 0);
+  const shopBottom = layout.south[layout.south.length - 1] - 3 - (layout.full ? 1.6 : 0);
+  return {kiosks: [[left, top, 0], [right, top, 0], [right, bottom, 180]], shop: [shopLeft, shopBottom, 180]};
+}
+/** The shop grows with each level. */
+const SHOP_SCALE = [0, 1.7, 2.2, 2.7];
+
+/** A scarf held up over a supporter's head with both hands: stripes in the club's colours, fringed ends. */
+function FanScarf({x, y, club}: {x: number; y: number; club: Club}) {
+  const top = y - 1.35;
+  return (
+    <g>
+      {[0, 1, 2, 3, 4].map((i) => (
+        <rect key={i} x={x - 1.25 + i * 0.5} y={top} width={0.5} height={0.38} fill={i % 2 ? club.color2 : club.color} />
+      ))}
+      <path d={`M${x - 1.25} ${top + 0.38} v0.25 M${x + 1.25} ${top + 0.38} v0.25`} stroke={club.color2} strokeWidth={0.12} />
+    </g>
+  );
+}
+
+/** A white line icon centred on (cx, cy), turned back upright inside a building turned by `turn`. */
+function UprightIcon({name, cx, cy, size, turn}: {name: IconName; cx: number; cy: number; size: number; turn: number}) {
+  return (
+    <g transform={`translate(${cx} ${cy}) rotate(${-turn}) translate(${-size / 2} ${-size / 2})`} style={{color: "#fff"}}>
+      <Icon name={name} size={size} />
+    </g>
+  );
+}
+
+/** A kiosk in a corner of the ground: a counter under a striped awning in the club's colours. */
+function Kiosk({x, y, club, turn = 0}: {x: number; y: number; club: Club; turn?: number}) {
+  return (
+    <g className="kiosk" aria-hidden>
+      <rect x={x} y={y + 0.9} width={3.4} height={1.6} rx={0.2} fill="#e2e8f0" stroke="#0f172a" strokeWidth={0.12} />
+      <rect x={x + 0.5} y={y + 1.25} width={2.4} height={0.9} rx={0.15} fill="#0f172a" opacity={0.8} />
+      <UprightIcon name="coffee" cx={x + 1.7} cy={y + 1.7} size={0.85} turn={turn} />
+      {[0, 1, 2, 3].map((i) => (
+        <path key={i} d={`M${x - 0.2 + i * 0.95} ${y + 0.9} l0.475 -0.9 l0.475 0.9 Z`} fill={i % 2 ? club.color2 : club.color} stroke="#0f172a" strokeWidth={0.08} />
+      ))}
+    </g>
+  );
+}
+
+/** The supporters' shop: a little building in the club's colour with a shirt on its sign, bigger windows the higher the level. */
+function SupporterShop({x, y, club, level, turn = 0}: {x: number; y: number; club: Club; level: number; turn?: number}) {
+  return (
+    <g className="supporter-shop" aria-hidden>
+      <rect x={x} y={y + 0.8} width={5} height={2.6} rx={0.25} fill={club.color} stroke="#0f172a" strokeWidth={0.14} />
+      <rect x={x - 0.2} y={y + 0.5} width={5.4} height={0.6} rx={0.2} fill={club.color2} stroke="#0f172a" strokeWidth={0.1} />
+      {/* Lit windows either side, more the bigger the shop. */}
+      {[x + 0.35, x + 3.95, x + 0.35].slice(0, Math.min(level, 2)).map((wx, i) => (
+        <rect key={i} x={wx} y={y + 1.45} width={0.7} height={1.1} rx={0.1} fill="#fde68a" opacity={0.9} />
+      ))}
+      <circle cx={x + 2.5} cy={y + 2.05} r={0.95} fill="rgb(0 0 0 / 0.35)" />
+      <UprightIcon name="shirt" cx={x + 2.5} cy={y + 2.05} size={1.3} turn={turn} />
+    </g>
+  );
 }
 
 /** A small banner with the club's initials, read along it. */
@@ -1207,16 +1331,32 @@ function Banner({club, spot}: {club: Club; spot: BannerSpot}) {
 }
 
 /** `fill`: share of seats taken (the crowd that came); the rest show as empty seats. */
+
+/**
+ * The stands round the pitch. The home club's stadium shows: each level a stand is built up
+ * adds a row of fans to it (the ground holds more), and its club shop adds flags, banners and
+ * confetti to the home crowd.
+ */
 const Stands = memo(function Stands({home, away, cheering, boards, fill = 1}: {home: Club; away: Club; cheering: Side | null; boards: string; fill?: number}) {
+  const levels = home.stadium?.stands ?? {north: 0, south: 0, west: 0, east: 0};
+  const shop = home.stadium?.shop ?? 0;
+  const kiosks = home.stadium?.kiosks ?? 0;
+  const layout = standLayout(levels);
+  const {west, east} = layout;
   const fans = useMemo(() => {
     const spots: {x: number; y: number; side: Side}[] = [];
-    // Pitch units as drawn (105 x 68). Top and bottom: two rows; ends: three columns.
-    for (const y of [-2.7, -4.3, 70.7, 72.3]) {
-      for (let x = -10; x <= 115; x += 1.75) spots.push({x: x + (y % 2 ? 0.8 : 0), y, side: x < 52.5 ? "home" : "away"});
-    }
-    for (const x of [-6.2, -8, -9.8, 111.2, 113, 114.8]) {
-      for (let y = -1.2; y <= 69.2; y += 1.75) spots.push({x, y: y + (x % 2 ? 0.8 : 0), side: x < 52.5 ? "home" : "away"});
-    }
+    // Pitch units as drawn (105 x 68). The long sides (north on top, south below) from two
+    // rows, the ends (west, east) from three columns, one more per level built.
+    const long = [...layout.north, ...layout.south];
+    long.forEach((y, row) => {
+      // Right out to the ends' back columns, so the corners fill as well.
+      const from = Math.min(-10, west[west.length - 1]);
+      const to = Math.max(115, east[east.length - 1]);
+      for (let x = from; x <= to; x += 1.75) spots.push({x: x + (row % 2 ? 0.8 : 0), y, side: x < 52.5 ? "home" : "away"});
+    });
+    [...west, ...east].forEach((x, col) => {
+      for (let y = -1.2; y <= 69.2; y += 1.75) spots.push({x, y: y + (col % 2 ? 0.8 : 0), side: x < 52.5 ? "home" : "away"});
+    });
     // Who sits where: the best seats (halfway down the long sides) go first, with
     // some chance in it, so a half-full ground has gaps all round, more at the ends.
     const order = spots
@@ -1231,12 +1371,20 @@ const Stands = memo(function Stands({home, away, cheering, boards, fill = 1}: {h
       const h = (i * 37) % 11;
       const shirt = h < 5 ? club.color : h < 8 ? club.color2 : ["#e5e7eb", "#64748b", "#1f2937"][h % 3];
       const skin = ["#f6d5bd", "#ebbd9c", "#d49c74", "#8a5638"][(i * 7) % 4];
-      // Behind the goals, every so often a supporter with a flag (striped in the club's colours).
-      const end = s.y >= -1.2 && s.y <= 70;
-      const flag = end && taken.has(i) && ((i * 2654435761) >>> 0) % 7 === 0;
-      return {...s, shirt, skin, delay: (h % 5) * 0.08, empty: !taken.has(i), flag};
+      // Behind the goals, every so often a supporter with a flag (striped in the club's colours);
+      // the home club's shop sells more of them.
+      const end = s.x < -4 || s.x > 109;
+      const every = s.side === "home" ? [7, 5, 4, 3][shop] : 7;
+      // A full-size shop (level 3): the home fans wave them along the long sides too.
+      const flagHere = end || (s.side === "home" && shop >= 3);
+      const flag = flagHere && taken.has(i) && ((i * 2654435761) >>> 0) % (end ? every : every + 3) === 0;
+      // Confetti and streamers over the home crowd, more the bigger the shop.
+      const confetti = s.side === "home" && shop > 0 && taken.has(i) && ((i * 40503) >>> 0) % [0, 9, 6, 4][shop] === 0;
+      // Scarves held up over their heads, striped in the club's colours (more with a bigger shop at home).
+      const scarf = !flag && taken.has(i) && ((i * 2246822519) >>> 0) % (s.side === "home" ? [9, 7, 6, 5][shop] : 9) === 0;
+      return {...s, shirt, skin, delay: (h % 5) * 0.08, empty: !taken.has(i), flag, confetti, scarf, bit: [club.color, club.color2, "#ffffff", "#facc15"][(i * 13) % 4]};
     });
-  }, [home, away, fill]);
+  }, [home, away, fill, levels.north, levels.south, levels.west, levels.east, shop]);
   const crowds = useMemo(() => {
     const draw = (side: Side) =>
       fans.filter((f) => f.side === side).map((f, i) =>
@@ -1247,6 +1395,8 @@ const Stands = memo(function Stands({home, away, cheering, boards, fill = 1}: {h
             <rect x={f.x - 0.55} y={f.y - 0.2} width={1.1} height={1} rx={0.35} fill={f.shirt} />
             <circle cx={f.x} cy={f.y - 0.45} r={0.42} fill={f.skin} />
             {f.flag && <FanFlag x={f.x} y={f.y} club={side === "home" ? home : away} out={f.x < 52.5 ? -1 : 1} delay={f.delay} />}
+            {f.scarf && <FanScarf x={f.x} y={f.y} club={side === "home" ? home : away} />}
+            {f.confetti && <rect className="confetti" x={f.x + 0.3} y={f.y - 1.6} width={0.55} height={0.3} rx={0.1} fill={f.bit} transform={`rotate(${(i * 47) % 180} ${f.x + 0.5} ${f.y - 1.5})`} style={{animationDelay: `${f.delay * 4}s`}} />}
           </g>
         )
       );
@@ -1254,12 +1404,42 @@ const Stands = memo(function Stands({home, away, cheering, boards, fill = 1}: {h
   }, [fans, home, away]);
   return (
     <g className="stands" aria-hidden>
-      <rect x={-14} y={-7} width={132} height={82} className="stand-bg" />
-      <g className={cheering === "home" ? "fans cheer" : "fans"}>{crowds.home}</g>
-      <g className={cheering === "away" ? "fans cheer" : "fans"}>{crowds.away}</g>
+      {/* The stand behind the fans, as big as the ground has been built (and never less than before). */}
+      {layout.full ? (
+        <>
+          {/* The oval outer wall of a fully built ground, a band in the club's colour along it, and the stands inside with rounded corners. */}
+          <rect x={layout.box.left} y={layout.box.top} width={layout.box.right - layout.box.left} height={layout.box.bottom - layout.box.top} rx={16} className="stadium-wall" />
+          <rect x={layout.box.left + 1} y={layout.box.top + 1} width={layout.box.right - layout.box.left - 2} height={layout.box.bottom - layout.box.top - 2} rx={15} fill="none" stroke={home.color} strokeWidth={0.7} opacity={0.85} />
+          <rect x={layout.box.left + layout.wall} y={layout.box.top + layout.wall} width={layout.box.right - layout.box.left - 2 * layout.wall} height={layout.box.bottom - layout.box.top - 2 * layout.wall} rx={11} className="stand-bg" />
+        </>
+      ) : (
+        <rect x={Math.min(-14, layout.box.left)} y={Math.min(-7, layout.box.top)} width={Math.max(118, layout.box.right) - Math.min(-14, layout.box.left)} height={Math.max(75, layout.box.bottom) - Math.min(-7, layout.box.top)} className="stand-bg" />
+      )}
+      {/* Fully built, the crowd stays inside the oval wall (the rounded corners cut it). */}
+      {layout.full && (
+        <clipPath id="stand-clip">
+          <rect x={layout.box.left + layout.wall} y={layout.box.top + layout.wall} width={layout.box.right - layout.box.left - 2 * layout.wall} height={layout.box.bottom - layout.box.top - 2 * layout.wall} rx={11} />
+        </clipPath>
+      )}
+      <g clipPath={layout.full ? "url(#stand-clip)" : undefined}>
+        <g className={cheering === "home" ? "fans cheer" : "fans"}>{crowds.home}</g>
+        <g className={cheering === "away" ? "fans cheer" : "fans"}>{crowds.away}</g>
+      </g>
       {/* Each end's banner with the club's initials, over the fans behind the goal (once there are fans to hold it). */}
-      {fill > 0.25 && bannerSpots(home.id, "home").map((spot, i) => <Banner key={"h" + i} club={home} spot={spot} />)}
-      {fill > 0.25 && bannerSpots(away.id, "away").map((spot, i) => <Banner key={"a" + i} club={away} spot={spot} />)}
+      {fill > 0.25 && bannerSpots(home.id, "home", (west[0] + west[west.length - 1]) / 2, 1 + shop).map((spot, i) => <Banner key={"h" + i} club={home} spot={spot} />)}
+      {/* A full-size shop: banners along the home half of both long sides as well. */}
+      {fill > 0.25 && shop >= 3 && [layout.north, layout.south].flatMap((rows, side) =>
+        [16, 38].map((x) => <Banner key={`l${side}${x}`} club={home} spot={{x, y: (rows[0] + rows[rows.length - 1]) / 2, rotate: 0}} />)
+      )}
+      {fill > 0.25 && bannerSpots(away.id, "away", (east[0] + east[east.length - 1]) / 2).map((spot, i) => <Banner key={"a" + i} club={away} spot={spot} />)}
+      {/* The kiosks (a stall a level) and the supporters' shop, set slanting in the corners with the
+          counter facing the pitch: the rest of the building can be out of sight. */}
+      {corners(layout).kiosks.slice(0, kiosks).map(([x, y, turn], i) => (
+        <g key={i} transform={`translate(${x} ${y}) rotate(${turn}) scale(2.1) translate(-1.7 -2.6)`}><Kiosk x={0} y={0} club={home} turn={turn} /></g>
+      ))}
+      {shop > 0 && (
+        <g clipPath={layout.full ? "url(#stand-clip)" : undefined}><g transform={`translate(${corners(layout).shop[0]} ${corners(layout).shop[1]}) rotate(${corners(layout).shop[2]}) scale(${SHOP_SCALE[shop]}) translate(-2.5 -3.4)`}><SupporterShop x={0} y={0} club={home} level={shop} turn={corners(layout).shop[2]} /></g></g>
+      )}
       {/* Advertising boards round the pitch. */}
       <path d="M-4.6 -1.4 H109.6 V69.4 H-4.6 Z" className="ad-boards" stroke={boards} />
     </g>
@@ -1359,6 +1539,17 @@ function TeamTalkDialog({report, onDone}: {report: MatchReport; onDone: (words?:
               </div>
             ))}
           </dl>
+          {/* The help beside the choices, by difficulty (and which one this game is on). */}
+          <div className="tt-help-marks">
+            <p className="tt-help-now">{iconize(t("tt.help.marksNow", {level: t(`new.difficulty.${difficulty(game)}`)}))}</p>
+            <ul className="tt-help-list">
+              {(["easy", "medium", "hard"] as const).map((d) => (
+                <li key={d} className={d === difficulty(game) ? "now" : undefined}>
+                  <strong>{t(`new.difficulty.${d}`)}:</strong> {iconize(t(`tt.help.marks.${d}`))}
+                </li>
+              ))}
+            </ul>
+          </div>
           {/* How the words work on the players (as morale.ts counts it). */}
           <details className="tt-help-more">
             <summary><h4 className="tt-help-title">{iconize(t("tt.help.title"))}</h4></summary>
@@ -1375,6 +1566,7 @@ function TeamTalkDialog({report, onDone}: {report: MatchReport; onDone: (words?:
           <button key={k} className={`tt-option ${talk === k ? "active" : ""}`} onClick={() => setTalk(k)}>
             <Icon name={icons[k]} size={24} />
             <strong>{iconize(tx(`tt.talk.${k}`))}</strong>
+            <TalkEffect talk={k} verdict={verdict} />
           </button>
         ))}
       </div>
@@ -1554,7 +1746,11 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
       return true;
     }
   });
-  const viewBox = useZoom(zoomedIn);
+  // Zoomed out: the home ground, however big it has been built.
+  const homeStands = game.clubs[report.homeId]?.stadium?.stands ?? NO_STANDS;
+  const standsKey = `${homeStands.north}-${homeStands.south}-${homeStands.west}-${homeStands.east}`;
+  const stadiumBox = useMemo(() => stadiumView(homeStands), [standsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const viewBox = useZoom(zoomedIn, stadiumBox);
   const [replay, setReplay] = useState<GoalReplay | null>(null);
   /** Asking whether to leave a live match before the end. */
   const [confirmClose, setConfirmClose] = useState(false);
@@ -2108,8 +2304,9 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
       const gear = game.players[id]?.gear;
       // Which way they face (degrees, as drawn): the way they run, or standing still the goal they attack.
       const speed = Math.hypot(b.vx, b.vy);
-      const running = speed > 0.8;
-      const facing = running ? (Math.atan2(b.vy * 0.68, b.vx * 1.05) * 180) / Math.PI : side === "home" ? 0 : 180;
+      // Stepping only while the match is actually running (paused, the feet stand still).
+      const stepping = running && speed > 0.8;
+      const facing = speed > 0.8 ? (Math.atan2(b.vy * 0.68, b.vx * 1.05) * 180) / Math.PI : side === "home" ? 0 : 180;
       return (
         <g key={id} className={`dot${mine && !finished ? " mine" : ""}${celebrating === side ? " celebrate" : ""}`} onClick={mine && !freeze && !finished ? () => setSelected(id) : undefined}>
           {trail > 0 && (
@@ -2117,14 +2314,13 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
           )}
           <g transform={`translate(${cx} ${cy})`}>
             {mine && <circle r={4} className="hit" />}
-            {forzaSide === side && <circle r={2.6} className="forza-glow" />}
             {shoutedAt.has(id) && <circle r={3.2} className="shout-ring" />}
             {id === carrierId && <circle r={2.4} className="carrier-ring" />}
             {id === selected && <circle r={2.8} className="selected-ring" />}
             {/* Boots (or a keeper's gloves) in their tier's colour, under the player: the toes point
                 the way they run and step in turn while running; standing, they face the other goal. */}
             {gear && (
-              <g transform={`rotate(${facing.toFixed(0)})`} className={running ? "gear-feet running" : "gear-feet"} fill={GEAR_KIND_COLOR[gear.kind]} stroke={GEAR_COLOR[gear.tier]}>
+              <g transform={`rotate(${facing.toFixed(0)})`} className={stepping ? "gear-feet running" : "gear-feet"} fill={GEAR_KIND_COLOR[gear.kind]} stroke={GEAR_COLOR[gear.tier]}>
                 {gear.kind === "gloves" ? (
                   <>
                     <circle cx={0.75} cy={-1.45} r={0.48} className={gear.tier === "special" ? "gear-dot special" : "gear-dot"} />
@@ -2144,6 +2340,8 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
             ) : (
               <circle r={1.6 * (1 + (air[id]?.lift ?? 0) * 0.4)} fill={club.color} stroke={club.color2} strokeWidth={0.4} className="body" />
             )}
+            {/* "Forza!": a glowing ring over the player while it lasts. */}
+            {forzaSide === side && <circle r={2.05} className="forza-glow" />}
             {id === captain && <text y={0.62} className="dot-captain" fill={club.color2}>C</text>}
             {booked.has(id) && <rect x={0.9} y={-2.6} width={1.1} height={1.5} rx={0.2} className="booked" />}
             {hurt.has(id) && <text x={-2.6} y={0.6} className="dot-hurt">✚</text>}
@@ -2450,7 +2648,7 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
                 {forzaIcon}<span className="max-forza-label"> {iconize(t("match.forza"))}</span>
               </button>
               <button className="btn small max-forza" onClick={() => setSelected("team")} disabled={!!freeze && !atHalftime} title={t("match.giveOrders")} aria-label={t("match.giveOrders")}>
-                📋
+                <Icon name="megaphone" size={18} />
               </button>
             </div>
           )}
@@ -2495,7 +2693,7 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
           </ul>
           <p className="muted small">{iconize(t("match.htHint"))}</p>
           <div className="btn-row dialog-actions">
-            <button className="btn" onClick={() => setSelected("team")}><Icon name="clipboard" size={18} /> {iconize(t("match.giveOrders"))}</button>
+            <button className="btn" onClick={() => setSelected("team")}><Icon name="megaphone" size={18} /> {iconize(t("match.giveOrders"))}</button>
             <button className="btn primary" onClick={startSecondHalf}><Icon name="play" size={18} /> {iconize(t("match.secondHalf"))}</button>
           </div>
         </MatchDialog>
@@ -2528,7 +2726,7 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
       )}
 
       {live && selected && !finished && !current && !injuryStop && (
-        <MatchDialog title={<><Icon name="clipboard" size={20} /> {iconize(t("orders.title"))}</>} onClose={() => setSelected(null)}>
+        <MatchDialog title={<><Icon name="megaphone" size={20} /> {iconize(t("orders.title"))}</>} onClose={() => setSelected(null)}>
           <OrdersPanel
             live={live}
             target={selected}
@@ -2566,7 +2764,7 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
                 {menuOpen && (
                   <div className="manager-pop" role="menu">
                     <button className="manager-item" role="menuitem" disabled={!!freeze && !atHalftime} onClick={() => { setMenuOpen(false); setSelected("team"); }}>
-                      <Icon name="clipboard" size={18} /> {iconize(t("match.giveOrders"))}
+                      <Icon name="megaphone" size={18} /> {iconize(t("match.giveOrders"))}
                     </button>
                     {/* Once a match: the manager fires up the whole team. */}
                     <button className="manager-item forza-btn" role="menuitem" disabled={forzaUsed} onClick={forza}>
@@ -2605,7 +2803,7 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
                         ))}
                       </span>
                     </div>
-                    <p className="muted small manager-hint">{iconize(t("match.managerHint"))}</p>
+                    <div className="manager-hint-row"><Hint>{iconize(t("match.managerHint"))}</Hint></div>
                   </div>
                 )}
               </div>
@@ -2626,7 +2824,7 @@ function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
         <details className="control-help-fold">
           <summary className="muted small">{iconize(t("match.help"))}</summary>
           <ul className="control-help muted small">
-            <li><Icon name="clipboard" size={18} /> {iconize(t("orders.hint"))}</li>
+            <li><Icon name="megaphone" size={18} /> {iconize(t("orders.hint"))}</li>
             <li><Icon name="target" size={18} /> {iconize(t("match.setPiecesHint"))}</li>
             <li><Icon name="swap" size={18} /> {iconize(t("match.subsHint"))}</li>
             <li>{iconize(t("match.zoomHint"))}</li>
@@ -2710,23 +2908,42 @@ export function Confetti({colors}: {colors: string[]}) {
   );
 }
 
-const INSTRUCTION_ICONS: Record<InstructionKey, string> = {passing: "🔁", dribbling: "🏃", shooting: "🥅", tackling: "🦵", position: "↕️"};
+const INSTRUCTION_ICONS: Record<InstructionKey, IconName> = {passing: "swap", dribbling: "run", shooting: "target", tackling: "shield", position: "updown"};
 const levelName = (lvl: InstructionLevel) => (lvl === -1 ? "low" : lvl === 1 ? "high" : "normal");
 
 /** One row per instruction: less, normal, more, with what the current choice does. */
-function InstructionGrid({value, disabled, onPick, keeper}: {value: (key: InstructionKey) => InstructionLevel; disabled?: boolean; onPick: (key: InstructionKey, level: InstructionLevel) => void; keeper?: boolean}) {
+function InstructionGrid({value, disabled, onPick, keeper, intro}: {value: (key: InstructionKey) => InstructionLevel; disabled?: boolean; onPick: (key: InstructionKey, level: InstructionLevel) => void; keeper?: boolean; intro?: ReactNode}) {
   const {t, tx} = useT();
   // A keeper only has one order: how to play it out (passing: "more" is short, "direct" is long).
   const keys = keeper ? (["passing"] as const) : INSTRUCTIONS;
   const base = (key: InstructionKey) => (keeper ? "orders.gk" : `orders.${key}`);
+  const icon = (key: InstructionKey): IconName => (keeper ? "glove" : INSTRUCTION_ICONS[key]);
   return (
     <div className="orders-grid">
+      {/* What it's all about, and what every level does, behind the (i). */}
+      <div className="orders-help-row">
+        <Hint>
+          {intro && <p>{intro}</p>}
+          <dl className="tt-help">
+            {keys.map((key) => (
+              <div key={key}>
+                <dt><Icon name={icon(key)} size={16} /> {iconize(tx(base(key)))}</dt>
+                {([-1, 0, 1] as const).map((lvl) => (
+                  <dd key={lvl}>
+                    <strong>{lvl === -1 ? tx(`${base(key)}.low`) : lvl === 1 ? tx(`${base(key)}.high`) : t("orders.normal")}:</strong> {iconize(tx(`${base(key)}.${levelName(lvl)}.desc`))}
+                  </dd>
+                ))}
+              </div>
+            ))}
+          </dl>
+        </Hint>
+      </div>
       {keys.map((key) => {
         const current = value(key);
         return (
           <div key={key} className={current === 0 ? "order-row" : "order-row changed"}>
-            <span className="order-label">{keeper ? "🧤" : INSTRUCTION_ICONS[key]} {iconize(tx(base(key)))}</span>
-            <div className="order-chips">
+            <span className="order-label"><Icon name={icon(key)} size={18} /> {iconize(tx(base(key)))}</span>
+            <div className="order-chips order-switch" role="radiogroup">
               {([-1, 0, 1] as const).map((lvl) => (
                 <button
                   key={lvl}
@@ -2739,7 +2956,6 @@ function InstructionGrid({value, disabled, onPick, keeper}: {value: (key: Instru
                 </button>
               ))}
             </div>
-            <p className="order-desc">{iconize(tx(`${base(key)}.${levelName(current)}.desc`))}</p>
           </div>
         );
       })}
@@ -2830,7 +3046,7 @@ function OrdersPanel({
     <div className="orders">
       <div className="target-strip" role="tablist" aria-label={t("orders.who")}>
         <button role="tab" aria-selected={target === "team"} className={target === "team" ? "target active" : "target"} onClick={() => onTarget("team")}>
-          <span className="target-icon" aria-hidden>👥</span>
+          <span className="target-icon" aria-hidden><Icon name="users" size={26} /></span>
           <span className="target-name">{iconize(t("orders.teamTitle"))}</span>
           {teamTold && <span className="target-told" aria-hidden>📣</span>}
         </button>
@@ -2843,7 +3059,7 @@ function OrdersPanel({
               <Avatar player={p} shirt={club.color} trim={club.color2} size={34} />
               <span className="target-name">{shortName(p)}</span>
               <span className="target-pos">{iconize(t(`pos.${team.slots[o.slot].pos}`))}{booked.has(o.id) ? " 🟨" : ""}</span>
-              {told && <span className="target-told" aria-hidden>📣</span>}
+              {told && <span className="target-told" aria-hidden><Icon name="megaphone" size={14} /></span>}
             </button>
           );
         })}
@@ -2851,8 +3067,7 @@ function OrdersPanel({
 
       {target === "team" ? (
         <>
-          <p className="orders-intro">{iconize(t("orders.teamHint"))}</p>
-          <InstructionGrid value={(key) => live.teamLevel(key)} onPick={onTeamInstruct} />
+          <InstructionGrid intro={iconize(t("orders.teamHint"))} value={(key) => live.teamLevel(key)} onPick={onTeamInstruct} />
         </>
       ) : (
         <PlayerOrders key={target} live={live} playerId={target} booked={booked.has(target)} onInstruct={onInstruct} onSub={onSub} />
@@ -2917,8 +3132,7 @@ function PlayerOrders({
         </>
       ) : (
         <>
-          <p className="orders-intro">{iconize(t("orders.playerHint", {name: shortName(p)}))}</p>
-          <InstructionGrid keeper={(slot ? team.slots[slot.slot].pos : p.position) === "GK"} value={(key) => live.level(playerId, key)} disabled={!onPitch} onPick={(key, lvl) => onInstruct(playerId, key, lvl)} />
+          <InstructionGrid intro={iconize(t("orders.playerHint", {name: shortName(p)}))} keeper={(slot ? team.slots[slot.slot].pos : p.position) === "GK"} value={(key) => live.level(playerId, key)} disabled={!onPitch} onPick={(key, lvl) => onInstruct(playerId, key, lvl)} />
           <div className="btn-row">
             {comingOff ? (
               <span className="muted small"><Icon name="swap" size={18} /> {iconize(t("orders.subPending"))}</span>
@@ -2980,4 +3194,21 @@ function Summary({report}: {report: MatchReport}) {
       </div>
     </div>
   );
+}
+
+/**
+ * How a team talk will go down after this match, as help by difficulty. Easy: from very good to
+ * very bad (++ right words, + harmless gentle ones, − tough words that miss, −− the wrong words).
+ * Medium: just good (+) or bad (−). Hard: no help.
+ */
+function TalkEffect({talk, verdict}: {talk: TeamTalk; verdict: ReturnType<typeof matchVerdict>}) {
+  const game = useGameState();
+  const level = difficulty(game);
+  if (level === "hard") return null;
+  const fit = talkFit(talk, verdict);
+  const gentle = talk === "praise" || talk === "calm";
+  const good = fit === 1 || (fit === 0 && gentle);
+  const mark = level === "medium" ? (good ? "+" : "−") : fit === 1 ? "++" : fit === -1 ? "−−" : gentle ? "+" : "−";
+  const tone = level === "medium" ? (good ? "great" : "bad") : fit === 1 ? "great" : fit === -1 ? "bad" : gentle ? "good" : "meh";
+  return <span className={`tt-effect tt-effect-${tone}`} aria-hidden>{mark}</span>;
 }

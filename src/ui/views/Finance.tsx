@@ -44,6 +44,14 @@ export function Finance() {
     <div className="grid">
       <BoardWarningBanner />
       <Card title={t("fin.overview")}>
+        <Hint>
+          <p>{iconize(t("fin.wageHint.what"))}</p>
+          <p>{iconize(t("fin.wageHint.over"))}</p>
+          <h4>{iconize(t("fin.wageHint.howTitle"))}</h4>
+          <ul className="tt-help-list">
+            {(["sell", "loan", "expire", "negotiate", "buy"] as const).map((k) => <li key={k}>{iconize(t(`fin.wageHint.${k}`))}</li>)}
+          </ul>
+        </Hint>
         <dl className="kv">
           <dt>{iconize(t("fin.cash"))}</dt><dd className={club.cash < 0 ? "neg" : ""}>{money(club.cash)}</dd>
           <dt>{iconize(t("fin.transferBudget"))}</dt><dd>{money(club.transferBudget)}</dd>

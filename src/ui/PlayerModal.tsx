@@ -55,13 +55,6 @@ export function PlayerModal({playerId}: {playerId: string}) {
         </div>
       </div>
 
-      {/* The kit (boots, gloves, shin guards) first: the thing changed most often. */}
-      {own && p.clubId === game.userClubId && (
-        <Fold title={<><Icon name="shirt" size={20} /> {iconize(t("gear.equipment"))}</>}>
-          <GearPanel player={p} />
-        </Fold>
-      )}
-
       <div className="player-grid">
         <section>
           <h3>{iconize(t("pl.attributes"))}</h3>
@@ -84,6 +77,12 @@ export function PlayerModal({playerId}: {playerId: string}) {
 
         <section>
           {own && <Condition player={p} />}
+          {/* The kit (boots, gloves, shin guards), before the statistics. */}
+          {own && p.clubId === game.userClubId && (
+            <Fold title={<><Icon name="shirt" size={20} /> {iconize(t("gear.equipment"))}</>}>
+              <GearPanel player={p} />
+            </Fold>
+          )}
           <Fold title={<><Icon name="chart" size={20} /> {iconize(t("pl.stats"))}</>}>
             <dl className="kv">
               <dt>{iconize(t("pl.apps"))}</dt><dd>{p.stats.apps} ({p.stats.starts})</dd>
@@ -163,8 +162,17 @@ function Condition({player: p}: {player: Player}) {
 function ContractInfo({player: p}: {player: Player}) {
   const {t, money} = useT();
   const game = useGameState();
+  const notify = useGame((s) => s.notify);
+  const setNegotiation = useGame((s) => s.setNegotiation);
   if (!p.clubId) return null;
   const known = isKnown(game, p);
+  // Our own player (not one out on loan): the contract can be talked over right here.
+  const ours = p.clubId === game.userClubId && !p.loan;
+  const negotiate = () => {
+    const neg = startNegotiation(game, p.id, game.userClubId, "renewal");
+    if ("refused" in neg) notify(neg.refused, {name: shortName(p)}, "error");
+    else setNegotiation(neg);
+  };
   return (
     <Fold title={<><Icon name="pen" size={20} /> {iconize(t("pl.contract"))}</>}>
       <dl className="kv">
@@ -175,6 +183,7 @@ function ContractInfo({player: p}: {player: Player}) {
         {known && p.contract.releaseClause !== null && <><dt>{iconize(t("pl.releaseClause"))}</dt><dd>{money(p.contract.releaseClause)}</dd></>}
         {p.loan && <><dt>{iconize(t("pl.loan"))}</dt><dd>{game.clubs[p.loan.parentClubId].name} → {game.clubs[p.clubId].name}</dd></>}
       </dl>
+      {ours && <button className="btn small" onClick={negotiate}><Icon name="pen" size={16} /> {iconize(t("pl.discussContract"))}</button>}
     </Fold>
   );
 }

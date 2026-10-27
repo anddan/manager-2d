@@ -1876,3 +1876,68 @@ h2, h3, .modal-head h2 { display: flex; align-items: center; gap: 8px; }
 .pack-gold .pack-emblem text { fill: #3b2a04; }
 .pack-silver .pack-name { color: #1e293b; }
 .pack-gold .pack-name { color: #3b2a04; }
+
+/* Match orders: an (i) at the top; each order its label and one switch of three. */
+.orders-help-row, .manager-hint-row { display: flex; justify-content: flex-end; }
+.orders-help-row .hint-btn, .manager-hint-row .hint-btn { position: static; width: 28px; height: 28px; }
+.order-label { display: inline-flex; align-items: center; gap: 6px; }
+.order-label .icon { color: var(--accent-text); }
+.order-switch {
+  display: inline-flex; gap: 0; padding: 3px; border-radius: 999px; background: rgb(255 255 255 / 0.06);
+  border: 1px solid rgb(255 255 255 / 0.14);
+}
+.order-switch .chip {
+  border: 0; background: none; color: var(--muted); padding: 5px 12px; border-radius: 999px; font-weight: 700; font-size: 0.8rem;
+}
+.order-switch .chip.active { background: var(--accent); color: #fff; box-shadow: 0 2px 6px rgb(30 155 255 / 0.3); }
+.order-switch .chip:disabled { opacity: 0.5; }
+.tt-help dd strong { color: var(--text); }
+.target-told { display: inline-flex; color: var(--accent-text); }
+/* Team talk: how it will go down, at the right of each choice. */
+.tt-option { position: relative; }
+.tt-effect { margin-left: auto; font-weight: 900; font-family: var(--display); font-size: 1.05rem; letter-spacing: 0.02em; min-width: 26px; text-align: right; }
+.tt-effect-great { color: var(--good); }
+.tt-effect-good { color: #86efac; }
+.tt-effect-meh { color: #fca5a5; }
+.tt-effect-bad { color: var(--bad); }
+
+/* Confetti over the home crowd (the club shop): a gentle twinkle, a flurry when they cheer. */
+.confetti { animation: confetti-twinkle 1.8s ease-in-out infinite alternate; }
+@keyframes confetti-twinkle { from { opacity: 0.35; } to { opacity: 1; } }
+.fans.cheer .confetti { animation: confetti-fly 0.6s ease-out infinite alternate; }
+@keyframes confetti-fly { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-1.6px); opacity: 0.6; } }
+@media (prefers-reduced-motion: reduce) { .confetti, .fans.cheer .confetti { animation: none; } }
+/* The order switches only as wide as their three choices. */
+.order-switch { justify-self: start; width: max-content; max-width: 100%; flex-wrap: nowrap; }
+/* Empty seats: light grey squares, clearly not people. */
+.seat { fill: #cbd5e1; opacity: 0.55; }
+/* The talk help in the same blue as the icons (not green and red). */
+.tt-effect, .tt-effect-great, .tt-effect-good, .tt-effect-meh, .tt-effect-bad { color: var(--accent-text); }
+.tt-option.active .tt-effect { color: #fff; }
+/* Results in colour: good news green, bad news red, the rest the dark blue of the cards. */
+.toast { background: #0f1f3b; color: #fff; border: 1px solid rgb(255 255 255 / 0.12); border-left-width: 5px; border-left-color: var(--accent); box-shadow: 0 10px 28px rgb(0 0 0 / 0.45); }
+.toast-good { background: linear-gradient(90deg, #14532d, #0f2f22); border-left-color: var(--good); }
+.toast-error { background: linear-gradient(90deg, #7f1d1d, #3a1414); border-left-color: var(--bad); }
+.toast { bottom: calc(110px + env(safe-area-inset-bottom)); }
+/* The colour only on the edge, as before: the toast itself stays the card's dark blue. */
+.toast-good, .toast-error { background: #0f1f3b; }
+
+.tt-help-marks { margin-top: 12px; }
+.tt-help-now { margin: 0 0 6px; font-weight: 700; }
+.tt-help-list li.now { color: var(--text); }
+
+/* How many of a piece there are, in the card's corner. */
+.gear-count {
+  position: absolute; top: 14px; right: 12px; z-index: 2; min-width: 28px; height: 22px; padding: 0 7px; border-radius: 999px;
+  display: grid; place-items: center; font-weight: 900; font-size: 0.8rem; color: #fff; background: var(--accent); box-shadow: 0 2px 6px rgb(0 0 0 / 0.35);
+}
+.gear-card.small .gear-count { top: 10px; right: 8px; height: 19px; min-width: 24px; font-size: 0.72rem; }
+/* "Forza!": a steady glow round the players instead of a pulsing ring. */
+.forza-glow { animation: none; transform: none; opacity: 1; fill: rgb(30 155 255 / 0.28); stroke: rgb(92 184 255 / 0.55); stroke-width: 0.25; filter: drop-shadow(0 0 1.2px rgb(30 155 255 / 0.9)); }
+/* Forza: a thicker ring and a stronger glow. */
+.forza-glow { stroke: #5cb8ff; stroke-width: 0.6; fill: rgb(30 155 255 / 0.32); filter: drop-shadow(0 0 1.6px rgb(30 155 255 / 1)) drop-shadow(0 0 3px rgb(30 155 255 / 0.8)); }
+.forza-glow { stroke-width: 0.42; }
+.forza-glow { fill: none; pointer-events: none; }
+
+/* A fully built ground's oval outer wall: concrete with a lit roof edge. */
+.stadium-wall { fill: #3b4658; stroke: #0b1220; stroke-width: 0.5; filter: drop-shadow(0 0 2px rgb(0 0 0 / 0.6)); }

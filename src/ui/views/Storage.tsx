@@ -2,7 +2,7 @@
 // here), and who is wearing what (take it off again).
 import {Icon, iconize} from "../Icon";
 import {useState} from "react";
-import {GEAR_ICON, gearResale, sellGear, equipGear, gearFits, gearIn, gearSlot, unequipGear, wornGear, type GearItem, type GearSlot} from "../../game/gear";
+import {gearResale, sellGear, equipGear, gearFits, gearIn, gearSlot, unequipGear, wornGear, type GearItem, type GearSlot, groupBag} from "../../game/gear";
 import {effectiveRating} from "../../game/ratings";
 import type {Player} from "../../game/types";
 import {listName} from "../../game/helpers";
@@ -54,11 +54,11 @@ export function Storage() {
           <Empty>{iconize(t("storage.empty"))}</Empty>
         ) : (
           <div className="gear-cards">
-            {bag.map((item, i) => (
+            {groupBag(bag).map(({item, index: i, count}) => (
               <div key={i} className="gear-offer">
-                <GearCard item={item} />
+                <GearCard item={item} count={count} />
                 <div className="btn-row storage-actions">
-                  <button className="btn primary small" onClick={() => setGiving(i)}>{GEAR_ICON[item.kind]} {iconize(t("storage.give"))}</button>
+                  <button className="btn primary small" onClick={() => setGiving(i)}><Icon name="plus" size={16} /> {iconize(t("storage.give"))}</button>
                   <button className="btn small" onClick={() => setSelling(i)}><Icon name="coins" size={18} /> {iconize(t("storage.sell"))}</button>
                 </div>
               </div>

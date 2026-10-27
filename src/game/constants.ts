@@ -48,7 +48,7 @@ export const SALE_TO_BUDGET_SHARE = 0.7;
 export const BID_EXPIRY_WEEKS = 2;
 
 // Monetization: energy for matches and extra training, diamonds as premium currency.
-export const ENERGY_MAX = 9;
+export const ENERGY_MAX = 10;
 /** One ⚡ back every 9 min 59 s. */
 export const ENERGY_REGEN_MS = 10 * 60 * 1000;
 export const ENERGY_COST_MATCH = 1;
@@ -148,3 +148,6 @@ export function roleAt(x: number, y: number): Position {
   if (x < 68) return wide ? "W" : "AM";
   return wide ? "W" : "ST";
 }
+
+/** The fewest players (who can play) a team may start a match with. */
+export const MIN_PLAYERS = 8;

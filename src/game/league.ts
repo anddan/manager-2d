@@ -15,8 +15,11 @@ export function makeFixtures(state: GameState, rng: Rng, clubIds: string[]): Fix
     for (let i = 0; i < n / 2; i++) {
       const a = order[i];
       const b = order[n - 1 - i];
-      // Alternate home and away so nobody plays five home games in a row.
-      round.push((r + i) % 2 === 0 ? [a, b] : [b, a]);
+      // Home and away taken in turns (as in Berger tables): the fixed team swaps every round, the
+      // pairs from the circle by their place in it. Nobody gets more than two in a row (three
+      // at most where the season turns), however the circle has moved the clubs round.
+      const aHome = i === 0 ? r % 2 === 0 : i % 2 === 1;
+      round.push(aHome ? [a, b] : [b, a]);
     }
     firstHalf.push(round);
     rotating.unshift(rotating.pop()!);
