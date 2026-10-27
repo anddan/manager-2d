@@ -25,12 +25,15 @@ import {PlayerCard} from "./PlayerCard";
 import {KitAvatar, editableLook, lookFromEditor} from "./Avatar";
 import {ManagerEditor} from "./ManagerEditor";
 import {GearPanel} from "./Gear";
+import {SellToFriend} from "./FriendSale";
 import {totalGearBonus} from "../game/gear";
 
 export function PlayerModal({playerId}: {playerId: string}) {
   const {t} = useT();
   const game = useGameState();
   const openPlayer = useGame((s) => s.openPlayer);
+  const slot = useGame((s) => s.profileSlot);
+  const act = useGame((s) => s.act);
   const p = game.players[playerId];
   if (!p) return null;
   const own = p.clubId === game.userClubId || p.loan?.parentClubId === game.userClubId;
@@ -38,9 +41,27 @@ export function PlayerModal({playerId}: {playerId: string}) {
   const club = p.clubId ? game.clubs[p.clubId] : null;
   // Boots or gloves on: their bonus shown beside the attribute.
   const gear = totalGearBonus(p);
+  // Opened from their spot in the tactics: they can be taken out of it from here.
+  const inSpot = slot !== null && game.clubs[game.userClubId].lineup[slot] === p.id;
+  const takeOut = () => {
+    act((g) => {
+      const c = g.clubs[g.userClubId];
+      c.lineup = c.lineup.map((id, i) => (i === slot ? "" : id));
+    });
+    openPlayer(null);
+  };
 
   return (
-    <Modal wide onClose={() => openPlayer(null)} title={<><Flag code={p.nationality} /> {profileName(p)} <StatusIcons player={p} /></>}>
+    <Modal
+      wide
+      onClose={() => openPlayer(null)}
+      title={
+        <>
+          <Flag code={p.nationality} /> {profileName(p)} <StatusIcons player={p} />
+          {inSpot && <button className="btn small danger pm-take-out" onClick={takeOut}><Icon name="close" size={14} /> {iconize(t("tac.clearShort"))}</button>}
+        </>
+      }
+    >
       <div className="player-top">
         <PlayerCard game={game} player={p} />
         <div className="player-head">
@@ -255,6 +276,7 @@ function OwnActions({player: p}: {player: Player}) {
         </label>
       </div>
       <QuickSale player={p} />
+      <div className="btn-row"><SellToFriend player={p} /></div>
       </Fold>
 
       <LookEditor player={p} />

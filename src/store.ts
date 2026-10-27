@@ -3,6 +3,7 @@
 // random sequence going and autosaves.
 import {TUTORIAL_VERSION} from "./game/tutorial";
 import {create} from "zustand";
+import {createContext, useContext} from "react";
 import type {Negotiation} from "./game/contracts";
 import {newGame} from "./game/generate";
 import {Rng} from "./game/rng";
@@ -23,6 +24,7 @@ export const VIEWS = [
   "friends",
   "stadium",
   "transfers",
+  "codes",
   "contracts",
   "finance",
   "storage",
@@ -42,12 +44,14 @@ interface Store {
   lang: Lang;
   view: View;
   playerId: string | null;
+  /** The tactics spot the open profile was opened from (it can then take them out of it). */
+  profileSlot: number | null;
   matchFixtureId: string | null;
   negotiation: Negotiation | null;
   toast: Toast | null;
   setLang: (lang: Lang) => void;
   setView: (view: View) => void;
-  openPlayer: (id: string | null) => void;
+  openPlayer: (id: string | null, slot?: number) => void;
   watchMatch: (fixtureId: string | null) => void;
   setNegotiation: (neg: Negotiation | null) => void;
   notify: (key: string, params?: Params, tone?: Toast["tone"]) => void;
@@ -76,6 +80,7 @@ export const useGame = create<Store>((set, get) => ({
   lang: loadLang(),
   view: "overview",
   playerId: null,
+  profileSlot: null,
   matchFixtureId: null,
   negotiation: null,
   toast: null,
@@ -89,7 +94,7 @@ export const useGame = create<Store>((set, get) => ({
     set({lang});
   },
   setView: (view) => set({view, playerId: null}),
-  openPlayer: (playerId) => set({playerId}),
+  openPlayer: (playerId, slot) => set({playerId, profileSlot: slot ?? null}),
   watchMatch: (matchFixtureId) => set({matchFixtureId}),
   setNegotiation: (negotiation) => set({negotiation}),
   notify: (key, params, tone = "info") => set({toast: {key, params, tone}}),
@@ -121,7 +126,12 @@ export const useGame = create<Store>((set, get) => ({
   },
 }));
 
-/** The loaded game; only use inside screens that render with a game. */
+/** A game lent to the screens inside it instead of the saved one (a friends' cup match being watched). */
+export const GameOverride = createContext<GameState | null>(null);
+
+/** The loaded game (or one lent by GameOverride); only use inside screens that render with a game. */
 export function useGameState(): GameState {
-  return useGame((s) => s.game)!;
+  const lent = useContext(GameOverride);
+  const game = useGame((s) => s.game);
+  return (lent ?? game)!;
 }

@@ -1,6 +1,7 @@
 // The friends' cup: everyone meets once, a match is the same wherever it's played, the table adds up.
 import {describe, expect, it} from "vitest";
-import {friendFixtures, friendTable, playFriendMatch, playFriendRound, snapshotTeam} from "./friendCup";
+import {collectFriendPrize, friendFixtures, friendPack, friendTable, openFriendPack, playFriendMatch, playFriendRound, snapshotTeam} from "./friendCup";
+import {Rng} from "./rng";
 import {newGame} from "./generate";
 
 describe("the friends' cup", () => {
@@ -33,5 +34,28 @@ describe("the friends' cup", () => {
     const table = friendTable(["A", "B"], results);
     expect(table[0]).toMatchObject({id: "A", points: 3, won: 1});
     expect(table[1]).toMatchObject({id: "B", points: 0, lost: 1});
+  }, 30_000);
+
+  it("gives a better pack the more teams were in it", () => {
+    expect([1, 2, 3, 4, 5, 6, 9].map(friendPack)).toEqual([null, "bronze", "silver", "gold", "special", "diamond", "diamond"]);
+  });
+
+  it("opens the cup pack for free, and pays the winner per team", () => {
+    const g = newGame("Anna", 2, 41);
+    const diamonds = g.monetization.diamonds;
+    const squad = Object.values(g.players).filter((p) => p.clubId === g.userClubId).length;
+    const res = openFriendPack(g, new Rng(3), "gold");
+    expect("playerId" in res).toBe(true);
+    expect(g.monetization.diamonds).toBe(diamonds);
+    expect(Object.values(g.players).filter((p) => p.clubId === g.userClubId).length).toBe(squad + 1);
+    const cash = g.clubs[g.userClubId].cash;
+    const res2 = openFriendPack(g, new Rng(4), "diamond");
+    expect("playerIds" in res2 && res2.playerIds.length).toBe(4);
+    expect(g.clubs[g.userClubId].cash).toBe(cash);
+    expect(openFriendPack(g, new Rng(5), "diamond")).toEqual({error: "friends.packWaiting"});
+    collectFriendPrize(g, "diamonds", 4);
+    expect(g.monetization.diamonds).toBe(diamonds + 20);
+    collectFriendPrize(g, "money", 3);
+    expect(g.clubs[g.userClubId].cash).toBe(cash + 300_000);
   }, 30_000);
 });

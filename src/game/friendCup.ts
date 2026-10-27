@@ -5,14 +5,15 @@
 // A match is played in a ground of its own, built only from the two snapshots and a shared
 // seed, so whoever plays it gets the same result. The cup's creator plays each round and
 // stores the results; the others read them.
-import {MIN_PLAYERS} from "./constants";
+import {MIN_PLAYERS, SQUAD_MAX} from "./constants";
+import {drawDiamondChoice, openPack, PLAYER_PACKS, type PlayerPackId} from "./packs";
 import {newGame} from "./generate";
-import {shortName} from "./helpers";
+import {book, shortName} from "./helpers";
 import {pickBestLineup, repairLineup} from "./lineup";
 import {simulateMatch} from "./match";
 import {clubSlots} from "./constants";
 import {Rng} from "./rng";
-import type {Club, CupFixture, GameState, Player} from "./types";
+import type {Club, CupFixture, GameState, MatchReport, Player} from "./types";
 
 /** What of a club goes into the cup: how it looks, how it plays, and its players (picked or on the bench). */
 export interface TeamSnapshot {
@@ -136,17 +137,22 @@ function lineupGaps(state: GameState, club: Club): number {
 }
 
 /** A match between two snapshots with a shared seed: the same result wherever it's played. */
-export function playFriendMatch(home: TeamSnapshot, away: TeamSnapshot, seed: number): FriendResult & {state: GameState} {
+export function playFriendMatch(home: TeamSnapshot, away: TeamSnapshot, seed: number, withFrames = false): FriendResult & {state: GameState; report: MatchReport} {
   const state = ground();
   state.userClubId = "fc-nobody";
   putTeam(state, "fcH", home);
   putTeam(state, "fcA", away);
   const fixture: CupFixture = {id: "fc", round: 0, stage: 0, homeId: "fcH", awayId: "fcA", played: false, homeGoals: 0, awayGoals: 0};
-  const report = simulateMatch(state, new Rng(seed), fixture, false);
+  const report = simulateMatch(state, new Rng(seed), fixture, withFrames);
   const goals = report.events
     .filter((e) => e.type === "goal")
     .map((e) => ({minute: e.minute, side: e.side as "home" | "away", name: e.playerId && state.players[e.playerId] ? shortName(state.players[e.playerId]) : "?"}));
-  return {home: "", away: "", homeGoals: report.homeGoals, awayGoals: report.awayGoals, goals, state};
+  return {home: "", away: "", homeGoals: report.homeGoals, awayGoals: report.awayGoals, goals, state, report};
+}
+
+/** The seed of a round's `i`th match (from the round's own). */
+export function friendMatchSeed(roundSeed: number, i: number): number {
+  return (roundSeed + i * 7919) >>> 0;
 }
 
 /** Plays a whole round: each pair's match from their snapshots, with the round's seed. */
@@ -156,7 +162,7 @@ export function playFriendRound(pairs: [string, string][], teams: Record<string,
     const a = teams[away];
     // A team that never sent itself loses 0–3.
     if (!h || !a) return {home, away, homeGoals: h ? 3 : 0, awayGoals: a ? 3 : 0, goals: []};
-    const {homeGoals, awayGoals, goals} = playFriendMatch(h, a, (seed + i * 7919) >>> 0);
+    const {homeGoals, awayGoals, goals} = playFriendMatch(h, a, friendMatchSeed(seed, i));
     return {home, away, homeGoals, awayGoals, goals};
   });
 }
@@ -203,6 +209,50 @@ export function friendTable(ids: string[], results: FriendResult[]): FriendRow[]
   return Object.values(rows).sort(
     (x, y) => y.points - x.points || y.goalsFor - y.goalsAgainst - (x.goalsFor - x.goalsAgainst) || y.goalsFor - x.goalsFor
   );
+}
+
+/** The winner's prize, per team in the cup: diamonds or money, whichever they choose. */
+export const FRIEND_PRIZE = {diamonds: 5, money: 100_000};
+export type FriendPrize = keyof typeof FRIEND_PRIZE;
+
+export function friendPrize(kind: FriendPrize, teams: number): number {
+  return FRIEND_PRIZE[kind] * teams;
+}
+
+/** The winner collects their prize. */
+export function collectFriendPrize(state: GameState, kind: FriendPrize, teams: number): void {
+  const amount = friendPrize(kind, teams);
+  if (kind === "diamonds") state.monetization.diamonds += amount;
+  else book(state, state.userClubId, "prize", amount);
+}
+
+/** Everyone's pack when the cup is over: the more teams, the better (6 or more: the diamond pack). */
+export type FriendPack = PlayerPackId | "diamond";
+const FRIEND_PACKS: PlayerPackId[] = ["bronze", "silver", "gold", "special"];
+
+export function friendPack(teams: number): FriendPack | null {
+  if (teams < 2) return null;
+  return FRIEND_PACKS[teams - 2] ?? "diamond";
+}
+
+/** Can the cup pack be opened now? An error key if not (the squad is full, or a diamond pick is waiting). */
+export function friendPackBlocked(state: GameState, pack: FriendPack): string | null {
+  const squad = Object.values(state.players).filter((p) => p.clubId === state.userClubId).length;
+  if (squad >= SQUAD_MAX) return "shop.squadFull";
+  if (pack === "diamond" && state.packChoice) return "friends.packWaiting";
+  return null;
+}
+
+/** Opens the cup pack, free: one new player, or (diamond) four to pick one from in the shop. */
+export function openFriendPack(state: GameState, rng: Rng, pack: FriendPack): {playerId: string} | {playerIds: string[]} | {error: string} {
+  const blocked = friendPackBlocked(state, pack);
+  if (blocked) return {error: blocked};
+  if (pack === "diamond") return {playerIds: drawDiamondChoice(state, rng)};
+  // On the house: its price given, then opened.
+  state.monetization.diamonds += PLAYER_PACKS[pack].price;
+  const res = openPack(state, rng, pack);
+  if ("error" in res) state.monetization.diamonds -= PLAYER_PACKS[pack].price;
+  return res;
 }
 
 /** A cup code to share: easy to read out (no 0/O or 1/I). */

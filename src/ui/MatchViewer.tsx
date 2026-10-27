@@ -1713,7 +1713,7 @@ const REPLAY_LINGER_MS = 900;
 /** How much play is kept for replays, in match minutes. */
 const REPLAY_KEEP = 2.5;
 
-function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
+export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   const {t, tx, lang} = useT();
   const game = useGameState();
   const act = useGame((s) => s.act);

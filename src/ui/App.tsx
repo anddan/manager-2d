@@ -39,6 +39,7 @@ import {Tactics} from "./views/Tactics";
 import {Training} from "./views/Training";
 import {Transfers} from "./views/Transfers";
 import {Storage} from "./views/Storage";
+import {CodeSalesPage, FriendSalesWatcher} from "./FriendSale";
 
 const ICONS: Record<View, IconName> = {
   overview: "home",
@@ -49,9 +50,10 @@ const ICONS: Record<View, IconName> = {
   fixtures: "calendar",
   table: "list",
   cup: "trophy",
-  friends: "handshake",
+  friends: "users",
   stadium: "stadium",
   transfers: "swap",
+  codes: "tag",
   contracts: "pen",
   finance: "wallet",
   storage: "boot",
@@ -67,7 +69,7 @@ const NAV_GROUPS: {id: "home" | "team" | "matches" | "club"; icon: IconName; vie
   {id: "club", icon: "shield", views: ["finance", "transfers", "shop", "settings"]},
 ];
 /** Pages shown as a sub-tab of another (three tabs fit a phone): Contracts under Squad, Arena under Finance. */
-const SUB_PAGES: Partial<Record<View, View[]>> = {squad: ["squad", "contracts"], finance: ["finance", "stadium"], cup: ["cup", "friends"]};
+const SUB_PAGES: Partial<Record<View, View[]>> = {squad: ["squad", "contracts"], transfers: ["transfers", "codes"], finance: ["finance", "stadium"], cup: ["cup", "friends"]};
 /** The tab a page sits under (itself, or the page it's a sub-tab of). */
 const tabOf = (v: View): View => (Object.entries(SUB_PAGES).find(([, subs]) => subs!.includes(v))?.[0] as View | undefined) ?? v;
 /** The group a page is in. */
@@ -87,6 +89,7 @@ const SCREENS: Record<View, () => React.JSX.Element> = {
   friends: FriendCup,
   stadium: Stadium,
   transfers: Transfers,
+  codes: CodeSalesPage,
   contracts: Contracts,
   finance: Finance,
   shop: Shop,
@@ -149,6 +152,7 @@ function Game() {
       {playerId && <PlayerModal key={playerId} playerId={playerId} />}
       {negotiation && <ContractModal />}
       <TrophyCelebration />
+      <FriendSalesWatcher />
       <BoardWarningPopup />
       <TutorialCoach />
       <ToastView />
@@ -164,11 +168,13 @@ function useBadges(): Partial<Record<View, number>> {
     overview: dailyToCollect(game.daily),
     // Kit bought but not put on anyone yet.
     storage: game.gearBag?.length ?? 0,
+    // Players up for sale to a friend with a code, waiting to be bought.
+    codes: Object.keys(game.friendSales ?? {}).length,
   };
 }
 
 /** Pages whose number is a reminder rather than something waiting (shown in blue, not red). */
-const BLUE_BADGES: View[] = ["storage"];
+const BLUE_BADGES: View[] = ["storage", "codes"];
 const badgeClass = (v: View) => (BLUE_BADGES.includes(v) ? "badge blue" : "badge");
 
 /**
@@ -400,12 +406,12 @@ function TopBar() {
         </button>
       </div>
       <div className="topbar-stats">
-        <button className="chip" onClick={() => setView("finance")} title={t("fin.cash")}><Icon name="coins" size={16} /> {money(club.cash)}</button>
+        <button className="chip hud-cash" onClick={() => setView("finance")} title={t("fin.cash")}><Icon name="coins" size={16} /> {money(club.cash)}</button>
         <button className="chip" onClick={() => setView("shop")} title={t("shop.energy")}>
           <Icon name="bolt" size={16} /> {m.energy}/{ENERGY_MAX}
           {wait > 0 && <small className="timer">{formatWait(wait)}</small>}
         </button>
-        <button className="chip" onClick={() => setView("shop")} title={t("shop.diamonds")}><Icon name="diamond" size={16} /> {m.diamonds}</button>
+        <button className="chip hud-diamonds" onClick={() => setView("shop")} title={t("shop.diamonds")}><Icon name="diamond" size={16} /> {m.diamonds}</button>
       </div>
     </header>
   );

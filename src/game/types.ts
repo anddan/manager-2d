@@ -486,6 +486,10 @@ export interface GameState {
   packChoice?: string[];
   /** Boots and gloves bought and not worn by anyone. */
   gearBag?: GearItem[];
+  /** Trades with friends (by offer id) already settled here, so none is paid or received twice. */
+  friendTrades?: Record<string, true>;
+  /** Players put up for sale to a friend with a code (by code), until bought or taken back. */
+  friendSales?: Record<string, {name: string; price: number; currency?: "money" | "diamonds"}>;
   /** Trophies won and not celebrated yet (shown once, then removed). */
   celebrations?: {kind: "league" | "cup"; season: number}[];
   /** Set when the manager is sacked: the game is over. */

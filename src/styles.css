@@ -1221,6 +1221,24 @@ button.pick { grid-template-columns: auto 1fr auto auto auto 60px; }
 .pick-row > .pick { flex: 1; min-width: 0; }
 .pick-avatar { flex: none; display: grid; place-items: center; width: 42px; padding: 0; border: 1px solid var(--border); border-radius: 8px; background: none; cursor: pointer; }
 .pick-avatar:hover { background: rgb(127 127 127 / 0.12); border-color: var(--accent, #2563eb); }
+/* The player in the spot, at the top of the picker: the row opens their profile, ✖ takes them out. */
+.pick-current > .pick { border-color: var(--accent, #2563eb); }
+.pick-out {
+  flex: none; display: grid; place-items: center; align-content: center; gap: 1px; width: 52px; padding: 2px; cursor: pointer;
+  border: 1px solid var(--bad, #dc2626); border-radius: 8px; background: rgb(220 38 38 / 0.12); color: var(--bad, #dc2626);
+  font: inherit; font-size: 0.68rem; font-weight: 800;
+}
+/* A number inside a tab label (players up for sale with a code). */
+.tab-badge { margin-left: 6px; position: static; }
+/* Selling to a friend: for money or diamonds. */
+.sale-currency { display: flex; gap: 8px; margin: 4px 0 10px; }
+.sale-currency .btn { flex: 1; justify-content: center; }
+/* Transfers → Friend: buy with a code, and your own players up for sale. */
+.code-sales { display: grid; gap: 18px; margin-top: 8px; }
+.code-sales h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; }
+/* In a profile opened from the tactics: take the player out of their spot. */
+.pm-take-out { margin-left: 10px; vertical-align: middle; font-family: inherit; text-transform: none; letter-spacing: 0; font-size: 0.8rem; }
+.pick-out:hover { background: rgb(220 38 38 / 0.22); }
 
 /* The manager's menu in the match: the avatar, and what folds out under it. */
 .manager-menu { position: relative; }
@@ -1775,6 +1793,10 @@ h2, h3, .modal-head h2 { display: flex; align-items: center; gap: 8px; }
 .burst-text .icon, .burst-gem .icon { color: #5cb8ff; vertical-align: middle; }
 .burst-text.energy { color: #fff; text-shadow: 0 2px 6px rgb(0 0 0 / 0.6), 0 0 12px rgb(30 155 255 / 0.8); }
 .burst-gem { color: #5cb8ff; }
+/* Money: gold coins instead of blue diamonds. */
+.burst-text.coins { text-shadow: 0 2px 6px rgb(0 0 0 / 0.6), 0 0 12px rgb(250 204 21 / 0.8); }
+.burst-text.coins .icon, .burst-gem.coins .icon, .burst-gem.coins { color: #facc15; }
+.burst-gem.coins { filter: drop-shadow(0 0 6px #facc15); }
 
 /* The (i) in the heading row: centred on it, at its right end (after any buttons). */
 .card-head .hint-btn.in-head { position: static; margin-left: auto; flex: none; width: 30px; height: 30px; margin-right: -6px; }
@@ -1959,3 +1981,34 @@ h2, h3, .modal-head h2 { display: flex; align-items: center; gap: 8px; }
 .friends-goals { margin: 0 0 8px; display: grid; gap: 2px; }
 .friends-next { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
 .badge.blue { background: var(--accent); color: #fff; }
+
+/* The friends' cup: a match row with its hidden score and the watch / show buttons. */
+.friends-match { padding: 6px 0; border-bottom: 1px solid var(--border); }
+.friends-match-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; align-items: center; padding: 4px 0; }
+.friends-match-row .friends-team { font-weight: 600; }
+.friends-match-row .friends-team.home { justify-content: flex-end; text-align: right; }
+.friends-match-row .friends-team.away { justify-content: flex-start; }
+.friends-member {
+  display: inline-flex; align-items: center; gap: 6px; background: none; border: 0; padding: 2px 0; color: inherit; font: inherit; cursor: pointer;
+}
+.friends-member:disabled { cursor: default; }
+.friends-member .icon { color: var(--accent); }
+/* A friend's team: the tactics board, only to look at. */
+.friends-board { margin: 8px auto 12px; }
+.friends-board .slot.empty { cursor: default; }
+.friends-board .slot.empty:hover { transform: translate(-50%, 0); }
+.friends-clickable { cursor: pointer; }
+/* Trades with friends: offers to answer (marked), offers waiting, and the last ones done. */
+.friends-offers { display: grid; gap: 6px; margin-top: 4px; }
+.friends-offer { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.friends-offer > span:first-child { flex: 1 1 200px; }
+.friends-offer.incoming { border-left: 3px solid var(--accent); padding-left: 10px; }
+.friends-offer.done { display: block; padding: 4px 0; border: 0; }
+.friends-offer .btn-row { margin: 0; }
+.friends-card { display: grid; place-items: center; padding: 4px 0 8px; }
+.friends-bench-row { display: flex; align-items: center; gap: 8px; }
+.friends-bench-row .pick-name { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 6px; }
+.friends-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.friends-score { min-width: 52px; text-align: center; }
+.friends-members .crest.tiny, .friends-match-row .crest.tiny, .friends-next .crest.tiny { width: 12px; height: 12px; }
+.friends-match-actions { justify-content: center; margin: 4px 0 2px; }

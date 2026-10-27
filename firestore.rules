@@ -1,11 +1,38 @@
 rules_version = '2';
 
 // The friends' cup (see src/ui/friendCupApi.ts). No accounts: devices are known by a random id.
-// A cup can be made and joined; its code and host never change and its round count only goes up.
-// A team can only be sent by a member of the cup, and a round played can never be changed.
-// Nothing is ever deleted.
+// A cup can be made and joined; its code never changes and its round count only goes up. The
+// host only changes when they leave. A team can only be sent by a member of the cup, and a round
+// played can never be changed. When everyone has left, the cup and all in it may be cleared away.
 service cloud.firestore {
   match /databases/{database}/documents {
+    // No one is in the cup any more: no members, or every member has left.
+    function deserted(cup) {
+      return cup.members.size() == 0
+        || (cup.get('left', []) is list && cup.get('left', []).toSet().hasAll(cup.members.keys()));
+    }
+
+    function cupAt(code) {
+      return get(/databases/$(database)/documents/cups/$(code)).data;
+    }
+
+    // A player sold with a code: put up open, then bought or taken back once; cleared when done.
+    match /sales/{code} {
+      allow read: if true;
+      allow create: if code.size() == 6
+        && request.resource.data.code == code
+        && request.resource.data.status == 'open'
+        && request.resource.data.seller is string
+        && request.resource.data.price is number
+        && request.resource.data.price >= 0
+        && request.resource.data.player is string
+        && request.resource.data.player.size() < 200000;
+      allow update: if resource.data.status == 'open'
+        && request.resource.data.status in ['sold', 'cancelled']
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'buyer']);
+      allow delete: if resource.data.status != 'open';
+    }
+
     match /cups/{code} {
       allow read: if true;
       allow create: if code.size() == 6
@@ -15,24 +42,47 @@ service cloud.firestore {
         && request.resource.data.members is map
         && request.resource.data.members.size() == 1;
       allow update: if request.resource.data.code == resource.data.code
-        && request.resource.data.creator == resource.data.creator
+        && (request.resource.data.creator == resource.data.creator
+          || !(resource.data.creator in request.resource.data.members)
+          || resource.data.creator in request.resource.data.get('left', []))
         && request.resource.data.seed == resource.data.seed
         && request.resource.data.round >= resource.data.round
-        && request.resource.data.members.size() <= 16;
-      allow delete: if false;
+        && request.resource.data.members.size() <= 16
+        // A prize taken stays taken, and a pack opened stays opened.
+        && (!('prizeClaimed' in resource.data) || request.resource.data.get('prizeClaimed', null) == resource.data.prizeClaimed)
+        && (!('packsTaken' in resource.data) || request.resource.data.get('packsTaken', {}).keys().hasAll(resource.data.packsTaken.keys()));
+      allow delete: if deserted(resource.data);
 
       match /teams/{member} {
         allow read: if true;
-        allow create, update: if member in get(/databases/$(database)/documents/cups/$(code)).data.members
+        allow create, update: if member in cupAt(code).members
           && request.resource.data.json is string
           && request.resource.data.json.size() < 500000;
-        allow delete: if false;
+        allow delete: if !(member in cupAt(code).members) || deserted(cupAt(code));
+      }
+
+      // Trades between members: made open, then only accepted, declined or withdrawn, once.
+      match /offers/{offer} {
+        allow read: if true;
+        allow create: if request.resource.data.from in cupAt(code).members
+          && request.resource.data.to in cupAt(code).members
+          && request.resource.data.from != request.resource.data.to
+          && request.resource.data.status == 'open'
+          && request.resource.data.price is number
+          && request.resource.data.price >= 0
+          && request.resource.data.get('swap', '').size() < 200000;
+        allow update: if resource.data.status == 'open'
+          && request.resource.data.status in ['accepted', 'declined', 'cancelled']
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'player'])
+          && request.resource.data.get('player', '').size() < 200000;
+        allow delete: if deserted(cupAt(code));
       }
 
       match /rounds/{round} {
         allow read: if true;
         allow create: if request.resource.data.results is list;
-        allow update, delete: if false;
+        allow update: if false;
+        allow delete: if deserted(cupAt(code));
       }
     }
   }

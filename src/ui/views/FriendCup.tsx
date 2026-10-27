@@ -1,17 +1,49 @@
 // The friends' cup page: make a cup (and share its code) or join one; then the members, your
 // team sent in, the rounds' results and the table. The cup's creator starts it and plays the
 // rounds; everyone sees the same results as they come in.
-import {useEffect, useState} from "react";
-import {friendFixtures, friendTable, snapshotReady, snapshotTeam} from "../../game/friendCup";
-import {userClub} from "../../game/helpers";
+import {useCallback, useEffect, useState} from "react";
+import {
+  collectFriendPrize,
+  friendFixtures,
+  friendMatchSeed,
+  friendPack,
+  friendPackBlocked,
+  friendPrize,
+  friendTable,
+  openFriendPack,
+  playFriendMatch,
+  snapshotReady,
+  snapshotTeam,
+  type FriendPrize,
+  type TeamSnapshot,
+} from "../../game/friendCup";
+import type {GameState, MatchReport} from "../../game/types";
+import {GameOverride} from "../../store";
+import {MatchScreen} from "../MatchViewer";
+import {listName, shortName, userClub} from "../../game/helpers";
 import {useT, type TKey} from "../../i18n";
 import {useGame, useGameState} from "../../store";
-import {Card, Empty, Hint} from "../common";
+import {Card, Empty, Flag, FormArrow, Hint, Modal, PosBadge} from "../common";
+import {clubSlots} from "../../game/constants";
+import {effectiveRating} from "../../game/ratings";
+import {Jersey} from "../Jersey";
+import {PlayerCard} from "../PlayerCard";
+import {PackReveal} from "../PackReveal";
+import {OfferDialog, TradeOffers, useOffers, useSettleTrades} from "./FriendTrades";
+import {diamondBurst, moneyBurst} from "../effects";
+import type {PlayerPackId} from "../../game/packs";
+import {GearPicture} from "../Gear";
+import {boardSpots} from "./Tactics";
+import type {Club, Player} from "../../game/types";
 import {Icon, iconize} from "../Icon";
 import {
+  claimPack,
+  claimPrize,
   createCup,
   deviceId,
+  fetchTeam,
   joinCup,
+  leaveCup,
   myCupCode,
   playNextRound,
   sendTeam,
@@ -79,7 +111,7 @@ function CupStart({onEnter}: {onEnter: (code: string) => void}) {
   };
   return (
     <div className="grid">
-      <Card title={<><Icon name="trophy" size={20} /> {iconize(t("friends.create"))}</>}>
+      <Card title={<><Icon name="users" size={20} /> {iconize(t("friends.create"))}</>}>
         <Hint>{iconize(t("friends.hint"))}</Hint>
         <label className="field">
           <span>{iconize(t("friends.cupName"))}</span>
@@ -89,13 +121,13 @@ function CupStart({onEnter}: {onEnter: (code: string) => void}) {
           <button className="btn primary" disabled={busy} onClick={create}><Icon name="plus" size={16} /> {iconize(t("friends.createButton"))}</button>
         </div>
       </Card>
-      <Card title={<><Icon name="handshake" size={20} /> {iconize(t("friends.join"))}</>}>
+      <Card title={<><Icon name="users" size={20} /> {iconize(t("friends.join"))}</>}>
         <label className="field">
           <span>{iconize(t("friends.code"))}</span>
           <input className="input friends-code-input" value={join} maxLength={6} placeholder="ABC123" onChange={(e) => setJoin(e.target.value.toUpperCase())} />
         </label>
         <div className="btn-row">
-          <button className="btn primary" disabled={busy || join.trim().length < 4} onClick={enter}><Icon name="handshake" size={16} /> {iconize(t("friends.joinButton"))}</button>
+          <button className="btn primary" disabled={busy || join.trim().length < 4} onClick={enter}><Icon name="users" size={16} /> {iconize(t("friends.joinButton"))}</button>
         </div>
       </Card>
     </div>
@@ -104,14 +136,37 @@ function CupStart({onEnter}: {onEnter: (code: string) => void}) {
 
 /** In a cup: who's in it, sending your team, starting and playing the rounds, results and table. */
 function CupRoom({code, onLeave}: {code: string; onLeave: () => void}) {
-  const {t} = useT();
+  const {t, money} = useT();
   const game = useGameState();
   const notify = useGame((s) => s.notify);
   const [cup, setCup] = useState<FriendCupDoc | null | undefined>(undefined);
+  // Trades: offers made and answered come in here; the ones this device made are settled as they're answered.
+  const offers = useOffers(code);
+  useSettleTrades(offers, useCallback((id: string) => cup?.members[id]?.club.name ?? "?", [cup]));
   const [rounds, setRounds] = useState<FriendRoundDoc[]>([]);
   const [sent, setSent] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState(false);
   const [offline, setOffline] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const act = useGame((s) => s.act);
+  const setView = useGame((s) => s.setView);
+  // The player from this cup's pack, being revealed.
+  const [opened, setOpened] = useState<{playerId: string; pack: PlayerPackId} | null>(null);
+  // The member whose team is being looked at.
+  const [viewing, setViewing] = useState<string | null>(null);
+  // Matches seen (watched or shown) on this device: their scores show, and they count in the table.
+  const [seen, setSeen] = useState<Set<string>>(() => loadSeen());
+  const see = (key: string) => setSeen((s) => saveSeen(new Set(s).add(key)));
+  // A match being watched: played again here from the round's teams and seed.
+  const [watching, setWatching] = useState<{state: GameState; report: MatchReport; key: string} | null>(null);
+  const watch = (r: FriendRoundDoc, i: number) => {
+    if (!r.teams || r.seed === undefined) return;
+    const teams = JSON.parse(r.teams) as Record<string, TeamSnapshot>;
+    const m = r.results[i];
+    if (!teams[m.home] || !teams[m.away]) return;
+    const played = playFriendMatch(teams[m.home], teams[m.away], friendMatchSeed(r.seed, i), true);
+    setWatching({state: played.state, report: played.report, key: matchKey(code, r.round, i)});
+  };
   useEffect(
     () =>
       watchCup(code, {
@@ -122,13 +177,15 @@ function CupRoom({code, onLeave}: {code: string; onLeave: () => void}) {
       }),
     [code]
   );
-  const run = async (job: () => Promise<unknown>, done?: TKey) => {
+  const run = async (job: () => Promise<unknown>, done?: TKey): Promise<boolean> => {
     setBusy(true);
     try {
       await job();
       if (done) notify(done, undefined, "good");
+      return true;
     } catch (e) {
       notify(e instanceof Error && e.message.startsWith("friends.") ? (e.message as TKey) : "friends.err.offline", undefined, "error");
+      return false;
     } finally {
       setBusy(false);
     }
@@ -149,14 +206,41 @@ function CupRoom({code, onLeave}: {code: string; onLeave: () => void}) {
   const fixtures = cup.order ? friendFixtures(cup.order) : [];
   const started = !!cup.order;
   const finished = started && cup.round >= fixtures.length;
-  const results = rounds.flatMap((r) => r.results);
+  // Only what's been seen counts, so the table gives nothing away.
+  const results = rounds.flatMap((r) => r.results.filter((_, i) => seen.has(matchKey(code, r.round, i))));
+  const unseen = rounds.reduce((n, r) => n + r.results.filter((_, i) => !seen.has(matchKey(code, r.round, i))).length, 0);
   const table = friendTable(members, results);
   const name = (id: string) => cup.members[id]?.club.name ?? "?";
   const crest = (id: string) => {
     const c = cup.members[id]?.club;
-    return c ? <span className="crest tiny" style={{background: c.color, color: c.color2}}>{c.short}</span> : null;
+    return c ? <span className="crest tiny" style={{background: c.color}} /> : null;
   };
   const snap = snapshotTeam(game);
+  const teams = cup.order?.length ?? 0;
+  const collect = (kind: FriendPrize, button: HTMLElement) =>
+    run(async () => {
+      if (!(await claimPrize(code, kind))) throw new Error("friends.prizeTaken");
+      act((g) => collectFriendPrize(g, kind, teams));
+      // The prize flies from the button to its count in the top bar.
+      const amount = friendPrize(kind, teams);
+      if (kind === "diamonds") diamondBurst(button, amount);
+      else moneyBurst(button, money(amount));
+    }, "friends.prizeGot");
+  const pack = friendPack(teams);
+  const openMyPack = () => {
+    if (!pack) return;
+    const blocked = friendPackBlocked(game, pack);
+    if (blocked) return notify(blocked as TKey, undefined, "error");
+    void run(async () => {
+      if (!(await claimPack(code))) throw new Error("friends.packTaken");
+      const res = act((g, rng) => openFriendPack(g, rng, pack));
+      if ("playerId" in res && pack !== "diamond") setOpened({playerId: res.playerId, pack});
+      else if ("playerIds" in res) {
+        notify("friends.pickInShop", undefined, "good");
+        setView("shop");
+      }
+    });
+  };
   const share = () => {
     navigator.clipboard?.writeText(code).then(() => notify("friends.copied", undefined, "good"), () => undefined);
   };
@@ -169,8 +253,15 @@ function CupRoom({code, onLeave}: {code: string; onLeave: () => void}) {
         <ul className="plain-list friends-members">
           {members.map((id) => (
             <li key={id}>
-              {crest(id)} <strong>{name(id)}</strong> <span className="muted small">{cup.members[id].manager}{id === cup.creator ? ` · ${t("friends.host")}` : ""}</span>
-              <span className={sent[id] ? "friends-sent" : "friends-sent missing"}>{sent[id] ? <><Icon name="check" size={14} /> {iconize(t("friends.sent"))}</> : iconize(t("friends.notSent"))}</span>
+              <button className="friends-member" disabled={!sent[id]} title={t("friends.viewTeam")} onClick={() => setViewing(id)}>
+                {crest(id)} <strong>{name(id)}</strong> {sent[id] ? <Icon name="eye" size={14} /> : null}
+              </button>
+              <span className="muted small">{cup.members[id].manager}{id === cup.creator ? ` · ${t("friends.host")}` : ""}</span>
+              {cup.left?.includes(id) ? (
+                <span className="friends-sent missing">{iconize(t("friends.hasLeft"))}</span>
+              ) : (
+                <span className={sent[id] ? "friends-sent" : "friends-sent missing"}>{sent[id] ? <><Icon name="check" size={14} /> {iconize(t("friends.sent"))}</> : iconize(t("friends.notSent"))}</span>
+              )}
             </li>
           ))}
         </ul>
@@ -194,6 +285,8 @@ function CupRoom({code, onLeave}: {code: string; onLeave: () => void}) {
         {!creator && started && !finished && <p className="muted small">{iconize(t("friends.hostPlays", {host: cup.members[cup.creator]?.manager ?? "?"}))}</p>}
       </Card>
 
+      {members.length > 1 && <TradeOffers code={code} cup={cup} offers={offers} />}
+
       {started && (
         <Card title={<><Icon name="list" size={20} /> {iconize(t("friends.table"))}</>}>
           <table className="table compact">
@@ -216,7 +309,41 @@ function CupRoom({code, onLeave}: {code: string; onLeave: () => void}) {
               ))}
             </tbody>
           </table>
-          {finished && table[0] && <p className="cup-winner">{iconize(t("friends.winner", {club: name(table[0].id)}))}</p>}
+          {unseen > 0 && <p className="muted small">{iconize(t("friends.unseen", {n: unseen}))}</p>}
+          {finished && unseen === 0 && table[0] && <p className="cup-winner">{iconize(t("friends.winner", {club: name(table[0].id)}))}</p>}
+          {/* The winner chooses their prize: diamonds or money, more the more teams were in it. */}
+          {finished && unseen === 0 && table[0]?.id === me && (
+            cup.prizeClaimed ? (
+              <p className="muted small">{iconize(t("friends.prizeTaken"))}</p>
+            ) : (
+              <div className="friends-prize">
+                <p>{iconize(t("friends.prizeText", {n: teams}))}</p>
+                <div className="btn-row">
+                  <button className="btn primary" disabled={busy} onClick={(e) => collect("diamonds", e.currentTarget)}>
+                    {iconize(t("friends.takeDiamonds", {n: friendPrize("diamonds", teams)}))}
+                  </button>
+                  <button className="btn primary" disabled={busy} onClick={(e) => collect("money", e.currentTarget)}>
+                    {iconize(t("friends.takeMoney", {x: friendPrize("money", teams)}))}
+                  </button>
+                </div>
+              </div>
+            )
+          )}
+          {/* Everyone's pack once the cup is over: better the more teams were in it. */}
+          {finished && pack && cup.members[me] && (
+            cup.packsTaken?.[me] ? (
+              <p className="muted small">{iconize(t("friends.packTaken"))}</p>
+            ) : (
+              <div className="friends-prize">
+                <p>{iconize(t("friends.packText", {pack: t(`pack.${pack}`), n: teams}))}</p>
+                <div className="btn-row">
+                  <button className="btn primary" disabled={busy} onClick={openMyPack}>
+                    <Icon name="gift" size={16} /> {iconize(t("friends.openPack", {pack: t(`pack.${pack}`)}))}
+                  </button>
+                </div>
+              </div>
+            )
+          )}
         </Card>
       )}
 
@@ -226,22 +353,38 @@ function CupRoom({code, onLeave}: {code: string; onLeave: () => void}) {
           {[...rounds].reverse().map((r) => (
             <section key={r.round} className="friends-round">
               <h4>{iconize(t("friends.round", {round: r.round}))}</h4>
-              {r.results.map((m, i) => (
-                <details key={i} className="friends-match">
-                  <summary>
-                    <span className="friends-team">{crest(m.home)} {name(m.home)}</span>
-                    <strong className="friends-score">{m.homeGoals} – {m.awayGoals}</strong>
-                    <span className="friends-team away">{name(m.away)} {crest(m.away)}</span>
-                  </summary>
-                  {m.goals.length > 0 ? (
+              {r.results.map((m, i) => {
+                const key = matchKey(code, r.round, i);
+                const shown = seen.has(key);
+                const canWatch = !!r.teams && r.seed !== undefined && m.goals !== undefined;
+                return (
+                <div key={i} className="friends-match">
+                  <div className="friends-match-row">
+                    <span className="friends-team home"><span className="friends-name">{name(m.home)}</span> {crest(m.home)}</span>
+                    <strong className="friends-score">{shown ? `${m.homeGoals} – ${m.awayGoals}` : "? – ?"}</strong>
+                    <span className="friends-team away">{crest(m.away)} <span className="friends-name">{name(m.away)}</span></span>
+                  </div>
+                  {!shown && (
+                    <div className="btn-row friends-match-actions">
+                      {canWatch && <button className="btn primary small" onClick={() => watch(r, i)}><Icon name="play" size={14} /> {iconize(t("friends.watch"))}</button>}
+                      <button className="btn small" onClick={() => see(key)}><Icon name="eye" size={14} /> {iconize(t("friends.show"))}</button>
+                    </div>
+                  )}
+                  {shown && canWatch && (
+                    <div className="btn-row friends-match-actions">
+                      <button className="btn small" onClick={() => watch(r, i)}><Icon name="play" size={14} /> {iconize(t("friends.watchAgain"))}</button>
+                    </div>
+                  )}
+                  {shown && (m.goals.length > 0 ? (
                     <ul className="plain-list small muted friends-goals">
                       {m.goals.map((g, j) => <li key={j}><Icon name="ball" size={14} /> {g.minute}' {g.name} ({name(g.side === "home" ? m.home : m.away)})</li>)}
                     </ul>
                   ) : (
                     <p className="small muted">{iconize(t("friends.noGoals"))}</p>
-                  )}
-                </details>
-              ))}
+                  ))}
+                </div>
+                );
+              })}
               {/* Who sits out an odd round. */}
               {fixtures[r.round - 1] && members.filter((id) => !fixtures[r.round - 1].flat().includes(id)).map((id) => (
                 <p key={id} className="small muted">{iconize(t("friends.bye", {club: name(id)}))}</p>
@@ -259,9 +402,143 @@ function CupRoom({code, onLeave}: {code: string; onLeave: () => void}) {
         </Card>
       )}
 
+      {/* The match being watched, in the usual match screen, lent its own ground. */}
+      {watching && (
+        <GameOverride.Provider value={watching.state}>
+          <MatchScreen report={watching.report} onClose={() => { see(watching.key); setWatching(null); }} />
+        </GameOverride.Provider>
+      )}
+
       <div className="btn-row span-2">
-        <button className="btn small" onClick={onLeave}><Icon name="close" size={14} /> {iconize(t("friends.leave"))}</button>
+        <button className="btn small" onClick={() => setLeaving(true)}><Icon name="close" size={14} /> {iconize(t("friends.leave"))}</button>
       </div>
+      {opened && <PackReveal playerId={opened.playerId} pack={opened.pack} onClose={() => setOpened(null)} />}
+      {viewing && <TeamView code={code} member={viewing} sentAt={sent[viewing]} onClose={() => setViewing(null)} />}
+      {leaving && (
+        <Modal title={iconize(t("friends.leave"))} compact onClose={() => setLeaving(false)}>
+          <p>{iconize(t(members.every((id) => id === me || cup.left?.includes(id)) ? "friends.leaveLast" : "friends.leaveSure"))}</p>
+          <div className="btn-row">
+            <button className="btn" onClick={() => setLeaving(false)}>{iconize(t("common.cancel"))}</button>
+            <button className="btn danger" disabled={busy} onClick={() => run(() => leaveCup(code)).then((ok) => { setLeaving(false); if (ok) onLeave(); })}>
+              <Icon name="close" size={16} /> {iconize(t("friends.leave"))}
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
+}
+
+/** A member's team as they last sent it: the starting eleven on a small pitch, and the bench. */
+function TeamView({code, member, sentAt, onClose}: {code: string; member: string; sentAt?: number; onClose: () => void}) {
+  const {t} = useT();
+  const [team, setTeam] = useState<TeamSnapshot | null | undefined>(undefined);
+  const game = useGameState();
+  // The player whose card is open.
+  const [card, setCard] = useState<Player | null>(null);
+  // The player an offer is being made for.
+  const [buying, setBuying] = useState<Player | null>(null);
+  useEffect(() => {
+    let live = true;
+    fetchTeam(code, member).then((x) => live && setTeam(x), () => live && setTeam(null));
+    return () => {
+      live = false;
+    };
+  }, [code, member, sentAt]);
+  const club = team?.club;
+  const players = new Map(team?.players.map((p) => [p.id, p]) ?? []);
+  const slots = club ? clubSlots(club as Club) : [];
+  const spots = boardSpots(slots);
+  const bench = (club?.bench ?? []).map((id) => players.get(id)).filter((p): p is Player => !!p);
+  return (
+    <Modal title={club ? <><span className="crest tiny" style={{background: club.color}} /> {club.name}</> : iconize(t("friends.lineup"))} onClose={onClose}>
+      {team === undefined && <Empty>{iconize(t("friends.loading"))}</Empty>}
+      {team === null && <Empty>{iconize(t("friends.noTeam"))}</Empty>}
+      {club && team && (
+        <>
+          <p className="muted small">{team.manager} · {club.formation} · {iconize(t(`tac.${club.mentality}`))}</p>
+          {/* The same board as on the tactics page: shirts, gear and name plates. */}
+          <div className="pitch-board friends-board" aria-label={t("friends.lineup")}>
+            <div className="pitch-lines" aria-hidden />
+            {slots.map((slot, i) => {
+              const p = players.get(club.lineup[i]);
+              return (
+                <div key={i} className={p ? "slot" : "slot empty"} style={spots[i]} role={p ? "button" : undefined} onClick={p ? () => setCard(p) : undefined}>
+                  {p && club.roles?.captain === p.id && <span className="armband" title={t("roles.captain")}>C</span>}
+                  {p?.gear && <span className={p.gear.kind === "gloves" ? "slot-gear gloves" : "slot-gear"} aria-hidden><GearPicture item={p.gear} size={p.gear.kind === "gloves" ? 22 : 24} /></span>}
+                  {p?.shin && <span className="slot-gear slot-shin" aria-hidden><GearPicture item={p.shin} size={15} /></span>}
+                  <Jersey color={club.color} trim={club.color2} keeper={slot.pos === "GK"} number={i + 1} />
+                  <span className="plate">
+                    <span className="plate-name">{p ? shortName(p) : t(`pos.${slot.pos}`)}</span>
+                    <span className="plate-info">
+                      {p && <Flag code={p.nationality} size={13} />}
+                      <span>{iconize(t(`pos.${slot.pos}`))}</span>
+                      {p && <strong>{Math.round(effectiveRating(p, slot.pos))}</strong>}
+                      {p && <FormArrow form={p.form} size={12} />}
+                    </span>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <h4><Icon name="bench" size={18} /> {iconize(t("friends.bench"))}</h4>
+          {bench.length === 0 ? (
+            <p className="muted small">{iconize(t("common.none"))}</p>
+          ) : (
+            <ul className="pick-list">
+              {bench.map((p) => (
+                <li key={p.id} className="bench-row friends-clickable" role="button" onClick={() => setCard(p)}>
+                  <div className="pick friends-bench-row">
+                    <Jersey color={club.color} trim={club.color2} keeper={p.position === "GK"} size={26} />
+                    <PosBadge pos={p.position} />
+                    <span className="pick-name"><Flag code={p.nationality} size={15} /> {listName(p)}</span>
+                    {p.gear && <GearPicture item={p.gear} size={20} />}
+                    {p.shin && <GearPicture item={p.shin} size={16} />}
+                    <FormArrow form={p.form} />
+                    <span className="num">{Math.round(effectiveRating(p, p.position))}</span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+      {/* A player's card: lent a ground with this friend's club in it, for the crest and shirt. */}
+      {card && club && (
+        <Modal title={<><Flag code={card.nationality} /> {listName(card)}</>} compact onClose={() => setCard(null)}>
+          <div className="friends-card">
+            <PlayerCard game={{...game, clubs: {...game.clubs, [card.clubId!]: {...(game.clubs[card.clubId!] ?? Object.values(game.clubs)[0]), ...club, id: card.clubId!}}}} player={card} reveal />
+          </div>
+          {/* A friend's player: make an offer. */}
+          {member !== deviceId() && (
+            <div className="btn-row dialog-actions">
+              <button className="btn primary" onClick={() => setBuying(card)}><Icon name="handshake" size={16} /> {iconize(t("friends.buy"))}</button>
+            </div>
+          )}
+        </Modal>
+      )}
+      {buying && <OfferDialog code={code} seller={member} player={buying} onClose={() => { setBuying(null); setCard(null); }} />}
+    </Modal>
+  );
+}
+
+/** A match's key among the seen ones: the cup, the round and its place in the round. */
+function matchKey(code: string, round: number, i: number): string {
+  return `${code}:${round}:${i}`;
+}
+const SEEN_KEY = "manager2d.friendSeen";
+function loadSeen(): Set<string> {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(SEEN_KEY) ?? "[]") as string[]);
+  } catch {
+    return new Set();
+  }
+}
+function saveSeen(seen: Set<string>): Set<string> {
+  try {
+    localStorage.setItem(SEEN_KEY, JSON.stringify([...seen]));
+  } catch {
+    // Only for this visit then.
+  }
+  return seen;
 }

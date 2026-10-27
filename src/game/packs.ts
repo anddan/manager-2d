@@ -37,6 +37,11 @@ export function openDiamondPack(state: GameState, rng: Rng): {playerIds: string[
   const squad = Object.values(state.players).filter((p) => p.clubId === state.userClubId).length;
   if (squad >= SQUAD_MAX) return {error: "shop.squadFull"};
   book(state, club.id, "transfers", -DIAMOND_PACK.price);
+  return {playerIds: drawDiamondChoice(state, rng)};
+}
+
+/** The diamond pack's four to pick from (kept in `state.packChoice`), however it was paid for. */
+export function drawDiamondChoice(state: GameState, rng: Rng): string[] {
   const ids: string[] = [];
   for (let i = 0; i < DIAMOND_PACK.choices; i++) {
     const position = rng.weighted([...POSITIONS], (p) => SQUAD_TEMPLATE[p]);
@@ -46,7 +51,7 @@ export function openDiamondPack(state: GameState, rng: Rng): {playerIds: string[
   }
   state.packChoice = ids;
   taskProgress(state, "pack");
-  return {playerIds: ids};
+  return ids;
 }
 
 /** Picks one of the diamond pack's four: they join the squad, the other three are gone. */

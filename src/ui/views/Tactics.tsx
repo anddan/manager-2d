@@ -22,7 +22,7 @@ import {GearPicture} from "../Gear";
  * keeper at the bottom and strikers at the top, to give every row room for
  * its shirt and name plate. Sideways it keeps clear of the touchlines.
  */
-function boardSpots(slots: Slot[]): {left: string; top: string}[] {
+export function boardSpots(slots: Slot[]): {left: string; top: string}[] {
   // Work in percent of the board; a shirt with its plate is about 18% wide and 14% tall.
   const W = 18;
   const H = 14;
@@ -209,19 +209,19 @@ export function Tactics() {
         </label>
       </li>
       {inSlot && (
-        <li className="pick-row">
-          {/* The player in the spot, like the rows below (to compare), with ✖ to take them out. */}
-          <button className="pick pick-clear" onClick={clearSlot} title={t("tac.clearSlot", {name: listName(inSlot)})} aria-label={t("tac.clearSlot", {name: listName(inSlot)})}>
+        <li className="pick-row pick-current">
+          {/* The player in the spot, like the rows below (to compare): tap for their profile, ✖ to take them out. */}
+          <button className="pick" onClick={() => profile(inSlot.id)} title={t("tac.profile")} aria-label={`${t("tac.profile")}: ${listName(inSlot)}`}>
             <PosBadge pos={inSlot.position} />
             <span className="pick-name"><Flag code={inSlot.nationality} size={15} /> {listName(inSlot)} <StatusIcons player={inSlot} /></span>
-            {/* In the status column, like the other rows: what tapping it does. */}
-            <span className="pick-clear-x small"><Icon name="close" size={18} /> {iconize(t("tac.clearShort"))}</span>
+            <span className="muted small"><Icon name="user" size={16} /></span>
             <FormArrow form={inSlot.form} />
             <span className={familiarity(inSlot, pos) < 1 ? "num warn" : "num strong"}>{Math.round(effectiveRating(inSlot, pos))}</span>
             <Bar value={inSlot.fitness} small />
           </button>
-          <button className="pick-avatar" title={t("tac.profile")} aria-label={`${t("tac.profile")}: ${listName(inSlot)}`} onClick={() => profile(inSlot.id)}>
-            <Avatar player={inSlot} shirt={club.color} trim={club.color2} size={34} />
+          <button className="pick-out" onClick={clearSlot} title={t("tac.clearSlot", {name: listName(inSlot)})} aria-label={t("tac.clearSlot", {name: listName(inSlot)})}>
+            <Icon name="close" size={18} />
+            <span>{iconize(t("tac.clearShort"))}</span>
           </button>
         </li>
       )}
@@ -299,7 +299,8 @@ export function Tactics() {
                 className={`slot ${selected === i ? "selected" : ""} ${bad && !out ? "empty" : ""} ${out ? "out" : ""} ${drag.over === i ? "drop" : ""}`}
                 style={spots[i]}
                 onPointerDown={p && !bad ? (e) => drag.start(e, p.id, i, shortName(p)) : custom && i > 0 ? (e) => drag.start(e, "", i, t(`pos.${slot.pos}`)) : undefined}
-                onClick={() => !drag.justDropped() && setSelected(selected === i ? null : i)}
+                // A shirt with someone in it opens their profile (where they can be taken out); an empty spot, the picker.
+                onClick={() => !drag.justDropped() && (p && p.clubId === club.id ? openPlayer(p.id, i) : setSelected(selected === i ? null : i))}
               >
                 {p && !bad && club.roles?.captain === p.id && <span className="armband" title={t("roles.captain")}>C</span>}
                 {out ? (
