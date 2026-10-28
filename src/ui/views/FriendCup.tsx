@@ -27,6 +27,7 @@ import {Card, Empty, Flag, Hint, Modal} from "../common";
 import {PlayerCard} from "../PlayerCard";
 import {GearCard} from "../Gear";
 import {LineupSheet} from "../LineupSheet";
+import {InviteFriends} from "./Pals";
 import {PackReveal} from "../PackReveal";
 import {OfferDialog, TradeOffers, useOffers, useSettleTrades} from "./FriendTrades";
 import {diamondBurst, moneyBurst} from "../effects";
@@ -35,6 +36,7 @@ import type {Player} from "../../game/types";
 import {Icon, iconize} from "../Icon";
 import {
   claimPack,
+  cupOffers,
   claimPrize,
   createCup,
   deviceId,
@@ -292,10 +294,11 @@ function CupRoom({code, onLeave}: {code: string; onLeave: () => void}) {
             </button>
           )}
         </div>
+        {creator && !started && <InviteFriends code={code} cupName={cup.name} members={members} />}
         {!creator && started && !finished && <p className="muted small">{iconize(t("friends.hostPlays", {host: cup.members[cup.creator]?.manager ?? "?"}))}</p>}
       </Card>
 
-      {members.length > 1 && <TradeOffers code={code} cup={cup} offers={offers} />}
+      {members.length > 1 && <TradeOffers path={cupOffers(code)} offers={offers} clubName={(id) => cup.members[id]?.club.name ?? "?"} />}
 
       {started && (
         <Card title={<><Icon name="list" size={20} /> {iconize(t("friends.table"))}</>}>
@@ -489,7 +492,7 @@ function TeamView({code, member, sentAt, onClose}: {code: string; member: string
           )}
         </Modal>
       )}
-      {buying && <OfferDialog code={code} seller={member} player={buying} onClose={() => { setBuying(null); setCard(null); }} />}
+      {buying && <OfferDialog path={cupOffers(code)} seller={member} player={buying} onClose={() => { setBuying(null); setCard(null); }} />}
     </Modal>
   );
 }

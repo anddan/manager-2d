@@ -6,7 +6,7 @@
 // the rounds (on their device, from everyone's latest snapshot) and stores the results, so
 // everyone reads the same scores.
 import {getApps, initializeApp} from "firebase/app";
-import {arrayUnion, collection, deleteDoc, deleteField, doc, getDoc, getDocs, getFirestore, onSnapshot, runTransaction, setDoc, updateDoc, type Firestore} from "firebase/firestore";
+import {arrayUnion, collection, deleteDoc, deleteField, doc, getDoc, getDocs, getFirestore, onSnapshot, query, runTransaction, setDoc, updateDoc, where, type Firestore} from "firebase/firestore";
 import type {Player} from "../game/types";
 import {friendFixtures, newCupCode, playFriendRound, snapshotOvr, type FriendPrize, type FriendResult, type TeamSnapshot} from "../game/friendCup";
 
@@ -19,7 +19,7 @@ const CONFIG = {
   appId: "1:997961071440:web:5bdaf1ccaef19e06f08a55",
 };
 
-function db(): Firestore {
+export function db(): Firestore {
   return getFirestore(getApps()[0] ?? initializeApp(CONFIG));
 }
 
@@ -248,26 +248,50 @@ export interface TradeOfferDoc {
   status: "open" | "accepted" | "declined" | "cancelled";
   /** The player sold (JSON), once accepted. */
   player?: string;
+  /** The buyer's and the seller's clubs, by name (between friends, where there's no cup to look them up in). */
+  fromName?: string;
+  toName?: string;
   createdAt: number;
 }
 
+/** Where offers live: a cup's ("cups/CODE/offers") or between friends ("trades"). */
+export type OfferPath = string[];
+export const cupOffers = (code: string): OfferPath => ["cups", code, "offers"];
+export const PAL_OFFERS: OfferPath = ["trades"];
+
 /** Sends an offer (the buyer has already put up their side). */
-export async function makeOffer(code: string, offer: Omit<TradeOfferDoc, "id" | "from" | "status" | "createdAt">): Promise<string> {
-  const ref = doc(collection(db(), "cups", code, "offers"));
+export async function makeOffer(path: OfferPath, offer: Omit<TradeOfferDoc, "id" | "from" | "status" | "createdAt">): Promise<string> {
+  const [first, ...rest] = path;
+  const ref = doc(collection(db(), first, ...rest));
   const full: TradeOfferDoc = {...offer, id: ref.id, from: deviceId(), status: "open", createdAt: Date.now()};
   await setDoc(ref, full);
   return ref.id;
 }
 
 /** Answers or withdraws an open offer: false if it wasn't open any more. `player` goes with a yes. */
-export async function closeOffer(code: string, id: string, status: "accepted" | "declined" | "cancelled", player?: string): Promise<boolean> {
-  const ref = doc(db(), "cups", code, "offers", id);
+export async function closeOffer(path: OfferPath, id: string, status: "accepted" | "declined" | "cancelled", player?: string): Promise<boolean> {
+  const [first, ...rest] = path;
+  const ref = doc(db(), first, ...rest, id);
   return runTransaction(db(), async (tx) => {
     const offer = (await tx.get(ref)).data() as TradeOfferDoc | undefined;
     if (!offer || offer.status !== "open") return false;
     tx.update(ref, player ? {status, player} : {status});
     return true;
   });
+}
+
+/** Follows the offers between friends to and from this device (newest first). */
+export function watchPalOffers(on: (offers: TradeOfferDoc[]) => void): () => void {
+  const me = deviceId();
+  let sent: TradeOfferDoc[] = [];
+  let got: TradeOfferDoc[] = [];
+  const emit = () => on([...sent, ...got].sort((a, b) => b.createdAt - a.createdAt));
+  const ref = collection(db(), "trades");
+  const stops = [
+    onSnapshot(query(ref, where("from", "==", me)), (s) => { sent = s.docs.map((x) => x.data() as TradeOfferDoc); emit(); }, () => undefined),
+    onSnapshot(query(ref, where("to", "==", me)), (s) => { got = s.docs.map((x) => x.data() as TradeOfferDoc); emit(); }, () => undefined),
+  ];
+  return () => stops.forEach((stop) => stop());
 }
 
 /** Follows the offers to and from this device in a cup. */

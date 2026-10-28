@@ -789,6 +789,20 @@ button.pick { grid-template-columns: auto 1fr auto auto auto 60px; }
 }
 @media (prefers-reduced-motion: reduce) { .fut-card.tier-special::before { animation: none; } }
 
+/* Friends: the friend code big, and the list of friends with their team strength. */
+.pals-code-row { display: flex; justify-content: center; margin: 4px 0; }
+.pals-code { display: inline-flex; align-items: center; gap: 10px; padding: 10px 18px; border-radius: 14px; border: 1.5px solid var(--accent); background: var(--surface-2); color: #fff; font-family: var(--display); font-size: 1.8rem; font-weight: 900; letter-spacing: 0.18em; cursor: pointer; }
+.pals-code .icon { color: var(--accent-text); }
+.pals-list { display: grid; gap: 6px; }
+.pal-row { width: 100%; display: flex; align-items: center; gap: 10px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); color: inherit; font: inherit; cursor: pointer; text-align: left; }
+.pal-row:hover { border-color: var(--accent); }
+.pal-row .crest { width: 34px; height: 34px; font-size: 0.62rem; }
+.pal-row-name { flex: 1; min-width: 0; display: grid; line-height: 1.2; }
+.pal-row-name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The host inviting friends to the cup, before it starts. */
+.invite-friends { margin: 10px 0 4px; }
+.invite-row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
+.invite-row .crest { width: 32px; height: 32px; font-size: 0.6rem; }
 /* The kiosks' and the shop's prices: name, price with arrows, the fair price and what it brings in. */
 .item-prices { display: grid; gap: 10px; margin: 6px 0 0; padding: 0; list-style: none; }
 .item-price { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }

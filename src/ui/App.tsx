@@ -41,6 +41,9 @@ import {Transfers} from "./views/Transfers";
 import {Storage} from "./views/Storage";
 import {CodeSalesPage, FriendSalesWatcher} from "./FriendSale";
 import {useFriendCupBadge} from "./friendCupBadge";
+import {Pals} from "./views/Pals";
+import {ProfileSync} from "./ProfileSync";
+import {PalWatcher, palsTodo, usePals} from "./palStore";
 
 const ICONS: Record<View, IconName> = {
   overview: "home",
@@ -52,6 +55,7 @@ const ICONS: Record<View, IconName> = {
   table: "list",
   cup: "trophy",
   friends: "users",
+  pals: "user",
   stadium: "stadium",
   transfers: "swap",
   codes: "tag",
@@ -64,7 +68,7 @@ const ICONS: Record<View, IconName> = {
 
 /** The menu: four groups of pages (and the round play button in the middle of the bar). */
 const NAV_GROUPS: {id: "home" | "team" | "matches" | "club"; icon: IconName; views: View[]}[] = [
-  {id: "home", icon: "home", views: ["overview", "inbox", "storage"]},
+  {id: "home", icon: "home", views: ["overview", "inbox", "pals", "storage"]},
   {id: "team", icon: "users", views: ["squad", "tactics", "training"]},
   {id: "matches", icon: "ball", views: ["fixtures", "table", "cup"]},
   {id: "club", icon: "shield", views: ["finance", "transfers", "shop", "settings"]},
@@ -88,6 +92,7 @@ const SCREENS: Record<View, () => React.JSX.Element> = {
   table: Table,
   cup: Cup,
   friends: FriendCup,
+  pals: Pals,
   stadium: Stadium,
   transfers: Transfers,
   codes: CodeSalesPage,
@@ -154,6 +159,8 @@ function Game() {
       {negotiation && <ContractModal />}
       <TrophyCelebration />
       <FriendSalesWatcher />
+      <ProfileSync />
+      <PalWatcher />
       <BoardWarningPopup />
       <TutorialCoach />
       <ToastView />
@@ -165,6 +172,7 @@ function Game() {
 function useBadges(): Partial<Record<View, number>> {
   const game = useGameState();
   const friends = useFriendCupBadge();
+  const pals = palsTodo(usePals());
   return {
     inbox: game.inbox.filter((m) => !m.read).length,
     overview: dailyToCollect(game.daily),
@@ -174,6 +182,8 @@ function useBadges(): Partial<Record<View, number>> {
     codes: Object.keys(game.friendSales ?? {}).length,
     // Things to do in the friends' cup: offers to answer, matches to see, prizes, rounds to play.
     friends,
+    // Friends: offers to answer and invitations to cups.
+    pals,
   };
 }
 

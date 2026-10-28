@@ -1,5 +1,5 @@
-// Buying and swapping players with friends in the friends' cup. An offer is made from a friend's
-// team (tap a player); the friend says yes or no in the cup room. The buyer pays (or lets their
+// Buying and swapping players with friends, in the friends' cup or between friends. An offer is made
+// from a friend's team (tap a player); the friend says yes or no (in the cup room, or under Friends). The buyer pays (or lets their
 // swap player go) when making it, and gets the player, or their own back, once it's answered.
 import {useEffect, useState} from "react";
 import {cannotLeave, roomForOne, sendAway, settleOnce, takeIn, tradeMoney} from "../../game/friendTrade";
@@ -10,7 +10,7 @@ import {useT, type TKey} from "../../i18n";
 import {useGame, useGameState} from "../../store";
 import {Card, Hint, Modal} from "../common";
 import {Icon, iconize} from "../Icon";
-import {closeOffer, deviceId, makeOffer, watchOffers, type FriendCupDoc, type TradeOfferDoc} from "../friendCupApi";
+import {closeOffer, deviceId, makeOffer, watchOffers, type OfferPath, type TradeOfferDoc} from "../friendCupApi";
 
 /** The offers to and from this device in a cup, as they come in. */
 export function useOffers(code: string): TradeOfferDoc[] {
@@ -23,7 +23,7 @@ export function useOffers(code: string): TradeOfferDoc[] {
  * Settles the offers this device made once they're answered: the player comes in, or (a no)
  * the money and the swap player come back. Each only once.
  */
-export function useSettleTrades(offers: TradeOfferDoc[], clubName: (id: string) => string): void {
+export function useSettleTrades(offers: TradeOfferDoc[], clubName: (id: string, o: TradeOfferDoc) => string): void {
   const game = useGameState();
   const act = useGame((s) => s.act);
   const notify = useGame((s) => s.notify);
@@ -43,21 +43,20 @@ export function useSettleTrades(offers: TradeOfferDoc[], clubName: (id: string) 
       });
       if (done) {
         if (o.status === "accepted") notify("friends.tradeGot", {player: o.playerName}, "good");
-        else notify("friends.tradeDeclined", {club: clubName(o.to)}, "error");
+        else notify("friends.tradeDeclined", {club: clubName(o.to, o)}, "error");
       }
     }
   }, [offers, game.friendTrades, act, notify, clubName]);
 }
 
-/** The cup room's trades: offers to answer, offers waiting, and the last ones done. */
-export function TradeOffers({code, cup, offers}: {code: string; cup: FriendCupDoc; offers: TradeOfferDoc[]}) {
+/** The trades: offers to answer, offers waiting, and the last ones done. */
+export function TradeOffers({path, offers, clubName, hint = "friends.tradeHint"}: {path: OfferPath; offers: TradeOfferDoc[]; clubName: (id: string, o: TradeOfferDoc) => string; hint?: TKey}) {
   const {t, money} = useT();
   const game = useGameState();
   const act = useGame((s) => s.act);
   const notify = useGame((s) => s.notify);
   const [busy, setBusy] = useState(false);
   const me = deviceId();
-  const club = (id: string) => cup.members[id]?.club.name ?? "?";
   const fail = (e: unknown) =>
     notify(e instanceof Error && /^(friends|trade)\./.test(e.message) ? (e.message as TKey) : "friends.err.offline", undefined, "error");
 
@@ -68,7 +67,7 @@ export function TradeOffers({code, cup, offers}: {code: string; cup: FriendCupDo
     const player: Player = structuredClone(game.players[o.playerId]);
     setBusy(true);
     try {
-      if (!(await closeOffer(code, o.id, "accepted", JSON.stringify(player)))) throw new Error("trade.notOpen");
+      if (!(await closeOffer(path, o.id, "accepted", JSON.stringify(player)))) throw new Error("trade.notOpen");
       act((g) => {
         if (!settleOnce(g, o.id)) return;
         sendAway(g, o.playerId);
@@ -85,7 +84,7 @@ export function TradeOffers({code, cup, offers}: {code: string; cup: FriendCupDo
   const close = async (o: TradeOfferDoc, status: "declined" | "cancelled") => {
     setBusy(true);
     try {
-      if (!(await closeOffer(code, o.id, status))) throw new Error("trade.notOpen");
+      if (!(await closeOffer(path, o.id, status))) throw new Error("trade.notOpen");
       // Withdrawn: the buyer's own side comes straight back.
       if (status === "cancelled") {
         act((g) => {
@@ -103,15 +102,15 @@ export function TradeOffers({code, cup, offers}: {code: string; cup: FriendCupDo
 
   const what = (o: TradeOfferDoc) =>
     o.swap
-      ? t(o.price ? "friends.wantsSwapPlus" : "friends.wantsSwap", {club: club(o.from), swap: o.swapName ?? "?", player: o.playerName, price: o.price})
-      : t("friends.wantsBuy", {club: club(o.from), player: o.playerName, price: o.price});
+      ? t(o.price ? "friends.wantsSwapPlus" : "friends.wantsSwap", {club: clubName(o.from, o), swap: o.swapName ?? "?", player: o.playerName, price: o.price})
+      : t("friends.wantsBuy", {club: clubName(o.from, o), player: o.playerName, price: o.price});
   const toMe = offers.filter((o) => o.to === me && o.status === "open");
   const mine = offers.filter((o) => o.from === me && o.status === "open");
   const done = offers.filter((o) => o.status === "accepted" || o.status === "declined").slice(0, 5);
 
   return (
     <Card title={<><Icon name="handshake" size={20} /> {iconize(t("friends.trades"))}</>} className="span-2">
-      <Hint>{iconize(t("friends.tradeHint"))}</Hint>
+      <Hint>{iconize(t(hint))}</Hint>
       {toMe.length + mine.length + done.length === 0 && <p className="muted small">{iconize(t("friends.noOffers"))}</p>}
       <ul className="plain-list friends-offers">
         {toMe.map((o) => (
@@ -125,7 +124,7 @@ export function TradeOffers({code, cup, offers}: {code: string; cup: FriendCupDo
         ))}
         {mine.map((o) => (
           <li key={o.id} className="friends-offer">
-            <span>{t("friends.yourOffer", {player: o.playerName, club: club(o.to)})}{o.price ? ` · ${money(o.price)}` : ""}{o.swapName ? ` · ⇄ ${o.swapName}` : ""}</span>
+            <span>{t("friends.yourOffer", {player: o.playerName, club: clubName(o.to, o)})}{o.price ? ` · ${money(o.price)}` : ""}{o.swapName ? ` · ⇄ ${o.swapName}` : ""}</span>
             <span className="muted small">{iconize(t("friends.awaiting"))}</span>
             <button className="btn small" disabled={busy} onClick={() => close(o, "cancelled")}><Icon name="undo" size={14} /> {iconize(t("friends.withdraw"))}</button>
           </li>
@@ -141,7 +140,7 @@ export function TradeOffers({code, cup, offers}: {code: string; cup: FriendCupDo
 }
 
 /** Making an offer for a friend's player: a price, and if you like one of yours in swap. */
-export function OfferDialog({code, seller, player, onClose}: {code: string; seller: string; player: Player; onClose: () => void}) {
+export function OfferDialog({path, seller, sellerName, player, onClose}: {path: OfferPath; seller: string; sellerName?: string; player: Player; onClose: () => void}) {
   const {t, money} = useT();
   const game = useGameState();
   const act = useGame((s) => s.act);
@@ -170,8 +169,10 @@ export function OfferDialog({code, seller, player, onClose}: {code: string; sell
       return swap ? sendAway(g, swap) : null;
     });
     try {
-      await makeOffer(code, {
+      await makeOffer(path, {
         to: seller,
+        fromName: game.clubs[game.userClubId].name,
+        ...(sellerName ? {toName: sellerName} : {}),
         playerId: player.id,
         playerName: shortName(player),
         price: amount,

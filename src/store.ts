@@ -22,6 +22,7 @@ export const VIEWS = [
   "table",
   "cup",
   "friends",
+  "pals",
   "stadium",
   "transfers",
   "codes",
