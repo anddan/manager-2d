@@ -18,6 +18,7 @@
 // penalties, free kicks and corners stop play while the players line up.
 import {STAND_MAX} from "../game/stadium";
 import {Icon, iconize, type IconName} from "./Icon";
+import {ClubCrest, TeamOvr} from "./LineupSheet";
 import {memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode} from "react";
 import {createPortal} from "react-dom";
 import {addMessage, findFixture, fullName, isCupFixture, isKnockout, listName, playerName, shortName, difficulty} from "../game/helpers";
@@ -29,7 +30,7 @@ import {boardAt, clockLabel, matchLength} from "../game/clock";
 import {FORMATIONS, type Slot, ENERGY_COST_FORZA} from "../game/constants";
 import {LiveMatch} from "../game/live";
 import {distance, fromSide, kickoffSpot, progressFor, teamSpot, type Point} from "../game/pitch";
-import {effectiveRating, overall, teamOvr} from "../game/ratings";
+import {effectiveRating, overall} from "../game/ratings";
 import {aerial, cornerAttacker, resolveSetPiece, type SetPiece, type SetPieceInput, type SetPieceOutcome} from "../game/setpieces";
 import {cornerZone, FORZA, hashString} from "../game/match";
 import {GEAR_COLOR, GEAR_KIND_COLOR} from "../game/gear";
@@ -1526,7 +1527,7 @@ function TeamTalkDialog({report, onDone}: {report: MatchReport; onDone: (words?:
     .sort((a, b) => b[1] - a[1]);
   const icons: Record<TeamTalk, IconName> = {praise: "star", calm: "target", demand: "fire", disappointed: "warn"};
   return (
-    <MatchDialog title={<><Icon name="megaphone" size={20} /> {iconize(t("tt.title"))}</>} onClose={() => onDone()}>
+    <MatchDialog title={<><Icon name="debrief" size={20} /> {iconize(t("tt.title"))}</>} onClose={() => onDone()}>
       {/* The verdict, and what each talk does behind the (i) (no text on the choices). */}
       <div className="tt-verdict-row">
         <p className="tt-verdict">{iconize(tx(`tt.verdict.${verdict.result}.${verdict.how}`))}</p>
@@ -1561,6 +1562,8 @@ function TeamTalkDialog({report, onDone}: {report: MatchReport; onDone: (words?:
           </details>
         </Hint>
       </div>
+      {/* What can be said (the guide points here only, not at the (i) above). */}
+      <div className="tt-body">
       <div className="tt-options">
         {TEAM_TALKS.map((k) => (
           <button key={k} className={`tt-option ${talk === k ? "active" : ""}`} onClick={() => setTalk(k)}>
@@ -1581,7 +1584,7 @@ function TeamTalkDialog({report, onDone}: {report: MatchReport; onDone: (words?:
               <span className="tt-name">{shortName(p)} <span className={`rating-pill ${rating >= 7 ? "good" : rating < 6 ? "bad" : ""}`}>{rating.toFixed(1)}</span></span>
               {PLAYER_TALKS.map((pt) => (
                 <button key={pt} className={`btn small ${mine && single?.talk === pt ? "primary" : ""}`} onClick={() => setSingle(mine && single?.talk === pt ? null : {playerId: id, talk: pt})} title={tx(`tt.player.${pt}`)}>
-                  {pt === "praise" ? "👍" : "👎"}
+                  <Icon name={pt === "praise" ? "thumbUp" : "thumbDown"} size={16} />
                 </button>
               ))}
             </div>
@@ -1592,6 +1595,7 @@ function TeamTalkDialog({report, onDone}: {report: MatchReport; onDone: (words?:
       <div className="btn-row dialog-actions">
         <button className="btn" onClick={() => onDone()}>{iconize(t("tt.skip"))}</button>
         <button className="btn primary" disabled={!talk} onClick={() => talk && onDone({talk, ...(single ? {single} : {})})}>{iconize(t("tt.say"))} <Icon name="play" size={16} /></button>
+      </div>
       </div>
     </MatchDialog>
   );
@@ -2527,12 +2531,12 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   return (
     <Modal wide title={<>{live && <span className="live-badge">{iconize(t("match.live"))}</span>} {home.name} – {away.name}</>} onClose={close} backdropCloses={!live}>
       <div className="scoreboard">
-        {live && <span className="team-ovr" title={t("tac.teamOvrHint")}>{iconize(t("tac.teamOvr"))} <strong>{teamOvr(game, home.id)}</strong></span>}
-        <span className="crest" style={{background: home.color, color: home.color2}}>{home.short}</span>
+        {live && <TeamOvr clubId={home.id} />}
+        <ClubCrest clubId={home.id} />
         <span className="score">{score.home} – {score.away}</span>
         {shootoutScore && <small className="score-pens">{iconize(t("fx.penalties", {h: shootoutScore[0], a: shootoutScore[1]}))}</small>}
-        <span className="crest" style={{background: away.color, color: away.color2}}>{away.short}</span>
-        {live && <span className="team-ovr" title={t("tac.teamOvrHint")}>{iconize(t("tac.teamOvr"))} <strong>{teamOvr(game, away.id)}</strong></span>}
+        <ClubCrest clubId={away.id} />
+        {live && <TeamOvr clubId={away.id} />}
         <span className="clock">{clock}</span>
         {board > 0 && !atHalftime && !finished && (
           <span className="board" title={t("match.added", {n: board})}>+{board}</span>

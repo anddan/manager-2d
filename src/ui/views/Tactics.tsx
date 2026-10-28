@@ -15,6 +15,7 @@ import {Bar, Card, Flag, FormArrow, Modal, PosBadge, StatusIcons, Hint} from "..
 import {Avatar} from "../Avatar";
 import {Jersey} from "../Jersey";
 import {GearPicture} from "../Gear";
+import {ClubSheet} from "../LineupSheet";
 
 /**
  * Where a slot sits on the lineup board. Formations only use depth 5 (keeper)
@@ -455,11 +456,16 @@ function NextMatch() {
   const {t} = useT();
   const game = useGameState();
   const next = nextUserFixture(game);
+  const [sheet, setSheet] = useState<string | null>(null);
   if (!next || fixtureWeek(next) !== game.week) return null;
   const home = game.clubs[next.homeId];
   const away = game.clubs[next.awayId];
   if (!home || !away) return null;
   const crest = (c: typeof home) => <span className="crest" style={{background: c.color, color: c.color2}}>{c.short}</span>;
+  const team = (c: typeof home, crestLast: boolean) => {
+    const inner = crestLast ? <><strong>{c.name}</strong> {crest(c)}</> : <>{crest(c)} <strong>{c.name}</strong></>;
+    return c.id === game.userClubId ? <span className="next-match-opp">{inner}</span> : <button type="button" className="next-match-opp" title={t("tac.seeTeam")} onClick={() => setSheet(c.id)}>{inner}</button>;
+  };
   return (
     <div className="next-match span-2" role="status">
       <span className="next-match-what">
@@ -468,8 +474,10 @@ function NextMatch() {
         <span className="next-match-where"> · {next.homeId === game.userClubId ? t("tac.home") : t("tac.away")}</span>
       </span>
       <span className="next-match-teams">
-        {crest(home)} <strong>{home.name}</strong> <span className="muted">–</span> <strong>{away.name}</strong> {crest(away)}
+        {/* The opponent: tap for their tactics and players. */}
+        {team(home, false)} <span className="muted">–</span> {team(away, true)}
       </span>
+      {sheet && <ClubSheet clubId={sheet} onClose={() => setSheet(null)} />}
     </div>
   );
 }

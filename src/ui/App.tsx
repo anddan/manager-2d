@@ -214,7 +214,8 @@ function Nav() {
       {group && (
         <div className="nav-arc-backdrop" onClick={() => setOpen(null)}>
           <div className="nav-arc" style={{"--n": group.views.length} as React.CSSProperties}>
-            {groupPages(group).map((v, i, pages) => {
+            {/* Settings has its own button by the Club tabs, not a place in the menu. */}
+            {groupPages(group).filter((v) => v !== "settings").map((v, i, pages) => {
               // Spread evenly over an arc above the bar, from left to right.
               const n = pages.length;
               const angle = n === 1 ? 90 : 160 - (140 * i) / (n - 1);
@@ -279,6 +280,11 @@ function GroupTabs() {
             })}
           </button>
         ))}
+        {group.views.includes("settings") && (
+          <button role="tab" aria-selected={view === "settings"} data-tour="nav-settings" className={view === "settings" ? "pill-tab icon-only active" : "pill-tab icon-only"} title={t("nav.settings")} aria-label={t("nav.settings")} onClick={() => setView("settings")}>
+            <Icon name={ICONS.settings} size={18} />
+          </button>
+        )}
       </div>
       {/* Sub-tabs: e.g. the squad and their contracts. */}
       {subs && (

@@ -5,7 +5,6 @@
 // The buyer puts up their side when they make the offer (the money is paid, or their player
 // leaves), so it's there when the seller says yes; if the seller says no, it comes back.
 import {MIN_PLAYERS, SQUAD_MAX} from "./constants";
-import {unequipGear} from "./gear";
 import {book, newId} from "./helpers";
 import {PLAYER_PACKS} from "./packs";
 import {overall} from "./ratings";
@@ -33,10 +32,9 @@ export function roomForOne(state: GameState): boolean {
   return squadSize(state) < SQUAD_MAX;
 }
 
-/** A player of yours leaves for a friend's game: gear back in the bag, out of the team. Returns them as they go. */
+/** A player of yours leaves for a friend's game, kit and all, out of the team. Returns them as they go. */
 export function sendAway(state: GameState, playerId: string): Player {
   const club = state.clubs[state.userClubId];
-  unequipGear(state, playerId);
   const p = structuredClone(state.players[playerId]);
   club.lineup = club.lineup.map((id) => (id === playerId ? "" : id));
   club.bench = club.bench.filter((id) => id !== playerId);
@@ -47,15 +45,15 @@ export function sendAway(state: GameState, playerId: string): Player {
   return p;
 }
 
-/** A player from a friend's game joins your squad (with a new id here, and a fresh contract). */
+/** A player from a friend's game joins your squad, kit and all (with a new id here, and a fresh contract). */
 export function takeIn(state: GameState, player: Player): string {
   const id = newId(state, "p");
   state.players[id] = {
     ...structuredClone(player),
     id,
     clubId: state.userClubId,
-    gear: undefined,
-    shin: undefined,
+    // Their looks stay their own (they're drawn from the id they came with).
+    lookId: player.lookId ?? player.id,
     loan: null,
     transferListed: false,
     loanListed: false,

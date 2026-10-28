@@ -11,6 +11,7 @@ import {newGame} from "./generate";
 import {book, shortName} from "./helpers";
 import {pickBestLineup, repairLineup} from "./lineup";
 import {simulateMatch} from "./match";
+import {effectiveRating} from "./ratings";
 import {clubSlots} from "./constants";
 import {Rng} from "./rng";
 import type {Club, CupFixture, GameState, MatchReport, Player} from "./types";
@@ -49,6 +50,17 @@ export function snapshotTeam(state: GameState): TeamSnapshot {
     },
     players: [...new Set(ids)].map((id) => structuredClone(state.players[id])),
   };
+}
+
+/** A sent team's strength: the average of its starting eleven where they play (as the tactics page counts it). */
+export function snapshotOvr(snap: TeamSnapshot): number {
+  const players = new Map(snap.players.map((p) => [p.id, p]));
+  const slots = clubSlots(snap.club as Club);
+  const ratings = snap.club.lineup.flatMap((id, i) => {
+    const p = players.get(id);
+    return p && slots[i] ? [effectiveRating(p, slots[i].pos)] : [];
+  });
+  return ratings.length ? Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length) : 0;
 }
 
 /** A team is fit to send with at least the fewest who may start a match. */
@@ -120,7 +132,7 @@ function putTeam(state: GameState, id: string, snap: TeamSnapshot): void {
   delete (club as Partial<Club>).guest;
   state.clubs[id] = club;
   for (const p of snap.players) {
-    state.players[map(p.id)] = {...structuredClone(p), id: map(p.id), clubId: id, loan: null};
+    state.players[map(p.id)] = {...structuredClone(p), id: map(p.id), lookId: p.lookId ?? p.id, clubId: id, loan: null};
   }
   // Whoever is missing or can't play: the best of the rest steps in.
   if (lineupGaps(state, club) > 0) {

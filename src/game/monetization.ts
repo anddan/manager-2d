@@ -110,3 +110,11 @@ export function grantPack(m: Monetization, packId: PackId): number {
   m.diamonds += total;
   return total;
 }
+
+/** Keeps count of what's been bought with real money (shown in the manager's profile). */
+export function recordPurchase(state: GameState, got: {diamonds?: number; money?: number}, eur: number): void {
+  const p = (state.purchases ??= {diamonds: 0, money: 0, eur: 0});
+  p.diamonds += got.diamonds ?? 0;
+  p.money += got.money ?? 0;
+  p.eur = Math.round((p.eur + eur) * 100) / 100;
+}

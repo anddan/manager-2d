@@ -25,10 +25,15 @@ import {PlayerCard} from "./PlayerCard";
 import {KitAvatar, editableLook, lookFromEditor} from "./Avatar";
 import {ManagerEditor} from "./ManagerEditor";
 import {GearPanel} from "./Gear";
+import {FocusPicker} from "./FocusPicker";
 import {SellToFriend} from "./FriendSale";
 import {totalGearBonus} from "../game/gear";
 
-export function PlayerModal({playerId}: {playerId: string}) {
+/**
+ * A player's profile. With `preview` it only shows them (a friend's player for sale, lent into
+ * the game for the look): no actions of its own, the given buttons at the bottom instead.
+ */
+export function PlayerModal({playerId, preview}: {playerId: string; preview?: {onClose: () => void; footer: ReactNode}}) {
   const {t} = useT();
   const game = useGameState();
   const openPlayer = useGame((s) => s.openPlayer);
@@ -36,13 +41,13 @@ export function PlayerModal({playerId}: {playerId: string}) {
   const act = useGame((s) => s.act);
   const p = game.players[playerId];
   if (!p) return null;
-  const own = p.clubId === game.userClubId || p.loan?.parentClubId === game.userClubId;
-  const known = isKnown(game, p);
+  const own = !preview && (p.clubId === game.userClubId || p.loan?.parentClubId === game.userClubId);
+  const known = !!preview || isKnown(game, p);
   const club = p.clubId ? game.clubs[p.clubId] : null;
   // Boots or gloves on: their bonus shown beside the attribute.
   const gear = totalGearBonus(p);
   // Opened from their spot in the tactics: they can be taken out of it from here.
-  const inSpot = slot !== null && game.clubs[game.userClubId].lineup[slot] === p.id;
+  const inSpot = !preview && slot !== null && game.clubs[game.userClubId].lineup[slot] === p.id;
   const takeOut = () => {
     act((g) => {
       const c = g.clubs[g.userClubId];
@@ -54,7 +59,7 @@ export function PlayerModal({playerId}: {playerId: string}) {
   return (
     <Modal
       wide
-      onClose={() => openPlayer(null)}
+      onClose={preview?.onClose ?? (() => openPlayer(null))}
       title={
         <>
           <Flag code={p.nationality} /> {profileName(p)} <StatusIcons player={p} />
@@ -117,7 +122,7 @@ export function PlayerModal({playerId}: {playerId: string}) {
         </section>
       </div>
 
-      {own ? <OwnActions player={p} /> : <MarketActions player={p} />}
+      {preview ? <div className="btn-row dialog-actions pm-preview-actions">{preview.footer}</div> : own ? <OwnActions player={p} /> : <MarketActions player={p} />}
     </Modal>
   );
 }
@@ -252,16 +257,10 @@ function OwnActions({player: p}: {player: Player}) {
       </Fold>
 
       <Fold title={<><Icon name="trend" size={20} /> {iconize(t("pl.development"))}</>}>
-      <label className="field inline">
+      <div className="field inline">
         <span>{iconize(t("pl.individualFocus"))}</span>
-        <select
-          value={p.individualFocus ?? ""}
-          onChange={(e) => act((g) => { g.players[p.id].individualFocus = (e.target.value || null) as Player["individualFocus"]; })}
-        >
-          <option value="">{iconize(t("common.none"))}</option>
-          {ATTRIBUTES.map((a) => <option key={a} value={a}>{iconize(t(`attr.${a}`))}</option>)}
-        </select>
-      </label>
+        <FocusPicker player={p} />
+      </div>
       </Fold>
 
       <Fold title={<><Icon name="tag" size={20} /> {iconize(t("pl.market"))}</>}>

@@ -36,7 +36,8 @@ const STEPS: Record<TutorialStep, StepSpec> = {
   orders: {target: '[data-tour="orders"]', showWhen: '[data-tour="orders"]', next: true},
   setpieces: {target: '[data-tour="orders"]', showWhen: '[data-tour="orders"]', next: true},
   forza: {target: '[data-tour="orders"]', showWhen: '[data-tour="orders"]', next: true},
-  talk: {target: ".match-dialog:has(.tt-options)", showWhen: ".tt-options"},
+  // Only the choices and buttons, not the (i) above them (its help would open out of place).
+  talk: {target: ".tt-body", showWhen: ".tt-options"},
   // After the match: back to the overview in the menu, where the last step is.
   toOverview: {target: "nav:overview", showWhen: "body:not(:has(.modal-backdrop))"},
   daily: {target: ".daily-tasks", showWhen: ".daily-tasks", next: true},

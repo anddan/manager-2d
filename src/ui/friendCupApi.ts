@@ -8,7 +8,7 @@
 import {getApps, initializeApp} from "firebase/app";
 import {arrayUnion, collection, deleteDoc, deleteField, doc, getDoc, getDocs, getFirestore, onSnapshot, runTransaction, setDoc, updateDoc, type Firestore} from "firebase/firestore";
 import type {Player} from "../game/types";
-import {friendFixtures, newCupCode, playFriendRound, type FriendPrize, type FriendResult, type TeamSnapshot} from "../game/friendCup";
+import {friendFixtures, newCupCode, playFriendRound, snapshotOvr, type FriendPrize, type FriendResult, type TeamSnapshot} from "../game/friendCup";
 
 const CONFIG = {
   apiKey: "AIzaSyD0xd1I1oUjHZu3n-wG7pMH7MlZGaYQ7d4",
@@ -289,6 +289,8 @@ export interface SaleDoc {
   player: string;
   playerName: string;
   price: number;
+  /** The seller's club, shown in the player's profile. */
+  clubName?: string;
   /** Paid in club money or diamonds (missing: money). */
   currency?: "money" | "diamonds";
   status: "open" | "sold" | "cancelled";
@@ -297,13 +299,13 @@ export interface SaleDoc {
 }
 
 /** Puts a player up for sale; returns the code to give to a friend. */
-export async function createSale(player: Player, playerName: string, price: number, currency: "money" | "diamonds"): Promise<string> {
+export async function createSale(player: Player, playerName: string, price: number, currency: "money" | "diamonds", clubName: string): Promise<string> {
   const d = db();
   for (let tries = 0; tries < 5; tries++) {
     const code = newCupCode();
     const ref = doc(d, "sales", code);
     if ((await getDoc(ref)).exists()) continue;
-    const sale: SaleDoc = {code, seller: deviceId(), player: JSON.stringify(player), playerName, price, currency, status: "open", createdAt: Date.now()};
+    const sale: SaleDoc = {code, seller: deviceId(), player: JSON.stringify(player), playerName, clubName, price, currency, status: "open", createdAt: Date.now()};
     await setDoc(ref, sale);
     return code;
   }
@@ -350,13 +352,28 @@ export async function clearSale(code: string): Promise<void> {
 /** Follows a cup: the cup itself, the rounds played and when each member last sent their team. */
 export function watchCup(
   code: string,
-  on: {cup: (cup: FriendCupDoc | null) => void; rounds: (rounds: FriendRoundDoc[]) => void; sent: (sent: Record<string, number>) => void; error: (e: unknown) => void}
+  on: {cup: (cup: FriendCupDoc | null) => void; rounds: (rounds: FriendRoundDoc[]) => void; sent: (sent: Record<string, number>, ovrs: Record<string, number>) => void; error: (e: unknown) => void}
 ): () => void {
   const d = db();
   const stops = [
     onSnapshot(doc(d, "cups", code), (s) => on.cup(s.exists() ? (s.data() as FriendCupDoc) : null), on.error),
     onSnapshot(collection(d, "cups", code, "rounds"), (s) => on.rounds(s.docs.map((x) => x.data() as FriendRoundDoc).sort((a, b) => a.round - b.round)), on.error),
-    onSnapshot(collection(d, "cups", code, "teams"), (s) => on.sent(Object.fromEntries(s.docs.map((x) => [x.id, (x.data() as {sentAt: number}).sentAt]))), on.error),
+    onSnapshot(
+      collection(d, "cups", code, "teams"),
+      (s) => {
+        const docs = s.docs.map((x) => ({id: x.id, ...(x.data() as {sentAt: number; json: string})}));
+        // Each team's strength, from the team as sent.
+        const ovr = (json: string) => {
+          try {
+            return snapshotOvr(JSON.parse(json) as TeamSnapshot);
+          } catch {
+            return 0;
+          }
+        };
+        on.sent(Object.fromEntries(docs.map((x) => [x.id, x.sentAt])), Object.fromEntries(docs.map((x) => [x.id, ovr(x.json)])));
+      },
+      on.error
+    ),
   ];
   return () => stops.forEach((stop) => stop());
 }

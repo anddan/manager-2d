@@ -8,6 +8,7 @@ import {extraTraining, FOCUS_ATTRIBUTES, trainingPlan} from "../../game/training
 import {ATTRIBUTES, INTENSITIES, POSITIONS, TRAINING_FOCUSES, type Attribute, type Intensity, type Player, type TrainingFocus} from "../../game/types";
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
+import {FocusPicker} from "../FocusPicker";
 import {Bar, Card, Delta, PosBadge, SortTh, sortRows, useSort, Hint} from "../common";
 
 type TrainingSort = "pos" | "name" | "age" | "ovr" | "fitness" | "change" | "focus";
@@ -155,14 +156,7 @@ export function Training() {
                       ))}
                     </td>
                     <td>
-                      <select
-                        value={p.individualFocus ?? ""}
-                        aria-label={t("pl.individualFocus")}
-                        onChange={(e) => act((g) => { g.players[p.id].individualFocus = (e.target.value || null) as Attribute | null; })}
-                      >
-                        <option value="">–</option>
-                        {ATTRIBUTES.map((a) => <option key={a} value={a}>{iconize(t(`attr.${a}`))}</option>)}
-                      </select>
+                      <FocusPicker player={p} compact />
                     </td>
                   </tr>
                 );

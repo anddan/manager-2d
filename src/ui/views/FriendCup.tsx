@@ -20,21 +20,17 @@ import {
 import type {GameState, MatchReport} from "../../game/types";
 import {GameOverride} from "../../store";
 import {MatchScreen} from "../MatchViewer";
-import {listName, shortName, userClub} from "../../game/helpers";
+import {listName, userClub} from "../../game/helpers";
 import {useT, type TKey} from "../../i18n";
 import {useGame, useGameState} from "../../store";
-import {Card, Empty, Flag, FormArrow, Hint, Modal, PosBadge} from "../common";
-import {clubSlots} from "../../game/constants";
-import {effectiveRating} from "../../game/ratings";
-import {Jersey} from "../Jersey";
+import {Card, Empty, Flag, Hint, Modal} from "../common";
 import {PlayerCard} from "../PlayerCard";
+import {LineupSheet} from "../LineupSheet";
 import {PackReveal} from "../PackReveal";
 import {OfferDialog, TradeOffers, useOffers, useSettleTrades} from "./FriendTrades";
 import {diamondBurst, moneyBurst} from "../effects";
 import type {PlayerPackId} from "../../game/packs";
-import {GearPicture} from "../Gear";
-import {boardSpots} from "./Tactics";
-import type {Club, Player} from "../../game/types";
+import type {Player} from "../../game/types";
 import {Icon, iconize} from "../Icon";
 import {
   claimPack,
@@ -148,6 +144,8 @@ function CupRoom({code, onLeave}: {code: string; onLeave: () => void}) {
   useSettleTrades(offers, useCallback((id: string) => cup?.members[id]?.club.name ?? "?", [cup]));
   const [rounds, setRounds] = useState<FriendRoundDoc[]>([]);
   const [sent, setSent] = useState<Record<string, number>>({});
+  // Each sent team's strength.
+  const [ovrs, setOvrs] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState(false);
   const [offline, setOffline] = useState(false);
   const [leaving, setLeaving] = useState(false);
@@ -175,7 +173,10 @@ function CupRoom({code, onLeave}: {code: string; onLeave: () => void}) {
       watchCup(code, {
         cup: (c) => { setCup(c); setOffline(false); },
         rounds: setRounds,
-        sent: setSent,
+        sent: (at, o) => {
+          setSent(at);
+          setOvrs(o);
+        },
         error: () => setOffline(true),
       }),
     [code]
@@ -256,10 +257,15 @@ function CupRoom({code, onLeave}: {code: string; onLeave: () => void}) {
         <ul className="plain-list friends-members">
           {members.map((id) => (
             <li key={id}>
-              <button className="friends-member" disabled={!sent[id]} title={t("friends.viewTeam")} onClick={() => setViewing(id)}>
-                {crest(id)} <strong>{name(id)}</strong> {sent[id] ? <Icon name="eye" size={14} /> : null}
+              {/* The club's badge with the team's strength: tap it for the team as sent. */}
+              <button className="friends-team-btn" disabled={!sent[id]} title={t("friends.viewTeam")} onClick={() => setViewing(id)}>
+                <span className="crest" style={{background: cup.members[id].club.color, color: cup.members[id].club.color2}}>{cup.members[id].club.short}</span>
+                <span className="team-ovr">{iconize(t("tac.teamOvr"))} <strong>{sent[id] ? ovrs[id] || "–" : "–"}</strong></span>
               </button>
-              <span className="muted small">{cup.members[id].manager}{id === cup.creator ? ` · ${t("friends.host")}` : ""}</span>
+              <span className="friends-member-name">
+                <strong>{name(id)}</strong>
+                <span className="muted small">{cup.members[id].manager}{id === cup.creator ? ` · ${t("friends.host")}` : ""}</span>
+              </span>
               {cup.left?.includes(id) ? (
                 <span className="friends-sent missing">{iconize(t("friends.hasLeft"))}</span>
               ) : (
@@ -450,9 +456,6 @@ function TeamView({code, member, sentAt, onClose}: {code: string; member: string
   }, [code, member, sentAt]);
   const club = team?.club;
   const players = new Map(team?.players.map((p) => [p.id, p]) ?? []);
-  const slots = club ? clubSlots(club as Club) : [];
-  const spots = boardSpots(slots);
-  const bench = (club?.bench ?? []).map((id) => players.get(id)).filter((p): p is Player => !!p);
   return (
     <Modal title={club ? <><span className="crest tiny" style={{background: club.color}} /> {club.name}</> : iconize(t("friends.lineup"))} onClose={onClose}>
       {team === undefined && <Empty>{iconize(t("friends.loading"))}</Empty>}
@@ -461,49 +464,7 @@ function TeamView({code, member, sentAt, onClose}: {code: string; member: string
         <>
           <p className="muted small">{team.manager} · {club.formation} · {iconize(t(`tac.${club.mentality}`))}</p>
           {/* The same board as on the tactics page: shirts, gear and name plates. */}
-          <div className="pitch-board friends-board" aria-label={t("friends.lineup")}>
-            <div className="pitch-lines" aria-hidden />
-            {slots.map((slot, i) => {
-              const p = players.get(club.lineup[i]);
-              return (
-                <div key={i} className={p ? "slot" : "slot empty"} style={spots[i]} role={p ? "button" : undefined} onClick={p ? () => setCard(p) : undefined}>
-                  {p && club.roles?.captain === p.id && <span className="armband" title={t("roles.captain")}>C</span>}
-                  {p?.gear && <span className={p.gear.kind === "gloves" ? "slot-gear gloves" : "slot-gear"} aria-hidden><GearPicture item={p.gear} size={p.gear.kind === "gloves" ? 22 : 24} /></span>}
-                  {p?.shin && <span className="slot-gear slot-shin" aria-hidden><GearPicture item={p.shin} size={15} /></span>}
-                  <Jersey color={club.color} trim={club.color2} keeper={slot.pos === "GK"} number={i + 1} />
-                  <span className="plate">
-                    <span className="plate-name">{p ? shortName(p) : t(`pos.${slot.pos}`)}</span>
-                    <span className="plate-info">
-                      {p && <Flag code={p.nationality} size={13} />}
-                      <span>{iconize(t(`pos.${slot.pos}`))}</span>
-                      {p && <strong>{Math.round(effectiveRating(p, slot.pos))}</strong>}
-                      {p && <FormArrow form={p.form} size={12} />}
-                    </span>
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-          <h4><Icon name="bench" size={18} /> {iconize(t("friends.bench"))}</h4>
-          {bench.length === 0 ? (
-            <p className="muted small">{iconize(t("common.none"))}</p>
-          ) : (
-            <ul className="pick-list">
-              {bench.map((p) => (
-                <li key={p.id} className="bench-row friends-clickable" role="button" onClick={() => setCard(p)}>
-                  <div className="pick friends-bench-row">
-                    <Jersey color={club.color} trim={club.color2} keeper={p.position === "GK"} size={26} />
-                    <PosBadge pos={p.position} />
-                    <span className="pick-name"><Flag code={p.nationality} size={15} /> {listName(p)}</span>
-                    {p.gear && <GearPicture item={p.gear} size={20} />}
-                    {p.shin && <GearPicture item={p.shin} size={16} />}
-                    <FormArrow form={p.form} />
-                    <span className="num">{Math.round(effectiveRating(p, p.position))}</span>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
+          <LineupSheet club={club} player={(id) => players.get(id)} onPick={setCard} />
         </>
       )}
       {/* A player's card: lent a ground with this friend's club in it, for the crest and shirt. */}

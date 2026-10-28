@@ -3,6 +3,7 @@
 // taken off) in the player's profile; they never wear out. The bonus counts in the
 // match and the line-up, not in the player's own attributes (so not in value or training).
 import {book} from "./helpers";
+import type {Rng} from "./rng";
 import type {Attribute, GameState, Player} from "./types";
 
 export const GEAR_KINDS = ["speed", "shooting", "technique", "grip", "gloves", "shin"] as const;
@@ -13,6 +14,8 @@ export type GearTier = (typeof GEAR_TIERS)[number];
 export interface GearItem {
   kind: GearKind;
   tier: GearTier;
+  /** From the kit pack: a lucky extra on one attribute (it can lift a piece past the best in the shop). */
+  perk?: {attr: Attribute; n: number};
 }
 
 /** What each kind lifts. Gloves lift one thing, twice as much. */
@@ -77,7 +80,9 @@ export function totalGearBonus(p: Player): Partial<Record<Attribute, number>> {
 export function gearBonus(item: GearItem): Partial<Record<Attribute, number>> {
   const attrs = GEAR_ATTRS[item.kind];
   const each = GEAR_BONUS[item.tier] * (attrs.length === 1 ? 2 : 1);
-  return Object.fromEntries(attrs.map((a) => [a, each]));
+  const out: Partial<Record<Attribute, number>> = Object.fromEntries(attrs.map((a) => [a, each]));
+  if (item.perk) out[item.perk.attr] = (out[item.perk.attr] ?? 0) + item.perk.n;
+  return out;
 }
 
 /** The player as they play: with their gear's bonus on top (capped at 99). */
@@ -154,9 +159,35 @@ export function unequipGear(state: GameState, playerId: string, slot?: GearSlot)
 export function groupBag(bag: GearItem[]): {item: GearItem; index: number; count: number}[] {
   const groups: {item: GearItem; index: number; count: number}[] = [];
   bag.forEach((item, index) => {
-    const same = groups.find((x) => x.item.kind === item.kind && x.item.tier === item.tier);
+    const same = groups.find((x) => x.item.kind === item.kind && x.item.tier === item.tier && x.item.perk?.attr === item.perk?.attr && x.item.perk?.n === item.perk?.n);
     if (same) same.count++;
     else groups.push({item, index, count: 1});
   });
   return groups;
+}
+
+/**
+ * The kit pack: a random piece (any kind, mostly common or silver) with a perk on top, an extra
+ * on one attribute. Most perks are small; now and then one is big enough to beat a special pair.
+ */
+export const GEAR_PACK = {price: 60} as const;
+const PACK_TIERS: Record<GearTier, number> = {common: 34, silver: 34, gold: 22, special: 10};
+const PERK_SIZES: [number, number][] = [[1, 36], [2, 28], [3, 16], [4, 10], [5, 6], [7, 3], [10, 1]];
+const PERK_ATTRS: Attribute[] = ["pace", "finishing", "passing", "technique", "defending", "physical", "stamina", "vision"];
+
+export function rollGearPack(rng: Rng): GearItem {
+  const kind = rng.pick([...GEAR_KINDS]);
+  const tier = rng.weighted([...GEAR_TIERS], (t) => PACK_TIERS[t]);
+  const n = rng.weighted(PERK_SIZES, ([, w]) => w)[0];
+  const attr = kind === "gloves" ? rng.pick<Attribute>(["goalkeeping", "vision", "physical"]) : rng.pick(PERK_ATTRS);
+  return {kind, tier, perk: {attr, n}};
+}
+
+/** Opens a kit pack for diamonds: the piece goes in the bag. The piece, or an error key. */
+export function openGearPack(state: GameState, rng: Rng): GearItem | string {
+  if (state.monetization.diamonds < GEAR_PACK.price) return "shop.notEnoughDiamonds";
+  state.monetization.diamonds -= GEAR_PACK.price;
+  const item = rollGearPack(rng);
+  (state.gearBag ??= []).push(item);
+  return item;
 }

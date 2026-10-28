@@ -2,9 +2,11 @@
 // the player cards) with a picture and what it gives; the shop's rack to buy from; and
 // the part of a player's profile where they're put on and taken off.
 import {Icon, iconize} from "./Icon";
-import {Hint} from "./common";
+import {Hint, Modal} from "./common";
+import {PackArt} from "./PackArt";
+import {chime} from "./sound";
 import {useState} from "react";
-import {GEAR_ATTRS, GEAR_KIND_COLOR, GEAR_KINDS, SHIN_PROTECT, gearIn, gearSlot, type GearSlot, GEAR_PRICE, GEAR_TIERS, buyGear, equipGear, gearBonus, gearFits, unequipGear, type GearItem, type GearKind, type GearTier, groupBag} from "../game/gear";
+import {GEAR_ATTRS, GEAR_KIND_COLOR, GEAR_KINDS, SHIN_PROTECT, gearIn, gearSlot, type GearSlot, GEAR_PRICE, GEAR_TIERS, GEAR_PACK, buyGear, openGearPack, equipGear, gearBonus, gearFits, unequipGear, type GearItem, type GearKind, type GearTier, groupBag} from "../game/gear";
 import type {Attribute, Player} from "../game/types";
 import {freeBootsOffered, takeFreeBoots} from "../game/tutorial";
 import {useT} from "../i18n";
@@ -89,7 +91,7 @@ export function GearCard({item, small, count = 1}: {item: GearItem; small?: bool
   const {t} = useT();
   const bonus = Object.entries(gearBonus(item)) as [Attribute, number][];
   return (
-    <div className={`fut-card gear-card tier-${item.tier === "common" ? "common" : item.tier}${small ? " small" : ""}`}>
+    <div className={`fut-card gear-card tier-${item.tier === "common" ? "common" : item.tier}${small ? " small" : ""}${item.perk ? " perked" : ""}`}>
       {count > 1 && <span className="gear-count">×{count}</span>}
       <div className="fut-top">
         <div className="fut-rating">
@@ -101,7 +103,8 @@ export function GearCard({item, small, count = 1}: {item: GearItem; small?: bool
       <div className="fut-name">{iconize(t(`gear.kind.${item.kind}`))}</div>
       <div className="gear-card-stats">
         {bonus.map(([a, n]) => (
-          <div key={a} className="fut-stat">
+          // The pack's perk stands out (its attribute, with the extra in it).
+          <div key={a} className={item.perk?.attr === a ? "fut-stat perk" : "fut-stat"}>
             <strong>+{n}</strong>
             <span>{iconize(t(`attr.${a}`))}</span>
           </div>
@@ -124,7 +127,15 @@ export function GearShop() {
   const act = useGame((s) => s.act);
   const notify = useGame((s) => s.notify);
   const setView = useGame((s) => s.setView);
-  const [kind, setKind] = useState<GearKind>("speed");
+  // A kind of kit, or the kit pack (its own tab, last).
+  const [kind, setKind] = useState<GearKind | "pack">("speed");
+  const [opened, setOpened] = useState<GearItem | null>(null);
+  const openPack = () => {
+    const res = act((g, rng) => openGearPack(g, rng));
+    if (typeof res === "string") return notify(res, undefined, "error");
+    chime();
+    setOpened(res);
+  };
   const cash = game.clubs[game.userClubId].cash;
   const diamonds = game.monetization.diamonds;
   // The guide's present: basic boots are free while it shows the Shop.
@@ -147,7 +158,22 @@ export function GearShop() {
             <span>{iconize(t(`gear.kind.${k}`))}</span>
           </button>
         ))}
+        {/* The kit pack, after the shin guards. */}
+        <button role="tab" aria-selected={kind === "pack"} className={kind === "pack" ? "gear-kind-tab on" : "gear-kind-tab"} onClick={() => setKind("pack")}>
+          <Icon name="gift" size={28} />
+          <span>{iconize(t("gear.packTab"))}</span>
+        </button>
       </div>
+      {kind === "pack" ? (
+        <div className="ppacks gear-pack-row">
+          <div className="ppack-offer">
+            <PackArt tier="gear" name={t("gear.packTab")} range={t("gear.packRange")} note={t("gear.packNote")} />
+            <button className="ppack-btn" disabled={diamonds < GEAR_PACK.price} onClick={openPack}>
+              <Icon name="diamond" size={16} /> {GEAR_PACK.price} · {iconize(t("pack.open"))}
+            </button>
+          </div>
+        </div>
+      ) : (<>
       <p className="muted small">
         {iconize(t("gear.lifts", {attrs: GEAR_ATTRS[kind].map((a) => t(`attr.${a}`)).join(", ")}))} ·{" "}
         <button className="link" onClick={() => setView("storage")}><Icon name="boot" size={18} /> {iconize(t("gear.inBag", {n: game.gearBag?.length ?? 0}))}</button>
@@ -167,6 +193,23 @@ export function GearShop() {
           );
         })}
       </div>
+      </>)}
+      {opened && (
+        <Modal compact title={<><Icon name="gift" size={20} /> {iconize(t("gear.pack"))}</>} onClose={() => setOpened(null)}>
+          <div className="gear-reveal">
+            <GearCard item={opened} />
+          </div>
+          {opened.perk && (
+            <p className={opened.perk.n >= 5 ? "gear-perk-line lucky" : "gear-perk-line"}>
+              {iconize(t(opened.perk.n >= 5 ? "gear.perkLucky" : "gear.perkGot", {n: opened.perk.n, attr: t(`attr.${opened.perk.attr}`)}))}
+            </p>
+          )}
+          <div className="btn-row dialog-actions">
+            <button className="btn" onClick={() => { setOpened(null); setView("storage"); }}><Icon name="boot" size={16} /> {iconize(t("gear.toBag"))}</button>
+            <button className="btn primary" onClick={() => setOpened(null)}>{iconize(t("pack.great"))}</button>
+          </div>
+        </Modal>
+      )}
     </>
   );
 }

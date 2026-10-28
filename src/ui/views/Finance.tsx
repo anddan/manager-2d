@@ -61,6 +61,8 @@ export function Finance() {
       </Card>
 
       <Card title={t("fin.stadium")}>
+        {/* How the price works: in the (i), not in the way. */}
+        <Hint>{iconize(t("fin.autoHint"))} {iconize(t("fin.manualHint"))} {iconize(t("fin.crowdHint"))}</Hint>
         <dl className="kv">
           <dt>{iconize(t("fin.capacity"))}</dt><dd>{club.capacity.toLocaleString()}</dd>
           <dt>{iconize(t("fin.priceMode"))}</dt>
@@ -103,7 +105,6 @@ export function Finance() {
           <dt>{iconize(t("fin.sponsor"))}</dt><dd>{money(club.sponsorWeekly)} {iconize(t("common.perWeek"))}</dd>
           <dt>{iconize(t("fin.operations"))}</dt><dd>{money(-operatingCost(club))} {iconize(t("common.perWeek"))}</dd>
         </dl>
-        <p className="muted small">{club.ticketAuto && <>{iconize(t("fin.autoHint"))} </>}{iconize(t("fin.crowdHint"))}</p>
       </Card>
 
       <Card title={last ? t("fin.lastWeek", {week: last.week}) : t("fin.lastWeekEmpty")}>

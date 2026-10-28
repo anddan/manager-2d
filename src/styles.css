@@ -807,6 +807,7 @@ button.pick { grid-template-columns: auto 1fr auto auto auto 60px; }
 
 /* Team talk after the match */
 .tt-verdict { font-weight: 700; margin: 0 0 10px; }
+.tt-body { display: grid; gap: 8px; }
 .tt-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
 .tt-option { display: grid; gap: 3px; text-align: left; padding: 10px; border-radius: 10px; border: 2px solid var(--border); background: var(--surface-2); color: inherit; cursor: pointer; font: inherit; }
 .tt-option small { opacity: 0.8; line-height: 1.3; }
@@ -1239,6 +1240,55 @@ button.pick { grid-template-columns: auto 1fr auto auto auto 60px; }
 /* Transfers → Friend: buy with a code, and your own players up for sale. */
 .code-sales { display: grid; gap: 18px; margin-top: 8px; }
 .code-sales h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; }
+/* Inbox: mark all as read, with the green tick (greyed out once everything is read). */
+.mark-all .icon { color: var(--good); }
+.mark-all:disabled .icon { color: var(--muted); }
+/* Another club's badge: tap to see their team. */
+.crest-btn { border: 0; padding: 0; font-family: inherit; cursor: pointer; }
+.crest-btn:hover { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Above a team sheet: formation and style, the strength as a pill. */
+.sheet-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* The opponent's team strength: tap to see their tactics and players. */
+.team-ovr-btn { cursor: pointer; font-family: inherit; color: inherit; border: 0; }
+.next-match-opp { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+/* Settings: a gear-wheel button at the end of the Club tabs. */
+.pill-tab.icon-only { padding-left: 12px; padding-right: 12px; }
+/* A player's individual focus: a button with its icon, the choices in a grid. */
+.focus-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); color: inherit; font: inherit; cursor: pointer; white-space: nowrap; }
+.focus-btn.compact { padding: 4px 8px; font-size: 0.82rem; }
+.focus-btn:hover { border-color: var(--accent); }
+.focus-btn .icon { color: var(--accent); }
+.focus-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.focus-choice { display: flex; align-items: center; gap: 8px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); color: inherit; font: inherit; font-weight: 700; cursor: pointer; text-align: left; }
+.focus-choice .icon { color: var(--accent); }
+.focus-choice.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+/* A member of the friends' cup: their badge and team strength (tap for the team), then name and manager. */
+.friends-team-btn { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px 3px 3px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); color: inherit; font: inherit; cursor: pointer; }
+.friends-team-btn:hover:not(:disabled) { border-color: var(--accent); }
+.friends-team-btn:disabled { cursor: default; opacity: 0.75; }
+.friends-team-btn .crest { width: 32px; height: 32px; font-size: 0.62rem; }
+.friends-member-name { display: grid; min-width: 0; line-height: 1.2; }
+/* Kompisköp lists: who the player is at a glance, tap for the profile. */
+.sale-row { flex: 1 1 220px; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); color: inherit; font: inherit; cursor: pointer; text-align: left; }
+.sale-row:hover { border-color: var(--accent); }
+.sale-row-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sale-row-ovr { font-weight: 900; color: var(--accent); }
+.sale-row .muted { margin-left: auto; white-space: nowrap; }
+/* The kit pack in the shop, and what came out of it (its perk marked ✦). */
+.gear-pack-row { margin-top: 12px; }
+/* The kit pack's long name: smaller, and every line of the wrapper may wrap. */
+.pack-gear .pack-name { font-size: 1.05rem; text-align: center; }
+.pack-gear .pack-range, .pack-gear .pack-note { white-space: normal; text-align: center; }
+.gear-kind-tab .icon { height: 34px; }
+.gear-reveal { display: grid; place-items: center; padding: 6px 0 4px; animation: gear-pop 0.6s cubic-bezier(0.2, 1.4, 0.4, 1); }
+@keyframes gear-pop { 0% { transform: scale(0.4) rotate(-8deg); opacity: 0; } 100% { transform: none; opacity: 1; } }
+.gear-perk-line { text-align: center; font-weight: 700; }
+.gear-perk-line.lucky { color: #facc15; text-shadow: 0 0 10px rgb(250 204 21 / 0.6); }
+.gear-card .fut-stat.perk strong { color: #facc15; }
+.gear-card.tier-common .fut-stat.perk strong, .gear-card.tier-silver .fut-stat.perk strong, .gear-card.tier-gold .fut-stat.perk strong { color: #c2410c; }
+.gear-card.perked { box-shadow: 0 0 0 2px rgb(250 204 21 / 0.55), 0 0 18px rgb(250 204 21 / 0.35); }
+/* A friend's player for sale: Buy / No thanks always in sight at the bottom of the profile. */
+.pm-preview-actions { position: sticky; bottom: -14px; z-index: 2; margin: 12px -12px -14px; padding: 12px; background: var(--surface); border-top: 1px solid var(--border); }
 /* In a profile opened from the tactics: take the player out of their spot. */
 .pm-take-out { margin-left: 10px; vertical-align: middle; font-family: inherit; text-transform: none; letter-spacing: 0; font-size: 0.8rem; }
 .pick-out:hover { background: rgb(220 38 38 / 0.22); }
@@ -1888,6 +1938,7 @@ h2, h3, .modal-head h2 { display: flex; align-items: center; gap: 8px; }
 .pack-gold { --p1: #fde68a; --p2: #b7860b; --ink: #3b2a04; }
 .pack-gold .pack-name, .pack-gold .pack-range { text-shadow: none; }
 .pack-special { --p1: #a78bfa; --p2: #2e1065; }
+.pack-gear { --p1: #5eead4; --p2: #134e4a; }
 .pack-diamond { --p1: #a5f3fc; --p2: #0c4a6e; }
 .pack-special::after, .pack-diamond::after {
   content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;

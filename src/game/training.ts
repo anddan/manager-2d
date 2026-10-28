@@ -59,7 +59,9 @@ interface TrainOptions {
 }
 
 /** Trains one player; returns the attribute changes. */
-export function trainPlayer(rng: Rng, club: Club, p: Player, opts: TrainOptions): Partial<Record<Attribute, number>> {
+export function trainPlayer(rng: Rng, club: Club, p: Player, given: TrainOptions): Partial<Record<Attribute, number>> {
+  // A player set to rest has a light recovery week, whatever the rest of the squad does.
+  const opts: TrainOptions = p.individualFocus === "rest" ? {...given, focus: "recovery", intensity: "light"} : given;
   const changes: Partial<Record<Attribute, number>> = {};
   const intensity = INTENSITY[opts.intensity];
   if (p.injuryWeeks > 0) return changes;

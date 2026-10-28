@@ -50,3 +50,21 @@ describe("trading with friends", () => {
     expect([20, 50, 100, 175]).toContain(diamondPrice(p));
   }, 30_000);
 });
+
+describe("trading with friends keeps the player as they were", () => {
+  it("brings their kit and their looks along", () => {
+    const seller = newGame("Eva", 2, 71);
+    const buyer = newGame("Finn", 3, 72);
+    const id = seller.clubs[seller.userClubId].lineup[5];
+    seller.players[id].gear = {kind: "speed", tier: "gold"};
+    const bag = seller.gearBag?.length ?? 0;
+    const p = sendAway(seller, id);
+    expect(seller.gearBag?.length ?? 0).toBe(bag);
+    const newId = takeIn(buyer, p);
+    expect(buyer.players[newId].gear).toEqual({kind: "speed", tier: "gold"});
+    expect(buyer.players[newId].lookId).toBe(id);
+    // Sold on again: still the first look.
+    const again = takeIn(seller, sendAway(buyer, newId));
+    expect(seller.players[again].lookId).toBe(id);
+  }, 30_000);
+});

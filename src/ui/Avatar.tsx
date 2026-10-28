@@ -85,16 +85,18 @@ function bornLook(p: Player): Look {
 
 /** Eye colour from its own seed (so the rest of everyone's look stays as it was): light eyes mostly up north. */
 function bornEyes(p: Player): string {
-  if (FIXED_LOOKS[p.id]) return FIXED_LOOKS[p.id].eyes ?? EYES[0];
-  const rng = new Rng(seedOf(p.id + ":eyes"));
+  const id = p.lookId ?? p.id;
+  if (FIXED_LOOKS[id]) return FIXED_LOOKS[id].eyes ?? EYES[0];
+  const rng = new Rng(seedOf(id + ":eyes"));
   const north = REGION[p.nationality] === "north";
   return rng.weighted(EYES, (e) => (e === EYES[0] ? (north ? 3 : 8) : e === EYES[1] ? 2 : north ? 2 : 0.3));
 }
 
 function bornFace(p: Player): Look {
-  const fixed = FIXED_LOOKS[p.id];
+  const id = p.lookId ?? p.id;
+  const fixed = FIXED_LOOKS[id];
   if (fixed) return fixed;
-  const rng = new Rng(seedOf(p.id));
+  const rng = new Rng(seedOf(id));
   const weights = SKIN_WEIGHTS[REGION[p.nationality] ?? "south"];
   const skinIndex = rng.weighted(SKIN.map((_, i) => i), (i) => weights[i]);
   // Darker skin mostly goes with dark hair; blond and red hair mostly up north.

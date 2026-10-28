@@ -1,5 +1,6 @@
 import {CUP_STAGES} from "../../game/cup";
 import {Icon, iconize} from "../Icon";
+import {ClubCrest, TeamOvr} from "../LineupSheet";
 import {BoardWarningBanner} from "../BoardWarning";
 import {isCupFixture, nextUserFixture, userClub} from "../../game/helpers";
 import {leaguePosition, standings} from "../../game/league";
@@ -107,14 +108,13 @@ function matchup(diff: number): "ov.even" | "ov.favourite" | "ov.underdog" {
 }
 
 function Team({id}: {id: string}) {
-  const {t} = useT();
   const game = useGameState();
   const c = game.clubs[id];
   return (
     <div className="team">
-      <span className="crest big" style={{background: c.color, color: c.color2}}>{c.short}</span>
+      <ClubCrest clubId={id} className="crest big" />
       <span>{c.name}</span>
-      <span className="team-ovr">{iconize(t("tac.teamOvr"))} <strong>{teamOvr(game, id)}</strong></span>
+      <TeamOvr clubId={id} />
     </div>
   );
 }

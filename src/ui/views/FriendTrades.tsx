@@ -64,8 +64,8 @@ export function TradeOffers({code, cup, offers}: {code: string; cup: FriendCupDo
   const accept = async (o: TradeOfferDoc) => {
     const err = cannotLeave(game, o.playerId);
     if (err) return notify(err as TKey, undefined, "error");
-    // As they leave: without their boots (those stay here).
-    const player: Player = {...structuredClone(game.players[o.playerId]), gear: undefined, shin: undefined};
+    // As they leave, kit and all.
+    const player: Player = structuredClone(game.players[o.playerId]);
     setBusy(true);
     try {
       if (!(await closeOffer(code, o.id, "accepted", JSON.stringify(player)))) throw new Error("trade.notOpen");

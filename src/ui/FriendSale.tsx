@@ -1,18 +1,18 @@
 // Selling a player to a friend with a code: put up from the player's profile (they leave the
 // club then), bought by whoever types the code in under Transfers → Friend trades. The seller's money
 // comes in by itself once they're bought; until then they can be taken back.
-import {useEffect, useState} from "react";
+import {useEffect, useState, type ReactNode} from "react";
 import {canPay, cannotLeave, diamondPrice, roomForOne, sendAway, settleOnce, takeIn, tradePay, type TradeCurrency} from "../game/friendTrade";
 import {shortName} from "../game/helpers";
-import {marketValue} from "../game/ratings";
-import type {Player} from "../game/types";
+import {marketValue, overall} from "../game/ratings";
+import type {FriendSaleEntry, GameState, Player} from "../game/types";
 import {useT, type TKey} from "../i18n";
-import {useGame, useGameState} from "../store";
-import {Card, Hint, Modal} from "./common";
+import {GameOverride, useGame, useGameState} from "../store";
+import {Card, Flag, Hint, Modal, PosBadge} from "./common";
 import {diamondBurst, moneyBurst} from "./effects";
 import {Icon, iconize} from "./Icon";
 import {PackReveal} from "./PackReveal";
-import {PlayerCard} from "./PlayerCard";
+import {PlayerModal} from "./PlayerModal";
 import {chime} from "./sound";
 import {buySale, cancelSale, clearSale, createSale, deviceId, fetchSale, watchSale, type SaleDoc} from "./friendCupApi";
 
@@ -43,12 +43,12 @@ export function SellToFriend({player}: {player: Player}) {
     const amount = Math.max(0, Math.round(price || 0));
     const name = shortName(player);
     setBusy(true);
-    // The player leaves now (their boots stay); they come back if the sale can't be put up.
+    // The player leaves now, kit and all; they come back if the sale can't be put up.
     const gone = act((g) => sendAway(g, player.id));
     try {
-      const code = await createSale({...gone, gear: undefined, shin: undefined}, name, amount, currency);
+      const code = await createSale(gone, name, amount, currency, game.clubs[game.userClubId].name);
       act((g) => {
-        g.friendSales = {...g.friendSales, [code]: {name, price: amount, currency}};
+        g.friendSales = {...g.friendSales, [code]: {...glance(player), name, price: amount, currency}};
       });
       notify("sale.listed", {name, code}, "good");
       openPlayer(null);
@@ -110,12 +110,24 @@ export function CodeSales() {
   const [arrived, setArrived] = useState<string | null>(null);
   const mine = Object.entries(game.friendSales ?? {});
 
-  const look = async () => {
+  const mineLooks = Object.entries(game.friendLooks ?? {});
+  // Off the saved list (declined, bought or gone).
+  const forget = (c: string) =>
+    act((g) => {
+      if (g.friendLooks) delete g.friendLooks[c];
+    });
+  const look = async (c = code.trim().toUpperCase()) => {
     setBusy(true);
     try {
-      const s = await fetchSale(code.trim().toUpperCase());
-      if (!s) throw new Error("sale.noSale");
-      if (s.status !== "open") throw new Error("sale.gone");
+      const s = await fetchSale(c);
+      if (!s) {
+        forget(c);
+        throw new Error("sale.noSale");
+      }
+      if (s.status !== "open") {
+        forget(c);
+        throw new Error("sale.gone");
+      }
       if (s.seller === deviceId()) throw new Error("sale.own");
       setSale(s);
     } catch (e) {
@@ -141,6 +153,7 @@ export function CodeSales() {
       // The new player shown as from a pack: the card bit by bit.
       if (id) setArrived(id);
       notify("sale.bought", {name: bought.playerName}, "good");
+      forget(s.code);
       setSale(null);
       setCode("");
     } catch (e) {
@@ -166,9 +179,33 @@ export function CodeSales() {
       setBusy(false);
     }
   };
+  // Closed without deciding: kept on the list to come back to.
+  const keep = (x: SaleDoc) => {
+    act((g) => {
+      g.friendLooks = {...g.friendLooks, [x.code]: {...glance(JSON.parse(x.player) as Player), name: x.playerName, price: x.price, currency: x.currency}};
+    });
+    setSale(null);
+  };
+  // One of your own up for sale: their profile, from the sale (they're not in the club now).
+  const [ownSale, setOwnSale] = useState<SaleDoc | null>(null);
+  const viewOwn = async (c: string) => {
+    setBusy(true);
+    try {
+      const s = await fetchSale(c);
+      if (!s) throw new Error("sale.noSale");
+      setOwnSale(s);
+    } catch (e) {
+      notify(fail(e), undefined, "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const decline = (c: string) => {
+    forget(c);
+    setSale(null);
+  };
   const price = (n: number, c?: TradeCurrency) => (c === "diamonds" ? iconize(`${n} 💎`) : money(n));
   const copy = (c: string) => navigator.clipboard?.writeText(c).then(() => notify("friends.copied", undefined, "good"), () => undefined);
-  // A friend's player, lent their own club for the card's crest.
   const shown = sale ? (JSON.parse(sale.player) as Player) : null;
 
   return (
@@ -178,9 +215,22 @@ export function CodeSales() {
         <Hint>{iconize(t("sale.buyHint"))}</Hint>
         <div className="btn-row">
           <input className="input friends-code-input" value={code} maxLength={6} placeholder="ABC123" onChange={(e) => setCode(e.target.value.toUpperCase())} />
-          <button className="btn primary" disabled={busy || code.trim().length < 6} onClick={look}><Icon name="search" size={16} /> {iconize(t("sale.show"))}</button>
+          <button className="btn primary" disabled={busy || code.trim().length < 6} onClick={() => look()}><Icon name="search" size={16} /> {iconize(t("sale.show"))}</button>
         </div>
       </section>
+      {mineLooks.length > 0 && (
+        <section>
+          <h3><Icon name="eye" size={20} /> {iconize(t("sale.looked"))}</h3>
+          <ul className="plain-list friends-offers">
+            {mineLooks.map(([c, l]) => (
+              <li key={c} className="friends-offer">
+                <SaleRow entry={l} price={price(l.price, l.currency)} onOpen={() => look(c)} />
+                <button className="btn small" disabled={busy} onClick={() => forget(c)}><Icon name="close" size={14} /> {iconize(t("sale.decline"))}</button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {mine.length > 0 && (
         <section>
           <h3><Icon name="handshake" size={20} /> {iconize(t("sale.mine"))}</h3>
@@ -188,7 +238,7 @@ export function CodeSales() {
           <ul className="plain-list friends-offers">
             {mine.map(([c, s]) => (
               <li key={c} className="friends-offer">
-                <span><strong>{s.name}</strong> · {price(s.price, s.currency)}</span>
+                <SaleRow entry={s} price={price(s.price, s.currency)} onOpen={() => viewOwn(c)} />
                 <button className="btn small" onClick={() => copy(c)}><Icon name="clip" size={14} /> {c}</button>
                 <button className="btn small" disabled={busy} onClick={() => takeBack(c)}><Icon name="undo" size={14} /> {iconize(t("friends.withdraw"))}</button>
               </li>
@@ -197,19 +247,73 @@ export function CodeSales() {
         </section>
       )}
       {arrived && <PackReveal playerId={arrived} title={<><Icon name="handshake" size={20} /> {iconize(t("sale.boughtTitle"))}</>} onClose={() => setArrived(null)} />}
+      {/* The whole profile of the friend's player, lent into the game to be looked at. */}
       {sale && shown && (
-        <Modal title={iconize(t("sale.buyTitle"))} compact onClose={() => setSale(null)}>
-          <div className="friends-card">
-            <PlayerCard game={{...game, clubs: {...game.clubs, [shown.clubId ?? "x"]: {...game.clubs[game.userClubId], id: shown.clubId ?? "x", short: "?", color: "#64748b", color2: "#e2e8f0"}}}} player={shown} reveal />
-          </div>
-          <div className="btn-row dialog-actions">
-            <button className="btn" onClick={() => setSale(null)}>{iconize(t("common.cancel"))}</button>
-            <button className="btn primary" disabled={busy} onClick={() => buy(sale)}><Icon name="handshake" size={16} /> {t("sale.buyFor")} {price(sale.price, sale.currency)}</button>
-          </div>
-        </Modal>
+        <GameOverride.Provider value={lent(game, shown, sale.clubName ?? t("sale.friendClub"))}>
+          <PlayerModal
+            playerId={LENT_ID}
+            preview={{
+              onClose: () => keep(sale),
+              footer: (
+                <>
+                  <button className="btn" onClick={() => decline(sale.code)}><Icon name="close" size={16} /> {iconize(t("sale.decline"))}</button>
+                  <button className="btn primary" disabled={busy} onClick={() => buy(sale)}><Icon name="handshake" size={16} /> {t("sale.buyFor")} {price(sale.price, sale.currency)}</button>
+                </>
+              ),
+            }}
+          />
+        </GameOverride.Provider>
+      )}
+      {ownSale && (
+        <GameOverride.Provider value={lent(game, JSON.parse(ownSale.player) as Player, game.clubs[game.userClubId].name)}>
+          <PlayerModal
+            playerId={LENT_ID}
+            preview={{
+              onClose: () => setOwnSale(null),
+              footer: (
+                <>
+                  <button className="btn" disabled={busy} onClick={() => { takeBack(ownSale.code); setOwnSale(null); }}><Icon name="undo" size={16} /> {iconize(t("friends.withdraw"))}</button>
+                  <button className="btn primary" onClick={() => copy(ownSale.code)}><Icon name="clip" size={16} /> {ownSale.code}</button>
+                </>
+              ),
+            }}
+          />
+        </GameOverride.Provider>
       )}
     </div>
   );
+}
+
+/** Who a listed player is at a glance: position, country and total. */
+function glance(p: Player): Pick<FriendSaleEntry, "ovr" | "pos" | "nat"> {
+  return {ovr: overall(p), pos: p.position, nat: p.nationality};
+}
+
+/** A listed player: position, flag, name and total (tap for the profile), and the price. */
+function SaleRow({entry, price, onOpen}: {entry: FriendSaleEntry; price: ReactNode; onOpen: () => void}) {
+  return (
+    <button className="sale-row" onClick={onOpen}>
+      {entry.pos && <PosBadge pos={entry.pos} />}
+      {entry.nat && <Flag code={entry.nat} size={15} />}
+      <strong className="sale-row-name">{entry.name}</strong>
+      {entry.ovr !== undefined && <span className="sale-row-ovr">{entry.ovr}</span>}
+      <span className="muted">{price}</span>
+    </button>
+  );
+}
+
+const LENT_ID = "friend-sale";
+const LENT_CLUB = "friend-club";
+
+/** The game with a friend's player (and their club, by name) lent into it, to show their profile. */
+function lent(game: GameState, player: Player, clubName: string): GameState {
+  const own = game.clubs[game.userClubId];
+  return {
+    ...game,
+    players: {...game.players, [LENT_ID]: {...player, id: LENT_ID, lookId: player.lookId ?? player.id, clubId: LENT_CLUB}},
+    clubs: {...game.clubs, [LENT_CLUB]: {...own, id: LENT_CLUB, name: clubName, short: clubName.slice(0, 3).toUpperCase(), color: "#64748b", color2: "#e2e8f0"}},
+    scouted: {...game.scouted, [LENT_ID]: game.absWeek},
+  };
 }
 
 /** Watches this manager's players up for sale; when one is bought, the money (or diamonds) come in, once. */

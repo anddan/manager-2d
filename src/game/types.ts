@@ -74,6 +74,16 @@ export interface Loan {
   wageShare: number;
 }
 
+/** A player sold to (or looked at from) a friend, as listed: the price, and who they are at a glance. */
+export interface FriendSaleEntry {
+  name: string;
+  price: number;
+  currency?: "money" | "diamonds";
+  ovr?: number;
+  pos?: Position;
+  nat?: string;
+}
+
 export interface Player {
   id: string;
   firstName: string;
@@ -84,6 +94,8 @@ export interface Player {
   gear?: GearItem;
   /** Shin guards worn: a bonus, and fewer injuries. */
   shin?: GearItem;
+  /** The id their looks are drawn from, when they came from another game (their id here is new). */
+  lookId?: string;
   /** A look the manager picked (skin, hair, beard…); missing means the one the player came with. */
   look?: {skin: string; hair: string; style: string; beard: string; eyes?: string; glasses?: boolean; lashes?: boolean};
   age: number;
@@ -129,7 +141,8 @@ export interface Player {
   lastTalkWeek: number;
   lastComplaintWeek: number;
   loan: Loan | null;
-  individualFocus: Attribute | null;
+  /** Extra work on one attribute, or "rest": a light week of recovery for this player alone. */
+  individualFocus: Attribute | "rest" | null;
 }
 
 export interface Installment {
@@ -488,8 +501,12 @@ export interface GameState {
   gearBag?: GearItem[];
   /** Trades with friends (by offer id) already settled here, so none is paid or received twice. */
   friendTrades?: Record<string, true>;
+  /** Everything bought in the shop with real money: diamonds and club money got, and what it cost (euros). */
+  purchases?: {diamonds: number; money: number; eur: number};
   /** Players put up for sale to a friend with a code (by code), until bought or taken back. */
-  friendSales?: Record<string, {name: string; price: number; currency?: "money" | "diamonds"}>;
+  friendSales?: Record<string, FriendSaleEntry>;
+  /** Friends' players looked at with a code and kept to decide on later (by code). */
+  friendLooks?: Record<string, FriendSaleEntry>;
   /** Trophies won and not celebrated yet (shown once, then removed). */
   celebrations?: {kind: "league" | "cup"; season: number}[];
   /** Set when the manager is sacked: the game is over. */

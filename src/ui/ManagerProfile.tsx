@@ -11,7 +11,7 @@ import {ManagerAvatar, defaultManagerLook} from "./Avatar";
 import {Modal} from "./common";
 
 export function ManagerProfile({onClose}: {onClose: () => void}) {
-  const {t, tx} = useT();
+  const {t, tx, money, lang} = useT();
   const game = useGameState();
   const act = useGame((s) => s.act);
   const club = game.clubs[game.userClubId];
@@ -72,6 +72,14 @@ export function ManagerProfile({onClose}: {onClose: () => void}) {
           {trophies.map((tr, i) => <li key={i}><Icon name="trophy" size={18} /> {iconize(tx(tr.key, {season: tr.season}))}</li>)}
         </ul>
       )}
+
+      {/* What's been bought in the shop with real money. */}
+      <h4><Icon name="cart" size={18} /> {iconize(t("mgr.bought"))}</h4>
+      <dl className="kv mgr-bought">
+        <dt>{iconize(t("mgr.boughtDiamonds"))}</dt><dd><Icon name="diamond" size={16} /> {game.purchases?.diamonds ?? 0}</dd>
+        <dt>{iconize(t("mgr.boughtMoney"))}</dt><dd><Icon name="coins" size={16} /> {money(game.purchases?.money ?? 0)}</dd>
+        <dt>{iconize(t("mgr.boughtCost"))}</dt><dd>{new Intl.NumberFormat(lang, {style: "currency", currency: "EUR"}).format(game.purchases?.eur ?? 0)}</dd>
+      </dl>
 
       <h4><Icon name="list" size={18} /> {iconize(t("mgr.career"))}</h4>
       <ul className="mgr-career">
