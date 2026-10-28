@@ -1,7 +1,7 @@
 // The stadium: locked until the league is won, then stands, kiosks and a shop to build.
 import {describe, expect, it} from "vitest";
 import {newGame} from "./generate";
-import {KIOSK_SPEND, SHOP_WEEKLY, STAND_SEATS, ensureStadium, stadiumCapacity, startBuild, weeklyStadium} from "./stadium";
+import {STAND_SEATS, ensureStadium, itemTakings, kioskTakings, setItemPrice, shopTakings, stadiumCapacity, startBuild, weeklyStadium} from "./stadium";
 import type {Fixture} from "./types";
 
 describe("stadium", () => {
@@ -47,6 +47,24 @@ describe("stadium", () => {
     const lines = () => g.finance.current.matchday ?? 0;
     const start = lines();
     weeklyStadium(g, [home]);
-    expect(lines() - start).toBe(20_000 * KIOSK_SPEND * 2 + SHOP_WEEKLY[1]);
+    expect(lines() - start).toBe(kioskTakings(st, 20_000) + shopTakings(st));
+    // At fair prices: about 1.5 € a fan per kiosk level, and some 25 000 a week from a first shop.
+    expect(kioskTakings(st, 20_000)).toBe(Math.round(20_000 * 0.4 * 4) + Math.round(20_000 * 0.4 * 3));
+    expect(shopTakings(st)).toBe(1200 * 15 + 150 * 60);
+  });
+
+  it("brings in most a little above the fair price, and little when far too dear", () => {
+    const g = newGame("Arena", 3, 5);
+    const st = ensureStadium(g.clubs[g.userClubId]);
+    st.kiosks = 1;
+    const at = (price: number) => {
+      setItemPrice(g, "hotdog", price);
+      return itemTakings(st, "hotdog", 20_000);
+    };
+    expect(at(5)).toBeGreaterThan(at(4));
+    expect(at(5)).toBeGreaterThan(at(8));
+    expect(at(12)).toBe(0);
+    setItemPrice(g, "hotdog", 1000);
+    expect(st.prices?.hotdog).toBe(12);
   });
 });

@@ -15,12 +15,54 @@ export const STAND_MAX = 5;
 const SEAT_COST = 200;
 export const KIOSK_MAX = 3;
 const KIOSK_COST = [300_000, 550_000, 900_000];
-/** What each fan spends at the kiosks per level, at a home match. */
-export const KIOSK_SPEND = 1.5;
 export const SHOP_MAX = 3;
 const SHOP_COST = [500_000, 900_000, 1_400_000];
-/** The club shop's takings each week, by level. */
-export const SHOP_WEEKLY = [0, 25_000, 55_000, 90_000];
+/**
+ * What the kiosks and the club shop sell, each at a price the manager sets (a fair one to start).
+ * The dearer it is, the fewer buy: just above fair brings in the most, far above it next to nothing.
+ */
+export const SALE_ITEMS = ["hotdog", "drink", "scarf", "shirt"] as const;
+export type SaleItem = (typeof SALE_ITEMS)[number];
+export const ITEM_FAIR: Record<SaleItem, number> = {hotdog: 4, drink: 3, scarf: 15, shirt: 60};
+export const ITEM_PART: Record<SaleItem, "kiosks" | "shop"> = {hotdog: "kiosks", drink: "kiosks", scarf: "shop", shirt: "shop"};
+/** Of the fans at a home match, the share buying each kiosk item (at a fair price), by kiosk level. */
+const KIOSK_SHARE = [0, 0.22, 0.4, 0.58];
+/** Shirts and scarves sold a week (at a fair price), by shop level. */
+const SHOP_BUYERS: Record<"scarf" | "shirt", number[]> = {scarf: [0, 1200, 2200, 3200], shirt: [0, 150, 350, 550]};
+
+export function itemPrice(st: StadiumState, item: SaleItem): number {
+  return st.prices?.[item] ?? ITEM_FAIR[item];
+}
+
+/** How many buy at a price, against how many would at a fair one (1 at fair, 0 at 2.7 times it). */
+export function priceDemand(item: SaleItem, price: number): number {
+  return Math.max(0, Math.min(1.6, 1.6 - (0.6 * price) / ITEM_FAIR[item]));
+}
+
+/** What one item brings in: at the kiosks per home match (from the crowd), at the shop per week. */
+export function itemTakings(st: StadiumState, item: SaleItem, attendance: number, level = ITEM_PART[item] === "kiosks" ? st.kiosks : st.shop): number {
+  const price = itemPrice(st, item);
+  const buyers = ITEM_PART[item] === "kiosks" ? attendance * (KIOSK_SHARE[level] ?? 0) : SHOP_BUYERS[item as "scarf" | "shirt"][level] ?? 0;
+  return Math.round(buyers * priceDemand(item, price) * price);
+}
+
+/** The kiosks' takings at a home match. */
+export function kioskTakings(st: StadiumState, attendance: number, level = st.kiosks): number {
+  return itemTakings(st, "hotdog", attendance, level) + itemTakings(st, "drink", attendance, level);
+}
+
+/** The shop's takings for a week. */
+export function shopTakings(st: StadiumState, level = st.shop): number {
+  return itemTakings(st, "scarf", 0, level) + itemTakings(st, "shirt", 0, level);
+}
+
+/** Sets an item's price (from a fifth of fair up to three times it). */
+export function setItemPrice(state: GameState, item: SaleItem, price: number): void {
+  const st = ensureStadium(state.clubs[state.userClubId]);
+  const fair = ITEM_FAIR[item];
+  st.prices = {...st.prices, [item]: Math.max(Math.ceil(fair / 5), Math.min(fair * 3, Math.round(price)))};
+}
+
 /** How long each kind of project takes, in weeks. */
 export const BUILD_WEEKS = {stand: 3, kiosks: 1, shop: 2};
 
@@ -30,6 +72,8 @@ export interface StadiumState {
   shop: number;
   /** The capacity before any building. */
   base: number;
+  /** The kiosks' and the shop's prices (missing: a fair one). */
+  prices?: Partial<Record<SaleItem, number>>;
   /** What's being built, and how many weeks are left. */
   project?: {part: StadiumPart; weeksLeft: number};
 }
@@ -105,6 +149,6 @@ export function weeklyStadium(state: GameState, played: Fixture[]): void {
     addMessage(state, {kind: "news", key: "msg.stadiumBuilt", params: {part: `stadium.part.${part}`, capacity: club.capacity}});
   }
   const home = played.find((f) => f.homeId === club.id && f.played);
-  if (home && st.kiosks > 0) book(state, club.id, "matchday", Math.round((home.attendance ?? 0) * KIOSK_SPEND * st.kiosks));
-  if (st.shop > 0) book(state, club.id, "matchday", SHOP_WEEKLY[st.shop]);
+  if (home && st.kiosks > 0) book(state, club.id, "matchday", kioskTakings(st, home.attendance ?? 0));
+  if (st.shop > 0) book(state, club.id, "matchday", shopTakings(st));
 }

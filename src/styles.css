@@ -789,6 +789,13 @@ button.pick { grid-template-columns: auto 1fr auto auto auto 60px; }
 }
 @media (prefers-reduced-motion: reduce) { .fut-card.tier-special::before { animation: none; } }
 
+/* The kiosks' and the shop's prices: name, price with arrows, the fair price and what it brings in. */
+.item-prices { display: grid; gap: 10px; margin: 6px 0 0; padding: 0; list-style: none; }
+.item-price { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.item-price-name { font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
+.item-price-name .icon { color: var(--accent-text); }
+.item-price small { grid-column: 1 / -1; }
+.item-price .price-stepper { display: inline-flex; align-items: center; gap: 8px; }
 /* Theo Bergqvist's card: green and white, with a white rim. */
 .fut-card.card-hammarby.tier-special {
   --card-1: #00a651; --card-2: #004d25; --card-ink: #ffffff;
@@ -799,7 +806,9 @@ button.pick { grid-template-columns: auto 1fr auto auto auto 60px; }
 .fut-card.card-hammarby.tier-special .fut-name { border-color: rgb(255 255 255 / 0.5); color: #ffffff; }
 
 /* The legends in the shop: the cards side by side, the secret one greyed out. */
-.legends { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; justify-items: center; }
+.legends { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; justify-items: center; }
+/* On a phone: one under the other. */
+@media (max-width: 599px) { .legends { grid-template-columns: 1fr; gap: 22px; } }
 .legend-offer { display: grid; justify-items: center; gap: 8px; text-align: center; }
 .legend-name { font-family: var(--display); font-size: 1.1rem; text-transform: uppercase; }
 .legend-offer .callout { margin: 0; }
@@ -1732,7 +1741,9 @@ body { background: radial-gradient(120% 60% at 50% 0%, #10264a 0%, var(--bg) 60%
 }
 .play-circle:hover { transform: scale(1.05); }
 .play-circle:active { transform: scale(0.95); }
-.play-circle.match { background: radial-gradient(circle at 35% 30%, #6ee7a8, #16a34a 55%, #0f7a37); box-shadow: 0 0 0 1px rgb(34 197 94 / 0.5), 0 8px 24px rgb(34 197 94 / 0.5); }
+.play-circle.match { background: #0b1430; overflow: hidden; box-shadow: 0 0 0 2px rgb(34 197 94 / 0.85), 0 8px 24px rgb(34 197 94 / 0.5); }
+/* The FZ badge filling the kick-off button (its ball just inside the circle). */
+.play-logo { width: 128%; height: 128%; object-fit: cover; pointer-events: none; }
 .nav-play-label { font-size: 0.68rem; font-weight: 700; color: #fff; white-space: nowrap; }
 
 /* A group's pages, popped out in an arc over the bar. */
@@ -2084,3 +2095,48 @@ h2, h3, .modal-head h2 { display: flex; align-items: center; gap: 8px; }
 .friends-score { min-width: 52px; text-align: center; }
 .friends-members .crest.tiny, .friends-match-row .crest.tiny, .friends-next .crest.tiny { width: 12px; height: 12px; }
 .friends-match-actions { justify-content: center; margin: 4px 0 2px; }
+
+/* The top bar, dressed up: a glow in the club's colour behind the crest, a lit line along the bottom,
+   the values as pills with the usual line icons. */
+.topbar {
+  position: relative;
+  background:
+    radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--club, #2563eb) 32%, transparent) 0%, transparent 55%),
+    linear-gradient(180deg, rgb(12 26 54 / 0.95), rgb(7 18 38 / 0.92));
+  border-bottom: 0;
+}
+.topbar::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; pointer-events: none;
+  background: linear-gradient(90deg, var(--club, #2563eb), var(--accent) 45%, transparent);
+  opacity: 0.85;
+}
+.topbar .crest {
+  box-shadow: 0 0 0 2px rgb(255 255 255 / 0.85), 0 0 16px color-mix(in srgb, var(--club, #2563eb) 75%, transparent);
+  position: relative; overflow: hidden;
+}
+.topbar .crest::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(135deg, rgb(255 255 255 / 0.35), transparent 45%);
+}
+.topbar-club strong { text-shadow: 0 1px 8px rgb(0 0 0 / 0.4); }
+.topbar-when {
+  display: inline-block; margin-top: 2px; padding: 1px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 700;
+  background: rgb(255 255 255 / 0.07); color: #cbd5e1;
+}
+.topbar .chip {
+  position: relative; overflow: hidden; gap: 5px; padding: 4px 10px; border-radius: 999px;
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.09), rgb(255 255 255 / 0.03));
+  border: 1px solid rgb(255 255 255 / 0.16); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.1);
+  transition: border-color 0.15s, transform 0.15s;
+}
+.topbar .chip:hover { border-color: rgb(255 255 255 / 0.4); transform: translateY(-1px); }
+.topbar .chip .icon { color: inherit; }
+/* The values' icons: plain line icons, as everywhere else. */
+.chip-ico { display: inline-grid; place-items: center; flex: none; color: var(--accent-text); }
+.chip-val { font-variant-numeric: tabular-nums; font-weight: 800; }
+.topbar .chip.neg .chip-val { color: #fca5a5; }
+.topbar-manager .avatar {
+  box-shadow: 0 0 0 2px transparent; background: linear-gradient(rgb(12 26 54), rgb(12 26 54)) padding-box, linear-gradient(135deg, var(--club, #2563eb), var(--accent)) border-box;
+  border: 2px solid transparent;
+}
+.topbar-manager:hover .avatar { box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 60%, transparent); }

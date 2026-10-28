@@ -3,8 +3,15 @@
 import {Icon, iconize} from "../Icon";
 import {useState} from "react";
 import {
-  KIOSK_SPEND,
-  SHOP_WEEKLY,
+  ITEM_FAIR,
+  ITEM_PART,
+  SALE_ITEMS,
+  itemPrice,
+  itemTakings,
+  kioskTakings,
+  setItemPrice,
+  shopTakings,
+  type SaleItem,
   STAND_MAX,
   STAND_SEATS,
   STANDS,
@@ -21,7 +28,7 @@ import {
   type StadiumState,
   type Stand,
 } from "../../game/stadium";
-import {userClub} from "../../game/helpers";
+import {difficulty, userClub} from "../../game/helpers";
 import type {TKey} from "../../i18n";
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
@@ -76,9 +83,9 @@ function StadiumBuilder() {
           <dt>{iconize(t("stadium.capacity"))}</dt><dd><strong>{iconize(t("stadium.seats", {n: stadiumCapacity(st)}))}</strong></dd>
         </dl>
         {st.project && <p className="stadium-project">{iconize(t("stadium.building", {part: `stadium.part.${st.project.part}`, weeks: st.project.weeksLeft}))}</p>}
-        {st.kiosks > 0 && <p className="muted small">{iconize(t("stadium.kiosksNow", {spend: KIOSK_SPEND * st.kiosks}))}</p>}
-        {st.shop > 0 && <p className="muted small">{iconize(t("stadium.shopNow", {weekly: SHOP_WEEKLY[st.shop]}))}</p>}
       </Card>
+
+      {(st.kiosks > 0 || st.shop > 0) && <ItemPrices st={st} attendance={club.capacity} />}
 
       <Card title={picked ? partName(picked) : t("stadium.title")}>
         {!picked && <p className="muted">{iconize(t("stadium.pick"))}</p>}
@@ -91,8 +98,8 @@ function StadiumBuilder() {
             const gain = isStand(part)
               ? t("stadium.standGain", {n: STAND_SEATS[part]})
               : part === "kiosks"
-                ? t("stadium.kioskGain", {spend: KIOSK_SPEND * (level + 1)})
-                : t("stadium.shopGain", {weekly: SHOP_WEEKLY[Math.min(level + 1, SHOP_WEEKLY.length - 1)]});
+                ? t("stadium.kioskGain", {spend: kioskTakings(st, 1000, Math.min(level + 1, max)) / 1000})
+                : t("stadium.shopGain", {weekly: shopTakings(st, Math.min(level + 1, max))});
             const building = st.project?.part === part;
             return (
               <li key={part} className={`stadium-part ${open ? "open" : ""}`}>
@@ -125,6 +132,43 @@ function StadiumBuilder() {
         <p className="muted small">{num(stadiumCapacity(st))} / {num(st.base + STANDS.reduce((n, s) => n + STAND_MAX * STAND_SEATS[s], 0))}</p>
       </Card>
     </div>
+  );
+}
+
+/**
+ * The kiosks' and the shop's prices: each item with its price (up and down), the fair price, and
+ * what it brings in (at the kiosks per full home match, at the shop per week).
+ */
+const ITEM_ICONS: Record<SaleItem, "hotdog" | "cup" | "scarf" | "shirt"> = {hotdog: "hotdog", drink: "cup", scarf: "scarf", shirt: "shirt"};
+
+function ItemPrices({st, attendance}: {st: StadiumState; attendance: number}) {
+  const {t, money} = useT();
+  const act = useGame((s) => s.act);
+  const helped = difficulty(useGameState()) !== "hard";
+  const items = SALE_ITEMS.filter((i) => (ITEM_PART[i] === "kiosks" ? st.kiosks : st.shop) > 0);
+  const set = (item: SaleItem, price: number) => act((g) => setItemPrice(g, item, price));
+  const step = (item: SaleItem) => (ITEM_FAIR[item] >= 20 ? 5 : 1);
+  return (
+    <Card title={<><Icon name="tag" size={20} /> {iconize(t("stadium.prices"))}</>}>
+      <Hint>{iconize(t("stadium.pricesHint"))}</Hint>
+      <ul className="item-prices">
+        {items.map((item) => {
+          const price = itemPrice(st, item);
+          return (
+            <li key={item} className="item-price">
+              <span className="item-price-name"><Icon name={ITEM_ICONS[item]} size={18} /> {iconize(t(`stadium.item.${item}` as TKey))}</span>
+              <span className="price-stepper">
+                <button className="btn small" aria-label={t("fin.priceDown")} disabled={price <= Math.ceil(ITEM_FAIR[item] / 5)} onClick={() => set(item, price - step(item))}>▼</button>
+                <strong>{money(price)}</strong>
+                <button className="btn small" aria-label={t("fin.priceUp")} disabled={price >= ITEM_FAIR[item] * 3} onClick={() => set(item, price + step(item))}>▲</button>
+              </span>
+              {/* The fair price and the takings: help on easy and medium only. */}
+              {helped && <small className="muted">{iconize(t("stadium.itemFair", {fair: ITEM_FAIR[item]}))} · {iconize(t(ITEM_PART[item] === "kiosks" ? "stadium.itemPerMatch" : "stadium.itemPerWeek", {x: itemTakings(st, item, attendance)}))}</small>}
+            </li>
+          );
+        })}
+      </ul>
+    </Card>
   );
 }
 

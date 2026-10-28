@@ -1,0 +1,16 @@
+{
+  "name": "Forza Manager",
+  "short_name": "Forza",
+  "description": "Ta över en klubb, bygg ett lag och led det mot toppen.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b1430",
+  "theme_color": "#0b1430",
+  "icons": [
+    {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}

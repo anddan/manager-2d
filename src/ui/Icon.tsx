@@ -5,7 +5,7 @@ import type {ReactNode} from "react";
 export type IconName =
   | "home" | "mail" | "users" | "clipboard" | "dumbbell" | "calendar" | "list" | "trophy" | "stadium"
   | "swap" | "pen" | "wallet" | "boot" | "diamond" | "settings" | "play" | "ball" | "shield" | "info" | "close"
-  | "warn" | "fire" | "video" | "gift" | "shin" | "glove" | "dice" | "user" | "text" | "palette" | "megaphone" | "skip" | "coffee" | "stop" | "target" | "star" | "sparkle" | "chart" | "chat" | "handshake" | "trend" | "tag" | "shirt" | "undo" | "check" | "bolt" | "bank" | "sound" | "compass" | "download" | "upload" | "cart" | "hammer" | "run" | "bench" | "moon" | "search" | "inbox" | "eye" | "coins" | "medical" | "plane" | "clip" | "lock" | "flag" | "updown" | "plus" | "male" | "female" | "mixed" | "chevron" | "thumbUp" | "thumbDown" | "debrief";
+  | "warn" | "fire" | "video" | "gift" | "shin" | "glove" | "dice" | "user" | "text" | "palette" | "megaphone" | "skip" | "coffee" | "stop" | "target" | "star" | "sparkle" | "chart" | "chat" | "handshake" | "trend" | "tag" | "shirt" | "undo" | "check" | "bolt" | "bank" | "sound" | "compass" | "download" | "upload" | "cart" | "hammer" | "run" | "bench" | "moon" | "search" | "inbox" | "eye" | "coins" | "medical" | "plane" | "clip" | "lock" | "flag" | "updown" | "plus" | "male" | "female" | "mixed" | "chevron" | "thumbUp" | "thumbDown" | "debrief" | "hotdog" | "cup" | "scarf";
 
 const PATHS: Record<IconName, ReactNode> = {
   home: <><path d="M3 11 12 4l9 7" /><path d="M5 10v10h14V10" /><path d="M10 20v-6h4v6" /></>,
@@ -54,6 +54,10 @@ const PATHS: Record<IconName, ReactNode> = {
   // A word to one player after the match: well done, or not good enough.
   thumbUp: <><path d="M7 10v10H4V10h3Z" /><path d="M7 10l4-7c1.4 0 2.3 1 2 2.4L12.4 9H19c1.2 0 2 1 1.8 2.2l-1.3 7A2 2 0 0 1 17.5 20H7" /></>,
   thumbDown: <><path d="M7 14V4H4v10h3Z" /><path d="M7 14l4 7c1.4 0 2.3-1 2-2.4L12.4 15H19c1.2 0 2-1 1.8-2.2l-1.3-7A2 2 0 0 0 17.5 4H7" /></>,
+  // Sold at the kiosks and the club shop.
+  hotdog: <><path d="M4 12c0-2 1.5-3 3-3h10c1.5 0 3 1 3 3s-1.5 3-3 3H7c-1.5 0-3-1-3-3Z" /><path d="M3 12h18" /><path d="M7 11.5c1-1 2 1 3 0s2 1 3 0 2 1 3 0" /></>,
+  cup: <><path d="M6 7h12l-1.5 13h-9L6 7Z" /><path d="M5 7h14" /><path d="M13 7l2-4h3" /></>,
+  scarf: <><path d="M5 4h14v5H5z" /><path d="M9 9v11M14 9v8" /><path d="M8 20h2M13 17h2" /></>,
   // The talk after the match: two speech bubbles.
   debrief: <><path d="M3 4h12v8H8l-5 4V4Z" /><path d="M15 8h6v8l-3-2.5h-7v-1.5" /></>,
   handshake: <><path d="M2 12 6 8l4 2 3-2 3 1 6 3" /><path d="m6 14 3 3 2-1 2 2 2-1 3-3" /></>,

@@ -1,7 +1,7 @@
 import {TICKET_ADJUST, TICKET_PRICE, crowdFor, fairPrice, operatingCost, sumLines} from "../../game/finance";
 import {Icon, iconize} from "../Icon";
 import {BoardWarningBanner} from "../BoardWarning";
-import {fixtureWeek, userClub} from "../../game/helpers";
+import {fixtureWeek, userClub, difficulty} from "../../game/helpers";
 import {wageBill} from "../../game/ratings";
 import {FINANCE_CATEGORIES, type FinanceLines} from "../../game/types";
 import {useT} from "../../i18n";
@@ -13,6 +13,8 @@ import {useState} from "react";
 export function Finance() {
   const {t, money} = useT();
   const game = useGameState();
+  // The sums (takings per match, the fair price) help on easy and medium; on hard you work it out.
+  const helped = difficulty(game) !== "hard";
   const club = userClub(game);
   const last = game.finance.weeks[0];
   const bill = wageBill(game, club.id);
@@ -78,7 +80,7 @@ export function Finance() {
               <button className="btn small" aria-label={t("fin.priceDown")} disabled={adjust <= TICKET_ADJUST.min} onClick={() => setAdjust(adjust - TICKET_ADJUST.step)}>▼</button>
               <span className="price-auto">
                 <strong>{money(crowd.price)}</strong>
-                <small className="muted">{adjust === 0 ? t("fin.priceBest") : `${adjust > 0 ? "+" : ""}${adjust} %`}</small>
+                <small className="muted">{adjust === 0 ? (helped ? t("fin.priceBest") : "") : `${adjust > 0 ? "+" : ""}${adjust} %`}</small>
               </span>
               <button className="btn small" aria-label={t("fin.priceUp")} disabled={adjust >= TICKET_ADJUST.max} onClick={() => setAdjust(adjust + TICKET_ADJUST.step)}>▲</button>
             </dd>
@@ -100,8 +102,9 @@ export function Finance() {
           <dd className={crowd.rate >= 0.995 ? "pos-num" : crowd.rate < 0.6 ? "neg" : ""}>
             {iconize(t("fin.crowd", {fans: crowd.fans, pct: Math.round(crowd.rate * 100)}))}{crowd.rate >= 0.995 ? ` · ${t("match.soldOut")}` : ""}
           </dd>
-          <dt>{iconize(t("fin.perHomeGame"))}</dt><dd>{money(crowd.fans * crowd.price)}</dd>
-          <dt>{iconize(t("fin.fairPrice"))}</dt><dd>{money(fair)}</dd>
+          {/* The sums are help: on easy and medium only. */}
+          {helped && <><dt>{iconize(t("fin.perHomeGame"))}</dt><dd>{money(crowd.fans * crowd.price)}</dd></>}
+          {helped && <><dt>{iconize(t("fin.fairPrice"))}</dt><dd>{money(fair)}</dd></>}
           <dt>{iconize(t("fin.sponsor"))}</dt><dd>{money(club.sponsorWeekly)} {iconize(t("common.perWeek"))}</dd>
           <dt>{iconize(t("fin.operations"))}</dt><dd>{money(-operatingCost(club))} {iconize(t("common.perWeek"))}</dd>
         </dl>

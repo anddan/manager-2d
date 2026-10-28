@@ -376,7 +376,8 @@ function PlayButton() {
         </Modal>
       )}
       <button ref={button} className={kickOff ? "play-circle continue match" : "play-circle continue"} onClick={advance} aria-label={label} title={label}>
-        <Icon name={kickOff ? "ball" : "play"} size={28} />
+        {/* Kick-off: the club's FZ badge (the app icon); otherwise the play arrow. */}
+        {kickOff ? <img className="play-logo" src="/icon-192.png" alt="" /> : <Icon name="play" size={28} />}
       </button>
       <span className="nav-play-label">{label}</span>
     </div>
@@ -404,7 +405,7 @@ function TopBar() {
   regenerateEnergy(m, now);
   const wait = msToNextEnergy(m, now);
   return (
-    <header className="topbar">
+    <header className="topbar" style={{"--club": club.color} as React.CSSProperties}>
       {profile && <ManagerProfile onClose={() => setProfile(false)} />}
       {/* The club (to its tactics) and, right after it, the manager (to their profile). */}
       <div className="topbar-id">
@@ -412,7 +413,7 @@ function TopBar() {
           <span className="crest" style={{background: club.color, color: club.color2}}>{club.short}</span>
           <span className="topbar-club-text">
             <strong>{club.name}</strong>
-            <small>{iconize(t("top.seasonWeek", {season: game.season, week: game.week}))}</small>
+            <small className="topbar-when">{iconize(t("top.seasonWeek", {season: game.season, week: game.week}))}</small>
           </span>
         </button>
         <button className="topbar-manager" onClick={() => setProfile(true)} title={game.managerName}>
@@ -421,12 +422,20 @@ function TopBar() {
         </button>
       </div>
       <div className="topbar-stats">
-        <button className="chip hud-cash" onClick={() => setView("finance")} title={t("fin.cash")}><Icon name="coins" size={16} /> {money(club.cash)}</button>
-        <button className="chip" onClick={() => setView("shop")} title={t("shop.energy")}>
-          <Icon name="bolt" size={16} /> {m.energy}/{ENERGY_MAX}
+        {/* Money, energy and diamonds. */}
+        <button className={club.cash < 0 ? "chip hud-cash neg" : "chip hud-cash"} onClick={() => setView("finance")} title={t("fin.cash")}>
+          <span className="chip-ico cash"><Icon name="coins" size={16} /></span>
+          <span className="chip-val">{money(club.cash)}</span>
+        </button>
+        <button className="chip hud-energy" onClick={() => setView("shop")} title={t("shop.energy")}>
+          <span className="chip-ico energy"><Icon name="bolt" size={16} /></span>
+          <span className="chip-val">{m.energy}/{ENERGY_MAX}</span>
           {wait > 0 && <small className="timer">{formatWait(wait)}</small>}
         </button>
-        <button className="chip hud-diamonds" onClick={() => setView("shop")} title={t("shop.diamonds")}><Icon name="diamond" size={16} /> {m.diamonds}</button>
+        <button className="chip hud-diamonds" onClick={() => setView("shop")} title={t("shop.diamonds")}>
+          <span className="chip-ico gem"><Icon name="diamond" size={16} /></span>
+          <span className="chip-val">{m.diamonds}</span>
+        </button>
       </div>
     </header>
   );
