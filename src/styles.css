@@ -1274,6 +1274,7 @@ button.pick { grid-template-columns: auto 1fr auto auto auto 60px; }
 .sale-row-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sale-row-ovr { font-weight: 900; color: var(--accent); }
 .sale-row .muted { margin-left: auto; white-space: nowrap; }
+.friends-card-gear { justify-content: center; margin-bottom: 8px; }
 /* The kit pack in the shop, and what came out of it (its perk marked ✦). */
 .gear-pack-row { margin-top: 12px; }
 /* The kit pack's long name: smaller, and every line of the wrapper may wrap. */

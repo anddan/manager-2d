@@ -25,6 +25,7 @@ import {useT, type TKey} from "../../i18n";
 import {useGame, useGameState} from "../../store";
 import {Card, Empty, Flag, Hint, Modal} from "../common";
 import {PlayerCard} from "../PlayerCard";
+import {GearCard} from "../Gear";
 import {LineupSheet} from "../LineupSheet";
 import {PackReveal} from "../PackReveal";
 import {OfferDialog, TradeOffers, useOffers, useSettleTrades} from "./FriendTrades";
@@ -473,6 +474,13 @@ function TeamView({code, member, sentAt, onClose}: {code: string; member: string
           <div className="friends-card">
             <PlayerCard game={{...game, clubs: {...game.clubs, [card.clubId!]: {...(game.clubs[card.clubId!] ?? Object.values(game.clubs)[0]), ...club, id: card.clubId!}}}} player={card} reveal />
           </div>
+          {/* The kit they wear (it comes along if they're bought). */}
+          {(card.gear || card.shin) && (
+            <div className="gear-cards friends-card-gear">
+              {card.gear && <GearCard item={card.gear} small />}
+              {card.shin && <GearCard item={card.shin} small />}
+            </div>
+          )}
           {/* A friend's player: make an offer. */}
           {member !== deviceId() && (
             <div className="btn-row dialog-actions">

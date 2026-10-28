@@ -60,7 +60,8 @@ export function snapshotOvr(snap: TeamSnapshot): number {
     const p = players.get(id);
     return p && slots[i] ? [effectiveRating(p, slots[i].pos)] : [];
   });
-  return ratings.length ? Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length) : 0;
+  // Over all eleven places, as on the tactics page (an empty one counts as 0).
+  return slots.length ? Math.round(ratings.reduce((a, b) => a + b, 0) / slots.length) : 0;
 }
 
 /** A team is fit to send with at least the fewest who may start a match. */

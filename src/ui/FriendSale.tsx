@@ -13,6 +13,7 @@ import {diamondBurst, moneyBurst} from "./effects";
 import {Icon, iconize} from "./Icon";
 import {PackReveal} from "./PackReveal";
 import {PlayerModal} from "./PlayerModal";
+import {GearPicture} from "./Gear";
 import {chime} from "./sound";
 import {buySale, cancelSale, clearSale, createSale, deviceId, fetchSale, watchSale, type SaleDoc} from "./friendCupApi";
 
@@ -285,8 +286,8 @@ export function CodeSales() {
 }
 
 /** Who a listed player is at a glance: position, country and total. */
-function glance(p: Player): Pick<FriendSaleEntry, "ovr" | "pos" | "nat"> {
-  return {ovr: overall(p), pos: p.position, nat: p.nationality};
+function glance(p: Player): Pick<FriendSaleEntry, "ovr" | "pos" | "nat" | "gear" | "shin"> {
+  return {ovr: overall(p), pos: p.position, nat: p.nationality, ...(p.gear ? {gear: p.gear} : {}), ...(p.shin ? {shin: p.shin} : {})};
 }
 
 /** A listed player: position, flag, name and total (tap for the profile), and the price. */
@@ -297,6 +298,8 @@ function SaleRow({entry, price, onOpen}: {entry: FriendSaleEntry; price: ReactNo
       {entry.nat && <Flag code={entry.nat} size={15} />}
       <strong className="sale-row-name">{entry.name}</strong>
       {entry.ovr !== undefined && <span className="sale-row-ovr">{entry.ovr}</span>}
+      {entry.gear && <GearPicture item={entry.gear} size={entry.gear.kind === "gloves" ? 18 : 22} />}
+      {entry.shin && <GearPicture item={entry.shin} size={14} />}
       <span className="muted">{price}</span>
     </button>
   );

@@ -86,6 +86,27 @@ export function GearPicture({item, size = 84}: {item: GearItem; size?: number}) 
   );
 }
 
+/** The kit pack, small: a teal foil pack, crimped at both ends, with a "?" card and a sparkle. */
+function PackPicture({size = 34}: {size?: number}) {
+  return (
+    <svg viewBox="0 0 40 40" width={size} height={size} aria-hidden>
+      <defs>
+        <linearGradient id="kit-pack-foil" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#99f6e4" />
+          <stop offset="0.5" stopColor="#2dd4bf" />
+          <stop offset="1" stopColor="#0f766e" />
+        </linearGradient>
+      </defs>
+      <path d="M9 5h22l-1 2 1 2v22l1 2-1 2H9l1-2-1-2V9l-1-2z" fill="url(#kit-pack-foil)" stroke="#134e4a" strokeWidth={1} strokeLinejoin="round" />
+      <path d="M9 9h22M9 31h22" stroke="#134e4a" strokeWidth={0.8} opacity={0.6} />
+      <path d="M13 11 L22 9 L18 30 L11 31Z" fill="#fff" opacity={0.18} />
+      <path d="M15.5 13h9l1.5 3v9l-6 3-6-3v-9z" fill="rgb(255 255 255 / 0.25)" stroke="#fff" strokeWidth={1} />
+      <text x="20" y="24.5" textAnchor="middle" fontSize="10" fontWeight={900} fill="#fff">?</text>
+      <path d="M32 3l1 2.2 2.2 1-2.2 1L32 9.4l-1-2.2-2.2-1 2.2-1z" fill="#fde047" />
+    </svg>
+  );
+}
+
 /** A pair as a card: the bonus big, the picture, the name, and every attribute it lifts. */
 export function GearCard({item, small, count = 1}: {item: GearItem; small?: boolean; count?: number}) {
   const {t} = useT();
@@ -160,7 +181,7 @@ export function GearShop() {
         ))}
         {/* The kit pack, after the shin guards. */}
         <button role="tab" aria-selected={kind === "pack"} className={kind === "pack" ? "gear-kind-tab on" : "gear-kind-tab"} onClick={() => setKind("pack")}>
-          <Icon name="gift" size={28} />
+          <PackPicture size={34} />
           <span>{iconize(t("gear.packTab"))}</span>
         </button>
       </div>

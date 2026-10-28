@@ -24,7 +24,7 @@ import {Bar, Delta, Face, Flag, FormArrow, Modal, NumberInput, Ovr, PosBadge, St
 import {PlayerCard} from "./PlayerCard";
 import {KitAvatar, editableLook, lookFromEditor} from "./Avatar";
 import {ManagerEditor} from "./ManagerEditor";
-import {GearPanel} from "./Gear";
+import {GearCard, GearPanel} from "./Gear";
 import {FocusPicker} from "./FocusPicker";
 import {SellToFriend} from "./FriendSale";
 import {totalGearBonus} from "../game/gear";
@@ -107,6 +107,15 @@ export function PlayerModal({playerId, preview}: {playerId: string; preview?: {o
           {own && p.clubId === game.userClubId && (
             <Fold title={<><Icon name="shirt" size={20} /> {iconize(t("gear.equipment"))}</>}>
               <GearPanel player={p} />
+            </Fold>
+          )}
+          {/* A player looked at before buying: what kit they come with (just to see). */}
+          {!own && (p.gear || p.shin) && (
+            <Fold open title={<><Icon name="shirt" size={20} /> {iconize(t("gear.equipment"))}</>}>
+              <div className="gear-cards">
+                {p.gear && <GearCard item={p.gear} small />}
+                {p.shin && <GearCard item={p.shin} small />}
+              </div>
             </Fold>
           )}
           <Fold title={<><Icon name="chart" size={20} /> {iconize(t("pl.stats"))}</>}>

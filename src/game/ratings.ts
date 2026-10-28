@@ -152,8 +152,8 @@ export function teamOvr(state: GameState, clubId: string): number {
       return p && p.clubId === clubId && slots[i] ? effectiveRating(p, slots[i].pos) : null;
     })
     .filter((r): r is number => r !== null);
-  // The players picked, on average (none picked: 0).
-  return ratings.length ? Math.round(ratings.reduce((s, n) => s + n, 0) / ratings.length) : 0;
+  // The average over all eleven places on the pitch: an empty place counts as 0.
+  return slots.length ? Math.round(ratings.reduce((s, n) => s + n, 0) / slots.length) : 0;
 }
 
 /** Club standing compared to the rest, used for attendance and transfer pull. */

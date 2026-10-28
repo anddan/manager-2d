@@ -82,6 +82,9 @@ export interface FriendSaleEntry {
   ovr?: number;
   pos?: Position;
   nat?: string;
+  /** The kit they come with. */
+  gear?: GearItem;
+  shin?: GearItem;
 }
 
 export interface Player {
