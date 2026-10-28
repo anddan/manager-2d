@@ -502,6 +502,8 @@ export interface GameState {
   packChoice?: string[];
   /** Boots and gloves bought and not worn by anyone. */
   gearBag?: GearItem[];
+  /** The coach's tips (on easy): which comes next, the week one was last shown, and if they're off. */
+  coachTips?: {next?: number; lastWeek?: number; off?: boolean};
   /** Trades with friends (by offer id) already settled here, so none is paid or received twice. */
   friendTrades?: Record<string, true>;
   /** Everything bought in the shop with real money: diamonds and club money got, and what it cost (euros). */

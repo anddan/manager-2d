@@ -444,7 +444,10 @@ button.pick { grid-template-columns: auto 1fr auto auto auto 60px; }
 .pitch-line .spot { fill: rgb(255 255 255 / 0.7); stroke: none; }
 .dot.mine { cursor: pointer; }
 .dot .hit { fill: transparent; }
-.shout-ring { fill: none; stroke: #fde047; stroke-width: 0.5; animation: pulse 0.9s ease-out infinite; }
+.shout-ring { fill: rgb(253 224 71 / 0.18); stroke: #fde047; stroke-width: 0.8; animation: pulse 0.9s ease-out infinite; }
+/* The word reaching the player: a yellow wave spreading out from them. */
+.shout-wave { fill: none; stroke: #fde047; stroke-width: 0.6; transform-box: fill-box; transform-origin: center; animation: shout-wave 1.1s ease-out infinite; }
+@keyframes shout-wave { from { transform: scale(1); opacity: 0.9; } to { transform: scale(2.6); opacity: 0; } }
 .selected-ring { fill: none; stroke: #fff; stroke-width: 0.5; stroke-dasharray: 1 0.6; }
 .booked { fill: #facc15; stroke: #111; stroke-width: 0.15; }
 @keyframes pulse { from { opacity: 1; } to { opacity: 0.2; } }
@@ -2113,7 +2116,7 @@ h2, h3, .modal-head h2 { display: flex; align-items: center; gap: 8px; }
 /* The top bar, dressed up: a glow in the club's colour behind the crest, a lit line along the bottom,
    the values as pills with the usual line icons. */
 .topbar {
-  position: relative;
+  /* Stays sticky at the top (from the base rule), so the money and diamonds are always in sight. */
   background:
     radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--club, #2563eb) 32%, transparent) 0%, transparent 55%),
     linear-gradient(180deg, rgb(12 26 54 / 0.95), rgb(7 18 38 / 0.92));
@@ -2154,3 +2157,40 @@ h2, h3, .modal-head h2 { display: flex; align-items: center; gap: 8px; }
   border: 2px solid transparent;
 }
 .topbar-manager:hover .avatar { box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 60%, transparent); }
+
+/* Spending: the sum drops out of its counter (red), a few coins or diamonds falling with it. */
+.spend-text {
+  position: fixed; z-index: 300; transform: translate(-50%, 0); pointer-events: none; display: inline-flex; align-items: center; gap: 4px;
+  font-weight: 900; font-size: 1.5rem; color: #fca5a5; text-shadow: 0 2px 6px rgb(0 0 0 / 0.6), 0 0 14px rgb(248 113 113 / 0.6); white-space: nowrap;
+  animation: spend-drop 1.6s ease-out both;
+}
+@keyframes spend-drop { 0% { opacity: 0; transform: translate(-50%, 0) scale(0.6); } 20% { opacity: 1; transform: translate(-50%, -14px) scale(1.25); } 100% { opacity: 0; transform: translate(-50%, -40px) scale(1); } }
+/* Energy, spent or got: yellow bolts. */
+.spend-text.energy { color: #fde047; text-shadow: 0 2px 6px rgb(0 0 0 / 0.6), 0 0 14px rgb(250 204 21 / 0.6); }
+.burst-gem.energy, .burst-gem.energy .icon, .burst-text.energy .icon { color: #fde047; }
+.burst-gem.energy { filter: drop-shadow(0 0 6px #facc15); }
+/* Paying: coins (or diamonds) fly from the counter to what was bought. */
+.burst-gem.spend-fly { filter: drop-shadow(0 0 6px rgb(248 113 113 / 0.6)); }
+.spend-bit { position: fixed; z-index: 300; pointer-events: none; font-size: 1rem; transform: translate(-50%, -50%); animation: spend-fall 0.9s ease-in both; }
+.spend-bit.money { color: #facc15; }
+.spend-bit.diamonds { color: #5cb8ff; }
+@keyframes spend-fall { 0% { opacity: 1; transform: translate(-50%, -50%); } 100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), 60px) rotate(40deg); } }
+.spend-pulse { animation: spend-pulse 0.6s ease-out; }
+@keyframes spend-pulse { 0%, 100% { transform: scale(1); } 40% { transform: scale(0.88); box-shadow: 0 0 12px rgb(248 113 113 / 0.7); } }
+
+/* A tip from the coach (on easy): a bubble above the bottom bar, like the guide's. */
+.coach-tip {
+  position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 45; width: min(340px, calc(100% - 24px));
+  padding: 12px 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--accent); box-shadow: 0 12px 30px rgb(0 0 0 / 0.45);
+  animation: pop-in 0.3s ease-out;
+}
+.coach-tip p { margin: 8px 0 10px; line-height: 1.4; }
+
+/* The profile's condition: what each part does to the rating on the day. */
+.effect-pct { margin-left: 6px; font-size: 0.78rem; font-weight: 800; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.effect-pct.up { color: var(--good); }
+.effect-pct.down { color: #f87171; }
+.day-form { font-variant-numeric: tabular-nums; }
+.day-form strong { font-size: 1.15rem; color: var(--accent-text); }
+.inline-hint-head { display: flex; align-items: center; gap: 6px; }
+.inline-hint-head .hint-btn { position: static; margin: 0; transform: none; }

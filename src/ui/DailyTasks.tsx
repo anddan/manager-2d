@@ -8,7 +8,7 @@ import {useGame, useGameState} from "../store";
 import {Card} from "./common";
 import {VideoAd} from "./VideoAd";
 import {PackReveal} from "./PackReveal";
-import {diamondBurst} from "./effects";
+import {diamondBurst, energyBurst} from "./effects";
 
 const ICONS: Record<TaskKind, IconName> = {win: "trophy", goals: "ball", order: "megaphone", talk: "chat", train: "dumbbell", pack: "gift", video: "video"};
 
@@ -44,6 +44,7 @@ export function DailyTasks() {
     const err = act((g) => videoForEnergy(g, today(), Date.now()));
     // Energy full or today's energy videos used up: the task still counts.
     if (err) act((g) => taskProgress(g, "video"));
+    else energyBurst(null, 1);
     notify(err ? "toast.videoThanks" : "toast.videoEnergy", undefined, "good");
   };
 

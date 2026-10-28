@@ -9,7 +9,7 @@ import type {FriendSaleEntry, GameState, Player} from "../game/types";
 import {useT, type TKey} from "../i18n";
 import {GameOverride, useGame, useGameState} from "../store";
 import {Card, Flag, Hint, Modal, PosBadge} from "./common";
-import {diamondBurst, moneyBurst} from "./effects";
+import {diamondBurst} from "./effects";
 import {Icon, iconize} from "./Icon";
 import {PackReveal} from "./PackReveal";
 import {PlayerModal} from "./PlayerModal";
@@ -344,7 +344,6 @@ export function FriendSalesWatcher() {
             diamondBurst(null, sale.price);
           } else {
             notify("sale.sold", {name: paid.name, price: sale.price}, "good");
-            moneyBurst(null, money(sale.price));
           }
           void clearSale(code).catch(() => undefined);
         }

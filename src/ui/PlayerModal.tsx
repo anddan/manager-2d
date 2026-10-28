@@ -20,7 +20,7 @@ import {
 import {ATTRIBUTES, type ManagerLook, type Player} from "../game/types";
 import {useT} from "../i18n";
 import {useGame, useGameState} from "../store";
-import {Bar, Delta, Face, Flag, FormArrow, Modal, NumberInput, Ovr, PosBadge, StatusIcons} from "./common";
+import {Bar, Delta, Face, Flag, FormArrow, Modal, NumberInput, Ovr, PosBadge, StatusIcons, Hint} from "./common";
 import {PlayerCard} from "./PlayerCard";
 import {KitAvatar, editableLook, lookFromEditor} from "./Avatar";
 import {ManagerEditor} from "./ManagerEditor";
@@ -28,6 +28,7 @@ import {GearCard, GearPanel} from "./Gear";
 import {FocusPicker} from "./FocusPicker";
 import {SellToFriend} from "./FriendSale";
 import {totalGearBonus} from "../game/gear";
+import {dayFormParts, effectiveRating} from "../game/ratings";
 
 /**
  * A player's profile. With `preview` it only shows them (a friend's player for sale, lent into
@@ -136,6 +137,13 @@ export function PlayerModal({playerId, preview}: {playerId: string; preview?: {o
   );
 }
 
+/** What one part does to the rating on the day: "+12 %" (green), "−3 %" (red), nothing when it's none. */
+function Effect({factor}: {factor: number}) {
+  const pct = Math.round((factor - 1) * 100);
+  if (pct === 0) return <span className="effect-pct">±0 %</span>;
+  return <span className={pct > 0 ? "effect-pct up" : "effect-pct down"}>{pct > 0 ? `+${pct}` : `−${-pct}`} %</span>;
+}
+
 /** What the manager calls the player. Shown instead of their name everywhere but here. */
 function Nickname({player: p}: {player: Player}) {
   const {t} = useT();
@@ -170,17 +178,23 @@ function Condition({player: p}: {player: Player}) {
   const {t, tx} = useT();
   const game = useGameState();
   const factors = happinessFactors(game, p);
+  const d = dayFormParts(p, p.position);
   return (
     <>
-      <h3>{iconize(t("pl.condition"))}</h3>
+      {/* The (i) right by the heading (a profile has no card head to put it in). */}
+      <h3 className="inline-hint-head">{iconize(t("pl.condition"))} <Hint>{iconize(t("pl.dayFormHint"))}</Hint></h3>
+      {/* Each part with what it does to the rating on the day, and the result at the bottom. */}
       <dl className="kv bars">
-        <dt>{iconize(t("col.form"))}</dt><dd><FormArrow form={p.form} size={20} /></dd>
-        <dt>{iconize(t("col.fitness"))}</dt><dd><Bar value={p.fitness} /></dd>
-        <dt>{iconize(t("pl.morale"))}</dt><dd><Bar value={p.morale} /></dd>
-        <dt>{iconize(t("pl.sharpness"))}</dt><dd><Bar value={p.sharpness} /></dd>
-        <dt>{iconize(t("col.happiness"))}</dt><dd><Bar value={p.happiness} /> <Face value={p.happiness} /></dd>
+        <dt>{iconize(t("col.form"))}</dt><dd><FormArrow form={p.form} size={20} /> <Effect factor={d.form} /></dd>
+        <dt>{iconize(t("col.fitness"))}</dt><dd><Bar value={p.fitness} /> <Effect factor={d.fitness} /></dd>
+        <dt>{iconize(t("pl.morale"))}</dt><dd><Bar value={p.morale} /> <Effect factor={d.morale} /></dd>
+        <dt>{iconize(t("pl.sharpness"))}</dt><dd><Bar value={p.sharpness} /> <Effect factor={d.sharpness} /></dd>
+        <dt>{iconize(t("col.happiness"))}</dt><dd><Bar value={p.happiness} /> <Face value={p.happiness} /> <Effect factor={d.attitude} /></dd>
         <dt>{iconize(t("pl.relation"))}</dt><dd><Bar value={p.relation} /></dd>
+        <dt className="strong">{iconize(t("pl.dayForm"))}</dt>
+        <dd className="day-form">{Math.round(d.base)} <span className="muted">→</span> <strong>{Math.round(effectiveRating(p, p.position))}</strong></dd>
       </dl>
+
       {factors.length > 0 && (
         <ul className="factors">
           {factors.map((f) => (

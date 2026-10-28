@@ -28,6 +28,7 @@ import {VideoAd} from "../VideoAd";
 import {PackReveal} from "../PackReveal";
 import {PlayerCard} from "../PlayerCard";
 import {GearShop} from "../Gear";
+import {energyBurst} from "../effects";
 import {PackArt} from "../PackArt";
 
 export function Shop() {
@@ -41,6 +42,7 @@ export function Shop() {
   const energyVideo = () => {
     setWatching(false);
     const err = act((g) => videoForEnergy(g, today(), Date.now()));
+    if (!err) energyBurst(null, 1);
     notify(err ?? "toast.videoEnergy", undefined, err ? "error" : "good");
   };
   // The player from the last pack opened, shown until closed.

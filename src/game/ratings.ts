@@ -56,17 +56,24 @@ export function familiarity(player: Player, pos: Position): number {
 /** How much form moves a player: ±18 % between the worst and the best form. */
 export const FORM_EFFECT = 0.18;
 
+/** What makes up a player's rating on the day in a place: their level there, and each thing that lifts or lowers it. */
+export function dayFormParts(player: Player, pos: Position): {base: number; fitness: number; form: number; morale: number; sharpness: number; attitude: number} {
+  return {
+    // With their boots (or gloves) on: the bonus counts on the day, not in their own rating.
+    base: ratingAt(geared(player), pos) * familiarity(player, pos),
+    fitness: 0.75 + 0.25 * (player.fitness / 100),
+    // Form counts a lot: from 18 % below their level in bad form to 18 % above in top form (none at average).
+    form: 1 + FORM_EFFECT * (player.form / 50 - 1),
+    morale: 0.95 + 0.1 * (player.morale / 100),
+    sharpness: 0.95 + 0.05 * (player.sharpness / 100),
+    // Unhappy players don't give everything.
+    attitude: player.happiness < 30 ? 0.95 : 1,
+  };
+}
+
 export function effectiveRating(player: Player, pos: Position): number {
-  // With their boots (or gloves) on: the bonus counts on the day, not in their own rating.
-  const base = ratingAt(geared(player), pos) * familiarity(player, pos);
-  const fitness = 0.75 + 0.25 * (player.fitness / 100);
-  // Form counts a lot: from 18 % below their level in bad form to 18 % above in top form (none at average).
-  const form = 1 + FORM_EFFECT * (player.form / 50 - 1);
-  const morale = 0.95 + 0.1 * (player.morale / 100);
-  const sharpness = 0.95 + 0.05 * (player.sharpness / 100);
-  // Unhappy players don't give everything.
-  const attitude = player.happiness < 30 ? 0.95 : 1;
-  return base * fitness * form * morale * sharpness * attitude;
+  const d = dayFormParts(player, pos);
+  return d.base * d.fitness * d.form * d.morale * d.sharpness * d.attitude;
 }
 
 /** 13990 -> 14000: values and wages look nicer rounded. */

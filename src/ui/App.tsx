@@ -43,6 +43,8 @@ import {CodeSalesPage, FriendSalesWatcher} from "./FriendSale";
 import {useFriendCupBadge} from "./friendCupBadge";
 import {Pals} from "./views/Pals";
 import {ProfileSync} from "./ProfileSync";
+import {DealEffects} from "./DealEffects";
+import {CoachTips} from "./CoachTips";
 import {PalWatcher, palsTodo, usePals} from "./palStore";
 
 const ICONS: Record<View, IconName> = {
@@ -161,6 +163,8 @@ function Game() {
       <FriendSalesWatcher />
       <ProfileSync />
       <PalWatcher />
+      <DealEffects />
+      <CoachTips />
       <BoardWarningPopup />
       <TutorialCoach />
       <ToastView />

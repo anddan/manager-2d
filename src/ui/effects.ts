@@ -1,5 +1,5 @@
 // Little reward effects, drawn straight into the page (no state to keep).
-import {chime} from "./sound";
+import {chime, kaching} from "./sound";
 
 /**
  * Diamonds earned: "+N" with a diamond pops up where they were won and a handful of
@@ -14,7 +14,8 @@ const BOLT_SVG = svg(`<path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" />`);
 
 export function diamondBurst(from: Element | null | undefined, amount: number): void {
   if (amount <= 0) return;
-  rewardBurst(from, `+${amount}`, DIAMOND_SVG, ".hud-diamonds", Math.min(10, 3 + Math.floor(amount / 3)), "");
+  // One diamond flying for each (up to ten), so a few look like a few.
+  rewardBurst(from, `+${amount}`, DIAMOND_SVG, ".hud-diamonds", Math.min(10, amount), "");
 }
 
 /** Money earned: the same, with coins flying to the club's money in the top bar. `label` is the sum, written out. */
@@ -22,10 +23,75 @@ export function moneyBurst(from: Element | null | undefined, label: string): voi
   rewardBurst(from, `+${label}`, COINS_SVG, ".hud-cash", 8, " coins");
 }
 
+/**
+ * Money or diamonds spent: the till rings, "−sum" shows where it was bought (the button pressed, or
+ * under the counter), and coins (or diamonds) fly from the counter in the top bar to it.
+ */
+export function spendBurst(kind: "money" | "diamonds" | "energy", label: string, at?: Element | null): void {
+  if (typeof document === "undefined") return;
+  lastSpend = Date.now();
+  // Energy isn't paid for: a whoosh-less burst, the till only for money and diamonds.
+  if (kind !== "energy") kaching();
+  const counter = document.querySelector<HTMLElement>(kind === "money" ? ".hud-cash" : kind === "diamonds" ? ".hud-diamonds" : ".hud-energy");
+  const box = counter && counter.offsetParent !== null ? counter.getBoundingClientRect() : null;
+  const sx = box ? box.left + box.width / 2 : window.innerWidth - 60;
+  const sy = box ? box.top + box.height / 2 : 40;
+  const end = at && document.contains(at) ? at.getBoundingClientRect() : null;
+  const tx = end ? end.left + end.width / 2 : sx;
+  const ty = end ? end.top + end.height / 2 : sy + 60;
+  const icon = kind === "money" ? COINS_SVG : kind === "diamonds" ? DIAMOND_SVG : BOLT_SVG;
+  const text = document.createElement("div");
+  text.className = kind === "energy" ? "spend-text energy" : "spend-text";
+  text.innerHTML = `−${label} ${icon}`;
+  text.style.left = `${tx}px`;
+  text.style.top = `${ty - 28}px`;
+  document.body.appendChild(text);
+  text.addEventListener("animationend", () => text.remove());
+  if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+  // Energy and diamonds: one for each spent (up to ten); money: a handful of coins.
+  const count = kind === "money" ? 6 : Math.max(1, Math.min(10, Number(label) || 1));
+  for (let i = 0; i < count; i++) {
+    const bit = document.createElement("div");
+    bit.className = `burst-gem spend-fly ${kind === "money" ? "coins" : kind === "energy" ? "energy" : ""}`;
+    bit.innerHTML = icon;
+    bit.style.left = `${sx}px`;
+    bit.style.top = `${sy}px`;
+    bit.style.setProperty("--sx", `${(i - (count - 1) / 2) * 10}px`);
+    bit.style.setProperty("--dx", `${tx - sx}px`);
+    bit.style.setProperty("--dy", `${ty - sy}px`);
+    bit.style.animationDelay = `${i * 55}ms`;
+    document.body.appendChild(bit);
+    bit.addEventListener("animationend", () => bit.remove());
+  }
+  if (counter && box) {
+    counter.classList.add("spend-pulse");
+    setTimeout(() => counter.classList.remove("spend-pulse"), 600);
+  }
+}
+
+/** Energy coming in (a video watched, a refill): "+N" and bolts flying to the energy count. */
+export function energyBurst(from: Element | null | undefined, amount: number): void {
+  if (amount <= 0) return;
+  rewardBurst(from, `+${amount}`, BOLT_SVG, ".hud-energy", Math.min(10, amount), " energy");
+}
+
+let lastSpend = 0;
+export function spendShownLately(): boolean {
+  return Date.now() - lastSpend < 800;
+}
+
+/** When a reward was last shown (so the deals' watcher doesn't show the same one again). */
+let lastReward = 0;
+export function rewardShownLately(): boolean {
+  return Date.now() - lastReward < 800;
+}
+
 function rewardBurst(from: Element | null | undefined, label: string, icon: string, target: string, count: number, kind: string): void {
   if (typeof document === "undefined") return;
+  lastReward = Date.now();
   chime();
-  const start = from?.getBoundingClientRect();
+  // A button gone from the page (its dialog closed) has no place left: the middle of the screen then.
+  const start = from && document.contains(from) ? from.getBoundingClientRect() : undefined;
   const sx = start ? start.left + start.width / 2 : window.innerWidth / 2;
   const sy = start ? start.top + start.height / 2 : window.innerHeight / 2;
   const counter = document.querySelector<HTMLElement>(target);
@@ -65,15 +131,7 @@ function rewardBurst(from: Element | null | undefined, label: string, icon: stri
   }
 }
 
-/** Energy spent: "−N" with a bolt rises from where it was spent and fades. */
+/** Energy spent (a match, Forza!, an extra session): bolts fly from the energy count to what was pressed. */
 export function energySpent(from: Element | null | undefined, amount: number): void {
-  if (typeof document === "undefined" || amount <= 0) return;
-  const start = from?.getBoundingClientRect();
-  const text = document.createElement("div");
-  text.className = "burst-text energy";
-  text.innerHTML = `−${amount} ${BOLT_SVG}`;
-  text.style.left = `${start ? start.left + start.width / 2 : window.innerWidth / 2}px`;
-  text.style.top = `${start ? start.top : window.innerHeight / 2}px`;
-  document.body.appendChild(text);
-  text.addEventListener("animationend", () => text.remove());
+  if (amount > 0) spendBurst("energy", String(amount), from);
 }

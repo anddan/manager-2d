@@ -2112,9 +2112,12 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   const pitchRef = useRef<HTMLDivElement>(null);
 
   // The manager's shouts, one after another (several orders at once are each heard), with a
-  // cartoon "blah-blah" for each. Shorter each when there's a queue behind.
+  // cartoon "blah-blah" for each. Orders given in the orders dialog wait until it's closed ("Done"),
+  // then the manager calls them out in turn.
   const shoutQueue = useRef<Shout[]>([]);
   const shouting = useRef(false);
+  const heldShouts = useRef<Shout[]>([]);
+  const holding = useRef(false);
   const nextShout = () => {
     const s = shoutQueue.current.shift();
     if (!s) {
@@ -2126,12 +2129,26 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
     setShouts([s]);
     if (s.cry) rallyFanfare();
     else chatter(s.text.length);
-    setTimeout(nextShout, shoutQueue.current.length > 0 ? SHOUT_MS * 0.65 : SHOUT_MS);
+    setTimeout(nextShout, shoutQueue.current.length > 0 ? SHOUT_MS * 0.8 : SHOUT_MS);
   };
   const shout = (playerId: string, text: string, cry = false) => {
-    shoutQueue.current.push({id: performance.now() + Math.random(), playerId, text, cry});
+    const s: Shout = {id: performance.now() + Math.random(), playerId, text, cry};
+    // While the orders are open, they wait (the last word for a player counts once).
+    if (holding.current && !cry) {
+      heldShouts.current = [...heldShouts.current.filter((h) => !(h.playerId === playerId && playerId !== "")), s];
+      return;
+    }
+    shoutQueue.current.push(s);
     if (!shouting.current) nextShout();
   };
+  // The orders closed: everything said in them is called out now, one after another.
+  useEffect(() => {
+    holding.current = !!selected;
+    if (selected || heldShouts.current.length === 0) return;
+    shoutQueue.current.push(...heldShouts.current);
+    heldShouts.current = [];
+    if (!shouting.current) nextShout();
+  }, [selected]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const give = (cmd: Parameters<LiveMatch["command"]>[0]) => {
     if (!live) return;
@@ -2257,6 +2274,8 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   const carrierId = carrierIndex >= 0 ? report.frames[carrierIndex].playerId : undefined;
   const booked = new Set(events.filter((e) => e.type === "yellow").map((e) => e.playerId));
   const hurt = new Set(events.filter((e) => e.type === "injury").map((e) => e.playerId));
+  // Who's being told right now: that player, or (a word to everyone) the whole team.
+  const toEveryone = shouts.some((s) => s.playerId === "" && !s.cry);
   const shoutedAt = new Set(shouts.map((s) => s.playerId));
   // "Forza!": the side that got it glows for as long as the lift lasts (its minutes in the engine).
   const forzaEvent = events.find((e) => e.type === "instruction" && (e.note === "forza" || e.note === "forzaRival") && view.time >= e.minute - 1 && view.time < e.minute - 1 + FORZA.minutes);
@@ -2318,7 +2337,12 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
           )}
           <g transform={`translate(${cx} ${cy})`}>
             {mine && <circle r={4} className="hit" />}
-            {shoutedAt.has(id) && <circle r={3.2} className="shout-ring" />}
+            {(shoutedAt.has(id) || (mine && toEveryone)) && (
+              <>
+                <circle r={3.2} className="shout-ring" />
+                <circle r={3.2} className="shout-wave" />
+              </>
+            )}
             {id === carrierId && <circle r={2.4} className="carrier-ring" />}
             {id === selected && <circle r={2.8} className="selected-ring" />}
             {/* Boots (or a keeper's gloves) in their tier's colour, under the player: the toes point

@@ -184,6 +184,35 @@ export function chime(): void {
  * The crowd's murmur under the match, louder the fuller the ground (0–1).
  * Returns a function that fades it out and stops it.
  */
+/** Paying for something: a till's "ka-ching" (a click, then two bright bells). */
+export function kaching(): void {
+  const a = audio();
+  if (!a || muted) return;
+  const t = a.ctx.currentTime;
+  const click = a.ctx.createOscillator();
+  click.type = "square";
+  click.frequency.value = 180;
+  const cg = a.ctx.createGain();
+  cg.gain.setValueAtTime(0.08, t);
+  cg.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+  click.connect(cg).connect(a.out);
+  click.start(t);
+  click.stop(t + 0.06);
+  [2093, 2637].forEach((f, i) => {
+    const t0 = t + 0.07 + i * 0.08;
+    const osc = a.ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.value = f;
+    const g = a.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.14, t0 + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.5);
+    osc.connect(g).connect(a.out);
+    osc.start(t0);
+    osc.stop(t0 + 0.55);
+  });
+}
+
 export function crowdMurmur(fill: number): () => void {
   const a = audio();
   if (!a || !noise) return () => undefined;
