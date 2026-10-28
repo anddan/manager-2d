@@ -25,7 +25,8 @@ export function tierFor(ovr: number): Tier {
  * club, 2 the flag, 3 the position, 4 the overall (and the card's colour),
  * 5 the name, 6 the picture and attributes. Hidden parts keep their place.
  */
-export function PlayerCard({game, player, reveal, stage, forClubId}: {game: GameState; player: Player; reveal?: boolean; stage?: number; forClubId?: string}) {
+/** `kit`: a legend's own colours for the card and the shirt on it (in the shop). */
+export function PlayerCard({game, player, reveal, stage, forClubId, kit}: {game: GameState; player: Player; reveal?: boolean; stage?: number; forClubId?: string; kit?: {color: string; trim: string; theme: string}}) {
   const {t} = useT();
   const known = reveal || isKnown(game, player);
   const ovr = known ? overall(player) : estimatedOvr(game, player);
@@ -40,7 +41,7 @@ export function PlayerCard({game, player, reveal, stage, forClubId}: {game: Game
   const step = (n: number) => (staged ? (stage >= n ? " step shown" : " step") : "");
 
   return (
-    <div className={`fut-card tier-${staged && stage < 4 ? "hidden" : tier} ${talent && (!staged || stage >= 6) ? "talent" : ""}${staged ? " staged" : ""}`}>
+    <div className={`fut-card tier-${staged && stage < 4 ? "hidden" : tier} ${talent && (!staged || stage >= 6) ? "talent" : ""}${staged ? " staged" : ""}${kit ? ` card-${kit.theme}` : ""}`}>
       <div className="fut-top">
         <div className="fut-rating">
           <span className={(known ? "fut-ovr" : "fut-ovr estimated") + step(4)} title={known ? undefined : t("pl.estimated")}>{ovr}</span>
@@ -53,8 +54,8 @@ export function PlayerCard({game, player, reveal, stage, forClubId}: {game: Game
         <div className={"fut-portrait" + step(6)}>
           <Avatar
             player={player}
-            shirt={club?.color ?? "#64748b"}
-            trim={club?.color2 ?? "#e2e8f0"}
+            shirt={kit?.color ?? club?.color ?? "#64748b"}
+            trim={kit?.trim ?? club?.color2 ?? "#e2e8f0"}
             size={120}
           />
         </div>

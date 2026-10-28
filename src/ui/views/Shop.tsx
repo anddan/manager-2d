@@ -15,7 +15,8 @@ import {
   MONEY_PACKS,
 } from "../../game/constants";
 import {fullName} from "../../game/helpers";
-import {LEGEND_ID, LEGEND_PRICE_DIAMONDS, buyLegend, legendOwned, legendPlayer} from "../../game/legend";
+import {LEGENDS, LEGEND_PRICE_DIAMONDS, buyLegend, buySecretLegend, legendOwned, legendPlayer, type Legend} from "../../game/legend";
+import {chime} from "../sound";
 import {exchangeDiamonds, grantMoneyPack, grantPack, mockPaymentProvider, recordPurchase, refillEnergy, regenerateEnergy, type MoneyPackId, type PackId} from "../../game/monetization";
 import {DIAMOND_PACK, PLAYER_PACKS, PLAYER_PACK_IDS, openDiamondPack, openPack, pickFromPack, type PlayerPackId} from "../../game/packs";
 import {useT} from "../../i18n";
@@ -106,12 +107,22 @@ export function Shop() {
     return () => clearTimeout(id);
   }, [choosing, seq, allShown]);
 
-  const owned = legendOwned(game);
-  const legend = owned ? game.players[LEGEND_ID] : legendPlayer(game, null);
-  const buyLeon = () => {
-    const err = act((g) => buyLegend(g));
-    notify(err ?? "toast.legendJoined", {name: fullName(legend)}, err ? "error" : "good");
+  // The legends: each bought once (then shown as he plays for you); the secret one any number of times.
+  const buyNamed = (l: Legend) => {
+    const err = act((g) => buyLegend(g, l.id));
+    if (err) return notify(err, undefined, "error");
+    chime();
+    setRevealed({playerId: l.id, title: "shop.legendTitle"});
   };
+  const buySecret = () => {
+    const res = act((g, rng) => buySecretLegend(g, rng));
+    if ("error" in res) return notify(res.error, undefined, "error");
+    chime();
+    setRevealed({playerId: res.playerId, title: "shop.secretTitle"});
+  };
+  const [revealed, setRevealed] = useState<{playerId: string; title: "shop.legendTitle" | "shop.secretTitle"} | null>(null);
+  // The secret legend's grey card: no name, no country, no position until bought.
+  const secret = {...legendPlayer(game, null), id: "legend-secret", firstName: "?", lastName: "?", nationality: ""};
 
   const buyMoney = async (packId: MoneyPackId, priceEur: number) => {
     setBuying(packId);
@@ -211,22 +222,37 @@ export function Shop() {
       )}
 
       <Card title={<><Icon name="star" size={20} /> {iconize(t("shop.legend"))}</>} className="span-2">
-        <div className="legend">
-          <PlayerCard game={game} player={legend} reveal />
-          <div className="legend-info">
-            <h3>{fullName(legend)}</h3>
-            <p className="muted">{iconize(t("shop.legendHint", {price: LEGEND_PRICE_DIAMONDS}))}</p>
-            {owned ? (
-              <p className="callout good"><Icon name="check" size={18} /> {iconize(t("shop.legendOwned"))}</p>
-            ) : (
-              <button className="btn primary big" disabled={m.diamonds < LEGEND_PRICE_DIAMONDS} onClick={buyLeon}>
-                <Icon name="diamond" size={16} /> {LEGEND_PRICE_DIAMONDS} · {iconize(t("shop.legendBuy"))}
-              </button>
-            )}
-            {!owned && m.diamonds < LEGEND_PRICE_DIAMONDS && <p className="muted small">{iconize(t("shop.legendNeed", {n: LEGEND_PRICE_DIAMONDS - m.diamonds}))}</p>}
+        <Hint>{iconize(t("shop.legendHint", {price: LEGEND_PRICE_DIAMONDS}))}</Hint>
+        <div className="legends">
+          {LEGENDS.map((l) => {
+            const owned = legendOwned(game, l.id);
+            const p = owned ? game.players[l.id] : legendPlayer(game, null, l);
+            return (
+              <div key={l.id} className="legend-offer">
+                <PlayerCard game={game} player={p} reveal kit={l.kit} />
+                <strong className="legend-name">{fullName(p)}</strong>
+                {owned ? (
+                  <p className="callout good"><Icon name="check" size={16} /> {iconize(t("shop.legendOwned"))}</p>
+                ) : (
+                  <button className="ppack-btn" disabled={m.diamonds < LEGEND_PRICE_DIAMONDS} onClick={() => buyNamed(l)}>
+                    <Icon name="diamond" size={16} /> {LEGEND_PRICE_DIAMONDS} · {iconize(t("shop.legendBuy"))}
+                  </button>
+                )}
+              </div>
+            );
+          })}
+          {/* The secret legend: grey until bought, then someone new each time. */}
+          <div className="legend-offer secret">
+            <PlayerCard game={game} player={secret} reveal stage={0} />
+            <strong className="legend-name">{iconize(t("shop.secretLegend"))}</strong>
+            <button className="ppack-btn" disabled={m.diamonds < LEGEND_PRICE_DIAMONDS} onClick={buySecret}>
+              <Icon name="diamond" size={16} /> {LEGEND_PRICE_DIAMONDS} · {iconize(t("shop.legendBuy"))}
+            </button>
           </div>
         </div>
+        {m.diamonds < LEGEND_PRICE_DIAMONDS && <p className="muted small">{iconize(t("shop.legendNeed", {n: LEGEND_PRICE_DIAMONDS - m.diamonds}))}</p>}
       </Card>
+      {revealed && <PackReveal playerId={revealed.playerId} title={<><Icon name="star" size={20} /> {iconize(t(revealed.title))}</>} onClose={() => setRevealed(null)} />}
 
       <Card title={<><Icon name="coins" size={20} /> {iconize(t("shop.buyMoney"))}</>} className="span-2">
         <p className="muted small">{iconize(t("shop.buyMoneyHint"))}</p>

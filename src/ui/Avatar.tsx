@@ -3,7 +3,7 @@
 // the club colours. The manager's look is picked when starting a new game.
 // The face follows the mood: a big grin when happy, a frown when unhappy and
 // angry brows when they're furious.
-import {LEGEND_ID} from "../game/legend";
+import {LEGEND_ID, THEO_ID} from "../game/legend";
 import {Rng} from "../game/rng";
 import type {ManagerLook, Player} from "../game/types";
 
@@ -58,6 +58,8 @@ function seedOf(id: string): number {
 const FIXED_LOOKS: Record<string, Look> = {
   // Léon Dani: short brown hair, clean-shaven.
   [LEGEND_ID]: {skin: SKIN[1], hair: HAIR[2], style: "short", beard: "none", brows: 0, eyeGap: 8},
+  // Theo Bergqvist: blond, swept to the side, clean-shaven, blue eyes.
+  [THEO_ID]: {skin: SKIN[0], hair: HAIR[4], style: "sidepart", beard: "none", brows: 0, eyeGap: 8, eyes: EYES[3]},
 };
 
 /** The player's fixed look. */

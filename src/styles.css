@@ -789,6 +789,22 @@ button.pick { grid-template-columns: auto 1fr auto auto auto 60px; }
 }
 @media (prefers-reduced-motion: reduce) { .fut-card.tier-special::before { animation: none; } }
 
+/* Theo Bergqvist's card: green and white, with a white rim. */
+.fut-card.card-hammarby.tier-special {
+  --card-1: #00a651; --card-2: #004d25; --card-ink: #ffffff;
+  background: radial-gradient(circle at 50% 18%, rgb(255 255 255 / 0.35) 0%, transparent 55%), repeating-linear-gradient(90deg, rgb(255 255 255 / 0.07) 0 14px, transparent 14px 28px), linear-gradient(160deg, var(--card-1), var(--card-2));
+  box-shadow: inset 0 0 0 3px #ffffff, inset 0 0 22px rgb(255 255 255 / 0.4);
+}
+.fut-card.card-hammarby.tier-special .fut-ovr { color: #ffffff; text-shadow: 0 0 10px rgb(255 255 255 / 0.6); }
+.fut-card.card-hammarby.tier-special .fut-name { border-color: rgb(255 255 255 / 0.5); color: #ffffff; }
+
+/* The legends in the shop: the cards side by side, the secret one greyed out. */
+.legends { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; justify-items: center; }
+.legend-offer { display: grid; justify-items: center; gap: 8px; text-align: center; }
+.legend-name { font-family: var(--display); font-size: 1.1rem; text-transform: uppercase; }
+.legend-offer .callout { margin: 0; }
+.legend-offer.secret .fut-card { filter: grayscale(1); opacity: 0.8; }
+
 /* The legend card in the shop */
 .legend { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
 .legend-info { flex: 1; min-width: 220px; display: grid; gap: 8px; }
