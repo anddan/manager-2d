@@ -2,7 +2,7 @@
 // drag a shirt onto another slot and they swap, or a player from the list (by
 // their handle) onto a slot to bring them in.
 import {Icon, iconize} from "../Icon";
-import {useEffect, useRef, useState, type PointerEvent as ReactPointerEvent} from "react";
+import {useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, useLayoutEffect} from "react";
 import {BENCH_SIZE, clubSlots, roleAt, type Slot} from "../../game/constants";
 import {CUP_STAGES} from "../../game/cup";
 import {fixtureWeek, isCupFixture, listName, nextUserFixture, shortName, userClub} from "../../game/helpers";
@@ -73,6 +73,31 @@ export function Tactics() {
   const custom = !!club.customSlots;
   const spots = boardSpots(slots);
   const [selected, setSelected] = useState<number | null>(null);
+  // The shirt tapped: a small bar with ✕ (take out) and the profile beside it.
+  const [actions, setActions] = useState<number | null>(null);
+  // Where the tapped shirt's name plate is (measured), so the bar lies right over all of it, name and black row.
+  const board = useRef<HTMLDivElement>(null);
+  const [bar, setBar] = useState<{drop: number; width: number; height: number} | null>(null);
+  useLayoutEffect(() => {
+    if (actions === null) {
+      setBar(null);
+      return;
+    }
+    setBar(null);
+    const info = board.current?.querySelector<HTMLElement>(`[data-slot="${actions}"] .plate`);
+    if (info) setBar({drop: info.offsetTop, width: Math.max(info.offsetWidth, 56), height: info.offsetHeight});
+  }, [actions]);
+  // Tapping anywhere else puts it away.
+  useEffect(() => {
+    if (actions === null) return;
+    const away = (e: PointerEvent) => {
+      const el = e.target as Element | null;
+      if (el?.closest(".slot-actions") || el?.closest(`[data-slot="${actions}"]`)) return;
+      setActions(null);
+    };
+    document.addEventListener("pointerdown", away, true);
+    return () => document.removeEventListener("pointerdown", away, true);
+  }, [actions]);
   // The picker shows only who could come in (not already starting, not injured or banned) unless told
   // otherwise; starters are moved about by dragging their shirts on the pitch.
   const [onlyFit, setOnlyFit] = useState(true);
@@ -113,13 +138,21 @@ export function Tactics() {
     setSelected(null);
   };
 
-  const auto = () =>
+  // Places whose player was changed by "Pick best XI": they light up for a moment.
+  const [flash, setFlash] = useState<number[]>([]);
+  const auto = () => {
+    let changed: number[] = [];
     act((g) => {
       const c = g.clubs[g.userClubId];
       const best = pickBestLineup(g, c, clubSlots(c));
+      changed = best.lineup.map((id, i) => (id !== c.lineup[i] ? i : -1)).filter((i) => i >= 0);
       c.lineup = best.lineup;
       c.bench = best.bench;
     });
+    setActions(null);
+    setFlash(changed);
+    window.setTimeout(() => setFlash([]), 1100);
+  };
 
   // Custom formation: a shirt dropped on open grass moves that position there (the keeper stays in goal).
   const moveSlot = (i: number, left: number, top: number) =>
@@ -162,7 +195,7 @@ export function Tactics() {
     <li key={p.id} className={!isAvailable(p) ? "out-row" : onBench ? "bench-row" : "rest-row"} data-zone={isAvailable(p) ? (onBench ? "bench" : "rest") : undefined} data-player={p.id}>
       <div className="pick">
         <span className="drag-handle" title={t("tac.dragIn")} onPointerDown={isAvailable(p) ? (e) => drag.start(e, p.id, null, shortName(p)) : undefined}>
-          <Jersey color={club.color} trim={club.color2} keeper={p.position === "GK"} size={26} />
+          <Jersey color={club.color} trim={club.color2} pattern={club.pattern} keeper={p.position === "GK"} size={26} />
         </span>
         <input type="checkbox" className="bench-check" aria-label={t("tac.toBench")} checked={onBench} disabled={!isAvailable(p)} onChange={() => toggleBench(p.id)} />
         <PosBadge pos={p.position} />
@@ -237,7 +270,7 @@ export function Tactics() {
             <Bar value={p.fitness} small />
           </button>
           <button className="pick-avatar" title={t("tac.profile")} aria-label={`${t("tac.profile")}: ${listName(p)}`} onClick={() => profile(p.id)}>
-            <Avatar player={p} shirt={club.color} trim={club.color2} size={34} />
+            <Avatar player={p} shirt={club.color} trim={club.color2} size={30} />
           </button>
         </li>
       ))}
@@ -286,7 +319,7 @@ export function Tactics() {
         </div>
         <p className="muted small">{iconize(t(`tac.${club.mentality}Hint`))}</p>
 
-        <div className={`pitch-board ${custom ? "custom" : ""}`} data-free={custom ? "" : undefined} role="group" aria-label={t("tac.pitch")}>
+        <div ref={board} className={`pitch-board ${custom ? "custom" : ""}`} data-free={custom ? "" : undefined} role="group" aria-label={t("tac.pitch")} onClick={(e) => e.target === e.currentTarget && setActions(null)}>
           <div className="pitch-lines" aria-hidden />
           {slots.map((slot, i) => {
             const p = game.players[club.lineup[i]];
@@ -297,16 +330,16 @@ export function Tactics() {
               <button
                 key={i}
                 data-slot={i}
-                className={`slot ${selected === i ? "selected" : ""} ${bad && !out ? "empty" : ""} ${out ? "out" : ""} ${drag.over === i ? "drop" : ""}`}
+                className={`slot ${actions === i ? "acting" : ""} ${flash.includes(i) ? "flash" : ""} ${selected === i ? "selected" : ""} ${bad && !out ? "empty" : ""} ${out ? "out" : ""} ${drag.over === i ? "drop" : ""}`}
                 style={spots[i]}
                 onPointerDown={p && !bad ? (e) => drag.start(e, p.id, i, shortName(p)) : custom && i > 0 ? (e) => drag.start(e, "", i, t(`pos.${slot.pos}`)) : undefined}
                 // A shirt with someone in it opens their profile (where they can be taken out); an empty spot, the picker.
-                onClick={() => !drag.justDropped() && (p && p.clubId === club.id ? openPlayer(p.id, i) : setSelected(selected === i ? null : i))}
+                onClick={() => !drag.justDropped() && (p && p.clubId === club.id ? setActions(actions === i ? null : i) : (setActions(null), setSelected(selected === i ? null : i)))}
               >
                 {p && !bad && club.roles?.captain === p.id && <span className="armband" title={t("roles.captain")}>C</span>}
                 {out ? (
                   <>
-                    <Jersey color={club.color} trim={club.color2} keeper={slot.pos === "GK"} number={i + 1} />
+                    <Jersey color={club.color} trim={club.color2} pattern={club.pattern} keeper={slot.pos === "GK"} number={i + 1} />
                     <span className="slot-out" title={p.injuryWeeks > 0 ? t("tac.injured") : t("tac.suspended")}>{p.injuryWeeks > 0 ? "🩹" : "🟥"}</span>
                   </>
                 ) : bad ? (
@@ -317,7 +350,7 @@ export function Tactics() {
                     {p?.gear && <span className={p.gear.kind === "gloves" ? "slot-gear gloves" : "slot-gear"} aria-hidden><GearPicture item={p.gear} size={p.gear.kind === "gloves" ? 22 : 24} /></span>}
                     {/* Shin guards on the other side. */}
                     {p?.shin && <span className="slot-gear slot-shin" aria-hidden><GearPicture item={p.shin} size={15} /></span>}
-                    <Jersey color={club.color} trim={club.color2} keeper={slot.pos === "GK"} number={i + 1} />
+                    <Jersey color={club.color} trim={club.color2} pattern={club.pattern} keeper={slot.pos === "GK"} number={i + 1} />
                   </>
                 )}
                 <span className="plate">
@@ -332,6 +365,20 @@ export function Tactics() {
               </button>
             );
           })}
+          {/* Tapped a shirt: take them out (red ✕) or open their profile. */}
+          {actions !== null && bar && game.players[club.lineup[actions]] && (() => {
+            const who = game.players[club.lineup[actions]];
+            return (
+              <div className="slot-actions" style={{left: spots[actions].left, top: `calc(${spots[actions].top} + ${bar.drop}px)`, width: bar.width, height: bar.height}} role="toolbar">
+                <button className="slot-action out" aria-label={t("tac.clearSlot", {name: listName(who)})} title={t("tac.clearSlot", {name: listName(who)})} onClick={() => { act((g) => { const c = g.clubs[g.userClubId]; c.lineup = c.lineup.map((id, k) => (k === actions ? "" : id)); }); setActions(null); }}>
+                  <Icon name="close" size={14} />
+                </button>
+                <button className="slot-action" aria-label={t("tac.profile")} title={t("tac.profile")} onClick={() => { const i = actions; setActions(null); openPlayer(who.id, i); }}>
+                  <Icon name="user" size={14} />
+                </button>
+              </div>
+            );
+          })()}
         </div>
         <p className="muted small">{iconize(t(custom ? "tac.customHint" : "tac.dragHint"))}</p>
       </Card>
@@ -350,9 +397,9 @@ export function Tactics() {
           <>
             <Hint>{iconize(t("tac.benchHint"))}</Hint>
             <ul className="pick-list">
-              <li className={`pick-group bench-head ${typeof drag.over === "object" && drag.over !== null && "zone" in drag.over && drag.over.zone === "bench" ? "drop" : ""}`} data-zone="bench"><Icon name="bench" size={18} /> {iconize(t("tac.benchGroup", {n: benched.length, max: BENCH_SIZE}))}</li>
+              {(benched.length > 0 || !!drag.ghost) && <li className={`pick-group bench-head ${typeof drag.over === "object" && drag.over !== null && "zone" in drag.over && drag.over.zone === "bench" ? "drop" : ""}`} data-zone="bench"><Icon name="bench" size={18} /> {iconize(t("tac.benchGroup", {n: benched.length, max: BENCH_SIZE}))}</li>}
               {benched.map((p) => row(p, true))}
-              <li className={`pick-group rest-head ${typeof drag.over === "object" && drag.over !== null && "zone" in drag.over && drag.over.zone === "rest" ? "drop" : ""}`} data-zone="rest"><Icon name="moon" size={18} /> {iconize(t("tac.restGroup", {n: resting.length}))}</li>
+              {(resting.length > 0 || !!drag.ghost) && <li className={`pick-group rest-head ${typeof drag.over === "object" && drag.over !== null && "zone" in drag.over && drag.over.zone === "rest" ? "drop" : ""}`} data-zone="rest"><Icon name="moon" size={18} /> {iconize(t("tac.restGroup", {n: resting.length}))}</li>}
               {resting.map((p) => row(p, false))}
               {out.length > 0 && <li className="pick-group out-head"><Icon name="medical" size={18} /> {iconize(t("tac.outGroup", {n: out.length}))}</li>}
               {out.map((p) => row(p, club.bench.includes(p.id)))}

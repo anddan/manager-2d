@@ -19,6 +19,7 @@
 import {STAND_MAX} from "../game/stadium";
 import {Icon, iconize, type IconName} from "./Icon";
 import {ClubCrest, TeamOvr} from "./LineupSheet";
+import {useKeepScroll} from "./scrollKeep";
 import {memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode} from "react";
 import {createPortal} from "react-dom";
 import {addMessage, findFixture, fullName, isCupFixture, isKnockout, listName, playerName, shortName, difficulty} from "../game/helpers";
@@ -90,6 +91,7 @@ const HALFTIME_REPLAY_MS = 3000;
 const SHOUT_MS = 3200;
 const SET_PIECES_KEY = "manager2d.manualSetPieces";
 const SUBS_KEY = "manager2d.manualSubs";
+const TEXT_ONLY_KEY = "manager2d.textOnly";
 /** Finishing above this: every shot flies with a tail of fire. */
 const FIRE_FINISHING = 95;
 
@@ -1772,6 +1774,33 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
 
   // The manager's menu under the avatar, and the pitch filling the screen.
   const [menuOpen, setMenuOpen] = useState(false);
+  // Watch the pitch, or only follow the commentary (remembered). Commentary only: set pieces are the assistant's.
+  const [textOnly, setTextOnlyState] = useState(() => {
+    try {
+      return localStorage.getItem(TEXT_ONLY_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    if (!live) return;
+    if (textOnly) live.manualSetPieces = false;
+    else {
+      try {
+        live.manualSetPieces = localStorage.getItem(SET_PIECES_KEY) === "self";
+      } catch {
+        // Keeps what it was.
+      }
+    }
+  }, [live, textOnly]);
+  const setTextOnly = (on: boolean) => {
+    setTextOnlyState(on);
+    try {
+      localStorage.setItem(TEXT_ONLY_KEY, on ? "1" : "0");
+    } catch {
+      // Only for this match.
+    }
+  };
   const menuRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!menuOpen) return;
@@ -2599,7 +2628,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
         />
         </div>
       ) : (
-        <div className={`pitch-wrap ${maxed ? "maxed" : ""}`} ref={pitchRef}>
+        <div className={`pitch-wrap ${maxed ? "maxed" : ""} ${textOnly ? "text-only" : ""}`} ref={pitchRef}>
           <svg className="pitch" viewBox={viewBox} role="img" aria-label={t("match.pitch")}>
             <Stands home={home} away={away} cheering={(freeze?.kind === "goal" || (freeze?.kind === "fulltime" && decided)) && !replay ? freeze.side : null} boards={(userSide === "away" ? away : home).color} fill={report.crowd?.rate ?? 1} />
             {PITCH}
@@ -2790,20 +2819,25 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
                   <span className="manager-btn-label">{iconize(t("match.manager"))}</span> <span aria-hidden>{menuOpen ? "▲" : "▼"}</span>
                 </button>
                 {menuOpen && (
-                  <div className="manager-pop" role="menu">
+                  <div className={textOnly ? "manager-pop down" : "manager-pop"} role="menu">
+                    <span className="speed-group manager-view" role="group">
+                      {([false, true] as const).map((only) => (
+                        <button key={String(only)} className={textOnly === only ? "chip active" : "chip"} onClick={() => setTextOnly(only)}><Icon name={only ? "chat" : "video"} size={16} /> {only ? t("match.viewText") : t("match.viewPitch")}</button>
+                      ))}
+                    </span>
                     <button className="manager-item" role="menuitem" disabled={!!freeze && !atHalftime} onClick={() => { setMenuOpen(false); setSelected("team"); }}>
                       <Icon name="megaphone" size={18} /> {iconize(t("match.giveOrders"))}
                     </button>
                     {/* Once a match: the manager fires up the whole team. */}
                     <button className="manager-item forza-btn" role="menuitem" disabled={forzaUsed} onClick={forza}>
                       <span>{forzaIcon} {iconize(t("match.forza"))}</span>
-                      <span className="muted small">{forzaNote}</span>
+                      <span className="muted small">{iconize(forzaNote)}</span>
                     </button>
                     <div className="manager-item manager-toggle" data-tour="setpieces">
                       <span><Icon name="target" size={18} /> {iconize(t("match.setPieces"))}</span>
                       <span className="speed-group" role="group" aria-label={t("match.setPieces")}>
                         {([true, false] as const).map((self) => (
-                          <button key={String(self)} className={live.manualSetPieces === self ? "chip active" : "chip"} onClick={() => {
+                          <button key={String(self)} disabled={textOnly} className={live.manualSetPieces === self ? "chip active" : "chip"} onClick={() => {
                             live.manualSetPieces = self;
                             try {
                               localStorage.setItem(SET_PIECES_KEY, self ? "self" : "auto");
@@ -2888,6 +2922,7 @@ function NoGoalBanner({reason}: {reason?: string}) {
 /** A see-through dialog over the match, so the pitch stays in view behind it. */
 function MatchDialog({title, onClose, children}: {title: ReactNode; onClose: () => void; children: ReactNode}) {
   const {t} = useT();
+  useKeepScroll();
   return (
     <div className="match-dialog-backdrop" onClick={onClose}>
       <section className="match-dialog" role="dialog" aria-modal="true" aria-label={typeof title === "string" ? title : undefined} onClick={(e) => e.stopPropagation()}>
@@ -3184,11 +3219,22 @@ function eventText(
   everyone: string
 ): string {
   const params = {player: e.type === "instruction" && !e.playerId ? everyone : name(e.playerId), other: name(e.otherId), team};
-  if (e.type === "goal" && e.otherId) return tx("ev.goalAssist", params);
+  if (e.type === "goal" && e.otherId) {
+    const v = [...(e.playerId ?? "")].reduce((n, c) => n + c.charCodeAt(0), e.minute * 31) % 3;
+    return tx(v > 0 ? `ev.goalAssist.v${v}` : "ev.goalAssist", params);
+  }
   if (e.type === "disallowed") return tx("ev.disallowed", {...params, reason: tx(`reason.${e.note}`)});
   if (e.type === "instruction" && e.note) return `📣 ${tx(e.note.endsWith("0") ? "shout.reset" : `shout.${e.note}`, params)}`;
+  // The usual events have a few ways of being said, picked from the minute and the player (the same for the same moment).
+  const extra = COMMENT_VARIANTS[e.type];
+  if (extra) {
+    const v = [...(e.playerId ?? "")].reduce((n, c) => n + c.charCodeAt(0), e.minute * 31) % (extra + 1);
+    if (v > 0) return tx(`ev.${e.type}.v${v}`, params);
+  }
   return tx(`ev.${e.type}`, params);
 }
+
+const COMMENT_VARIANTS: Record<string, number> = {goal: 2, saved: 2, missed: 2, blocked: 2, corner: 2, cleared: 2, yellow: 2};
 
 function Summary({report}: {report: MatchReport}) {
   const {t} = useT();

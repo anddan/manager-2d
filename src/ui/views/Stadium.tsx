@@ -76,6 +76,7 @@ function StadiumBuilder() {
   const partName = (part: StadiumPart) => t(`stadium.part.${part}` as TKey);
   return (
     <div className="grid">
+      {(st.kiosks > 0 || st.shop > 0) && <ItemPrices st={st} attendance={club.capacity} />}
       <Card title={<><Icon name="stadium" size={20} /> {iconize(t("stadium.title"))}</>}>
         <Hint><StadiumHelp /></Hint>
         <StadiumDrawing st={st} color={club.color} trim={club.color2} picked={picked} onPick={setPicked} />
@@ -84,8 +85,6 @@ function StadiumBuilder() {
         </dl>
         {st.project && <p className="stadium-project">{iconize(t("stadium.building", {part: `stadium.part.${st.project.part}`, weeks: st.project.weeksLeft}))}</p>}
       </Card>
-
-      {(st.kiosks > 0 || st.shop > 0) && <ItemPrices st={st} attendance={club.capacity} />}
 
       <Card title={picked ? partName(picked) : t("stadium.title")}>
         {!picked && <p className="muted">{iconize(t("stadium.pick"))}</p>}

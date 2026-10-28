@@ -2,6 +2,8 @@
 // intensity, facilities, form and morale. Older players decline.
 import {NATURAL_GAIN_SHARE, TRAINING_BASE_GAIN, TRAINING_INJURY_CHANCE} from "./constants";
 import {leagueClubs} from "./helpers";
+import {injure} from "./injuries";
+import {hasTrait} from "./traits";
 import {overall} from "./ratings";
 import {Rng, clamp} from "./rng";
 import {
@@ -78,7 +80,9 @@ export function trainPlayer(rng: Rng, club: Club, p: Player, given: TrainOptions
   const starts = p.recentStarts.filter(Boolean).length;
   const minutes = 0.8 + 0.4 * (starts / 5);
   const session = opts.extraSession ? 0.5 : 1;
-  const base = TRAINING_BASE_GAIN * ageFactor(p.age) * room * quality * intensity.gain * mood * minutes * session;
+  // A late bloomer keeps developing past the age most stop.
+  const late = p.age >= 24 && hasTrait(p, "late") ? 1.35 : 1;
+  const base = TRAINING_BASE_GAIN * ageFactor(p.age) * late * room * quality * intensity.gain * mood * minutes * session;
 
   for (const attr of ATTRIBUTES) {
     let delta = 0;
@@ -108,7 +112,7 @@ export function trainPlayer(rng: Rng, club: Club, p: Player, given: TrainOptions
 
   const tired = p.fitness < 50 ? 1.6 : 1;
   if (opts.focus !== "recovery" && rng.chance(TRAINING_INJURY_CHANCE * intensity.injury * tired * session)) {
-    p.injuryWeeks = rng.int(1, 3);
+    injure(p, rng.int(1, 3), "training", p.stats.apps);
   }
   return changes;
 }

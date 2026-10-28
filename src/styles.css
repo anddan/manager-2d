@@ -1590,7 +1590,7 @@ button.manager-item:hover:not(:disabled) { background: rgb(127 127 127 / 0.1); }
 }
 /* One scroll at a time: while a dialog is open the page behind it stays put, and on phones
    only the dialog's body scrolls (not the backdrop, and never sideways). */
-html:has(.modal-backdrop), body:has(.modal-backdrop) { overflow: hidden; }
+html:has(.modal-backdrop), body:has(.modal-backdrop), html:has(.match-dialog-backdrop), body:has(.match-dialog-backdrop) { overflow: hidden; }
 .modal-body { overflow-x: hidden; }
 @media (max-width: 599px) { .modal-backdrop { overflow: hidden; } }
 /* Maximised, the match owns the screen: the dialog's title bar is hidden and nothing behind the
@@ -1904,7 +1904,7 @@ h2, h3, .modal-head h2 { display: flex; align-items: center; gap: 8px; }
 
 /* The manager in the top bar: the round ringed style of the gear beside it. */
 .topbar-manager { background: none; padding: 0; border-radius: 50%; }
-.topbar-manager .avatar { border-radius: 50%; background: rgb(255 255 255 / 0.03); box-shadow: inset 0 0 0 1.5px rgb(255 255 255 / 0.18); width: 38px; height: 38px; }
+.topbar-manager .avatar { border-radius: 50%; background: rgb(255 255 255 / 0.03); box-shadow: inset 0 0 0 1.5px rgb(255 255 255 / 0.18); width: 46px; height: 46px; }
 .topbar-manager:hover .avatar { box-shadow: inset 0 0 0 1.5px var(--accent); }
 .card-head .hint-btn.in-head { width: 26px; height: 26px; margin-block: -2px; }
 /* After the match: the choices as icon tiles; what they do behind the (i) by the verdict. */
@@ -2178,12 +2178,19 @@ h2, h3, .modal-head h2 { display: flex; align-items: center; gap: 8px; }
 .spend-pulse { animation: spend-pulse 0.6s ease-out; }
 @keyframes spend-pulse { 0%, 100% { transform: scale(1); } 40% { transform: scale(0.88); box-shadow: 0 0 12px rgb(248 113 113 / 0.7); } }
 
-/* A tip from the coach (on easy): a bubble above the bottom bar, like the guide's. */
+/* A tip from the coach (on easy): a speech bubble from the manager in the top bar, its tail pointing at him. */
 .coach-tip {
-  position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 45; width: min(340px, calc(100% - 24px));
-  padding: 12px 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--accent); box-shadow: 0 12px 30px rgb(0 0 0 / 0.45);
-  animation: pop-in 0.3s ease-out;
+  position: fixed; right: 12px; z-index: 60; width: min(300px, calc(100% - 24px));
+  padding: 12px 14px; border-radius: 16px; background: #fff; color: #0b1430; box-shadow: 0 12px 30px rgb(0 0 0 / 0.45);
+  animation: tip-in 0.25s ease-out;
 }
+.coach-tip::before { content: ""; position: absolute; top: -9px; right: calc(var(--tail, 40px) - 12px - 9px); width: 18px; height: 18px; background: #fff; transform: rotate(45deg); border-radius: 3px 0 0 0; }
+@keyframes tip-in { from { opacity: 0; transform: translateY(-6px) scale(0.96); } to { opacity: 1; transform: none; } }
+.coach-tip .btn { color: #0b1430; border-color: rgb(11 20 48 / 0.25); background: rgb(11 20 48 / 0.06); }
+.coach-tip .btn.primary { color: #fff; background: var(--accent); border-color: var(--accent); }
+.topbar-manager.talking .avatar { animation: manager-talk 0.7s ease-in-out infinite; }
+@keyframes manager-talk { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px) scale(1.05); } }
+@media (prefers-reduced-motion: reduce) { .topbar-manager.talking .avatar { animation: none; } }
 .coach-tip p { margin: 8px 0 10px; line-height: 1.4; }
 
 /* The profile's condition: what each part does to the rating on the day. */
@@ -2194,3 +2201,109 @@ h2, h3, .modal-head h2 { display: flex; align-items: center; gap: 8px; }
 .day-form strong { font-size: 1.15rem; color: var(--accent-text); }
 .inline-hint-head { display: flex; align-items: center; gap: 6px; }
 .inline-hint-head .hint-btn { position: static; margin: 0; transform: none; }
+
+/* An injury in the profile: what it is and for how long. */
+.injury-callout { display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin: 4px 0 10px; border-radius: 12px; border: 1px solid rgb(248 113 113 / 0.5); background: rgb(220 38 38 / 0.12); }
+.injury-callout .icon { color: #f87171; flex: none; }
+.injury-callout div { display: grid; gap: 1px; line-height: 1.25; }
+.injury-callout strong { font-size: 1.05rem; }
+
+/* A dialog's own scrolling stays inside it: reaching its end doesn't pass on to the page behind. */
+.modal-backdrop, .match-dialog-backdrop, .match-dialog, .modal, .modal-body { overscroll-behavior: contain; }
+
+/* The talent's star: blue and filling while they grow, gold and shining when they've got to their potential. */
+.fut-star { position: absolute; top: 14px; right: 16px; filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.4)); z-index: 2; }
+.fut-star.gold { filter: drop-shadow(0 0 6px rgb(253 224 71 / 0.9)); animation: star-glint 2.4s ease-in-out infinite; }
+@keyframes star-glint { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.18) rotate(8deg); } }
+@media (prefers-reduced-motion: reduce) { .fut-star.gold { animation: none; } }
+.fut-badge.grown { color: #fde047; }
+/* A talent grown up: the card gets a gold rim and a warm shimmer. */
+.fut-card.grown { box-shadow: inset 0 0 0 3px #fde047, inset 0 0 20px rgb(253 224 71 / 0.45); }
+/* A veteran: the legend frame, a double gold rim with a ribbon. */
+.fut-card.legend-frame { box-shadow: inset 0 0 0 3px #e9c46a, inset 0 0 0 6px rgb(255 255 255 / 0.28), inset 0 0 0 8px #e9c46a, inset 0 0 22px rgb(233 196 106 / 0.5); }
+.fut-badge.legend { color: #7c4a03; background: linear-gradient(90deg, transparent, rgb(233 196 106 / 0.55), transparent); letter-spacing: 0.12em; text-transform: uppercase; font-weight: 900; }
+/* Traits: tiny icons on the card, chips in the profile. */
+.fut-traits { position: absolute; top: 44px; right: 14px; display: grid; gap: 3px; opacity: 0.75; color: inherit; z-index: 2; }
+.trait-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.trait-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 999px; font-size: 0.76rem; font-weight: 700; background: rgb(255 255 255 / 0.07); border: 1px solid var(--border); color: var(--text); font-family: inherit; cursor: pointer; }
+.trait-chip .icon { color: var(--accent-text); }
+.trait-chip.bad .icon { color: #f87171; }
+
+/* Tapped a shirt on the board: its whole name plate becomes two buttons, the red ✕ (take out) and the profile,
+   lying right over it with the same corners. (A plain fade in: a move or scale would shift it off its place.) */
+.slot-actions { position: absolute; z-index: 6; transform: translateX(-50%); display: flex; align-items: stretch; justify-content: center; gap: 4px; padding: 2px 3px; box-sizing: border-box; background: var(--chrome); border-radius: 5px; box-shadow: 0 2px 6px rgb(0 0 0 / 0.35); animation: bar-in 0.12s ease-out; }
+@keyframes bar-in { from { opacity: 0; } to { opacity: 1; } }
+.slot-action { flex: 1; max-width: 38px; min-width: 22px; border-radius: 4px; display: grid; place-items: center; padding: 0; cursor: pointer; color: #fff; border: 0; background: rgb(255 255 255 / 0.14); }
+.slot.acting .plate { visibility: hidden; } /* The bar over it stands in its place: nothing white peeks out round the edges. */
+.slot-action:hover { background: rgb(255 255 255 / 0.28); color: var(--accent-text); }
+.slot-action .icon { width: 14px; height: 14px; }
+.slot-action.out { background: #dc2626; }
+.slot-action.out:hover { background: #ef4444; color: #fff; }
+/* "Pick best XI": the places whose player changed give one soft white flash. */
+.slot.flash .jersey { animation: slot-flash 1s ease-out 1; }
+.slot.flash .plate { animation: plate-flash 1s ease-out 1; }
+@keyframes slot-flash { 0% { filter: drop-shadow(0 0 0 transparent); transform: scale(1); } 30% { filter: drop-shadow(0 0 6px #fff) drop-shadow(0 0 2px #fff); transform: scale(1.07); } 100% { filter: drop-shadow(0 0 0 transparent); transform: scale(1); } }
+@keyframes plate-flash { 0% { box-shadow: 0 2px 6px rgb(0 0 0 / 0.35); } 30% { box-shadow: 0 0 0 1.5px #fff, 0 0 8px rgb(255 255 255 / 0.6); } 100% { box-shadow: 0 2px 6px rgb(0 0 0 / 0.35); } }
+@media (prefers-reduced-motion: reduce) { .slot.flash .jersey, .slot.flash .plate { animation: none; } }
+
+/* The picker's rows: one row, the avatar sitting inside its right end. The row picks the player, the avatar opens the profile. */
+.pick-row:has(> .pick-avatar) { position: relative; }
+.pick-row:has(> .pick-avatar) > .pick { width: 100%; min-height: 36px; padding-top: 2px; padding-bottom: 2px; padding-right: 44px; }
+.pick-row > .pick-avatar { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 30px; height: 30px; padding: 0; overflow: hidden; border: 0; border-radius: 50%; background: none; }
+.pick-row > .pick-avatar:hover { background: rgb(255 255 255 / 0.1); box-shadow: 0 0 0 2px var(--accent); }
+
+/* The club's shirt: plain or patterned (picked in the manager's profile). */
+.shirt-patterns { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 8px; margin: 6px 0 10px; }
+.shirt-pattern { display: grid; justify-items: center; gap: 2px; padding: 6px 4px; border: 2px solid var(--border); border-radius: 12px; background: var(--surface-2); color: inherit; font: inherit; font-size: 0.74rem; font-weight: 700; cursor: pointer; }
+.shirt-pattern.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+
+.tips-list { margin-top: 10px; margin: 0; padding-left: 1.3em; display: grid; gap: 8px; line-height: 1.4; }
+
+.coach-more { display: inline-flex; align-items: center; gap: 2px; margin: 0 0 10px; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-weight: 700; font-size: 0.85rem; cursor: pointer; }
+
+/* Only the commentary: the pitch is put away (the match goes on). */
+.pitch-wrap.text-only { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px; min-height: 44px; padding: 6px; width: 100%; max-width: none; background: rgb(127 127 127 / 0.08); }
+.pitch-wrap.text-only > svg.pitch, .pitch-wrap.text-only .zoom-btn, .pitch-wrap.text-only .max-btn, .pitch-wrap.text-only .max-score, .pitch-wrap.text-only .max-controls, .pitch-wrap.text-only .max-manager, .pitch-wrap.text-only .confetti { display: none; }
+.pitch-wrap.text-only .setup-banner, .pitch-wrap.text-only .crowd-banner, .pitch-wrap.text-only .replay-badge { position: static; transform: none; animation: none; }
+.manager-view { display: flex; width: 100%; }
+.manager-view .chip { flex: 1; padding: 6px 10px; }
+
+.manager-pop { max-height: calc(100dvh - 220px); overflow-y: auto; }
+/* Commentary only (no pitch above): the menu opens downwards over the commentary. */
+.manager-pop.down { top: calc(100% + 6px); bottom: auto; }
+
+/* The manager's menu, tidier: soft rows without borders, a pill switch for the view, accent on what's chosen. */
+.manager-pop { gap: 8px; padding: 12px; border-radius: 16px; }
+.manager-item { border: 0; background: rgb(127 127 127 / 0.1); border-radius: 12px; padding: 10px 12px; }
+button.manager-item:hover:not(:disabled) { background: rgb(127 127 127 / 0.18); }
+.manager-pop .speed-group { border: 0; background: rgb(127 127 127 / 0.16); padding: 3px; gap: 2px; }
+.manager-pop .speed-group .chip { border-radius: 999px; font-weight: 700; }
+.manager-pop .speed-group .chip.active { background: var(--accent); color: #fff; }
+.manager-view { padding: 4px; }
+.manager-view .chip { padding: 8px 10px; }
+.manager-pop .forza-btn { background: rgb(255 140 0 / 0.16); }
+/* Commentary only: the menu sits in the flow (pushing the commentary down, never covering it) and the commentary gets the room. */
+.manager-menu:has(.manager-pop.down) { flex: 1 1 100%; }
+.manager-pop.down { position: static; width: 100%; margin-top: 8px; }
+.pitch-wrap.text-only ~ .match-controls .feed, .modal:has(.pitch-wrap.text-only) .feed { max-height: 55vh; }
+
+/* Phones: a smaller manager's menu that opens downwards, over whatever is below, so its first row is never cut off at the top. */
+@media (max-width: 700px) {
+  .manager-menu, .manager-menu:has(.manager-pop.down) { flex: 0 0 auto; }
+  .manager-pop, .manager-pop.down { position: absolute; top: calc(100% + 6px); bottom: auto; left: 0; width: min(320px, calc(100vw - 32px)); max-height: none; margin-top: 0; padding: 8px; gap: 5px; border-radius: 14px; }
+  .manager-item { padding: 6px 10px; font-size: 0.85rem; border-radius: 10px; }
+  .manager-view .chip { padding: 5px 8px; font-size: 0.8rem; }
+  .manager-pop .speed-group .chip { padding: 3px 9px; }
+  .manager-pop .forza-btn { padding: 6px 10px; }
+  .manager-hint-row { display: none; }
+}
+.manager-view .chip { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+/* Commentary only: no replay (there is no pitch to replay on), and the goal as a small line in the strip. */
+.pitch-wrap.text-only .replay-btn, .pitch-wrap.text-only .replay-skip { display: none; }
+.pitch-wrap.text-only .goal-banner { position: static; transform: none; animation: none; text-shadow: none; display: inline-flex; align-items: baseline; gap: 8px; }
+.pitch-wrap.text-only .goal-banner strong { display: inline; font-size: 1.25rem; }
+.pitch-wrap.text-only .goal-banner span { font-size: 0.95rem; }
+.modal:has(.pitch-wrap.text-only) .ev-replay { display: none; }
+/* The two views are always the same height, even on a narrow phone (no wrapping). */
+.manager-view { align-items: stretch; }
+.manager-view .chip { white-space: nowrap; min-height: 36px; padding-left: 6px; padding-right: 6px; font-size: 0.8rem; gap: 4px; }

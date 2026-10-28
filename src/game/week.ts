@@ -17,7 +17,7 @@ import {pickBestLineup, repairLineup} from "./lineup";
 import {applyMatch, simulateMatch} from "./match";
 import {spendEnergy} from "./monetization";
 import {updatePromises, weeklyMorale} from "./morale";
-import {clubStrength, marketValue} from "./ratings";
+import {clubStrength, marketValue, overall} from "./ratings";
 import {Rng, clamp} from "./rng";
 import {weeklyTraining} from "./training";
 import {weeklyTransfers} from "./transfers";
@@ -45,8 +45,11 @@ export function startWeek(state: GameState, rng: Rng, now: number, opts = {useEn
 
   // Healing happens across the week, before the next match.
   for (const p of Object.values(state.players)) {
+    // A young player with a long way to go is a talent, for good.
+    if (!p.talent && p.age <= 23 && p.potential - overall(p) >= 8) p.talent = true;
     if (p.injuryWeeks > 0) {
       p.injuryWeeks--;
+      if (p.injuryWeeks === 0) p.injury = undefined;
       if (p.injuryWeeks === 0 && p.clubId === state.userClubId) {
         addMessage(state, {kind: "player", key: "msg.recovered", params: {name: playerName(state, p.id)}, action: {type: "player", playerId: p.id}});
       }

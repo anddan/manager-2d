@@ -4,6 +4,7 @@ import {geared} from "./gear";
 import {clubSlots} from "./constants";
 import {clamp} from "./rng";
 import type {Attribute, Club, GameState, Player, Position, SquadRole} from "./types";
+import {hasTrait} from "./traits";
 
 /** How much each attribute counts per position. Each row sums to 1. */
 export const POSITION_WEIGHTS: Record<Position, Partial<Record<Attribute, number>>> = {
@@ -61,9 +62,11 @@ export function dayFormParts(player: Player, pos: Position): {base: number; fitn
   return {
     // With their boots (or gloves) on: the bonus counts on the day, not in their own rating.
     base: ratingAt(geared(player), pos) * familiarity(player, pos),
-    fitness: 0.75 + 0.25 * (player.fitness / 100),
+    // A tireless player (Engine) loses a little less to tired legs.
+    fitness: hasTrait(player, "engine") ? 0.8 + 0.2 * (player.fitness / 100) : 0.75 + 0.25 * (player.fitness / 100),
     // Form counts a lot: from 18 % below their level in bad form to 18 % above in top form (none at average).
-    form: 1 + FORM_EFFECT * (player.form / 50 - 1),
+    // A steady player swings less either way.
+    form: 1 + FORM_EFFECT * (hasTrait(player, "steady") ? 0.7 : 1) * (player.form / 50 - 1),
     morale: 0.95 + 0.1 * (player.morale / 100),
     sharpness: 0.95 + 0.05 * (player.sharpness / 100),
     // Unhappy players don't give everything.

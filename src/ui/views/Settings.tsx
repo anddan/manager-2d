@@ -2,7 +2,8 @@ import {useEffect, useRef, useState} from "react";
 import {Icon, iconize} from "../Icon";
 import {TUTORIAL_VERSION} from "../../game/tutorial";
 import {parseSave} from "../../game/save";
-import {LANGS, useT, type Lang} from "../../i18n";
+import {LANGS, useT, type Lang, type TKey} from "../../i18n";
+import {COACH_TIPS} from "../CoachTips";
 import {useGame, useGameState} from "../../store";
 import {Card, Hint} from "../common";
 import {isMuted, onMutedChange, setMuted} from "../sound";
@@ -21,6 +22,7 @@ export function Settings() {
   const act = useGame((s) => s.act);
   const setView = useGame((s) => s.setView);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [tipsOpen, setTipsOpen] = useState(false);
   const [soundOff, setSoundOff] = useState(isMuted());
   // The running version: when it was built, in local time.
   const [checking, setChecking] = useState(false);
@@ -84,6 +86,12 @@ export function Settings() {
       </Card>
       <Card title={<><Icon name="compass" size={20} /> {iconize(t("settings.tour"))}</>}>
         <button className="btn" onClick={() => { act((g) => { g.tutorial = {step: 0, firstMatch: true, v: TUTORIAL_VERSION}; }); setView("overview"); }}>{iconize(t("settings.tour"))}</button>
+      </Card>
+      <Card title={<><Icon name="chat" size={20} /> {iconize(t("tips.title"))}</>}>
+        <button className="btn" aria-expanded={tipsOpen} onClick={() => setTipsOpen((o) => !o)}>{tipsOpen ? iconize(t("tips.hide")) : iconize(t("tips.more"))} <Icon name="chevron" size={16} /></button>
+        {tipsOpen && <ol className="tips-list">
+          {Array.from({length: COACH_TIPS}, (_, i) => <li key={i}>{iconize(t(`tips.${i}` as TKey))}</li>)}
+        </ol>}
       </Card>
       <Card title={t("settings.save")}>
         <Hint>{iconize(t("settings.saveHint"))}</Hint>

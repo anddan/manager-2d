@@ -47,12 +47,13 @@ export function spendBurst(kind: "money" | "diamonds" | "energy", label: string,
   text.style.top = `${ty - 28}px`;
   document.body.appendChild(text);
   text.addEventListener("animationend", () => text.remove());
-  if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
-  // Energy and diamonds: one for each spent (up to ten); money: a handful of coins.
+  // Energy: only the sum by the button (nothing flies from the counter, nothing pulses up there).
+  if (kind === "energy" || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+  // Diamonds: one for each spent (up to ten); money: a handful of coins.
   const count = kind === "money" ? 6 : Math.max(1, Math.min(10, Number(label) || 1));
   for (let i = 0; i < count; i++) {
     const bit = document.createElement("div");
-    bit.className = `burst-gem spend-fly ${kind === "money" ? "coins" : kind === "energy" ? "energy" : ""}`;
+    bit.className = `burst-gem spend-fly ${kind === "money" ? "coins" : ""}`;
     bit.innerHTML = icon;
     bit.style.left = `${sx}px`;
     bit.style.top = `${sy}px`;

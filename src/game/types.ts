@@ -125,6 +125,10 @@ export interface Player {
   clubId: string | null;
   contract: Contract;
   injuryWeeks: number;
+  /** Marked as a young talent (young, with a long way to their potential): the star on their card turns gold when they get there. */
+  talent?: boolean;
+  /** What they're injured with (missing in older saves, or when they're not injured). */
+  injury?: {kind: string; total: number; source: "match" | "training"};
   suspension: number;
   yellowCount: number;
   stats: PlayerStats;
@@ -155,12 +159,17 @@ export interface Installment {
   weeksLeft: number;
 }
 
+export const SHIRT_PATTERNS = ["solid", "stripes", "hoops", "pinstripes", "checks", "halves", "sash", "yoke", "shards", "tonal", "waves", "chevron"] as const;
+export type ShirtPattern = (typeof SHIRT_PATTERNS)[number];
+
 export interface Club {
   id: string;
   name: string;
   short: string;
   color: string;
   color2: string;
+  /** How the shirt is patterned, in the club's two colours (missing: plain). */
+  pattern?: ShirtPattern;
   reputation: number;
   capacity: number;
   ticketPrice: number;

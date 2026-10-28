@@ -1,5 +1,6 @@
 // Small building blocks shared by the screens.
 import {Icon, iconize} from "./Icon";
+import {useKeepScroll} from "./scrollKeep";
 import {GearPicture} from "./Gear";
 import {wornGear} from "../game/gear";
 import {useEffect, useRef, useState, type ReactNode} from "react";
@@ -66,6 +67,7 @@ export function Hint({children}: {children: ReactNode}) {
  */
 export function Modal({title, onClose, children, wide, compact, backdropCloses = true}: {title: ReactNode; onClose: () => void; children: ReactNode; wide?: boolean; compact?: boolean; backdropCloses?: boolean}) {
   const {t} = useT();
+  useKeepScroll();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);

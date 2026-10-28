@@ -16,7 +16,7 @@ import {Jersey} from "./Jersey";
 import {boardSpots} from "./views/Tactics";
 
 /** What the sheet needs of a club: its kit, formation, roles and who's picked. */
-export type SheetClub = Pick<Club, "name" | "color" | "color2" | "formation" | "mentality" | "lineup" | "bench"> & Partial<Pick<Club, "roles" | "customSlots">>;
+export type SheetClub = Pick<Club, "name" | "color" | "color2" | "pattern" | "formation" | "mentality" | "lineup" | "bench"> & Partial<Pick<Club, "roles" | "customSlots">>;
 
 export function LineupSheet({club, player, onPick}: {club: SheetClub; player: (id: string) => Player | undefined; onPick: (p: Player) => void}) {
   const {t} = useT();
@@ -34,7 +34,7 @@ export function LineupSheet({club, player, onPick}: {club: SheetClub; player: (i
               {p && club.roles?.captain === p.id && <span className="armband" title={t("roles.captain")}>C</span>}
               {p?.gear && <span className={p.gear.kind === "gloves" ? "slot-gear gloves" : "slot-gear"} aria-hidden><GearPicture item={p.gear} size={p.gear.kind === "gloves" ? 22 : 24} /></span>}
               {p?.shin && <span className="slot-gear slot-shin" aria-hidden><GearPicture item={p.shin} size={15} /></span>}
-              <Jersey color={club.color} trim={club.color2} keeper={slot.pos === "GK"} number={i + 1} />
+              <Jersey color={club.color} trim={club.color2} pattern={club.pattern} keeper={slot.pos === "GK"} number={i + 1} />
               <span className="plate">
                 <span className="plate-name">{p ? shortName(p) : t(`pos.${slot.pos}`)}</span>
                 <span className="plate-info">
@@ -56,7 +56,7 @@ export function LineupSheet({club, player, onPick}: {club: SheetClub; player: (i
           {bench.map((p) => (
             <li key={p.id} className="bench-row friends-clickable" role="button" onClick={() => onPick(p)}>
               <div className="pick friends-bench-row">
-                <Jersey color={club.color} trim={club.color2} keeper={p.position === "GK"} size={26} />
+                <Jersey color={club.color} trim={club.color2} pattern={club.pattern} keeper={p.position === "GK"} size={26} />
                 <PosBadge pos={p.position} />
                 <span className="pick-name"><Flag code={p.nationality} size={15} /> {listName(p)}</span>
                 {p.gear && <GearPicture item={p.gear} size={20} />}

@@ -8,7 +8,7 @@ export function isAvailable(p: Player): boolean {
 }
 
 /** Positions that can stand in for each other when there is nobody in the right one. */
-const NEIGHBOURS: Record<Position, Position[]> = {
+export const NEIGHBOURS: Record<Position, Position[]> = {
   GK: [],
   CB: ["FB", "DM"],
   FB: ["CB", "W"],
@@ -19,8 +19,72 @@ const NEIGHBOURS: Record<Position, Position[]> = {
   ST: ["W", "AM"],
 };
 
-// Fill the hardest slots first so a lone keeper isn't used as a striker.
-const SLOT_ORDER: Position[] = ["GK", "CB", "ST", "DM", "FB", "CM", "AM", "W"];
+/** The three lines (and the keeper): a forward can play out wide, a holder in midfield, without losing much. */
+const LINE: Record<Position, "gk" | "back" | "mid" | "front"> = {GK: "gk", CB: "back", FB: "back", DM: "mid", CM: "mid", AM: "mid", W: "front", ST: "front"};
+
+/** How well a player fits a place, on top of the rating there: in the same line fully, a neighbour a little less, another line much less, a keeper only in goal. */
+function suitability(p: Player, pos: Position): number {
+  if (p.position === pos) return 1;
+  if (pos === "GK" || p.position === "GK") return 0.05;
+  // Same line: a small step down, so it only happens when the other is clearly the better pick.
+  if (LINE[p.position] === LINE[pos]) return 0.95;
+  if (NEIGHBOURS[pos].includes(p.position)) return 0.88;
+  return 0.6;
+}
+
+/**
+ * The assignment of players to places with the highest total (the Hungarian method): rows are the
+ * places, columns the players (with as many empty ones as there are places, so a short squad leaves
+ * places empty). Returns each place's column.
+ */
+function bestAssignment(score: number[][]): number[] {
+  const n = score.length;
+  const m = score[0]?.length ?? 0;
+  const INF = 1e9;
+  const u = new Array(n + 1).fill(0);
+  const v = new Array(m + 1).fill(0);
+  const p = new Array(m + 1).fill(0);
+  const way = new Array(m + 1).fill(0);
+  for (let i = 1; i <= n; i++) {
+    p[0] = i;
+    let j0 = 0;
+    const minv = new Array(m + 1).fill(INF);
+    const used = new Array(m + 1).fill(false);
+    do {
+      used[j0] = true;
+      const i0 = p[j0];
+      let delta = INF;
+      let j1 = 0;
+      for (let j = 1; j <= m; j++) {
+        if (used[j]) continue;
+        const cur = -score[i0 - 1][j - 1] - u[i0] - v[j];
+        if (cur < minv[j]) {
+          minv[j] = cur;
+          way[j] = j0;
+        }
+        if (minv[j] < delta) {
+          delta = minv[j];
+          j1 = j;
+        }
+      }
+      for (let j = 0; j <= m; j++) {
+        if (used[j]) {
+          u[p[j]] += delta;
+          v[j] -= delta;
+        } else minv[j] -= delta;
+      }
+      j0 = j1;
+    } while (p[j0] !== 0);
+    do {
+      const j1 = way[j0];
+      p[j0] = p[j1];
+      j0 = j1;
+    } while (j0);
+  }
+  const out = new Array(n).fill(-1);
+  for (let j = 1; j <= m; j++) if (p[j]) out[p[j] - 1] = j - 1;
+  return out;
+}
 
 /** Best available eleven for the slots, plus a bench with a keeper if possible. */
 export function pickBestLineup(
@@ -31,36 +95,16 @@ export function pickBestLineup(
   const pool = Object.values(state.players).filter((p) => p.clubId === club.id && isAvailable(p));
   const used = new Set<string>();
   const lineup: string[] = new Array(slots.length).fill("");
-  const order = slots
-    .map((slot, i) => ({slot, i}))
-    .sort((a, b) => SLOT_ORDER.indexOf(a.slot.pos) - SLOT_ORDER.indexOf(b.slot.pos));
-  // Three rounds over the whole eleven: players in their own position first, then a neighbouring
-  // one (a centre-back at full-back, a holder in central midfield...), and only then anyone left.
-  // So a midfielder only plays at the back when there is no defender to put there.
-  const fits: ((p: Player, pos: Position) => boolean)[] = [
-    (p, pos) => p.position === pos,
-    (p, pos) => NEIGHBOURS[pos].includes(p.position),
-    () => true,
-  ];
-  for (const fit of fits) {
-    for (const {slot, i} of order) {
-      if (lineup[i]) continue;
-      let best: Player | undefined;
-      let bestScore = -1;
-      for (const p of pool) {
-        if (used.has(p.id) || !fit(p, slot.pos)) continue;
-        const score = effectiveRating(p, slot.pos);
-        if (score > bestScore) {
-          bestScore = score;
-          best = p;
-        }
-      }
-      if (best) {
-        used.add(best.id);
-        lineup[i] = best.id;
-      }
+  // Every place weighed against every player at once: a 100 forward on the bench plays out wide
+  // before a 58 winger does, and a good holder plays in central midfield before a weak one.
+  const score = slots.map((slot) => [...pool.map((p) => effectiveRating(p, slot.pos) * suitability(p, slot.pos)), ...slots.map(() => 0)]);
+  const chosen = bestAssignment(score);
+  chosen.forEach((col, i) => {
+    if (col >= 0 && col < pool.length) {
+      lineup[i] = pool[col].id;
+      used.add(pool[col].id);
     }
-  }
+  });
   const rest = pool
     .filter((p) => !used.has(p.id))
     .sort((a, b) => effectiveRating(b, b.position) - effectiveRating(a, a.position));

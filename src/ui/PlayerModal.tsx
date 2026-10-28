@@ -25,6 +25,7 @@ import {PlayerCard} from "./PlayerCard";
 import {KitAvatar, editableLook, lookFromEditor} from "./Avatar";
 import {ManagerEditor} from "./ManagerEditor";
 import {GearCard, GearPanel} from "./Gear";
+import {TraitChips} from "./Traits";
 import {FocusPicker} from "./FocusPicker";
 import {SellToFriend} from "./FriendSale";
 import {totalGearBonus} from "../game/gear";
@@ -79,6 +80,7 @@ export function PlayerModal({playerId, preview}: {playerId: string; preview?: {o
             <div className="pm-fact wide"><dt>{iconize(t("pl.club"))}</dt><dd>{club ? club.name : t("pl.freeAgent")}</dd></div>
           </dl>
           {own && <Nickname key={p.id} player={p} />}
+          {known && <TraitChips player={p} />}
         </div>
       </div>
 
@@ -182,6 +184,17 @@ function Condition({player: p}: {player: Player}) {
   return (
     <>
       {/* The (i) right by the heading (a profile has no card head to put it in). */}
+      {/* An injury: what it is, and how long they're out. */}
+      {p.injuryWeeks > 0 && (
+        <div className="injury-callout" role="status">
+          <Icon name="medical" size={22} />
+          <div>
+            <strong>{p.injury ? iconize(tx(`injury.${p.injury.kind}`)) : iconize(t("injury.unknown"))}</strong>
+            <span>{iconize(t("injury.out", {weeks: p.injuryWeeks}))}{p.injury && p.injury.total > p.injuryWeeks ? ` · ${t("injury.of", {total: p.injury.total})}` : ""}</span>
+            {p.injury && <small className="muted">{iconize(t(`injury.from.${p.injury.source}`))}</small>}
+          </div>
+        </div>
+      )}
       <h3 className="inline-hint-head">{iconize(t("pl.condition"))} <Hint>{iconize(t("pl.dayFormHint"))}</Hint></h3>
       {/* Each part with what it does to the rating on the day, and the result at the bottom. */}
       <dl className="kv bars">
