@@ -100,7 +100,7 @@ export interface Player {
   /** The id their looks are drawn from, when they came from another game (their id here is new). */
   lookId?: string;
   /** A look the manager picked (skin, hair, beard…); missing means the one the player came with. */
-  look?: {skin: string; hair: string; style: string; beard: string; eyes?: string; glasses?: boolean; lashes?: boolean};
+  look?: {skin: string; hair: string; style: string; beard: string; eyes?: string; glasses?: boolean; lashes?: boolean; highlights?: boolean; shape?: string; headband?: string};
   age: number;
   /** "f" for women; missing means a man (older saves only had men). */
   gender?: "f";
@@ -484,6 +484,12 @@ export interface ManagerLook {
   suit: string;
   /** Eyelashes and softer brows. Missing in older saves. */
   lashes?: boolean;
+  /** Blond highlights in the hair. */
+  highlights?: boolean;
+  /** The shape of the face: oval (the default), round or a strong jaw. */
+  shape?: string;
+  /** A headband in this colour (missing: none). */
+  headband?: string;
   /** Eye colour; missing means brown. */
   eyes?: string;
 }

@@ -11,6 +11,37 @@ import {BUILD_ID, checkForUpdate} from "../updates";
 
 const LANG_NAMES: Record<Lang, string> = {sv: "Svenska", en: "English", es: "Español", it: "Italiano", fr: "Français"};
 
+/** A setting remembered on this device (the match reads the same keys). */
+function usePref<T extends string>(key: string, fallback: T): [T, (v: T) => void] {
+  const [value, setValue] = useState<T>(() => {
+    try {
+      return (localStorage.getItem(key) as T | null) ?? fallback;
+    } catch {
+      return fallback;
+    }
+  });
+  const set = (v: T) => {
+    setValue(v);
+    try {
+      localStorage.setItem(key, v);
+    } catch {
+      // Only for now.
+    }
+  };
+  return [value, set];
+}
+
+/** Two or more choices in a pill, the chosen one lit. */
+function Choice<T extends string>({value, options, onPick, label}: {value: T; options: readonly (readonly [T, string])[]; onPick: (v: T) => void; label: string}) {
+  return (
+    <span className="speed-group" role="radiogroup" aria-label={label}>
+      {options.map(([v, text]) => (
+        <button key={v} type="button" role="radio" aria-checked={value === v} className={value === v ? "chip active" : "chip"} onClick={() => onPick(v)}>{text}</button>
+      ))}
+    </span>
+  );
+}
+
 export function Settings() {
   const {t} = useT();
   const game = useGameState();
@@ -24,6 +55,14 @@ export function Settings() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [tipsOpen, setTipsOpen] = useState(false);
   const [soundOff, setSoundOff] = useState(isMuted());
+  // How a match is played: the way to watch it, how fast, who takes set pieces and changes, the view, buzz and effects.
+  const [textOnly, setTextOnly] = usePref<"0" | "1">("manager2d.textOnly", "0");
+  const [speed, setSpeed] = usePref<string>("manager2d.matchSpeed", "1");
+  const [setPieces, setSetPieces] = usePref<"auto" | "self">("manager2d.manualSetPieces", "auto");
+  const [subs, setSubs] = usePref<"auto" | "self">("manager2d.manualSubs", "auto");
+  const [zoom, setZoom] = usePref<"1" | "0">("manager2d.zoomedIn", "1");
+  const [haptics, setHaptics] = usePref<"on" | "off">("manager2d.haptics", "on");
+  const [effects, setEffects] = usePref<"on" | "off">("manager2d.effects", "on");
   // The running version: when it was built, in local time.
   const [checking, setChecking] = useState(false);
   const builtAt = (() => {
@@ -78,6 +117,25 @@ export function Settings() {
           <input type="checkbox" className="bench-check" checked={!soundOff} onChange={(e) => setMuted(!e.target.checked)} /> {iconize(t("sound.label"))}
         </label>
         <Hint>{iconize(t("sound.hint"))}</Hint>
+      </Card>
+      <Card title={<><Icon name="ball" size={20} /> {iconize(t("settings.match"))}</>}>
+        <dl className="kv setting-rows">
+          <dt><Icon name="video" size={18} /> {iconize(t("settings.view"))}</dt>
+          <dd><Choice label={t("settings.view")} value={textOnly} onPick={setTextOnly} options={[["0", t("match.viewPitch")], ["1", t("match.viewText")]]} /></dd>
+          <dt><Icon name="skip" size={18} /> {iconize(t("match.speed"))}</dt>
+          <dd><Choice label={t("match.speed")} value={speed} onPick={setSpeed} options={[["1", "1×"], ["2", "2×"], ["3", "3×"], ["4", "4×"], ["5", "5×"]]} /></dd>
+          <dt><Icon name="target" size={18} /> {iconize(t("match.setPieces"))}</dt>
+          <dd><Choice label={t("match.setPieces")} value={setPieces} onPick={setSetPieces} options={[["self", t("match.self")], ["auto", t("match.auto")]]} /></dd>
+          <dt><Icon name="swap" size={18} /> {iconize(t("match.subsWho"))}</dt>
+          <dd><Choice label={t("match.subsWho")} value={subs} onPick={setSubs} options={[["self", t("match.self")], ["auto", t("match.auto")]]} /></dd>
+          <dt><Icon name="eye" size={18} /> {iconize(t("settings.pitchView"))}</dt>
+          <dd><Choice label={t("settings.pitchView")} value={zoom} onPick={setZoom} options={[["1", t("settings.zoomNear")], ["0", t("settings.zoomFar")]]} /></dd>
+          <dt><Icon name="bolt" size={18} /> {iconize(t("settings.haptics"))}</dt>
+          <dd><Choice label={t("settings.haptics")} value={haptics} onPick={setHaptics} options={[["on", t("settings.on")], ["off", t("settings.off")]]} /></dd>
+          <dt><Icon name="coins" size={18} /> {iconize(t("settings.effects"))}</dt>
+          <dd><Choice label={t("settings.effects")} value={effects} onPick={setEffects} options={[["on", t("settings.on")], ["off", t("settings.off")]]} /></dd>
+        </dl>
+        <Hint>{iconize(t("settings.matchHint"))}</Hint>
       </Card>
       <Card title={t("settings.language")}>
         <select className="lang-select" value={lang} onChange={(e) => setLang(e.target.value as Lang)} aria-label={t("settings.language")}>

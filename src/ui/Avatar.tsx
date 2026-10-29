@@ -27,8 +27,14 @@ export const HAIR = ["#1c1714", "#3b2618", "#6b4226", "#b8863b", "#e3c27a", "#a8
 /** Men's styles; the order matters, players' looks are picked from it. */
 const MALE_STYLES = ["short", "buzz", "afro", "sidepart", "mohawk", "bald", "long", "spiky", "curly"] as const;
 const FEMALE_STYLES = ["long", "ponytail", "bun", "bob", "braids", "curly", "afro", "pixie"] as const;
-export const HAIR_STYLES = [...MALE_STYLES, "ponytail", "bun", "bob", "braids", "pixie"] as const;
+// The newer styles (a top knot, a quiff, a neat side sweep, coils, half up, a fade, dreads) are picked in the look editors only,
+// so everyone's generated look stays as it was.
+export const HAIR_STYLES = [...MALE_STYLES, "ponytail", "bun", "bob", "braids", "pixie", "topknot", "quiff", "swept", "coils", "halfup", "fade", "dreads"] as const;
 export type HairStyle = (typeof HAIR_STYLES)[number];
+export const FACE_SHAPES = ["oval", "round", "jaw", "pointed", "cleft"] as const;
+export type FaceShape = (typeof FACE_SHAPES)[number];
+/** Headband colours to pick from. */
+export const HEADBANDS = ["#f8fafc", "#111827", "#dc2626", "#2563eb", "#facc15", "#16a34a", "#ec4899", "#7c3aed"];
 export const BEARDS = ["none", "stubble", "beard", "moustache"] as const;
 export type Beard = (typeof BEARDS)[number];
 /** Eye colours: brown (the default), hazel, green, blue, grey. */
@@ -44,6 +50,11 @@ export interface Look {
   eyeGap: number;
   glasses?: boolean;
   lashes?: boolean;
+  /** Blond highlights in the hair. */
+  highlights?: boolean;
+  shape?: FaceShape;
+  /** A headband in this colour. */
+  headband?: string;
   /** Eye colour; missing means brown. */
   eyes?: string;
 }
@@ -77,6 +88,9 @@ export function lookFor(p: Player): Look {
     eyes: own.eyes ?? base.eyes,
     glasses: own.glasses,
     lashes: own.lashes,
+    highlights: own.highlights,
+    shape: (FACE_SHAPES as readonly string[]).includes(own.shape ?? "") ? (own.shape as FaceShape) : undefined,
+    headband: own.headband,
   };
 }
 
@@ -147,6 +161,9 @@ export function managerFace(m: ManagerLook): Look {
     eyeGap: 8,
     glasses: m.glasses,
     lashes: m.lashes,
+    highlights: m.highlights,
+    shape: (FACE_SHAPES as readonly string[]).includes(m.shape ?? "") ? (m.shape as FaceShape) : undefined,
+    headband: m.headband,
   };
 }
 
@@ -172,14 +189,35 @@ function HairBack({look}: {look: Look}) {
     );
   }
   if (look.style === "bun") return <circle cx={50} cy={15} r={9} fill={look.hair} />;
-  if (look.style === "bob") return <path d="M26 40 Q25 15 50 14 Q75 15 74 40 L76 63 Q70 67 64 63 L36 63 Q30 67 24 63Z" fill={look.hair} />;
-  if (look.style === "braids") {
+  // A knot on top of the head, the rest pulled back.
+  if (look.style === "topknot") {
     return (
       <g fill={look.hair}>
-        {[50, 56, 62, 68, 74].map((y) => (
-          <g key={y}>
-            <ellipse cx={28} cy={y} rx={4} ry={3.6} />
-            <ellipse cx={72} cy={y} rx={4} ry={3.6} />
+        <ellipse cx={50} cy={11} rx={7.200} ry={8} />
+        <path d="M43.500 17 Q50 21 56.500 17" fill="none" stroke={look.hair} strokeWidth={2.400} />
+      </g>
+    );
+  }
+  // Long hair behind, a small knot up top.
+  if (look.style === "halfup") {
+    return (
+      <g fill={look.hair}>
+        <path d="M28 40 Q25 66 34 75 L66 75 Q75 66 72 40Z" />
+        <circle cx={50} cy={14} r={6.500} />
+      </g>
+    );
+  }
+  // Dreadlocks hanging round the head, thick ropes of different lengths with their twists marked.
+  if (look.style === "dreads") {
+    const locks: [number, number, number][] = [[25, 30, 40], [29.500, 32, 46], [34, 34, 36], [38.500, 36, 30], [61.500, 36, 30], [66, 34, 36], [70.500, 32, 46], [75, 30, 40]];
+    return (
+      <g>
+        {locks.map(([x, y, h]) => (
+          <g key={x}>
+            <rect x={x - 2.600} y={y} width={5.200} height={h} rx={2.600} fill={look.hair} />
+            {[0.25, 0.45, 0.65, 0.85].map((k) => (
+              <path key={k} d={`M${x - 2.400} ${y + h * k} L${x + 2.400} ${y + h * k - 1.200}`} stroke="#000" strokeOpacity={0.22} strokeWidth={0.7} />
+            ))}
           </g>
         ))}
       </g>
@@ -225,6 +263,53 @@ function HairFront({look}: {look: Look}) {
     case "afro":
       // A full cap of hair, so no scalp shows between the curls behind.
       return <path d="M29 40 Q29 18 50 18 Q71 18 71 40 Q66 30 50 29 Q34 30 29 40Z" fill={f} />;
+    // Short at the sides, a textured block on top.
+    case "fade":
+      return (
+        <g fill={look.hair}>
+          <path d="M30 42 Q29 22 50 20 Q71 22 70 42 Q66 33 50 31 Q34 33 30 42Z" opacity={0.5} />
+          <path d="M35 31 Q37 17 50 16 Q63 17 65 31 Q58 24 50 24 Q42 24 35 31Z" />
+        </g>
+      );
+    // Neat and swept to one side, with a parting.
+    case "swept":
+      return (
+        <g>
+          <path d="M29 43 Q27 17 51 16 Q73 17 71 42 Q69 31 59 27 Q49 24 41 29 Q33 32 29 43Z" fill={f} />
+          <path d="M45 17.500 Q49 24 43 29.500" fill="none" stroke={shade(f, -0.4)} strokeWidth={0.9} strokeLinecap="round" />
+        </g>
+      );
+    // Swept up and back with some height at the front.
+    case "quiff":
+      return (
+        <g>
+          <path d="M29 42 Q26 23 37 14 Q46 7 59 9 Q71 12 72 30 L71 42 Q66 31 50 29 Q35 31 29 42Z" fill={f} />
+          <path d="M40 15 Q50 6 65 12" fill="none" stroke="#fff" strokeOpacity={0.3} strokeWidth={1.600} strokeLinecap="round" />
+        </g>
+      );
+    // Tight coils, twisted all over the top.
+    case "coils":
+      return (
+        <g fill={f}>
+          <path d="M29 40 Q29 19 50 19 Q71 19 71 40 Q66 31 50 30 Q34 31 29 40Z" />
+          {([[34, 27], [40, 22], [47, 19], [54, 19], [61, 22], [67, 27], [37, 33], [44, 26], [51, 24], [58, 26], [65, 32]] as const).map(([x, y]) => (
+            <circle key={`${x}-${y}`} cx={x} cy={y} r={3.600} />
+          ))}
+        </g>
+      );
+    case "topknot":
+    case "halfup":
+      // Pulled back from the face.
+      return <path d="M29 42 Q29 17 50 17 Q71 17 71 42 Q67 27 50 26 Q33 27 29 42Z" fill={f} />;
+    case "dreads":
+      return (
+        <g fill={f}>
+          <path d="M29 40 Q29 17 50 17 Q71 17 71 40 Q66 30 50 29 Q34 30 29 40Z" />
+          {[33, 39.500, 60.500, 67].map((x, i) => (
+            <rect key={x} x={x - 2.600} y={22 + (i % 2) * 2} width={5.200} height={13 + (i % 2) * 3} rx={2.600} />
+          ))}
+        </g>
+      );
     case "bald":
       // Cropped right down: a shadow of hair over the head, never bare scalp.
       return <path d="M29 40 Q29 18 50 18 Q71 18 71 40 Q66 30 50 29 Q34 30 29 40Z" fill={f} opacity={0.5} />;
@@ -240,15 +325,50 @@ function HairFront({look}: {look: Look}) {
   }
 }
 
+/** Highlights, very subtle: a lighter shade of the hair itself. Curls get a few lighter curls among them; straighter hair a few fine streaks along the way it falls. */
+function Highlights({style, hair}: {style: HairStyle; hair: string}) {
+  // Based on the chosen hair: the same colour a good deal lighter and a little warmer, so it only just shows.
+  const gold = shade(hair, 0.42);
+  // Golden curls among the dark ones, inside the head of hair: open arcs, each turned its own way, as a curl catches the light.
+  const tips = (spots: readonly (readonly [number, number])[], r: number) => (
+    <g fill="none" strokeLinecap="round" stroke={gold} strokeWidth={r * 0.34} opacity={0.5}>
+      {spots.map(([x, y], i) => (
+        <circle key={`${x}-${y}`} cx={x} cy={y} r={r} strokeDasharray={`${(2 * Math.PI * r) * 0.66} ${(2 * Math.PI * r) * 0.34}`} transform={`rotate(${(i * 83) % 360} ${x} ${y})`} />
+      ))}
+    </g>
+  );
+  if (style === "coils") return tips([[38, 26], [45, 22.500], [53, 21.500], [60, 24], [66, 29], [35, 31], [49, 27]], 2.300);
+  if (style === "curly") return tips([[34, 29], [41, 23.500], [48, 21], [56, 21.500], [62, 24], [68, 30], [38, 31], [52, 26], [58, 30]], 2.800);
+  if (style === "afro") return tips([[36, 21], [44, 16], [53, 14], [61, 18], [67, 26], [32, 30], [40, 26], [58, 25], [47, 22]], 3.400);
+  // A fine streak tapering to a point: from the hairline up and back, as the hair falls.
+  const streak = (x0: number, y0: number, cx: number, cy: number, x1: number, y1: number, w: number) => `M${x0} ${y0} Q${cx} ${cy} ${x1} ${y1} Q${cx + w} ${cy + w * 0.6} ${x0 + w} ${y0}Z`;
+  const streaks = [
+    streak(36, 30.500, 35.500, 23.500, 41.500, 18.500, 1.600),
+    streak(42, 29, 42, 22, 48, 17.500, 1.400),
+    streak(49, 28.500, 50, 21, 56, 17, 1.700),
+    streak(56, 28.500, 58.500, 22.500, 64.500, 21, 1.400),
+    streak(33, 35, 32, 28, 36.500, 23, 1.200),
+    streak(64, 31, 67.500, 26.500, 69, 33, 1.100),
+  ];
+  return (
+    <g fill={gold} opacity={0.5}>
+      {streaks.map((d, i) => <path key={i} d={d} />)}
+    </g>
+  );
+}
+
 function BeardShape({look}: {look: Look}) {
   if (look.beard === "none") return null;
-  if (look.beard === "moustache") return <path d="M42 56 Q50 52 58 56 Q50 55 42 56Z" fill={look.hair} stroke={look.hair} strokeWidth={1.6} strokeLinejoin="round" />;
+  // The moustache, over the lip and under the nose.
+  const MOUSTACHE = "M40.500 58.600 Q44.500 54.800 50 56.600 Q55.500 54.800 59.500 58.600 Q55.500 57.400 50 58.800 Q44.500 57.400 40.500 58.600Z";
+  if (look.beard === "moustache") return <path d={MOUSTACHE} fill={look.hair} stroke={look.hair} strokeWidth={1.6} strokeLinejoin="round" />;
+  const stubble = look.beard === "stubble";
   return (
-    <path
-      d="M30 48 Q31 72 50 73 Q69 72 70 48 Q66 60 58 62 Q50 57 42 62 Q34 60 30 48Z"
-      fill={look.hair}
-      opacity={look.beard === "stubble" ? 0.3 : 0.95}
-    />
+    <g opacity={stubble ? 0.3 : 0.95}>
+      {/* The beard: sideburns, the jaw and chin, and up over the mouth to the moustache. */}
+      <path d="M30 46 Q31 72 50 73 Q69 72 70 46 Q68 55 62 58.500 Q56 55.600 50 56.600 Q44 55.600 38 58.500 Q32 55 30 46Z" fill={look.hair} />
+      <path d={MOUSTACHE} fill={look.hair} stroke={look.hair} strokeWidth={1.400} strokeLinejoin="round" />
+    </g>
   );
 }
 
@@ -303,6 +423,16 @@ function shade(hex: string, amount: number): string {
 
 /** The head's outline: rounder on top, a jaw narrowing to the chin. */
 const HEAD = "M29 44 Q28 21 50 20 Q72 21 71 44 Q71 58 63 66 Q57 70.5 50 70.5 Q43 70.5 37 66 Q29 58 29 44Z";
+/** The three face shapes: oval (as it always was), round (fuller cheeks, a softer chin), a strong jaw (broad and square). */
+const HEADS: Record<FaceShape, string> = {
+  oval: HEAD,
+  round: "M28 45 Q27 21 50 20 Q73 21 72 45 Q73 60 62.500 67.500 Q56 70 50 70 Q44 70 37.500 67.500 Q27 60 28 45Z",
+  // A narrower face down to a pointed chin.
+  pointed: "M29 44 Q28 21 50 20 Q72 21 71 44 Q70 56 61 65 Q55 72 50 74 Q45 72 39 65 Q30 56 29 44Z",
+  // The oval, with a dimple in the chin (drawn below).
+  cleft: HEAD,
+  jaw: "M29 44 Q28 21 50 20 Q72 21 71 44 L70.500 57 L66 66 Q63 70.500 58 70.800 L42 70.800 Q37 70.500 34 66 L29.500 57Z",
+};
 
 /** Shading shared by every face (no colours of its own, so one set of ids serves all). */
 function FaceDefs() {
@@ -358,14 +488,33 @@ export function Face({look, mood = 60}: {look: Look; mood?: number}) {
         </g>
       ))}
       {/* The head, shaded at the edges and lit on the forehead, with a fine outline. */}
-      <path d={HEAD} fill={look.skin} />
-      <path d={HEAD} fill="url(#face-shade)" />
+      <path d={HEADS[look.shape ?? "oval"]} fill={look.skin} />
+      <path d={HEADS[look.shape ?? "oval"]} fill="url(#face-shade)" />
       <ellipse cx={46} cy={34} rx={14} ry={10} fill="url(#face-light)" />
-      <path d={HEAD} fill="none" stroke={edge} strokeWidth={0.8} />
+      <path d={HEADS[look.shape ?? "oval"]} fill="none" stroke={edge} strokeWidth={0.8} />
+      {look.shape === "cleft" && (
+        <g fill="none" strokeLinecap="round">
+          <path d="M50 66.200 L50 69" stroke={edge} strokeWidth={1.100} opacity={0.55} />
+          <path d="M51.400 66.600 L51.400 69" stroke="#fff" strokeWidth={0.6} opacity={0.18} />
+        </g>
+      )}
+      {/* Cheekbones catching the light, and a soft shadow under the jaw. */}
+      <ellipse cx={36.500} cy={50.500} rx={4.200} ry={2.600} fill="#fff" opacity={0.1} />
+      <ellipse cx={63.500} cy={50.500} rx={4.200} ry={2.600} fill="#fff" opacity={0.1} />
+      {look.shape !== "pointed" && <path d="M36 65.500 Q50 74 64 65.500" fill="none" stroke={edge} strokeWidth={1.600} strokeLinecap="round" opacity={0.18} />}
       <BeardShape look={look} />
       <g stroke={hairEdge} strokeWidth={0.7} strokeOpacity={0.6}>
         <HairFront look={look} />
       </g>
+      {/* Blond highlights: bleached tips on the curls, fine streaks swept through straighter hair. */}
+      {look.highlights && look.style !== "bald" && look.style !== "buzz" && <Highlights style={look.style} hair={look.hair} />}
+      {/* A headband across the forehead, over the hair. */}
+      {look.headband && (
+        <g>
+          <path d="M29.200 34.500 Q50 26.500 70.800 34.500 L70.600 39 Q50 31 29.400 39Z" fill={look.headband} stroke={shade(look.headband, -0.35)} strokeWidth={0.6} strokeLinejoin="round" />
+          <path d="M33 33.500 Q50 27.500 67 33.500" fill="none" stroke="#fff" strokeOpacity={0.28} strokeWidth={0.9} strokeLinecap="round" />
+        </g>
+      )}
       {/* A shine on the hair. */}
       {look.style !== "bald" && look.style !== "buzz" && (
         <path d="M38 24 Q47 19.5 58 22.5" fill="none" stroke="#fff" strokeOpacity={0.28} strokeWidth={1.6} strokeLinecap="round" />
@@ -385,10 +534,13 @@ export function Face({look, mood = 60}: {look: Look; mood?: number}) {
             // Almond eye: the white, a coloured iris with pupil and glint, the upper lid line.
             <g key={x}>
               <path d={`M${x - 4.5} 45.4 Q${x} 40.8 ${x + 4.5} 45.4 Q${x} 49.4 ${x - 4.5} 45.4Z`} fill="#fff" />
-              <circle cx={x + 0.4} cy={eyeY} r={2.7} fill={look.eyes ?? EYES[0]} />
+              <circle cx={x + 0.4} cy={eyeY} r={2.9} fill={look.eyes ?? EYES[0]} />
+              <circle cx={x + 0.4} cy={eyeY} r={2.9} fill="none" stroke="#000" strokeOpacity={0.25} strokeWidth={0.5} />
               <circle cx={x + 0.4} cy={eyeY} r={1.35} fill="#0b0f19" />
               <circle cx={x + 1.3} cy={eyeY - 0.9} r={0.75} fill="#fff" />
               <path d={`M${x - 4.7} 45.6 Q${x} 40.4 ${x + 4.7} 45.2`} fill="none" stroke="#2a1d16" strokeWidth={1.3} strokeLinecap="round" />
+              {/* The lower lid, a soft line under the eye. */}
+              <path d={`M${x - 3.2} 48.200 Q${x} 49.800 ${x + 3.2} 48.200`} fill="none" stroke={edge} strokeWidth={0.5} strokeLinecap="round" opacity={0.45} />
               {/* The crease of the lid above. */}
               <path d={`M${x - 3.6} 42.6 Q${x} 39.8 ${x + 3.6} 42.4`} fill="none" stroke={edge} strokeWidth={0.6} strokeLinecap="round" opacity={0.7} />
               {droopy && <path d={`M${x - 4} 44.6 Q${x} 42.4 ${x + 4} 44.4 L${x + 4} 41 L${x - 4} 41Z`} fill={look.skin} />}
@@ -396,17 +548,36 @@ export function Face({look, mood = 60}: {look: Look; mood?: number}) {
           ))}
         </>
       )}
-      {look.lashes && !squint && (
-        <g stroke="#1f2937" strokeWidth={1.1} strokeLinecap="round">
-          <path d={`M${50 - gap - 3.8} 44.6 l-1.6 -1.3 M${50 - gap - 2.6} 43 l-1 -1.6`} />
-          <path d={`M${50 + gap + 3.8} 44.6 l1.6 -1.3 M${50 + gap + 2.6} 43 l1 -1.6`} />
+      {look.lashes && (
+        // Lashes along the outer half of the upper lid, longer towards the corner (also on a smiling, closed eye).
+        <g stroke="#1f2937" strokeWidth={0.75} strokeLinecap="round">
+          {([-1, 1] as const).map((side) => (
+            <path
+              key={side}
+              d={[0.5, 0.72, 0.9, 1].map((t) => {
+                const px = 50 + side * (gap + t * 4.5);
+                const py = squint ? 46 - 3.4 * (1 - t * t) : 45.4 - 2.4 * (1 - t * t);
+                return `M${px.toFixed(2)} ${py.toFixed(2)} l${(side * (0.7 + t * 1.5)).toFixed(2)} ${(-2.1 + t * 0.4).toFixed(2)}`;
+              }).join(" ")}
+            />
+          ))}
         </g>
       )}
       {look.glasses && (
-        <g fill="rgb(255 255 255 / 0.12)" stroke="#111827" strokeWidth={1.4}>
-          <circle cx={50 - gap} cy={45} r={5.4} />
-          <circle cx={50 + gap} cy={45} r={5.4} />
-          <line x1={50 - gap + 5.4} y1={44.5} x2={50 + gap - 5.4} y2={44.5} />
+        // Rounded frames with a tinted glass and a glint, a bridge over the nose and the arms to the ears.
+        <g strokeLinejoin="round" strokeLinecap="round">
+          <g fill="none" stroke="#1f2937" strokeWidth={1.2}>
+            <path d={`M${50 - gap - 5.8} 44.200 L29.500 43.600`} />
+            <path d={`M${50 + gap + 5.8} 44.200 L70.500 43.600`} />
+            <path d={`M${50 - gap + 5.8} 43.600 Q50 41.600 ${50 + gap - 5.8} 43.600`} />
+          </g>
+          {[50 - gap, 50 + gap].map((x) => (
+            <g key={x}>
+              <rect x={x - 5.8} y={40.600} width={11.600} height={9} rx={3.600} fill="#bfe3ff" fillOpacity={0.16} stroke="#1f2937" strokeWidth={1.400} />
+              <path d={`M${x - 3.600} 48 L${x - 1.200} 42.400`} stroke="#fff" strokeOpacity={0.55} strokeWidth={0.9} />
+              <path d={`M${x - 1.600} 48.400 L${x + 0.200} 44.200`} stroke="#fff" strokeOpacity={0.35} strokeWidth={0.7} />
+            </g>
+          ))}
         </g>
       )}
       {/* The nose: a shadow down one side, the tip and the nostrils. */}
@@ -443,12 +614,12 @@ export function KitAvatar({look, keeper = false, shirt, trim, size = 96, mood = 
 /** A player's look in the editor's shape (it edits the manager's look, which has a suit too). */
 export function editableLook(p: Player): ManagerLook {
   const l = lookFor(p);
-  return {skin: l.skin, hair: l.hair, style: l.style, beard: l.beard, eyes: l.eyes, glasses: !!l.glasses, lashes: !!l.lashes, suit: "#1f2937"};
+  return {skin: l.skin, hair: l.hair, style: l.style, beard: l.beard, eyes: l.eyes, glasses: !!l.glasses, lashes: !!l.lashes, highlights: !!l.highlights, shape: l.shape, headband: l.headband, suit: "#1f2937"};
 }
 
 /** The editor's look back into a full look (with the face's fixed details from the player). */
 export function lookFromEditor(p: Player, m: ManagerLook): Look {
-  return {...lookFor({...p, look: {skin: m.skin, hair: m.hair, style: m.style, beard: m.beard, eyes: m.eyes, glasses: m.glasses, lashes: m.lashes}})};
+  return {...lookFor({...p, look: {skin: m.skin, hair: m.hair, style: m.style, beard: m.beard, eyes: m.eyes, glasses: m.glasses, lashes: m.lashes, highlights: m.highlights, shape: m.shape, headband: m.headband}})};
 }
 
 /** The manager in a suit and tie. */

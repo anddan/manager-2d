@@ -343,7 +343,7 @@ function LookEditor({player: p}: {player: Player}) {
   const draw = (look: ManagerLook, size: number) => <KitAvatar look={lookFromEditor(p, look)} keeper={keeper} shirt={club.color} trim={club.color2} size={size} />;
   const set = (look: ManagerLook) =>
     act((g) => {
-      g.players[p.id].look = {skin: look.skin, hair: look.hair, style: look.style, beard: look.beard, eyes: look.eyes, glasses: look.glasses, lashes: look.lashes};
+      g.players[p.id].look = {skin: look.skin, hair: look.hair, style: look.style, beard: look.beard, eyes: look.eyes, glasses: look.glasses, lashes: look.lashes, highlights: look.highlights, shape: look.shape, headband: look.headband};
     });
   return (
     <Fold title={<><Icon name="palette" size={20} /> {iconize(t("pl.look"))}</>}>

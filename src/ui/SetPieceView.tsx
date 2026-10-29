@@ -94,6 +94,7 @@ function useFeel(outcome: SetPieceOutcome | undefined, kind: SetPiece["kind"], s
     const land = corner ? 250 + 800 + 300 : 450 + (kind === "penalty" ? 380 : 720);
     const buzz = (p: number | number[]) => {
       try {
+        if (localStorage.getItem("manager2d.haptics") === "off") return;
         navigator.vibrate?.(p);
       } catch {
         // No buzz on this device.

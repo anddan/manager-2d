@@ -8,6 +8,7 @@ import {leaguePosition} from "../game/league";
 import {useT} from "../i18n";
 import {useGame, useGameState} from "../store";
 import {ManagerAvatar, defaultManagerLook} from "./Avatar";
+import {ManagerEditor} from "./ManagerEditor";
 import {Modal} from "./common";
 import {awayKit, homeKit} from "../game/kit";
 import {COLLARS, SHIRT_PATTERNS, SLEEVES, type Collar, type Kit, type ShirtPattern, type Sleeves} from "../game/types";
@@ -18,10 +19,14 @@ export function ManagerProfile({onClose}: {onClose: () => void}) {
   const {t, tx, money, lang} = useT();
   const game = useGameState();
   const act = useGame((s) => s.act);
+  const setView = useGame((s) => s.setView);
   const club = game.clubs[game.userClubId];
   const official = club.officialName ?? club.name;
   const [nick, setNick] = useState(club.officialName ? club.name : "");
   const [managerName, setManagerName] = useState(game.managerName);
+  // How the manager looks: changed here with the same editor as when the game began.
+  const [lookOpen, setLookOpen] = useState(false);
+  const [look, setLook] = useState(() => game.managerLook ?? defaultManagerLook(game.managerName));
   // Two kits, home and away, edited one at a time (the toggle picks which).
   const [which, setWhich] = useState<"home" | "away">("home");
   const [kits, setKits] = useState<{home: Kit; away: Kit}>(() => ({home: homeKit(club), away: awayKit(club)}));
@@ -52,6 +57,7 @@ export function ManagerProfile({onClose}: {onClose: () => void}) {
       const c = g.clubs[g.userClubId];
       const who = managerName.trim();
       if (who) g.managerName = who;
+      g.managerLook = look;
       const home = kits.home;
       c.color = home.color;
       c.color2 = home.color2;
@@ -79,7 +85,7 @@ export function ManagerProfile({onClose}: {onClose: () => void}) {
       <section className="mgr-section">
       <h3 className="mgr-section-title"><Icon name="user" size={18} /> {iconize(t("mgr.sectionManager"))}</h3>
       <div className="mgr-head">
-        <ManagerAvatar look={game.managerLook ?? defaultManagerLook(game.managerName)} size={84} tie={kits.home.color} />
+        <ManagerAvatar look={look} size={84} tie={kits.home.color} />
         <div>
           <h3>{managerName.trim() || game.managerName}</h3>
           <p className="muted">{club.officialName ? `${club.name} (${official})` : club.name}</p>
@@ -88,6 +94,13 @@ export function ManagerProfile({onClose}: {onClose: () => void}) {
 
       <h4><Icon name="pen" size={18} /> {iconize(t("mgr.managerName"))}</h4>
       <input className="input mgr-input" value={managerName} maxLength={30} placeholder={game.managerName} onChange={(e) => setManagerName(e.target.value)} />
+
+      {/* The look editor folds out when wanted. */}
+      <button type="button" className="mgr-fold" aria-expanded={lookOpen} onClick={() => setLookOpen((o) => !o)}>
+        <Icon name="palette" size={18} /> <span>{iconize(t("mgr.appearance"))}</span>
+        <span className={lookOpen ? "mgr-fold-chevron open" : "mgr-fold-chevron"}><Icon name="chevron" size={18} /></span>
+      </button>
+      {lookOpen && <ManagerEditor look={look} onChange={setLook} />}
 
       <h4><Icon name="trophy" size={18} /> {iconize(t("mgr.trophies"))}</h4>
       {trophies.length === 0 ? (
@@ -183,6 +196,8 @@ export function ManagerProfile({onClose}: {onClose: () => void}) {
 
       {/* Always in view at the bottom of the dialog, however far it's scrolled. */}
       <div className="btn-row dialog-actions mgr-actions">
+        {/* The settings, bottom left. */}
+        <button className="btn mgr-settings" onClick={() => { onClose(); setView("settings"); }}><Icon name="settings" size={18} /> {iconize(t("nav.settings"))}</button>
         <button className="btn" onClick={onClose}>{iconize(t("common.cancel"))}</button>
         <button className="btn primary" onClick={save}>{iconize(t("mgr.save"))}</button>
       </div>

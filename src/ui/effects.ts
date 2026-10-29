@@ -33,6 +33,7 @@ export function spendBurst(kind: "money" | "diamonds" | "energy", label: string,
   if (kind === "energy" && Date.now() - lastEnergyText < 1500) return;
   if (kind === "energy") lastEnergyText = Date.now();
   lastSpend = Date.now();
+  if (!effectsOn()) return;
   // Energy isn't paid for: a whoosh-less burst, the till only for money and diamonds.
   if (kind !== "energy") kaching();
   const counter = document.querySelector<HTMLElement>(kind === "money" ? ".hud-cash" : kind === "diamonds" ? ".hud-diamonds" : ".hud-energy");
@@ -82,6 +83,15 @@ export function energyBurst(from: Element | null | undefined, amount: number): v
 
 let lastSpend = 0;
 
+/** The flying coins, diamonds and energy can be turned off in the settings. */
+export function effectsOn(): boolean {
+  try {
+    return localStorage.getItem("manager2d.effects") !== "off";
+  } catch {
+    return true;
+  }
+}
+
 /** An x position kept clear of both edges (a sum is about 130 px wide). */
 function inView(x: number, width: number): number {
   return Math.max(80, Math.min(width - 80, x));
@@ -100,6 +110,7 @@ export function rewardShownLately(): boolean {
 function rewardBurst(from: Element | null | undefined, label: string, icon: string, target: string, count: number, kind: string): void {
   if (typeof document === "undefined") return;
   lastReward = Date.now();
+  if (!effectsOn()) return;
   chime();
   // A button gone from the page (its dialog closed) has no place left: the middle of the screen then.
   const start = from && document.contains(from) ? from.getBoundingClientRect() : undefined;
