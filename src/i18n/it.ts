@@ -812,6 +812,8 @@ export const it: Record<keyof typeof sv, string> = {
   "ev.formation": "Nuova formazione per {team}: {formation} 📋",
   "match.subsWho": "Chi cambia",
   "subs.hint": "Tocca un giocatore in campo, poi un sostituto.",
+  "subs.undo": "Annulla il cambio",
+  "subs.undoHint": "Tocca un giocatore attenuato per annullare il cambio, o un altro giocatore per altri cambi.",
   "subs.pickFor": "Chi sostituisce {name}?",
   "so.kickGoal": "{player} ({team}) segna il rigore! ⚽",
   "so.kickSaved": "{keeper} para il rigore di {player} ({team})! 🧤",

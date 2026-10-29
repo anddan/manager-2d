@@ -2405,3 +2405,7 @@ button.manager-item:hover:not(:disabled) { background: rgb(127 127 127 / 0.18); 
   .topbar-manager { align-self: center; margin: 0; }
   .topbar-manager .avatar { width: 46px; height: 46px; }
 }
+/* A player already taken off in the dialog: tap to take it back. */
+.subs-panel .slot.out { opacity: 0.55; cursor: pointer; }
+.subs-panel .slot.out:not(:disabled):hover { opacity: 0.8; }
+.slot-undo { position: absolute; top: -4px; right: 2px; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: #fff; box-shadow: 0 2px 6px rgb(0 0 0 / 0.4); }

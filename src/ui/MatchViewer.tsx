@@ -2346,6 +2346,19 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
     setSelected(null);
     rerender((n) => n + 1);
   };
+  // A substitution made in the dialog can be taken back (tap the faded player) until "Klar".
+  const undoSub = (outId: string) => {
+    const removed = live?.undoSub(outId);
+    if (!removed) return;
+    const key = JSON.stringify(removed);
+    act((g) => {
+      const list = g.liveMatch?.commands;
+      const i = list ? list.findIndex((c) => JSON.stringify(c) === key) : -1;
+      if (list && i >= 0) list.splice(i, 1);
+    });
+    heldShouts.current = heldShouts.current.filter((h) => h.playerId !== outId);
+    rerender((n) => n + 1);
+  };
   const changeFormation = (formation: FormationId) => give({type: "formation", formation});
   const swapPlayers = (aId: string, bId: string) => give({type: "swap", aId, bId});
   const placePlayer = (playerId: string, x: number, y: number) => give({type: "place", playerId, x, y});
@@ -2867,7 +2880,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
 
       {live && selected === "subs" && !finished && !current && !injuryStop && (
         <MatchDialog title={<><Icon name="swap" size={20} /> {iconize(t("match.subs"))}</>} onClose={cancelSubs}>
-          <SubsPanel live={live} onSub={substitute} onFormation={changeFormation} onSwap={swapPlayers} onPlace={placePlayer} onClose={() => setSelected(null)} />
+          <SubsPanel live={live} onSub={substitute} onFormation={changeFormation} onSwap={swapPlayers} onPlace={placePlayer} onUndo={undoSub} onClose={() => setSelected(null)} />
         </MatchDialog>
       )}
       {live && selected && selected !== "subs" && !finished && !current && !injuryStop && (
@@ -3288,7 +3301,7 @@ function PlayerOrders({live, playerId, onInstruct}: {live: LiveMatch; playerId: 
  * Substitutions and the formation, laid out like the tactics page: the pitch with the shirts, the
  * bench below. Tap a player on the pitch, then a substitute to bring on.
  */
-function SubsPanel({live, onSub, onFormation, onSwap, onPlace, onClose}: {live: LiveMatch; onSub: (outId: string, inId: string) => void; onFormation: (f: FormationId) => void; onSwap: (a: string, b: string) => void; onPlace: (id: string, x: number, y: number) => void; onClose: () => void}) {
+function SubsPanel({live, onSub, onFormation, onSwap, onPlace, onUndo, onClose}: {live: LiveMatch; onSub: (outId: string, inId: string) => void; onFormation: (f: FormationId) => void; onSwap: (a: string, b: string) => void; onPlace: (id: string, x: number, y: number) => void; onUndo: (outId: string) => void; onClose: () => void}) {
   const {t} = useT();
   const game = useGameState();
   const club = game.clubs[game.userClubId];
@@ -3351,8 +3364,9 @@ function SubsPanel({live, onSub, onFormation, onSwap, onPlace, onClose}: {live: 
           const id = byslot.get(i);
           const p = id ? live.player(id) : undefined;
           return (
-            <button key={i} data-slot={i} className={`slot ${out && out === id ? "selected" : ""} ${id && pendingOut.has(id) ? "out" : ""} ${p ? "" : "empty"}`} style={spots[i]} disabled={!p} onPointerDown={p ? (e) => startDrag(e, p.id, shortName(p)) : undefined} onClick={() => !dragged.current && p && subsLeft > 0 && !pendingOut.has(p.id) && setOut(out === p.id ? null : p.id)}>
+            <button key={i} data-slot={i} className={`slot ${out && out === id ? "selected" : ""} ${id && pendingOut.has(id) ? "out" : ""} ${p ? "" : "empty"}`} style={spots[i]} disabled={!p} onPointerDown={p && !pendingOut.has(p.id) ? (e) => startDrag(e, p.id, shortName(p)) : undefined} onClick={() => { if (dragged.current || !p) return; if (pendingOut.has(p.id)) onUndo(p.id); else if (subsLeft > 0) setOut(out === p.id ? null : p.id); }}>
               <Jersey color={club.color} trim={club.color2} pattern={club.pattern} trim3={club.color3} collar={club.collar} sleeves={club.sleeves} keeper={slot.pos === "GK"} number={i + 1} />
+              {id && pendingOut.has(id) && <span className="slot-undo" title={t("subs.undo")}><Icon name="undo" size={14} /></span>}
               <span className="plate">
                 <span className="plate-name">{p ? shortName(p) : t(`pos.${slot.pos}`)}</span>
                 <span className="plate-info">
@@ -3373,7 +3387,7 @@ function SubsPanel({live, onSub, onFormation, onSwap, onPlace, onClose}: {live: 
           <BenchList live={live} pos={outSlot?.pos} onPick={(inId) => { onSub(out, inId); setOut(null); }} />
         </>
       ) : (
-        <p className="muted small">{iconize(t("subs.hint"))}</p>
+        <p className="muted small">{iconize(t(pendingOut.size > 0 ? "subs.undoHint" : "subs.hint"))}</p>
       )}
       <div className="btn-row">
         <button className="btn primary push-right" onClick={onClose}>{iconize(t("orders.done"))}</button>

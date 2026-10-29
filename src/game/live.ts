@@ -227,6 +227,13 @@ export class LiveMatch {
     return this.instructions(id)[key] ?? 0;
   }
 
+  /** Takes back a substitution given but not played yet (the manager changed their mind). */
+  undoSub(outId: string): MatchCommand | undefined {
+    const from = this.commandMinute();
+    const i = this.commands.findIndex((c) => c.type === "sub" && c.outId === outId && c.minute >= from);
+    return i < 0 ? undefined : this.commands.splice(i, 1)[0];
+  }
+
   /** Takes back every command given after the first `count` (the substitutions dialog was cancelled); returns what was taken back. */
   cancelSince(count: number): MatchCommand[] {
     return this.commands.splice(count);

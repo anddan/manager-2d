@@ -823,6 +823,8 @@ export const en: Record<keyof typeof sv, string> = {
   "ev.formation": "New formation for {team}: {formation} 📋",
   "match.subsWho": "Who subs",
   "subs.hint": "Tap a player on the pitch, then a substitute.",
+  "subs.undo": "Undo the change",
+  "subs.undoHint": "Tap a faded player to undo the change, or another player for more changes.",
   "subs.pickFor": "Who replaces {name}?",
   "so.kickGoal": "{player} ({team}) scores the penalty! ⚽",
   "so.kickSaved": "{keeper} saves the penalty from {player} ({team})! 🧤",

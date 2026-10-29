@@ -827,6 +827,8 @@ export const sv = {
   "ev.formation": "Ny formation för {team}: {formation} 📋",
   "match.subsWho": "Vem byter",
   "subs.hint": "Tryck på en spelare på planen och sedan på en avbytare.",
+  "subs.undo": "Ångra bytet",
+  "subs.undoHint": "Tryck på en nedtonad spelare för att ångra bytet, eller på en annan spelare för fler byten.",
   "subs.pickFor": "Vem ersätter {name}?",
   "so.kickGoal": "{player} ({team}) sätter straffen! ⚽",
   "so.kickSaved": "{keeper} räddar straffen från {player} ({team})! 🧤",
