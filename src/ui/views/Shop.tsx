@@ -50,8 +50,10 @@ export function Shop() {
   const m = {...game.monetization};
   regenerateEnergy(m, Date.now());
 
-  const refill = () => {
+  const refill = (e?: {currentTarget: Element}) => {
+    const before = game.monetization.energy;
     const err = act((g) => refillEnergy(g.monetization, Date.now()));
+    if (!err) energyBurst(e?.currentTarget, Math.max(1, ENERGY_MAX - before));
     notify(err ?? "toast.refilled", undefined, err ? "error" : "good");
   };
 
@@ -153,7 +155,7 @@ export function Shop() {
         <div className="energy-count"><Icon name="bolt" size={26} /> <strong>{m.energy}/{ENERGY_MAX}</strong></div>
         <Hint>{iconize(t("shop.energyHint", {time: Math.round(ENERGY_REGEN_MS / 60_000), match: ENERGY_COST_MATCH, training: ENERGY_COST_EXTRA_TRAINING}))}</Hint>
         <div className="btn-row wrap">
-          <button className="btn primary" disabled={m.energy >= ENERGY_MAX} onClick={refill}><Icon name="diamond" size={18} /> {iconize(t("shop.refill", {cost: DIAMONDS_REFILL_COST}))}</button>
+          <button className="btn primary" disabled={m.energy >= ENERGY_MAX} onClick={(e) => refill(e)}><Icon name="diamond" size={18} /> {iconize(t("shop.refill", {cost: DIAMONDS_REFILL_COST}))}</button>
           {/* A video for one energy point, a few times a day. */}
           <button className="btn" disabled={m.energy >= ENERGY_MAX || videosLeft <= 0} onClick={() => setWatching(true)}>
             <Icon name="video" size={18} /> {iconize(t("video.energy"))} <small className="muted">({t("video.left", {n: videosLeft})})</small>

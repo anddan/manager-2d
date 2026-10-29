@@ -7,7 +7,7 @@ import {useEffect, useRef} from "react";
 import type {FinanceCategory, GameState} from "../game/types";
 import {useT} from "../i18n";
 import {useGame} from "../store";
-import {diamondBurst, energyBurst, moneyBurst, rewardShownLately, spendBurst, spendShownLately} from "./effects";
+import {diamondBurst, moneyBurst, rewardShownLately, spendBurst, spendShownLately} from "./effects";
 
 /** The finance lines that are deals the manager makes. */
 const DEALS: FinanceCategory[] = ["sales", "transfers", "signing", "equipment", "construction", "premium", "loan", "scouting"];
@@ -52,7 +52,7 @@ export function DealEffects() {
     // Energy: spent on something pressed (an extra session, a match, Forza!), or got from a video or a
     // refill. (It also comes back by itself over time: that, with nothing pressed, shows nothing.)
     if (now.energy < before.energy && !spendShownLately()) spendBurst("energy", String(before.energy - now.energy), at);
-    else if (now.energy > before.energy && at && !shown) energyBurst(at, now.energy - before.energy);
+    // (Energy coming in has its own effect where it's given: a video, a refill. It also trickles in by itself, and that must not look like a reward.)
   }, [game, money]);
   return null;
 }

@@ -96,6 +96,7 @@ const SHOUT_MS = 3200;
 const SET_PIECES_KEY = "manager2d.manualSetPieces";
 const SUBS_KEY = "manager2d.manualSubs";
 const TEXT_ONLY_KEY = "manager2d.textOnly";
+const SPEED_KEY = "manager2d.matchSpeed";
 /** Finishing above this: every shot flies with a tail of fire. */
 const FIRE_FINISHING = 95;
 
@@ -1768,7 +1769,23 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
     [report]
   );
   const [scene, setScene] = useState<Scene>(() => snap(ctx, 0, {overrides: buildOverrides(ctx, report.setPieces ?? []), push: {}}));
-  const [speed, setSpeed] = useState(1);
+  // The speed chosen (e.g. fast-forward ×5) is remembered for the next match.
+  const [speed, setSpeedState] = useState(() => {
+    try {
+      const v = Number(localStorage.getItem(SPEED_KEY));
+      return Number.isInteger(v) && v >= 1 && v <= MAX_SPEED ? v : 1;
+    } catch {
+      return 1;
+    }
+  });
+  const setSpeed = (n: number) => {
+    setSpeedState(n);
+    try {
+      localStorage.setItem(SPEED_KEY, String(n));
+    } catch {
+      // Only for this match.
+    }
+  };
   const [playing, setPlaying] = useState(true);
   const [freeze, setFreeze] = useState<Freeze | null>(null);
   const [shown, setShown] = useState<{sp: SetPiece; outcome?: SetPieceOutcome} | null>(null);

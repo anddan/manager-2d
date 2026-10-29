@@ -29,6 +29,9 @@ export function moneyBurst(from: Element | null | undefined, label: string): voi
  */
 export function spendBurst(kind: "money" | "diamonds" | "energy", label: string, at?: Element | null): void {
   if (typeof document === "undefined") return;
+  // One energy spent is one "−1": a second call for the same spend (the button's and the watcher's) shows nothing more.
+  if (kind === "energy" && Date.now() - lastEnergyText < 1500) return;
+  if (kind === "energy") lastEnergyText = Date.now();
   lastSpend = Date.now();
   // Energy isn't paid for: a whoosh-less burst, the till only for money and diamonds.
   if (kind !== "energy") kaching();
@@ -77,6 +80,7 @@ export function energyBurst(from: Element | null | undefined, amount: number): v
 }
 
 let lastSpend = 0;
+let lastEnergyText = 0;
 export function spendShownLately(): boolean {
   return Date.now() - lastSpend < 800;
 }
