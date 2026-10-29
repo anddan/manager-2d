@@ -195,7 +195,7 @@ export function Tactics() {
     <li key={p.id} className={!isAvailable(p) ? "out-row" : onBench ? "bench-row" : "rest-row"} data-zone={isAvailable(p) ? (onBench ? "bench" : "rest") : undefined} data-player={p.id}>
       <div className="pick">
         <span className="drag-handle" title={t("tac.dragIn")} onPointerDown={isAvailable(p) ? (e) => drag.start(e, p.id, null, shortName(p)) : undefined}>
-          <Jersey color={club.color} trim={club.color2} pattern={club.pattern} keeper={p.position === "GK"} size={26} />
+          <Jersey color={club.color} trim={club.color2} pattern={club.pattern} trim3={club.color3} collar={club.collar} sleeves={club.sleeves} keeper={p.position === "GK"} size={26} />
         </span>
         <input type="checkbox" className="bench-check" aria-label={t("tac.toBench")} checked={onBench} disabled={!isAvailable(p)} onChange={() => toggleBench(p.id)} />
         <PosBadge pos={p.position} />
@@ -339,7 +339,7 @@ export function Tactics() {
                 {p && !bad && club.roles?.captain === p.id && <span className="armband" title={t("roles.captain")}>C</span>}
                 {out ? (
                   <>
-                    <Jersey color={club.color} trim={club.color2} pattern={club.pattern} keeper={slot.pos === "GK"} number={i + 1} />
+                    <Jersey color={club.color} trim={club.color2} pattern={club.pattern} trim3={club.color3} collar={club.collar} sleeves={club.sleeves} keeper={slot.pos === "GK"} number={i + 1} />
                     <span className="slot-out" title={p.injuryWeeks > 0 ? t("tac.injured") : t("tac.suspended")}>{p.injuryWeeks > 0 ? "🩹" : "🟥"}</span>
                   </>
                 ) : bad ? (
@@ -350,7 +350,7 @@ export function Tactics() {
                     {p?.gear && <span className={p.gear.kind === "gloves" ? "slot-gear gloves" : "slot-gear"} aria-hidden><GearPicture item={p.gear} size={p.gear.kind === "gloves" ? 22 : 24} /></span>}
                     {/* Shin guards on the other side. */}
                     {p?.shin && <span className="slot-gear slot-shin" aria-hidden><GearPicture item={p.shin} size={15} /></span>}
-                    <Jersey color={club.color} trim={club.color2} pattern={club.pattern} keeper={slot.pos === "GK"} number={i + 1} />
+                    <Jersey color={club.color} trim={club.color2} pattern={club.pattern} trim3={club.color3} collar={club.collar} sleeves={club.sleeves} keeper={slot.pos === "GK"} number={i + 1} />
                   </>
                 )}
                 <span className="plate">

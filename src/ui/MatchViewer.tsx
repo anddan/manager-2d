@@ -20,8 +20,12 @@ import {STAND_MAX} from "../game/stadium";
 import {Icon, iconize, type IconName} from "./Icon";
 import {ClubCrest, TeamOvr} from "./LineupSheet";
 import {useKeepScroll} from "./scrollKeep";
+import {Jersey} from "./Jersey";
+import {boardSpots} from "./views/Tactics";
+import {FORMATION_IDS, type FormationId} from "../game/types";
 import {memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode} from "react";
 import {createPortal} from "react-dom";
+import type {PointerEvent as ReactPointerEvent} from "react";
 import {addMessage, findFixture, fullName, isCupFixture, isKnockout, listName, playerName, shortName, difficulty} from "../game/helpers";
 import {shootoutOver} from "../game/cup";
 import {WIN_VIDEO_DIAMONDS, taskProgress, videoAfterWin} from "../game/daily";
@@ -125,6 +129,13 @@ export interface Ctx {
   players: GameState["players"];
 }
 
+/** The places a side stands in at time t (a formation change moves them). */
+function slotsAt(ctx: Ctx, side: Side, t: number): Slot[] {
+  let slots = ctx.slots[side];
+  for (const c of ctx.report.slotChanges ?? []) if (c.side === side && c.minute - 1 <= t) slots = c.slots;
+  return slots;
+}
+
 /** Fixed positions for a stretch of play: kick-offs and set pieces. */
 interface Override {
   from: number;
@@ -212,12 +223,13 @@ const CENTRE_CIRCLE_M = 10.2;
  * nobody from the other side inside the centre circle.
  */
 function kickoffTargets(ctx: Ctx, t: number, kickerId?: string): Record<string, Point> {
+  const cs = {home: slotsAt(ctx, "home", t), away: slotsAt(ctx, "away", t)};
   const targets: Record<string, Point> = {};
   for (const side of ["home", "away"] as const) {
     const players = onPitchAt(ctx.report, side, t);
     const kicking = !!kickerId && [...players.values()].includes(kickerId);
     for (const [slot, id] of players) {
-      let spot = kickoffSpot(ctx.slots[side][slot], side);
+      let spot = kickoffSpot(cs[side][slot], side);
       if (!kicking) {
         // Out of the circle (in metres: the pitch is 105 x 68), still in their own half.
         const dx = (spot.x - 50) * 1.05;
@@ -241,6 +253,7 @@ function kickoffTargets(ctx: Ctx, t: number, kickerId?: string): Record<string, 
  * view (attacking towards 100) and converted at the end.
  */
 function setupTargets(ctx: Ctx, sp: SetPiece, t: number): Record<string, Point> {
+  const cs = {home: slotsAt(ctx, "home", t), away: slotsAt(ctx, "away", t)};
   const att = sp.side;
   const def: Side = att === "home" ? "away" : "home";
   const at = (depth: number, width: number) => fromSide(att, depth, width);
@@ -251,7 +264,7 @@ function setupTargets(ctx: Ctx, sp: SetPiece, t: number): Record<string, Point> 
   const defenders: string[] = [];
   for (const [side, list] of [[att, attackers], [def, defenders]] as const) {
     for (const [slot, id] of onPitchAt(ctx.report, side, t)) {
-      if (ctx.slots[side][slot].pos === "GK") {
+      if (cs[side][slot].pos === "GK") {
         // Defending keeper on the line; the other keeper stays home.
         targets[id] = side === def ? at(99.4, 50) : at(5, 50);
       } else if (id !== sp.takerId) {
@@ -353,11 +366,12 @@ const isRestart = (f: Frame) => f.kind === "goalkick" || f.kind === "throwin";
  * teams in shape around the ball.
  */
 function restartTargets(ctx: Ctx, f: Frame, t: number): Record<string, Point> {
+  const cs = {home: slotsAt(ctx, "home", t), away: slotsAt(ctx, "away", t)};
   const own = f.possession;
   const targets: Record<string, Point> = {};
   for (const side of ["home", "away"] as const) {
     for (const [slot, id] of onPitchAt(ctx.report, side, t)) {
-      const s = ctx.slots[side][slot];
+      const s = cs[side][slot];
       if (f.kind === "goalkick" && side === own) {
         const left = s.y < 50;
         const plan: Record<string, [number, number]> = {
@@ -447,6 +461,7 @@ function possessionAt(ctx: Ctx, t: number): Side {
 
 /** Everyone in place, the ball at the latest touch: used when jumping in time. */
 export function snap(ctx: Ctx, t: number, dyn: Dyn = NO_DYN): Scene {
+  const cs = {home: slotsAt(ctx, "home", t), away: slotsAt(ctx, "away", t)};
   const i = touchIndex(ctx.frames, t);
   const ball = i >= 0 && ctx.frames[i].kind !== "goal" ? {x: ctx.frames[i].x, y: ctx.frames[i].y} : {x: 50, y: 50};
   const possession = possessionAt(ctx, t);
@@ -454,7 +469,7 @@ export function snap(ctx: Ctx, t: number, dyn: Dyn = NO_DYN): Scene {
   const bodies: Record<string, Body> = {};
   for (const side of ["home", "away"] as const) {
     for (const [slot, id] of onPitchAt(ctx.report, side, t)) {
-      const spot = override?.targets[id] ?? teamSpot(ctx.slots[side][slot], side, ball, possession === side, pushFor(dyn, id, side));
+      const spot = override?.targets[id] ?? teamSpot(cs[side][slot], side, ball, possession === side, pushFor(dyn, id, side));
       bodies[id] = {...spot, vx: 0, vy: 0, sprint: false};
     }
   }
@@ -479,6 +494,7 @@ function nearestTo(bodies: Record<string, Body>, ids: string[], to: Point, skip?
 
 /** Moves the scene forward to t1 in small steps. Pure: returns a new scene. */
 export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): Scene {
+  const cs = {home: slotsAt(ctx, "home", t1), away: slotsAt(ctx, "away", t1)};
   let ball = {...prev.ball};
   let reached = prev.reached;
   let flying = prev.flying ?? false;
@@ -564,7 +580,7 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
         let best: string | undefined;
         let bestD = distance(tackler, ball) - 3;
         for (const [slot, id] of onPitchAt(ctx.report, won.possession, t)) {
-          if (ctx.slots[won.possession][slot].pos === "GK" || !bodies[id]) continue;
+          if (cs[won.possession][slot].pos === "GK" || !bodies[id]) continue;
           const d = distance(bodies[id], ball);
           if (d < bestD) {
             bestD = d;
@@ -609,7 +625,7 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
           let best: string | undefined;
           let bestD = distance(meant, ball) - 3;
           for (const [slot, id] of side) {
-            if (ctx.slots[lying.possession][slot].pos === "GK" || !bodies[id]) continue;
+            if (cs[lying.possession][slot].pos === "GK" || !bodies[id]) continue;
             const d = distance(bodies[id], ball);
             if (d < bestD) {
               bestD = d;
@@ -655,14 +671,14 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
     const justPassed = travelling && held?.playerId && heading.possession === held.possession && heading.playerId !== held.playerId ? held.playerId : undefined;
     // A keeper with the ball in their hands (or walking it out) isn't closed down.
     const onBall = carrierId ?? (travelling && heading.kind === "dribble" && heading.playerId === held?.playerId ? heading.playerId : undefined);
-    const keeperHolds = !!onBall && (["home", "away"] as const).some((s) => [...sides[s]].some(([slot, id]) => id === onBall && ctx.slots[s][slot].pos === "GK"));
+    const keeperHolds = !!onBall && (["home", "away"] as const).some((s) => [...sides[s]].some(([slot, id]) => id === onBall && cs[s][slot].pos === "GK"));
 
     for (const side of ["home", "away"] as const) {
       const other: Side = side === "home" ? "away" : "home";
       const onPitch = sides[side];
-      const slotsOf = ctx.slots[side];
+      const slotsOf = cs[side];
       const outfield = [...onPitch].filter(([slot]) => slotsOf[slot].pos !== "GK").map(([, id]) => id);
-      const opponents = [...sides[other]].filter(([slot]) => ctx.slots[other][slot].pos !== "GK").map(([, id]) => id);
+      const opponents = [...sides[other]].filter(([slot]) => cs[other][slot].pos !== "GK").map(([, id]) => id);
       const inPossession = side === possession;
       const ownGoal = fromSide(side, 0, 50);
       const ballDepth = progressFor(side, ball.x);
@@ -1094,7 +1110,7 @@ function shootoutTakers(players: Player[], designated?: string): Player[] {
  * penalties in the match. Five each, then sudden death; it stops as soon as
  * it's decided.
  */
-function Shootout({report, seed, userSide, onDone}: {report: MatchReport; seed: number; userSide: Side; onDone: (score: [number, number]) => void}) {
+function Shootout({report, seed, userSide, textOnly, onDone}: {report: MatchReport; seed: number; userSide: Side; textOnly?: boolean; onDone: (score: [number, number]) => void}) {
   const {t} = useT();
   const game = useGameState();
   const home = game.clubs[report.homeId];
@@ -1115,6 +1131,19 @@ function Shootout({report, seed, userSide, onDone}: {report: MatchReport; seed: 
   const taker = takers[side][Math.floor(k / 2) % Math.max(1, takers[side].length)];
   const keeper = keepers[other];
   const sp: SetPiece = {index: 1000 + k, kind: "penalty", minute: Math.ceil(end) + 1, side, takerId: taker?.id ?? "", keeperId: keeper?.id, wallSide: 1, spot: side === "home" ? {x: 89.5, y: 50} : {x: 10.5, y: 50}};
+
+  // Commentary only: every kick is taken by the game, one line at a time.
+  const [lines, setLines] = useState<string[]>([]);
+  useEffect(() => {
+    if (!textOnly || over || !taker) return;
+    const id = setTimeout(() => {
+      const res = resolveSetPiece(new Rng(seed + 7919 * (k + 1)), sp, null, taker, keeper);
+      const params = {player: shortName(taker), team: (side === "home" ? home : away).short, keeper: keeper ? shortName(keeper) : ""};
+      setLines((l) => [t(res.result === "goal" ? "so.kickGoal" : res.result === "saved" ? "so.kickSaved" : "so.kickMissed", params), ...l]);
+      setKicks((list) => [...list, res.result === "goal"]);
+    }, 1600);
+    return () => clearTimeout(id);
+  }, [textOnly, over, k]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Decided: show the final score a moment, then back to the pitch.
   useEffect(() => {
@@ -1145,7 +1174,7 @@ function Shootout({report, seed, userSide, onDone}: {report: MatchReport; seed: 
       {dots("away")}
       {over ? (
         <p className="shootout-result">{iconize(t((score[0] > score[1]) === (userSide === "home") ? "so.won" : "so.lost", {h: score[0], a: score[1]}))}</p>
-      ) : taker ? (
+      ) : textOnly ? null : taker ? (
         <SetPieceView
           key={k}
           sp={sp}
@@ -1162,6 +1191,11 @@ function Shootout({report, seed, userSide, onDone}: {report: MatchReport; seed: 
           }}
         />
       ) : null}
+      {textOnly && lines.length > 0 && (
+        <ul className="feed">
+          {lines.map((l, i) => <li key={lines.length - i} className="ev">{iconize(l)}</li>)}
+        </ul>
+      )}
     </div>
   );
 }
@@ -2265,8 +2299,37 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   const substitute = (outId: string, inId: string) => {
     give({type: "sub", outId, inId});
     shout(outId, t("shout.sub", {in: (game.players[inId] ? shortName(game.players[inId]) : undefined) ?? "", out: (game.players[outId] ? shortName(game.players[outId]) : undefined) ?? ""}));
-    setSelected(null);
+    // From the subs dialog it stays open (more changes may follow); from an injury the play goes on.
+    if (selected !== "subs") setSelected(null);
   };
+
+  // The substitutions dialog: its X cancels what was changed in it, "Klar" keeps it.
+  const subsStart = useRef(0);
+  useEffect(() => {
+    if (selected === "subs" && live) subsStart.current = live.allCommands().length;
+  }, [selected]); // eslint-disable-line react-hooks/exhaustive-deps
+  const cancelSubs = () => {
+    if (live) {
+      const removed = live.cancelSince(subsStart.current).map((c) => JSON.stringify(c));
+      if (removed.length > 0) {
+        act((g) => {
+          if (!g.liveMatch?.commands) return;
+          g.liveMatch.commands = g.liveMatch.commands.filter((c) => {
+            const i = removed.indexOf(JSON.stringify(c));
+            if (i < 0) return true;
+            removed.splice(i, 1);
+            return false;
+          });
+        });
+      }
+    }
+    heldShouts.current = [];
+    setSelected(null);
+    rerender((n) => n + 1);
+  };
+  const changeFormation = (formation: FormationId) => give({type: "formation", formation});
+  const swapPlayers = (aId: string, bId: string) => give({type: "swap", aId, bId});
+  const placePlayer = (playerId: string, x: number, y: number) => give({type: "place", playerId, x, y});
 
   // The injured player's replacement: picked, then play goes on.
   const replaceInjured = (inId: string) => {
@@ -2601,6 +2664,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
           report={report}
           seed={game.liveMatch?.seed ?? 1}
           userSide={live.userSide}
+          textOnly={textOnly}
           onDone={(score) => {
             act((g) => {
               const f = findFixture(g, report.fixtureId);
@@ -2750,6 +2814,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
           </ul>
           <p className="muted small">{iconize(t("match.htHint"))}</p>
           <div className="btn-row dialog-actions">
+            <button className="btn" onClick={() => setSelected("subs")}><Icon name="swap" size={18} /> {iconize(t("match.subs"))}</button>
             <button className="btn" onClick={() => setSelected("team")}><Icon name="megaphone" size={18} /> {iconize(t("match.giveOrders"))}</button>
             <button className="btn primary" onClick={startSecondHalf}><Icon name="play" size={18} /> {iconize(t("match.secondHalf"))}</button>
           </div>
@@ -2782,7 +2847,12 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
         <InjuryDialog live={live} playerId={injuryStop.playerId} pos={injuryStop.pos} onPick={replaceInjured} />
       )}
 
-      {live && selected && !finished && !current && !injuryStop && (
+      {live && selected === "subs" && !finished && !current && !injuryStop && (
+        <MatchDialog title={<><Icon name="swap" size={20} /> {iconize(t("match.subs"))}</>} onClose={cancelSubs}>
+          <SubsPanel live={live} onSub={substitute} onFormation={changeFormation} onSwap={swapPlayers} onPlace={placePlayer} onClose={() => setSelected(null)} />
+        </MatchDialog>
+      )}
+      {live && selected && selected !== "subs" && !finished && !current && !injuryStop && (
         <MatchDialog title={<><Icon name="megaphone" size={20} /> {iconize(t("orders.title"))}</>} onClose={() => setSelected(null)}>
           <OrdersPanel
             live={live}
@@ -2791,7 +2861,6 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
             onTarget={setSelected}
             onInstruct={instruct}
             onTeamInstruct={instructTeam}
-            onSub={substitute}
             onClose={() => setSelected(null)}
           />
         </MatchDialog>
@@ -2825,8 +2894,13 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
                         <button key={String(only)} className={textOnly === only ? "chip active" : "chip"} onClick={() => setTextOnly(only)}><Icon name={only ? "chat" : "video"} size={16} /> {only ? t("match.viewText") : t("match.viewPitch")}</button>
                       ))}
                     </span>
+                    <button className="manager-item" role="menuitem" disabled={!!freeze && !atHalftime} onClick={() => { setMenuOpen(false); setSelected("subs"); }}>
+                      <span><Icon name="swap" size={18} /> {iconize(t("match.subs"))}</span>
+                      <Icon name="chevron" size={16} />
+                    </button>
                     <button className="manager-item" role="menuitem" disabled={!!freeze && !atHalftime} onClick={() => { setMenuOpen(false); setSelected("team"); }}>
-                      <Icon name="megaphone" size={18} /> {iconize(t("match.giveOrders"))}
+                      <span><Icon name="megaphone" size={18} /> {iconize(t("match.giveOrders"))}</span>
+                      <Icon name="chevron" size={16} />
                     </button>
                     {/* Once a match: the manager fires up the whole team. */}
                     <button className="manager-item forza-btn" role="menuitem" disabled={forzaUsed} onClick={forza}>
@@ -2850,8 +2924,8 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
                       </span>
                     </div>
                     <div className="manager-item manager-toggle">
-                      <span><Icon name="swap" size={18} /> {iconize(t("match.subs"))}</span>
-                      <span className="speed-group" role="group" aria-label={t("match.subs")}>
+                      <span><Icon name="swap" size={18} /> {iconize(t("match.subsWho"))}</span>
+                      <span className="speed-group" role="group" aria-label={t("match.subsWho")}>
                         {([true, false] as const).map((self) => (
                           <button key={String(self)} className={live.manualSubs === self ? "chip active" : "chip"} onClick={() => {
                             live.manualSubs = self;
@@ -2886,7 +2960,10 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
         <details className="control-help-fold">
           <summary className="muted small">{iconize(t("match.help"))}</summary>
           <ul className="control-help muted small">
+            <li><Icon name="video" size={18} /> {iconize(t("match.viewHint"))}</li>
+            <li><Icon name="swap" size={18} /> {iconize(t("match.doSubsHint"))}</li>
             <li><Icon name="megaphone" size={18} /> {iconize(t("orders.hint"))}</li>
+            <li><Icon name="fire" size={18} /> {iconize(t("match.forzaHelp"))}</li>
             <li><Icon name="target" size={18} /> {iconize(t("match.setPiecesHint"))}</li>
             <li><Icon name="swap" size={18} /> {iconize(t("match.subsHint"))}</li>
             <li>{iconize(t("match.zoomHint"))}</li>
@@ -3076,9 +3153,8 @@ function InjuryDialog({live, playerId, pos, onPick}: {live: LiveMatch; playerId:
 export type OrdersTarget = "team" | string;
 
 /**
- * All the manager's orders in one place. The strip at the top picks who
- * they're for: the whole team or any player on the pitch (tapping a player
- * on the pitch opens it on them). Each instruction says what it does.
+ * The manager's instructions. A list at the top picks who they're for: the whole team or any
+ * player on the pitch (tapping a player on the pitch opens it on them). Each instruction says what it does.
  */
 function OrdersPanel({
   live,
@@ -3087,7 +3163,6 @@ function OrdersPanel({
   onTarget,
   onInstruct,
   onTeamInstruct,
-  onSub,
   onClose,
 }: {
   live: LiveMatch;
@@ -3096,118 +3171,196 @@ function OrdersPanel({
   onTarget: (target: OrdersTarget) => void;
   onInstruct: (id: string, key: InstructionKey, level: InstructionLevel) => void;
   onTeamInstruct: (key: InstructionKey, level: InstructionLevel) => void;
-  onSub: (outId: string, inId: string) => void;
   onClose: () => void;
 }) {
   const {t} = useT();
-  const game = useGameState();
-  const club = game.clubs[game.userClubId];
-  const team = live.team();
-  const subsLeft = team.subsLeft - live.pendingSubs().length;
-  const teamTold = INSTRUCTIONS.some((k) => live.teamLevel(k) !== 0);
   return (
     <div className="orders">
-      <div className="target-strip" role="tablist" aria-label={t("orders.who")}>
-        <button role="tab" aria-selected={target === "team"} className={target === "team" ? "target active" : "target"} onClick={() => onTarget("team")}>
-          <span className="target-icon" aria-hidden><Icon name="users" size={26} /></span>
-          <span className="target-name">{iconize(t("orders.teamTitle"))}</span>
-          {teamTold && <span className="target-told" aria-hidden>📣</span>}
-        </button>
-        {team.onPitch.map((o) => {
-          const p = live.player(o.id);
-          if (!p) return null;
-          const told = INSTRUCTIONS.some((k) => live.level(o.id, k) !== live.teamLevel(k));
-          return (
-            <button key={o.id} role="tab" aria-selected={target === o.id} className={target === o.id ? "target active" : "target"} onClick={() => onTarget(o.id)}>
-              <Avatar player={p} shirt={club.color} trim={club.color2} size={34} />
-              <span className="target-name">{shortName(p)}</span>
-              <span className="target-pos">{iconize(t(`pos.${team.slots[o.slot].pos}`))}{booked.has(o.id) ? " 🟨" : ""}</span>
-              {told && <span className="target-told" aria-hidden><Icon name="megaphone" size={14} /></span>}
-            </button>
-          );
-        })}
-      </div>
+      <TargetSelect live={live} target={target} booked={booked} onTarget={onTarget} />
 
       {target === "team" ? (
-        <>
-          <InstructionGrid intro={iconize(t("orders.teamHint"))} value={(key) => live.teamLevel(key)} onPick={onTeamInstruct} />
-        </>
+        <InstructionGrid intro={iconize(t("orders.teamHint"))} value={(key) => live.teamLevel(key)} onPick={onTeamInstruct} />
       ) : (
-        <PlayerOrders key={target} live={live} playerId={target} booked={booked.has(target)} onInstruct={onInstruct} onSub={onSub} />
+        <PlayerOrders key={target} live={live} playerId={target} onInstruct={onInstruct} />
       )}
 
       <div className="btn-row">
-        <span className="muted small">{subsLeft > 0 ? t("orders.subsLeft", {n: subsLeft}) : t("orders.noSubs")}</span>
         <button className="btn primary push-right" onClick={onClose}>{iconize(t("orders.done"))}</button>
       </div>
     </div>
   );
 }
 
-/** Instructions and substitution for one of the user's players. */
-function PlayerOrders({
-  live,
-  playerId,
-  booked,
-  onInstruct,
-  onSub,
-}: {
-  live: LiveMatch;
-  playerId: string;
-  booked: boolean;
-  onInstruct: (id: string, key: InstructionKey, level: InstructionLevel) => void;
-  onSub: (outId: string, inId: string) => void;
-}) {
+/** A drop-down for who the instructions are for: the whole team, or a player shown like on their card. */
+function TargetSelect({live, target, booked, onTarget}: {live: LiveMatch; target: OrdersTarget; booked: Set<string | undefined>; onTarget: (target: OrdersTarget) => void}) {
   const {t} = useT();
   const game = useGameState();
-  const [picking, setPicking] = useState(false);
+  const club = game.clubs[game.userClubId];
+  const team = live.team();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", away);
+    return () => document.removeEventListener("pointerdown", away);
+  }, [open]);
+  const row = (id: OrdersTarget) => {
+    if (id === "team") {
+      const told = INSTRUCTIONS.some((k) => live.teamLevel(k) !== 0);
+      return (
+        <>
+          <span className="target-icon" aria-hidden><Icon name="users" size={26} /></span>
+          <span className="target-row-name">{iconize(t("orders.teamTitle"))}</span>
+          {told && <Icon name="megaphone" size={14} />}
+        </>
+      );
+    }
+    const o = team.onPitch.find((x) => x.id === id);
+    const p = live.player(id);
+    if (!o || !p) return null;
+    const told = INSTRUCTIONS.some((k) => live.level(id, k) !== live.teamLevel(k));
+    return (
+      <>
+        <Avatar player={p} shirt={club.color} trim={club.color2} size={36} />
+        <span className="target-row-name">{fullName(p)}</span>
+        <PosBadge pos={team.slots[o.slot].pos} />
+        <Flag code={p.nationality} />
+        {booked.has(id) && <span aria-hidden>🟨</span>}
+        {told && <Icon name="megaphone" size={14} />}
+      </>
+    );
+  };
+  return (
+    <div className="target-select" ref={ref}>
+      <button type="button" className="target-current" aria-haspopup="listbox" aria-expanded={open} aria-label={t("orders.who")} onClick={() => setOpen(!open)}>
+        {row(target)}
+        <Icon name="chevron" size={16} />
+      </button>
+      {open && (
+        <ul className="target-options" role="listbox">
+          {(["team", ...team.onPitch.map((o) => o.id)] as OrdersTarget[]).map((id) => (
+            <li key={id}>
+              <button type="button" role="option" aria-selected={id === target} className={id === target ? "target-option active" : "target-option"} onClick={() => { setOpen(false); onTarget(id); }}>
+                {row(id)}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** Instructions for one of the user's players. */
+function PlayerOrders({live, playerId, onInstruct}: {live: LiveMatch; playerId: string; onInstruct: (id: string, key: InstructionKey, level: InstructionLevel) => void}) {
+  const {t} = useT();
   const p = live.player(playerId);
   const team = live.team();
   if (!p) return null;
-  const club = game.clubs[game.userClubId];
-  const pendingSubs = live.pendingSubs();
-  const subsLeft = team.subsLeft - pendingSubs.length;
-  const comingOff = pendingSubs.some((c) => c.type === "sub" && c.outId === playerId);
   const slot = team.onPitch.find((o) => o.id === playerId);
-  const onPitch = !!slot;
-  const benchLeft = team.bench.filter((id) => !pendingSubs.some((c) => c.type === "sub" && c.inId === id)).length;
-
   return (
-    <>
-      <header className="orders-head">
-        <Avatar player={p} shirt={club.color} trim={club.color2} size={48} />
-        <div className="orders-who">
-          <strong>{fullName(p)}</strong>
-          <span className="orders-meta">
-            <PosBadge pos={slot ? team.slots[slot.slot].pos : p.position} />
-            <Flag code={p.nationality} />
-            {booked && <span className="booked-tag">🟨 {iconize(t("orders.booked"))}</span>}
-          </span>
-        </div>
-        <span className="orders-fitness" title={t("col.fitness")}>⚡ <Bar value={p.fitness} small label={t("col.fitness")} /></span>
-      </header>
+    <InstructionGrid intro={iconize(t("orders.playerHint", {name: shortName(p)}))} keeper={(slot ? team.slots[slot.slot].pos : p.position) === "GK"} value={(key) => live.level(playerId, key)} disabled={!slot} onPick={(key, lvl) => onInstruct(playerId, key, lvl)} />
+  );
+}
 
-      {picking ? (
+/**
+ * Substitutions and the formation, laid out like the tactics page: the pitch with the shirts, the
+ * bench below. Tap a player on the pitch, then a substitute to bring on.
+ */
+function SubsPanel({live, onSub, onFormation, onSwap, onPlace, onClose}: {live: LiveMatch; onSub: (outId: string, inId: string) => void; onFormation: (f: FormationId) => void; onSwap: (a: string, b: string) => void; onPlace: (id: string, x: number, y: number) => void; onClose: () => void}) {
+  const {t} = useT();
+  const game = useGameState();
+  const club = game.clubs[game.userClubId];
+  const team = live.team();
+  const [out, setOut] = useState<string | null>(null);
+  const formation = live.formation();
+  // Changes given but not played yet: shown as they will be.
+  const ids = team.onPitch.map((o) => o.id);
+  const slots = live.previewSlots();
+  const at = team.onPitch.map((o) => o.slot);
+  const byslot = new Map(ids.map((id, k) => [at[k], id]));
+  // Drag a shirt onto another to swap them; with a custom formation, onto an empty spot to move it there.
+  const board = useRef<HTMLDivElement>(null);
+  const [ghost, setGhost] = useState<{x: number; y: number; label: string} | null>(null);
+  const dragged = useRef(false);
+  const startDrag = (e: ReactPointerEvent, id: string, label: string) => {
+    const from = {x: e.clientX, y: e.clientY};
+    dragged.current = false;
+    const move = (m: PointerEvent) => {
+      if (!dragged.current && Math.hypot(m.clientX - from.x, m.clientY - from.y) < 8) return;
+      dragged.current = true;
+      setGhost({x: m.clientX, y: m.clientY, label});
+    };
+    const up = (u: PointerEvent) => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      setGhost(null);
+      if (!dragged.current) return;
+      setTimeout(() => (dragged.current = false), 0);
+      const over = document.elementFromPoint(u.clientX, u.clientY)?.closest<HTMLElement>("[data-slot]");
+      const other = over ? byslot.get(Number(over.dataset.slot)) : undefined;
+      if (other && other !== id) return onSwap(id, other);
+      const rect = board.current?.getBoundingClientRect();
+      if (!other && !formation && rect && u.clientX >= rect.left && u.clientX <= rect.right && u.clientY >= rect.top && u.clientY <= rect.bottom) {
+        // The board's spot back to the pitch's (the opposite of how the shirts are laid out).
+        const left = ((u.clientX - rect.left) / rect.width) * 100;
+        const top = ((u.clientY - rect.top - 14) / rect.height) * 100;
+        onPlace(id, 5 + (1 - (top - 2) / 79) * 71, 50 + (left - 50) / 0.95);
+      }
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+  const spots = boardSpots(slots);
+  const pendingOut = new Set(live.pendingSubs().map((c) => (c.type === "sub" ? c.outId : "")));
+  const subsLeft = team.subsLeft - live.pendingSubs().length;
+  const outSlot = out ? slots[at[ids.indexOf(out)]] : undefined;
+  return (
+    <div className="orders subs-panel">
+      <label className="field">
+        <span>{iconize(t("tac.formation"))}</span>
+        <select value={formation ?? "custom"} disabled={team.injured.length > 0} onChange={(e) => e.target.value !== "custom" && onFormation(e.target.value as FormationId)}>
+          {!formation && <option value="custom">{iconize(t("tac.custom"))}</option>}
+          {FORMATION_IDS.map((f) => <option key={f} value={f}>{f}</option>)}
+        </select>
+      </label>
+      <div ref={board} className={`pitch-board ${formation ? "" : "custom"}`} role="group" aria-label={t("tac.pitch")}>
+        <div className="pitch-lines" aria-hidden />
+        {slots.map((slot, i) => {
+          const id = byslot.get(i);
+          const p = id ? live.player(id) : undefined;
+          return (
+            <button key={i} data-slot={i} className={`slot ${out && out === id ? "selected" : ""} ${id && pendingOut.has(id) ? "out" : ""} ${p ? "" : "empty"}`} style={spots[i]} disabled={!p} onPointerDown={p ? (e) => startDrag(e, p.id, shortName(p)) : undefined} onClick={() => !dragged.current && p && subsLeft > 0 && !pendingOut.has(p.id) && setOut(out === p.id ? null : p.id)}>
+              <Jersey color={club.color} trim={club.color2} pattern={club.pattern} trim3={club.color3} collar={club.collar} sleeves={club.sleeves} keeper={slot.pos === "GK"} number={i + 1} />
+              <span className="plate">
+                <span className="plate-name">{p ? shortName(p) : t(`pos.${slot.pos}`)}</span>
+                <span className="plate-info">
+                  {p && <Flag code={p.nationality} size={13} />}
+                  <span>{iconize(t(`pos.${slot.pos}`))}</span>
+                  {p && <strong>{Math.round(effectiveRating(p, slot.pos))}</strong>}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {ghost && <div className="drag-ghost" style={{left: ghost.x, top: ghost.y}}>{ghost.label}</div>}
+      <p className="muted small">{iconize(subsLeft > 0 ? t("orders.subsLeft", {n: subsLeft}) : t("orders.noSubs"))}</p>
+      {out && live.player(out) ? (
         <>
-          <h3>{iconize(t("orders.pickSub"))}</h3>
-          <BenchList live={live} pos={slot ? team.slots[slot.slot].pos : undefined} onPick={(id) => onSub(playerId, id)} />
-          <button className="btn small" onClick={() => setPicking(false)}>{iconize(t("common.cancel"))}</button>
+          <h3>{iconize(t("subs.pickFor", {name: shortName(live.player(out)!)}))}</h3>
+          <BenchList live={live} pos={outSlot?.pos} onPick={(inId) => { onSub(out, inId); setOut(null); }} />
         </>
       ) : (
-        <>
-          <InstructionGrid intro={iconize(t("orders.playerHint", {name: shortName(p)}))} keeper={(slot ? team.slots[slot.slot].pos : p.position) === "GK"} value={(key) => live.level(playerId, key)} disabled={!onPitch} onPick={(key, lvl) => onInstruct(playerId, key, lvl)} />
-          <div className="btn-row">
-            {comingOff ? (
-              <span className="muted small"><Icon name="swap" size={18} /> {iconize(t("orders.subPending"))}</span>
-            ) : (
-              <button className="btn" disabled={subsLeft <= 0 || !onPitch || benchLeft === 0} onClick={() => setPicking(true)}>
-                <Icon name="swap" size={18} /> {iconize(t("orders.sub"))}
-              </button>
-            )}
-          </div>
-        </>
+        <p className="muted small">{iconize(t("subs.hint"))}</p>
       )}
-    </>
+      <div className="btn-row">
+        <button className="btn primary push-right" onClick={onClose}>{iconize(t("orders.done"))}</button>
+      </div>
+    </div>
   );
 }
 
@@ -3220,10 +3373,11 @@ function eventText(
 ): string {
   const params = {player: e.type === "instruction" && !e.playerId ? everyone : name(e.playerId), other: name(e.otherId), team};
   if (e.type === "goal" && e.otherId) {
-    const v = [...(e.playerId ?? "")].reduce((n, c) => n + c.charCodeAt(0), e.minute * 31) % 3;
+    const v = [...(e.playerId ?? "")].reduce((n, c) => n + c.charCodeAt(0), e.minute * 31) % 5;
     return tx(v > 0 ? `ev.goalAssist.v${v}` : "ev.goalAssist", params);
   }
   if (e.type === "disallowed") return tx("ev.disallowed", {...params, reason: tx(`reason.${e.note}`)});
+  if (e.type === "instruction" && e.note?.startsWith("form:")) return tx("ev.formation", {...params, formation: e.note.slice(5)});
   if (e.type === "instruction" && e.note) return `📣 ${tx(e.note.endsWith("0") ? "shout.reset" : `shout.${e.note}`, params)}`;
   // The usual events have a few ways of being said, picked from the minute and the player (the same for the same moment).
   const extra = COMMENT_VARIANTS[e.type];
@@ -3234,7 +3388,7 @@ function eventText(
   return tx(`ev.${e.type}`, params);
 }
 
-const COMMENT_VARIANTS: Record<string, number> = {goal: 2, saved: 2, missed: 2, blocked: 2, corner: 2, cleared: 2, yellow: 2};
+const COMMENT_VARIANTS: Record<string, number> = {goal: 4, saved: 4, missed: 4, blocked: 3, corner: 3, cleared: 3, yellow: 3, freekick: 2, penalty: 2, injury: 2, red: 2, sub: 2};
 
 function Summary({report}: {report: MatchReport}) {
   const {t} = useT();

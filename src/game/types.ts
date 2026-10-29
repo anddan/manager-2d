@@ -159,8 +159,13 @@ export interface Installment {
   weeksLeft: number;
 }
 
-export const SHIRT_PATTERNS = ["solid", "stripes", "hoops", "pinstripes", "checks", "halves", "sash", "yoke", "shards", "tonal", "waves", "chevron"] as const;
+export const SHIRT_PATTERNS = ["solid", "stripes", "hoops", "pinstripes", "checks", "halves", "sash", "yoke", "sleeves", "tonal", "waves", "chevron"] as const;
 export type ShirtPattern = (typeof SHIRT_PATTERNS)[number];
+
+export const COLLARS = ["round", "v", "polo", "upolo"] as const;
+export type Collar = (typeof COLLARS)[number];
+export const SLEEVES = ["short", "rolled", "long", "none"] as const;
+export type Sleeves = (typeof SLEEVES)[number];
 
 export interface Club {
   id: string;
@@ -168,8 +173,13 @@ export interface Club {
   short: string;
   color: string;
   color2: string;
+  /** A third colour for the collar and cuffs (missing: the detail colour). */
+  color3?: string;
   /** How the shirt is patterned, in the club's two colours (missing: plain). */
   pattern?: ShirtPattern;
+  /** The shirt's neck (missing: round, a U) and sleeves (missing: short). */
+  collar?: Collar;
+  sleeves?: Sleeves;
   reputation: number;
   capacity: number;
   ticketPrice: number;
@@ -293,7 +303,13 @@ export type MatchCommand =
   /** The same instruction for everyone on the pitch, overriding their own. */
   | {minute: number; type: "instructTeam"; key: InstructionKey; level: InstructionLevel}
   /** "Forza!": the manager fires up the whole team (free once a match, then paid for with energy). */
-  | {minute: number; type: "forza"};
+  | {minute: number; type: "forza"}
+  /** A new formation for the managed team: the players on the pitch are moved to the best places in it. */
+  | {minute: number; type: "formation"; formation: FormationId}
+  /** Two players on the pitch swap places. */
+  | {minute: number; type: "swap"; aId: string; bId: string}
+  /** A player takes another spot on the pitch (a custom formation): x along the pitch from own goal, y across. */
+  | {minute: number; type: "place"; playerId: string; x: number; y: number};
 
 export type TouchKind = "kickoff" | "pass" | "dribble" | "tackle" | "setpiece" | "save" | "goal" | "nogoal" | "out" | "goalkick" | "throwin";
 
@@ -331,6 +347,8 @@ export interface MatchReport {
   formations: {home: FormationId; away: FormationId};
   /** The slots each side played in (custom formations included). Missing in old saves. */
   slots?: {home: Slot[]; away: Slot[]};
+  /** A formation change during the match: from this minute the places (same numbering as the lineup) stand as given. */
+  slotChanges?: {minute: number; side: Side; slots: Slot[]}[];
   /** The crowd (worked out before kick-off) and the home side's ticket money. Missing in old saves. */
   crowd?: {fans: number; rate: number; capacity: number; gate: number};
   /** Penalties and free kicks, with where the ball went. Missing in old saves. */

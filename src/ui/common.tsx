@@ -100,8 +100,8 @@ export function Bar({value, label, small}: {value: number; label?: string; small
 }
 
 export function Face({value}: {value: number}) {
-  const face = value >= 75 ? "😄" : value >= 55 ? "🙂" : value >= 35 ? "😐" : value >= 20 ? "😟" : "😠";
-  return <span className="face" title={String(Math.round(value))}>{face}</span>;
+  const [name, color] = value >= 75 ? (["faceGrin", "#4ade80"] as const) : value >= 55 ? (["faceSmile", "#a3e635"] as const) : value >= 35 ? (["faceNeutral", "#facc15"] as const) : value >= 20 ? (["faceWorried", "#fb923c"] as const) : (["faceAngry", "#f87171"] as const);
+  return <span className="face" style={{color}} title={String(Math.round(value))}><Icon name={name} size={20} /></span>;
 }
 
 export function PosBadge({pos}: {pos: Position}) {

@@ -2307,3 +2307,43 @@ button.manager-item:hover:not(:disabled) { background: rgb(127 127 127 / 0.18); 
 /* The two views are always the same height, even on a narrow phone (no wrapping). */
 .manager-view { align-items: stretch; }
 .manager-view .chip { white-space: nowrap; min-height: 36px; padding-left: 6px; padding-right: 6px; font-size: 0.8rem; gap: 4px; }
+
+/* The manager's menu: every row alike (label with its icon on the left, what it does on the right). */
+.manager-pop .manager-item { min-height: 44px; }
+.manager-pop .manager-item > span:first-child { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; font-weight: 700; }
+.manager-pop button.manager-item > .icon:last-child { opacity: 0.6; }
+.manager-pop .forza-btn > span:last-child { white-space: nowrap; }
+/* Who the instructions are for: a drop-down, each row like a player's card. */
+.target-select { position: relative; }
+.target-current, .target-option { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 12px; border: 0; border-radius: 12px; background: rgb(127 127 127 / 0.14); color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.target-current > .icon:last-child { margin-left: auto; opacity: 0.7; }
+.target-row-name { font-weight: 800; }
+.target-options { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 5; margin: 0; padding: 6px; list-style: none; display: grid; gap: 4px; max-height: 50vh; overflow-y: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--surface, #fff); box-shadow: var(--shadow); }
+.target-option { background: none; padding: 6px 8px; }
+.target-option:hover, .target-option.active { background: rgb(127 127 127 / 0.18); }
+.subs-panel .pitch-board { margin: 0 auto; width: 100%; }
+
+/* The first alternative (watch the match / commentary only) is 42 px high, like the other rows. */
+.manager-pop .manager-view { box-sizing: border-box; height: 42px; min-height: 42px; padding: 3px; }
+.manager-pop .manager-view .chip { min-height: 0; height: 100%; padding-top: 0; padding-bottom: 0; }
+.subs-panel .slot { touch-action: none; user-select: none; }
+/* Every row in the manager's menu is 42 px high. */
+.manager-pop .manager-item, .manager-pop .manager-view { box-sizing: border-box; height: 42px; min-height: 42px; padding-top: 0; padding-bottom: 0; }
+.manager-pop .manager-view { padding: 3px; }
+.manager-pop .forza-btn { padding-top: 0; padding-bottom: 0; }
+/* The kit room: two cards to a row on a phone, and the pictures in the list all the same size. */
+.gear-cards.storage-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; justify-items: center; }
+.storage-cards .fut-card.gear-card { width: 100%; max-width: 170px; }
+.storage-cards .gear-offer { width: 100%; }
+.storage-cards .storage-actions { flex-direction: column; align-items: stretch; width: 100%; max-width: 170px; gap: 6px; }
+.storage-cards .storage-actions .btn { justify-content: center; }
+@media (min-width: 700px) {
+  .gear-cards.storage-cards { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+  .storage-cards .fut-card.gear-card { width: 160px; }
+  .storage-cards .gear-offer { width: auto; }
+  .storage-cards .storage-actions { flex-direction: row; width: auto; max-width: none; }
+}
+.storage-pic { flex: 0 0 72px; height: 52px; display: grid; place-items: center; }
+.fold-count { color: var(--accent); font-weight: 800; white-space: pre; }
+.fold-warn { color: #f87171; font-weight: 800; }
+.pm-fold summary .fold-warn { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; font-size: 0.8rem; white-space: nowrap; }

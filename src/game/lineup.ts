@@ -86,6 +86,20 @@ function bestAssignment(score: number[][]): number[] {
   return out;
 }
 
+/** The place (index in `slots`) each of the players should stand in, best total first; a keeper stays in goal. */
+export function assignToSlots(state: GameState, ids: string[], slots: Slot[]): number[] {
+  const players = ids.map((id) => state.players[id]);
+  const score = slots.map((slot) => [...players.map((p) => (p ? effectiveRating(p, slot.pos) * suitability(p, slot.pos) : 0)), ...slots.map(() => 0)]);
+  const chosen = bestAssignment(score);
+  const at = new Array(ids.length).fill(-1);
+  chosen.forEach((col, slot) => {
+    if (col >= 0 && col < ids.length) at[col] = slot;
+  });
+  // Anyone left over (more players than places) takes a free place.
+  const free = slots.map((_, i) => i).filter((i) => !at.includes(i));
+  return at.map((a) => (a >= 0 ? a : free.shift() ?? 0));
+}
+
 /** Best available eleven for the slots, plus a bench with a keeper if possible. */
 export function pickBestLineup(
   state: GameState,

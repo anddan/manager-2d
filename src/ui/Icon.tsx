@@ -5,7 +5,8 @@ import type {ReactNode} from "react";
 export type IconName =
   | "home" | "mail" | "users" | "clipboard" | "dumbbell" | "calendar" | "list" | "trophy" | "stadium"
   | "swap" | "pen" | "wallet" | "boot" | "diamond" | "settings" | "play" | "ball" | "shield" | "info" | "close"
-  | "warn" | "fire" | "video" | "gift" | "shin" | "glove" | "dice" | "user" | "text" | "palette" | "megaphone" | "skip" | "coffee" | "stop" | "target" | "star" | "sparkle" | "chart" | "chat" | "handshake" | "trend" | "tag" | "shirt" | "undo" | "check" | "bolt" | "bank" | "sound" | "compass" | "download" | "upload" | "cart" | "hammer" | "run" | "bench" | "moon" | "search" | "inbox" | "eye" | "coins" | "medical" | "plane" | "clip" | "lock" | "flag" | "updown" | "plus" | "male" | "female" | "mixed" | "chevron" | "thumbUp" | "thumbDown" | "debrief" | "hotdog" | "cup" | "scarf";
+  | "warn" | "fire" | "video" | "gift" | "shin" | "glove" | "dice" | "user" | "text" | "palette" | "megaphone" | "skip" | "coffee" | "stop" | "target" | "star" | "sparkle" | "chart" | "chat" | "handshake" | "trend" | "tag" | "shirt" | "undo" | "check" | "bolt" | "bank" | "sound" | "compass" | "download" | "upload" | "cart" | "hammer" | "run" | "bench" | "moon" | "search" | "inbox" | "eye" | "coins" | "medical" | "plane" | "clip" | "lock" | "flag" | "updown" | "plus" | "male" | "female" | "mixed" | "chevron" | "thumbUp" | "thumbDown" | "debrief" | "hotdog" | "cup" | "scarf"
+  | "faceSmile" | "faceGrin" | "faceNeutral" | "faceWorried" | "faceSad" | "faceAngry" | "faceGrimace" | "faceYawn";
 
 const PATHS: Record<IconName, ReactNode> = {
   home: <><path d="M3 11 12 4l9 7" /><path d="M5 10v10h14V10" /><path d="M10 20v-6h4v6" /></>,
@@ -60,7 +61,8 @@ const PATHS: Record<IconName, ReactNode> = {
   scarf: <><path d="M5 4h14v5H5z" /><path d="M9 9v11M14 9v8" /><path d="M8 20h2M13 17h2" /></>,
   // The talk after the match: two speech bubbles.
   debrief: <><path d="M3 4h12v8H8l-5 4V4Z" /><path d="M15 8h6v8l-3-2.5h-7v-1.5" /></>,
-  handshake: <><path d="M2 12 6 8l4 2 3-2 3 1 6 3" /><path d="m6 14 3 3 2-1 2 2 2-1 3-3" /></>,
+  // Two sleeves and two hands clasped: the handshake.
+  handshake: <><path d="M2 8.5h3v8H2z" /><path d="M19 8.5h3v8h-3z" /><path d="M5 10l3.6-1.8c1-.5 2.1-.4 3 .2L14 10.2" /><path d="M5 15.2l3.6 3.2a1.7 1.7 0 0 0 2.4-.1" /><path d="M14 10.2l1.5-1.2L19 10" /><path d="M19 15.3l-3.2 3a1.7 1.7 0 0 1-2.4 0" /><path d="M8.5 12.5l3 3M11 11l3.2 3.2M13.5 10.8l1.2 1.2" /></>,
   trend: <><path d="M3 17 9 11l4 4 8-8" /><path d="M15 7h6v6" /></>,
   tag: <><path d="M3 3h8l10 10-8 8L3 11V3Z" /><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor" /></>,
   shirt: <path d="m8 3-5 3 2 5 2-1v11h10V10l2 1 2-5-5-3c-.5 1.5-2 2.5-4 2.5S8.5 4.5 8 3Z" />,
@@ -89,6 +91,15 @@ const PATHS: Record<IconName, ReactNode> = {
   updown: <><path d="M12 3v18M7 8l5-5 5 5M7 16l5 5 5-5" /></>,
   chevron: <path d="M6 9l6 6 6-6" />,
   plus: <path d="M12 5v14M5 12h14" />,
+  // Faces, drawn like the rest: a round head, two dots for eyes and a mouth that says how they feel.
+  faceSmile: <><circle cx="12" cy="12" r="9" /><circle cx="9" cy="10" r="0.9" fill="currentColor" /><circle cx="15" cy="10" r="0.9" fill="currentColor" /><path d="M8.5 14.5c1 1.4 2.2 2 3.5 2s2.5-.6 3.5-2" /></>,
+  faceGrin: <><circle cx="12" cy="12" r="9" /><circle cx="9" cy="10" r="0.9" fill="currentColor" /><circle cx="15" cy="10" r="0.9" fill="currentColor" /><path d="M8 13.5h8c0 2.5-1.8 4.2-4 4.2s-4-1.7-4-4.2Z" /></>,
+  faceNeutral: <><circle cx="12" cy="12" r="9" /><circle cx="9" cy="10" r="0.9" fill="currentColor" /><circle cx="15" cy="10" r="0.9" fill="currentColor" /><path d="M9 15.5h6" /></>,
+  faceWorried: <><circle cx="12" cy="12" r="9" /><circle cx="9" cy="10" r="0.9" fill="currentColor" /><circle cx="15" cy="10" r="0.9" fill="currentColor" /><path d="M8.5 16.8c1-1.2 2.2-1.8 3.5-1.8s2.5.6 3.5 1.8" /><path d="M7.5 7.6l2.6 1M16.5 7.6l-2.6 1" /></>,
+  faceSad: <><circle cx="12" cy="12" r="9" /><circle cx="9" cy="10" r="0.9" fill="currentColor" /><circle cx="15" cy="10" r="0.9" fill="currentColor" /><path d="M8 17c1.2-2 2.5-2.8 4-2.8s2.8.8 4 2.8" /></>,
+  faceAngry: <><circle cx="12" cy="12" r="9" /><circle cx="9" cy="10" r="0.9" fill="currentColor" /><circle cx="15" cy="10" r="0.9" fill="currentColor" /><path d="M7.4 7.6l3.6 1.8M16.6 7.6L13 9.4" /><path d="M9 16.2c1-1 2-1.5 3-1.5s2 .5 3 1.5" /></>,
+  faceGrimace: <><circle cx="12" cy="12" r="9" /><circle cx="9" cy="10" r="0.9" fill="currentColor" /><circle cx="15" cy="10" r="0.9" fill="currentColor" /><rect x="7.5" y="13.4" width="9" height="3.6" rx="1.4" /><path d="M10.5 13.4v3.6M13.5 13.4v3.6" /></>,
+  faceYawn: <><circle cx="12" cy="12" r="9" /><path d="M7.5 10h3M13.5 10h3" /><ellipse cx="12" cy="16" rx="2.3" ry="2.8" /></>,
 };
 
 export function Icon({name, size = 22}: {name: IconName; size?: number}) {
@@ -105,10 +116,13 @@ const EMOJI_ICONS: Record<string, IconName> = {
   "🔍": "search", "🏟️": "stadium", "🏗️": "hammer", "🎬": "video", "🎯": "target", "🔥": "fire", "🧤": "glove", "👟": "boot",
   "⭐": "star", "✅": "check", "❌": "close", "🏦": "bank", "✏️": "pen", "🖊️": "pen", "✍️": "pen", "🎨": "palette", "🔒": "lock",
   "🏁": "flag", "📋": "clipboard", "🔁": "swap", "🔄": "swap", "🏷️": "tag", "🏋️": "dumbbell", "⚠️": "warn", "📭": "inbox",
+  "😊": "faceSmile", "🙂": "faceSmile", "😀": "faceGrin", "😄": "faceGrin", "😅": "faceGrin", "😁": "faceGrin", "😐": "faceNeutral",
+  "😕": "faceWorried", "😟": "faceWorried", "😞": "faceSad", "😔": "faceSad", "😢": "faceSad", "😠": "faceAngry", "😡": "faceAngry",
+  "😤": "faceAngry", "👏": "thumbUp", "👍": "thumbUp", "👎": "thumbDown", "🤝": "handshake", "😬": "faceGrimace", "🥱": "faceYawn",
 };
 const EMOJI_RE = new RegExp("(" + Object.keys(EMOJI_ICONS).sort((a, b) => b.length - a.length).map((e) => e.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|") + ")", "u");
 
-/** A text with its money, energy, cup… emoji drawn as the white line icons (other emoji, like faces, stay). */
+/** A text with its money, energy, cup… emoji drawn as the white line icons (faces too). */
 export function iconize(text: string): ReactNode {
   if (!EMOJI_RE.test(text)) return text;
   return text.split(new RegExp(EMOJI_RE.source, "gu")).map((part, i) =>

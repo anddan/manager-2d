@@ -1,4 +1,5 @@
 // Player details. Own players: condition, mood, talks, focus, listing.
+import {wornGear} from "../game/gear";
 // Others: scouting, bids, loans and free-agent offers.
 import {Icon, iconize} from "./Icon";
 import {useState, type ReactNode} from "react";
@@ -108,7 +109,7 @@ export function PlayerModal({playerId, preview}: {playerId: string; preview?: {o
           {own && <Condition player={p} />}
           {/* The kit (boots, gloves, shin guards), before the statistics. */}
           {own && p.clubId === game.userClubId && (
-            <Fold title={<><Icon name="shirt" size={20} /> {iconize(t("gear.equipment"))}</>}>
+            <Fold title={<><Icon name="shirt" size={20} /> {iconize(t("gear.equipment"))}{wornGear(p).length > 0 && <span className="fold-count"> ({wornGear(p).length})</span>}</>}>
               <GearPanel player={p} />
             </Fold>
           )}
@@ -230,17 +231,19 @@ function ContractInfo({player: p}: {player: Player}) {
   const known = isKnown(game, p);
   // Our own player (not one out on loan): the contract can be talked over right here.
   const ours = p.clubId === game.userClubId && !p.loan;
+  // Our player whose contract runs out at the end of this season: warned about, so it is not forgotten.
+  const expiring = p.clubId === game.userClubId && p.contract.expiresSeason <= game.season;
   const negotiate = () => {
     const neg = startNegotiation(game, p.id, game.userClubId, "renewal");
     if ("refused" in neg) notify(neg.refused, {name: shortName(p)}, "error");
     else setNegotiation(neg);
   };
   return (
-    <Fold title={<><Icon name="pen" size={20} /> {iconize(t("pl.contract"))}</>}>
+    <Fold title={<><Icon name="pen" size={20} /> {iconize(t("pl.contract"))}{expiring && <span className="fold-warn"> <Icon name="warn" size={16} /> {t("pl.expiresSoon")}</span>}</>}>
       <dl className="kv">
         <dt>{iconize(t("col.value"))}</dt><dd>{money(p.value)}</dd>
         {known && <><dt>{iconize(t("col.wage"))}</dt><dd>{money(p.contract.wage)} {iconize(t("common.perWeek"))}</dd></>}
-        <dt>{iconize(t("pl.expires"))}</dt><dd>{p.contract.expiresSeason}</dd>
+        <dt>{iconize(t("pl.expires"))}</dt><dd className={expiring ? "fold-warn" : undefined}>{p.contract.expiresSeason}</dd>
         {known && <><dt>{iconize(t("col.role"))}</dt><dd>{iconize(t(`role.${p.contract.role}`))}</dd></>}
         {known && p.contract.releaseClause !== null && <><dt>{iconize(t("pl.releaseClause"))}</dt><dd>{money(p.contract.releaseClause)}</dd></>}
         {p.loan && <><dt>{iconize(t("pl.loan"))}</dt><dd>{game.clubs[p.loan.parentClubId].name} → {game.clubs[p.clubId].name}</dd></>}
@@ -292,7 +295,7 @@ function OwnActions({player: p}: {player: Player}) {
       ))}
       </Fold>
 
-      <Fold title={<><Icon name="trend" size={20} /> {iconize(t("pl.development"))}</>}>
+      <Fold title={<><Icon name="trend" size={20} /> {iconize(t("pl.development"))}{p.individualFocus && <span className="fold-count"> ({p.individualFocus === "rest" ? t("train.rest") : t(`attr.${p.individualFocus}`)})</span>}</>}>
       <div className="field inline">
         <span>{iconize(t("pl.individualFocus"))}</span>
         <FocusPicker player={p} />

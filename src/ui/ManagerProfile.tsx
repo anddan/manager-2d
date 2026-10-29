@@ -9,7 +9,7 @@ import {useT} from "../i18n";
 import {useGame, useGameState} from "../store";
 import {ManagerAvatar, defaultManagerLook} from "./Avatar";
 import {Modal} from "./common";
-import {SHIRT_PATTERNS, type ShirtPattern} from "../game/types";
+import {COLLARS, SHIRT_PATTERNS, SLEEVES, type Collar, type ShirtPattern, type Sleeves} from "../game/types";
 import {Jersey} from "./Jersey";
 import type {TKey} from "../i18n";
 
@@ -23,6 +23,9 @@ export function ManagerProfile({onClose}: {onClose: () => void}) {
   const [managerName, setManagerName] = useState(game.managerName);
   const [color, setColor] = useState(club.color);
   const [color2, setColor2] = useState(club.color2);
+  const [color3, setColor3] = useState<string | undefined>(club.color3);
+  const [collar, setCollar] = useState<Collar>(club.collar ?? "round");
+  const [sleeves, setSleeves] = useState<Sleeves>(club.sleeves ?? "short");
   const [pattern, setPattern] = useState<ShirtPattern>(club.pattern ?? "solid");
   // The club's initials on its crest (up to three letters).
   const [short, setShort] = useState(club.short);
@@ -39,7 +42,10 @@ export function ManagerProfile({onClose}: {onClose: () => void}) {
       if (who) g.managerName = who;
       c.color = color;
       c.color2 = color2;
+      c.color3 = color3;
       c.pattern = pattern === "solid" ? undefined : pattern;
+      c.collar = collar === "round" ? undefined : collar;
+      c.sleeves = sleeves === "short" ? undefined : sleeves;
       const initials = short.trim().toUpperCase();
       if (initials) c.short = initials;
       const name = nick.trim();
@@ -117,13 +123,31 @@ export function ManagerProfile({onClose}: {onClose: () => void}) {
         <div className="mgr-swatch-rows">
           <ColorRow label={t("mgr.color1")} value={color} onPick={setColor} />
           <ColorRow label={t("mgr.color2")} value={color2} onPick={setColor2} />
+          <ColorRow label={t("mgr.color3")} value={color3 ?? color2} onPick={setColor3} />
+          {color3 && <button type="button" className="btn small" onClick={() => setColor3(undefined)}>{iconize(t("mgr.color3Reset"))}</button>}
         {/* The shirt: plain or patterned, in the two colours above. */}
         <h4><Icon name="shirt" size={18} /> {iconize(t("mgr.shirt"))}</h4>
         <div className="shirt-patterns" role="radiogroup" aria-label={t("mgr.shirt")}>
           {SHIRT_PATTERNS.map((p) => (
             <button key={p} type="button" role="radio" aria-checked={p === pattern} className={p === pattern ? "shirt-pattern on" : "shirt-pattern"} onClick={() => setPattern(p)} title={t(`shirt.${p}` as TKey)}>
-              <Jersey color={color} trim={color2} pattern={p} size={44} />
+              <Jersey color={color} trim={color2} pattern={p} trim3={color3} collar={collar} sleeves={sleeves} size={44} />
               <span>{iconize(t(`shirt.${p}` as TKey))}</span>
+            </button>
+          ))}
+        </div>
+        <div className="shirt-patterns" role="radiogroup" aria-label={t("mgr.collar")}>
+          {COLLARS.map((o) => (
+            <button key={o} type="button" role="radio" aria-checked={o === collar} className={o === collar ? "shirt-pattern on" : "shirt-pattern"} onClick={() => setCollar(o)}>
+              <Jersey color={color} trim={color2} pattern={pattern} trim3={color3} size={44} collar={o} sleeves={sleeves} />
+              <span>{iconize(t(`collar.${o}` as TKey))}</span>
+            </button>
+          ))}
+        </div>
+        <div className="shirt-patterns" role="radiogroup" aria-label={t("mgr.sleeves")}>
+          {SLEEVES.map((o) => (
+            <button key={o} type="button" role="radio" aria-checked={o === sleeves} className={o === sleeves ? "shirt-pattern on" : "shirt-pattern"} onClick={() => setSleeves(o)}>
+              <Jersey color={color} trim={color2} pattern={pattern} trim3={color3} size={44} collar={collar} sleeves={o} />
+              <span>{iconize(t(`sleeves.${o}` as TKey))}</span>
             </button>
           ))}
         </div>

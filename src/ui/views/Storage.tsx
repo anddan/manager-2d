@@ -53,7 +53,7 @@ export function Storage() {
         {bag.length === 0 ? (
           <Empty>{iconize(t("storage.empty"))}</Empty>
         ) : (
-          <div className="gear-cards">
+          <div className="gear-cards storage-cards">
             {groupBag(bag).map(({item, index: i, count}) => (
               <div key={i} className="gear-offer">
                 <GearCard item={item} count={count} />
@@ -93,7 +93,7 @@ export function Storage() {
           <ul className="plain-list storage-list">
             {wearing.map(({player: p, slot, item}) => (
               <li key={p.id + slot} className="storage-row">
-                <GearPicture item={item} size={item.kind === "gloves" ? 26 : item.kind === "shin" ? 20 : 38} />
+                <span className="storage-pic"><GearPicture item={item} size={item.kind === "gloves" ? 44 : item.kind === "shin" ? 46 : 66} /></span>
                 <span className="storage-what">
                   <strong>{iconize(t(`gear.kind.${item.kind}`))} · {iconize(t(`gear.tier.${item.tier}`))}</strong>
                   <button className="link" onClick={() => openPlayer(p.id)}>

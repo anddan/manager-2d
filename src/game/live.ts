@@ -6,11 +6,13 @@
 // counted later by finishWeek, which replays the same seed with the same
 // choices and commands.
 import {matchLength} from "./clock";
+import {FORMATIONS, roleAt, type Slot} from "./constants";
+import {assignToSlots} from "./lineup";
 import {findFixture} from "./helpers";
 import {bestSub, createMatch, ordersFor, type MatchRun, type Team} from "./match";
 import {Rng} from "./rng";
 import type {SetPiece, SetPieceInput} from "./setpieces";
-import type {GameState, InstructionKey, InstructionLevel, Instructions, MatchCommand, MatchReport, Player, Position, Side} from "./types";
+import type {FormationId, GameState, InstructionKey, InstructionLevel, Instructions, MatchCommand, MatchReport, Player, Position, Side} from "./types";
 
 export type SetPieceRole = "shooter" | "keeper";
 
@@ -223,6 +225,58 @@ export class LiveMatch {
   /** Current level of one instruction, counting ones still waiting for the next minute. */
   level(id: string, key: InstructionKey): InstructionLevel {
     return this.instructions(id)[key] ?? 0;
+  }
+
+  /** Takes back every command given after the first `count` (the substitutions dialog was cancelled); returns what was taken back. */
+  cancelSince(count: number): MatchCommand[] {
+    return this.commands.splice(count);
+  }
+
+  /** The formation the team is in (or will be, once a change given now takes effect). */
+  formation(): FormationId | undefined {
+    let f: FormationId | undefined = this.teams[this.userSide].club.customSlots ? undefined : this.teams[this.userSide].club.formation;
+    for (const c of this.commands) {
+      if (c.type === "formation") f = c.formation;
+      // A swap or a move makes it a custom one.
+      if (c.type === "swap" || c.type === "place") f = undefined;
+    }
+    return f;
+  }
+
+  /** The places as they will stand once what's been given takes effect (numbered as the team's own). */
+  previewSlots(): Slot[] {
+    const team = this.teams[this.userSide];
+    let slots = team.slots;
+    const from = this.commandMinute();
+    for (const c of this.commands) {
+      if (c.minute < from) continue;
+      if (c.type === "formation") {
+        const target = FORMATIONS[c.formation];
+        const at = assignToSlots(this.copy, team.onPitch.map((o) => o.id), target);
+        const left = target.filter((_, i) => !at.includes(i));
+        const base = slots;
+        slots = base.map((_, i) => {
+          const k = team.onPitch.findIndex((o) => o.slot === i);
+          return k >= 0 ? target[at[k]] : left.shift() ?? target[0];
+        });
+      } else if (c.type === "swap") {
+        const a = team.onPitch.find((o) => o.id === c.aId);
+        const b = team.onPitch.find((o) => o.id === c.bId);
+        if (a && b && a !== b) {
+          slots = slots.slice();
+          [slots[a.slot], slots[b.slot]] = [slots[b.slot], slots[a.slot]];
+        }
+      } else if (c.type === "place") {
+        const o = team.onPitch.find((p) => p.id === c.playerId);
+        if (o && slots[o.slot].pos !== "GK") {
+          const x = Math.max(8, Math.min(78, c.x));
+          const y = Math.max(6, Math.min(94, c.y));
+          slots = slots.slice();
+          slots[o.slot] = {pos: roleAt(x, y), x, y};
+        }
+      }
+    }
+    return slots;
   }
 
   /** The whole team's level for one instruction, counting ones still waiting. */

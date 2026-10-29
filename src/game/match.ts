@@ -8,12 +8,12 @@
 // substitutions and instructions can come in) and at every set piece (so the
 // user can take it). simulateMatch runs one straight through.
 import {SHIN_PROTECT, geared} from "./gear";
-import {DIAMONDS_PER_WIN, MAX_SUBS, clubSlots, type Slot} from "./constants";
+import {DIAMONDS_PER_WIN, FORMATIONS, MAX_SUBS, clubSlots, roleAt, type Slot} from "./constants";
 import {crowdFor, matchAppeal} from "./finance";
 import {book, findFixture, isCupFixture, isKnockout} from "./helpers";
 import {injure} from "./injuries";
 import {hasTrait} from "./traits";
-import {isAvailable} from "./lineup";
+import {assignToSlots, isAvailable} from "./lineup";
 import {distance, fromSide, progressFor, teamSpot, type Point} from "./pitch";
 import {FORM_EFFECT, effectiveRating} from "./ratings";
 import {Rng, clamp} from "./rng";
@@ -260,6 +260,7 @@ interface SimContext {
   ratings: Record<string, number>;
   minutes: Record<string, {on: number; off: number}>;
   sentOff: Set<string>;
+  slotChanges: {minute: number; side: Side; slots: Slot[]}[];
 }
 
 function substitute(ctx: SimContext, team: Team, out: OnPitch, minute: number, chosen?: string): boolean {
@@ -1067,7 +1068,7 @@ export function createMatch(
   const rival = managed === "home" ? away : managed === "away" ? home : undefined;
   const bigMatch = isKnockout(fixture) || (!isCupFixture(fixture) && matchAppeal(state, fixture) >= 1.2);
   const rivalForzaAt = rival && bigMatch ? 55 + (hashString(fixture.id) % 30) : undefined;
-  const ctx: SimContext = {state, rng, events: [], ratings: {}, minutes: {}, sentOff: new Set()};
+  const ctx: SimContext = {state, rng, events: [], ratings: {}, minutes: {}, sentOff: new Set(), slotChanges: []};
   for (const team of [home, away]) {
     for (const o of team.onPitch) {
       ctx.ratings[o.id] = 6;
@@ -1095,6 +1096,7 @@ export function createMatch(
     lineups: {home: homeClub.lineup.slice(), away: awayClub.lineup.slice()},
     formations: {home: homeClub.formation, away: awayClub.formation},
     slots: {home: clubSlots(homeClub), away: clubSlots(awayClub)},
+    slotChanges: ctx.slotChanges,
     crowd: (() => {
       const c = crowdFor(state, homeClub, fixture);
       return {fans: c.fans, rate: c.rate, capacity: homeClub.capacity, gate: c.fans * c.price};
@@ -1124,6 +1126,41 @@ export function createMatch(
         if (!team || minute < team.forzaUntil) continue;
         team.forzaUntil = minute + FORZA.minutes;
         ctx.events.push({minute, type: "instruction", side: team.side, note: "forza"});
+      } else if (c.type === "formation") {
+        const team = managed === "home" ? home : managed === "away" ? away : undefined;
+        const slots = FORMATIONS[c.formation];
+        // Not while someone injured is waiting to be replaced (their place would move).
+        if (!team || !slots || team.injured.length > 0) continue;
+        const ids = team.onPitch.map((o) => o.id);
+        const at = assignToSlots(ctx.state, ids, slots);
+        // Everyone keeps their number; the places change under them (so the replay can follow).
+        const left = slots.filter((_, i) => !at.includes(i));
+        const next = team.slots.map((_, i) => {
+          const k = team.onPitch.findIndex((o) => o.slot === i);
+          return k >= 0 ? slots[at[k]] : left.shift() ?? slots[0];
+        });
+        team.slots = next;
+        ctx.slotChanges.push({minute, side: team.side, slots: next});
+        ctx.events.push({minute, type: "instruction", side: team.side, note: `form:${c.formation}`});
+      } else if (c.type === "swap" || c.type === "place") {
+        const team = managed === "home" ? home : managed === "away" ? away : undefined;
+        if (!team) continue;
+        const next = team.slots.slice();
+        if (c.type === "swap") {
+          const a = team.onPitch.find((o) => o.id === c.aId);
+          const b = team.onPitch.find((o) => o.id === c.bId);
+          if (!a || !b || a === b) continue;
+          [next[a.slot], next[b.slot]] = [next[b.slot], next[a.slot]];
+        } else {
+          const o = team.onPitch.find((p) => p.id === c.playerId);
+          // The keeper stays in goal.
+          if (!o || team.slots[o.slot].pos === "GK") continue;
+          const x = Math.max(8, Math.min(78, c.x));
+          const y = Math.max(6, Math.min(94, c.y));
+          next[o.slot] = {pos: roleAt(x, y), x, y};
+        }
+        team.slots = next;
+        ctx.slotChanges.push({minute, side: team.side, slots: next});
       } else if (c.type === "instructTeam") {
         const team = managed === "home" ? home : managed === "away" ? away : undefined;
         if (!team) continue;
