@@ -2397,3 +2397,11 @@ button.manager-item:hover:not(:disabled) { background: rgb(127 127 127 / 0.18); 
 @media (max-width: 599px) { .topbar .continue { margin-top: 4px; } }
 /* The club badge in the top bar: 4 px larger; the row keeps its height (the text beside it is taller). */
 .topbar .crest { width: 42px; height: 42px; margin-left: 2px; }
+/* A field the agent didn't accept in the offer: a red border until it's changed. */
+.field.bad input, .field.bad select { border-color: #ef4444 !important; box-shadow: 0 0 0 2px rgb(239 68 68 / 0.35); }
+.field.bad > span { color: #fca5a5; }
+/* On wider screens the manager's icon is smaller and sits in the row as usual (no spilling over). */
+@media (min-width: 600px) {
+  .topbar-manager { align-self: center; margin: 0; }
+  .topbar-manager .avatar { width: 46px; height: 46px; }
+}

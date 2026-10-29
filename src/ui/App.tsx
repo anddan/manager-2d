@@ -182,6 +182,8 @@ function useBadges(): Partial<Record<View, number>> {
     overview: dailyToCollect(game.daily),
     // Kit bought but not put on anyone yet.
     storage: game.gearBag?.length ?? 0,
+    // Bids on our players, waiting for an answer.
+    transfers: game.incomingBids.length,
     // Players up for sale to a friend with a code, waiting to be bought.
     codes: Object.keys(game.friendSales ?? {}).length,
     // Things to do in the friends' cup: offers to answer, matches to see, prizes, rounds to play.
@@ -192,7 +194,7 @@ function useBadges(): Partial<Record<View, number>> {
 }
 
 /** Pages whose number is a reminder rather than something waiting (shown in blue, not red). */
-const BLUE_BADGES: View[] = ["storage", "codes"];
+const BLUE_BADGES: View[] = ["storage", "codes", "transfers"];
 const badgeClass = (v: View) => (BLUE_BADGES.includes(v) ? "badge blue" : "badge");
 
 /**

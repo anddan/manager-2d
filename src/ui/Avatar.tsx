@@ -451,7 +451,7 @@ function FaceDefs() {
 }
 
 /** The head and face in a 100x100 box, centred at (50, 45). For use inside any SVG. */
-export function Face({look, mood = 60}: {look: Look; mood?: number}) {
+export function Face({look, mood = 60, neck = false}: {look: Look; mood?: number; neck?: boolean}) {
   const face = moodFace(mood);
   // Worried brows lift in the middle; furious ones drop.
   const browTilt = face === "sad" ? 2.2 : face === "upset" ? -2.6 : face === "elated" ? -0.5 + look.brows * 0.3 : look.brows;
@@ -480,6 +480,13 @@ export function Face({look, mood = 60}: {look: Look; mood?: number}) {
       <g stroke={hairEdge} strokeWidth={0.7} strokeOpacity={0.6}>
         <HairBack look={look} />
       </g>
+      {/* The neck, in front of long hair behind it but under the head. */}
+      {neck && (
+        <g>
+          <rect x={43} y={60} width={14} height={20} rx={4} fill={look.skin} />
+          <rect x={43} y={60} width={14} height={14} rx={4} fill="#000" opacity={0.18} />
+        </g>
+      )}
       {/* Ears, with the fold inside. */}
       {[29, 71].map((x) => (
         <g key={x}>
@@ -604,9 +611,7 @@ export function KitAvatar({look, keeper = false, shirt, trim, size = 96, mood = 
     <svg viewBox="0 0 100 100" width={size} height={size} className="avatar" aria-hidden>
       <path d="M14 100 Q16 80 34 76 L66 76 Q84 80 86 100Z" fill={kit} />
       <path d="M40 76 L50 86 L60 76" fill="none" stroke={kitTrim} strokeWidth={3} strokeLinejoin="round" />
-      <rect x={43} y={64} width={14} height={14} rx={4} fill={look.skin} />
-      <rect x={43} y={64} width={14} height={9} rx={4} fill="#000" opacity={0.18} />
-      <Face look={look} mood={mood} />
+      <Face look={look} mood={mood} neck />
     </svg>
   );
 }

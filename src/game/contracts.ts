@@ -108,6 +108,18 @@ export function offerScore(demand: ContractOffer, offer: ContractOffer): number 
   return score;
 }
 
+/** The parts of an offer that fall short of what the player asks (what the agent won't accept as it is). */
+export function offerShortfalls(demand: ContractOffer, offer: ContractOffer): (keyof ContractOffer)[] {
+  const bad: (keyof ContractOffer)[] = [];
+  if (offer.wage < demand.wage) bad.push("wage");
+  if (offer.years !== demand.years) bad.push("years");
+  if (offer.signingBonus < demand.signingBonus) bad.push("signingBonus");
+  if (offer.goalBonus < demand.goalBonus) bad.push("goalBonus");
+  if (offer.appearanceBonus < demand.appearanceBonus) bad.push("appearanceBonus");
+  if (ROLE_RANK[offer.role] < ROLE_RANK[demand.role]) bad.push("role");
+  return bad;
+}
+
 export function evaluateOffer(state: GameState, neg: Negotiation, offer: ContractOffer): NegotiationResult {
   const p = state.players[neg.playerId];
   const score = offerScore(neg.demand, offer);

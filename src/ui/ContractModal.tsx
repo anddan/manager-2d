@@ -3,7 +3,7 @@
 import {Icon, iconize} from "./Icon";
 import {useState} from "react";
 import {fullName, shortName} from "../game/helpers";
-import {evaluateOffer, signContract, wageBudgetCheck, type ContractOffer} from "../game/contracts";
+import {evaluateOffer, offerShortfalls, signContract, wageBudgetCheck, type ContractOffer} from "../game/contracts";
 import {completeTransfer} from "../game/transfers";
 import {SQUAD_ROLES, type SquadRole} from "../game/types";
 import {useT} from "../i18n";
@@ -25,10 +25,15 @@ export function ContractModal() {
   // The answer takes a moment, shown as waiting on the button; the reply then sits by the button.
   const [waiting, setWaiting] = useState(false);
   const [replies, setReplies] = useState(0);
+  // What the agent didn't accept in the last offer: marked in red until it's changed.
+  const [bad, setBad] = useState<(keyof ContractOffer)[]>([]);
   if (!p) return null;
   const budget = wageBudgetCheck(game, neg.clubId, p.id, offer.wage);
   const close = () => setNegotiation(null);
-  const set = <K extends keyof ContractOffer>(key: K, value: ContractOffer[K]) => setOffer({...offer, [key]: value});
+  const set = <K extends keyof ContractOffer>(key: K, value: ContractOffer[K]) => {
+    setOffer({...offer, [key]: value});
+    setBad((b) => b.filter((k) => k !== key));
+  };
 
   const submit = () => {
     if (waiting) return;
@@ -43,12 +48,13 @@ export function ContractModal() {
   const answer = () => {
     const outcome = act((g) => {
       const draft = structuredClone(neg);
+      const short = offerShortfalls(neg.demand, offer);
       const result = evaluateOffer(g, draft, offer);
       if (result.status === "accepted") {
         if (neg.kind !== "renewal") completeTransfer(g, p.id, neg.clubId, neg.fee, neg.upfrontShare, neg.installmentWeeks);
         signContract(g, p.id, neg.clubId, offer);
       }
-      return {result, draft};
+      return {result, draft, short};
     });
     if (outcome.result.status === "accepted") {
       notify("toast.contractSigned", {name: shortName(p)}, "good");
@@ -56,6 +62,7 @@ export function ContractModal() {
       openPlayer(p.id);
     } else if (outcome.result.status === "counter") {
       setNegotiation(outcome.draft);
+      setBad(outcome.short);
       setReply(t("neg.counter", {wage: outcome.result.demand.wage}));
       setReplies((n) => n + 1);
     } else {
@@ -66,7 +73,7 @@ export function ContractModal() {
   };
 
   const numberField = (key: "wage" | "signingBonus" | "goalBonus" | "appearanceBonus", step: number) => (
-    <label className="field">
+    <label className={bad.includes(key) ? "field bad" : "field"}>
       <span>{iconize(t(`neg.${key}`))} <small className="muted">({t("neg.asks")} {money(neg.demand[key])})</small></span>
       <NumberInput step={step} value={offer[key]} onChange={(n) => set(key, n)} />
     </label>
@@ -78,7 +85,7 @@ export function ContractModal() {
       <p className="muted">{iconize(t("neg.intro", {round: neg.round + 1}))}</p>
       <div className="form-grid">
         {numberField("wage", 50)}
-        <label className="field">
+        <label className={bad.includes("years") ? "field bad" : "field"}>
           <span>{iconize(t("neg.years"))} <small className="muted">({t("neg.asks")} {neg.demand.years})</small></span>
           <select value={offer.years} onChange={(e) => set("years", Number(e.target.value))}>
             {[1, 2, 3, 4, 5].map((y) => <option key={y} value={y}>{y}</option>)}
@@ -87,7 +94,7 @@ export function ContractModal() {
         {numberField("signingBonus", 500)}
         {numberField("goalBonus", 50)}
         {numberField("appearanceBonus", 50)}
-        <label className="field">
+        <label className={bad.includes("role") ? "field bad" : "field"}>
           <span>{iconize(t("col.role"))} <small className="muted">({t("neg.asks")} {iconize(t(`role.${neg.demand.role}`))})</small></span>
           <select value={offer.role} onChange={(e) => set("role", e.target.value as SquadRole)}>
             {SQUAD_ROLES.map((r) => <option key={r} value={r}>{iconize(t(`role.${r}`))}</option>)}
