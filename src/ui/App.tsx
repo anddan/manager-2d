@@ -431,7 +431,7 @@ function TopBar() {
           </span>
         </button>
         <button className="topbar-manager" onClick={() => setProfile(true)} title={game.managerName}>
-          <ManagerAvatar look={game.managerLook ?? defaultManagerLook(game.managerName)} size={60} tie={club.color} />
+          <ManagerAvatar look={game.managerLook ?? defaultManagerLook(game.managerName)} size={62} tie={club.color} />
           <span>{game.managerName}</span>
         </button>
       </div>
