@@ -19,8 +19,17 @@ export function diamondBurst(from: Element | null | undefined, amount: number): 
 }
 
 /** Money earned: the same, with coins flying to the club's money in the top bar. `label` is the sum, written out. */
-export function moneyBurst(from: Element | null | undefined, label: string): void {
-  rewardBurst(from, `+${label}`, COINS_SVG, ".hud-cash", 8, " coins");
+export function moneyBurst(from: Element | null | undefined, label: string, coins = 8): void {
+  rewardBurst(from, `+${label}`, COINS_SVG, ".hud-cash", coins, " coins");
+}
+
+/**
+ * Several players sold at once: a big burst of coins (more the more players) and a till that rings
+ * once for each, one after the other. (The deals' watcher sees this one has been shown and keeps quiet.)
+ */
+export function multiSaleBurst(from: Element | null | undefined, label: string, players: number): void {
+  moneyBurst(from, label, Math.min(26, 8 + players * 4));
+  for (let i = 1; i < players && i < 8; i++) setTimeout(() => kaching(), i * 170);
 }
 
 /**

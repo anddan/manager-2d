@@ -97,7 +97,7 @@ export function Tactics() {
     if (actions === null) return;
     const away = (e: PointerEvent) => {
       const el = e.target as Element | null;
-      if (el?.closest(".slot-actions") || el?.closest(`[data-slot="${actions}"]`)) return;
+      if (el?.closest(".pop-actions") || el?.closest(`[data-slot="${actions}"]`)) return;
       setActions(null);
     };
     document.addEventListener("pointerdown", away, true);
@@ -324,7 +324,6 @@ export function Tactics() {
         </div>
         <p className="muted small">{iconize(t(`tac.${club.mentality}Hint`))}</p>
 
-        <p className="kit-badge"><Jersey color={kit.color} trim={kit.color2} pattern={kit.pattern} trim3={kit.color3} collar={kit.collar} sleeves={kit.sleeves} size={22} /> {iconize(t(playingAway ? "tac.kitAway" : "tac.kitHome"))}</p>
         <div ref={board} className={`pitch-board ${custom ? "custom" : ""}`} data-free={custom ? "" : undefined} role="group" aria-label={t("tac.pitch")} onClick={(e) => e.target === e.currentTarget && setActions(null)}>
           <div className="pitch-lines" aria-hidden />
           {slots.map((slot, i) => {
@@ -336,7 +335,7 @@ export function Tactics() {
               <button
                 key={i}
                 data-slot={i}
-                className={`slot ${actions === i ? "acting" : ""} ${flash.includes(i) ? "flash" : ""} ${selected === i ? "selected" : ""} ${bad && !out ? "empty" : ""} ${out ? "out" : ""} ${drag.over === i ? "drop" : ""}`}
+                className={`slot ${flash.includes(i) ? "flash" : ""} ${selected === i ? "selected" : ""} ${bad && !out ? "empty" : ""} ${out ? "out" : ""} ${drag.over === i ? "drop" : ""}`}
                 style={spots[i]}
                 onPointerDown={p && !bad ? (e) => drag.start(e, p.id, i, shortName(p)) : custom && i > 0 ? (e) => drag.start(e, "", i, t(`pos.${slot.pos}`)) : undefined}
                 // A shirt with someone in it opens their profile (where they can be taken out); an empty spot, the picker.
@@ -375,18 +374,18 @@ export function Tactics() {
           {actions !== null && bar && game.players[club.lineup[actions]] && (() => {
             const who = game.players[club.lineup[actions]];
             return (
-              <div className="slot-actions" style={{left: spots[actions].left, top: `calc(${spots[actions].top} + ${bar.drop}px)`, width: bar.width, height: bar.height}} role="toolbar">
-                <button className="slot-action out" aria-label={t("tac.clearSlot", {name: listName(who)})} title={t("tac.clearSlot", {name: listName(who)})} onClick={() => { act((g) => { const c = g.clubs[g.userClubId]; c.lineup = c.lineup.map((id, k) => (k === actions ? "" : id)); }); setActions(null); }}>
+              <div className="pop-actions" style={{left: spots[actions].left, top: Math.min((parseFloat(spots[actions].top) / 100) * (board.current?.clientHeight ?? 0) + bar.drop + bar.height + 4, (board.current?.clientHeight ?? 9999) - 44)}} role="toolbar">
+                <button className="pop-action out" aria-label={t("tac.clearSlot", {name: listName(who)})} title={t("tac.clearSlot", {name: listName(who)})} onClick={() => { act((g) => { const c = g.clubs[g.userClubId]; c.lineup = c.lineup.map((id, k) => (k === actions ? "" : id)); }); setActions(null); }}>
                   <Icon name="close" size={14} />
                 </button>
-                <button className="slot-action" aria-label={t("tac.profile")} title={t("tac.profile")} onClick={() => { const i = actions; setActions(null); openPlayer(who.id, i); }}>
+                <button className="pop-action" aria-label={t("tac.profile")} title={t("tac.profile")} onClick={() => { const i = actions; setActions(null); openPlayer(who.id, i); }}>
                   <Icon name="user" size={14} />
                 </button>
               </div>
             );
           })()}
         </div>
-        <p className="muted small">{iconize(t(custom ? "tac.customHint" : "tac.dragHint"))}</p>
+        <p className="kit-badge"><Jersey color={kit.color} trim={kit.color2} pattern={kit.pattern} trim3={kit.color3} collar={kit.collar} sleeves={kit.sleeves} size={22} /> {iconize(t(playingAway ? "tac.kitAway" : "tac.kitHome"))}</p>
       </Card>
       {drag.ghost && <div className="drag-ghost" style={{left: drag.ghost.x, top: drag.ghost.y}}>{drag.ghost.label}</div>}
 
@@ -401,7 +400,10 @@ export function Tactics() {
           candidateList
         ) : (
           <>
-            <Hint>{iconize(t("tac.benchHint"))}</Hint>
+            <Hint>
+              <p>{iconize(t("tac.benchHint"))}</p>
+              <p>{iconize(t(custom ? "tac.customHint" : "tac.dragHint"))}</p>
+            </Hint>
             <ul className="pick-list">
               {(benched.length > 0 || !!drag.ghost) && <li className={`pick-group bench-head ${typeof drag.over === "object" && drag.over !== null && "zone" in drag.over && drag.over.zone === "bench" ? "drop" : ""}`} data-zone="bench"><Icon name="bench" size={18} /> {iconize(t("tac.benchGroup", {n: benched.length, max: BENCH_SIZE}))}</li>}
               {benched.map((p) => row(p, true))}

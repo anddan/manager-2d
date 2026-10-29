@@ -2409,3 +2409,129 @@ button.manager-item:hover:not(:disabled) { background: rgb(127 127 127 / 0.18); 
 .subs-panel .slot.out { opacity: 0.55; cursor: pointer; }
 .subs-panel .slot.out:not(:disabled):hover { opacity: 0.8; }
 .slot-undo { position: absolute; top: -4px; right: 2px; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: #fff; box-shadow: 0 2px 6px rgb(0 0 0 / 0.4); }
+/* The zones view: the pitch in three, grey to red by how much the ball has been there. */
+.zone-panel { flex: 1 1 100%; margin: 0; display: grid; justify-items: center; gap: 4px; }
+.zone-pct { fill: #fff; font-size: 12px; font-weight: 900; text-anchor: middle; paint-order: stroke; stroke: rgb(0 0 0 / 0.55); stroke-width: 1.6px; }
+.zone-name { fill: #fff; font-size: 5px; font-weight: 800; text-anchor: middle; letter-spacing: 0.4px; text-transform: uppercase; paint-order: stroke; stroke: rgb(0 0 0 / 0.5); stroke-width: 1px; }
+/* The zones view: the banners (goal, full time, crowd…) sit above the pitch; the possession bar tops the pitch. */
+/* The zones view: the pitch stays put; the banners (a set piece, the crowd, a goal, the end) lie over it. */
+.pitch-wrap.text-only.zones { display: block; position: relative; padding: 0; background: none; min-height: 0; }
+.pitch-wrap.text-only.zones .setup-banner, .pitch-wrap.text-only.zones .crowd-banner, .pitch-wrap.text-only.zones .replay-badge { position: absolute; top: 40px; left: 50%; transform: translateX(-50%); z-index: 3; max-width: 92%; box-shadow: 0 4px 14px rgb(0 0 0 / 0.5); }
+.pitch-wrap.text-only.zones .goal-banner { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 3; padding: 8px 18px; border-radius: 14px; background: rgb(11 20 48 / 0.82); }
+/* The zones board: the lineup as in Tactics, the zones laid over the grass, the numbers discreet. */
+.zone-board { width: min(100%, 330px); margin: 0; }
+.zone-band { position: absolute; left: 0; right: 0; height: 33.34%; pointer-events: none; }
+.zone-box { position: absolute; left: 26%; width: 48%; height: 13%; border: 2px solid rgb(255 255 255 / 0.5); pointer-events: none; }
+.zone-box.top { top: 3%; border-top: 0; }
+.zone-box.bottom { bottom: 3%; border-bottom: 0; }
+.zone-corner { position: absolute; width: 11px; height: 11px; border: 2px solid rgb(255 255 255 / 0.5); pointer-events: none; }
+.zone-corner.tl { left: 3%; top: 3%; border-radius: 0 0 100% 0; border-top: 0; border-left: 0; }
+.zone-corner.tr { right: 3%; top: 3%; border-radius: 0 0 0 100%; border-top: 0; border-right: 0; }
+.zone-corner.bl { left: 3%; bottom: 3%; border-radius: 0 100% 0 0; border-bottom: 0; border-left: 0; }
+.zone-corner.br { right: 3%; bottom: 3%; border-radius: 100% 0 0 0; border-bottom: 0; border-right: 0; }
+.zone-label { position: absolute; right: 6%; transform: translateY(-50%); display: grid; justify-items: end; line-height: 1.05; pointer-events: none; opacity: 0.6; }
+.zone-pct { font-size: 0.95rem; font-weight: 900; color: #fff; text-shadow: 0 1px 3px rgb(0 0 0 / 0.6); }
+.zone-name { font-size: 0.55rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: #fff; text-shadow: 0 1px 3px rgb(0 0 0 / 0.6); }
+.zone-slot { cursor: default; }
+.zone-slot:hover { transform: translate(-50%, 0); }
+.zone-slot .plate-info strong.good { color: #4ade80; }
+.zone-slot .plate-info strong.bad { color: #f87171; }
+.zone-fit { display: inline-block; width: 22px; height: 5px; border-radius: 3px; background: rgb(255 255 255 / 0.2); overflow: hidden; }
+.zone-fit i { display: block; height: 100%; border-radius: 3px; background: #4ade80; }
+.zone-fit i.mid { background: #facc15; }
+.zone-fit i.bad { background: #f87171; }
+.zone-shout { position: absolute; left: 2%; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 4px; max-width: 86%; z-index: 4; }
+.zone-shout .avatar { border-radius: 50%; background: rgb(255 255 255 / 0.85); box-shadow: 0 2px 6px rgb(0 0 0 / 0.4); }
+.zone-shout-bubble { padding: 4px 9px; border-radius: 12px; background: #fff; color: #0b1430; font-size: 0.78rem; font-weight: 700; box-shadow: 0 3px 10px rgb(0 0 0 / 0.4); }
+/* The players on the zones board: smaller and see-through so the zones show; a tapped one lights up. */
+.zone-slot { opacity: 0.68; transform: translate(-50%, 0) scale(0.84); transform-origin: 50% 0; cursor: pointer; }
+.zone-slot:hover { transform: translate(-50%, 0) scale(0.84); opacity: 0.85; }
+.zone-slot.picked { opacity: 1; z-index: 3; }
+.zone-slot.picked .jersey { filter: drop-shadow(0 0 6px var(--accent)); }
+/* The shirt's shadow is no longer cut off by the picture's edges (it showed as a square behind each player); the players are not see-through. */
+.jersey { overflow: visible; }
+.zone-slot { opacity: 1; }
+.zone-slot:hover { opacity: 1; }
+/* The statistics above the zones board: one neutral style, as wide as the board; the user's side in the accent colour. */
+.zone-stats { width: min(100%, 330px); display: grid; gap: 4px; padding: 8px 12px 10px; border-radius: 14px; background: rgb(255 255 255 / 0.07); font-size: 0.82rem; }
+.zs-head { display: flex; justify-content: space-between; font-weight: 900; letter-spacing: 0.04em; font-size: 0.78rem; }
+.zs-head span { display: inline-flex; align-items: center; gap: 4px; }
+.zs-row { display: grid; grid-template-columns: 3.4em 1fr 3.4em; align-items: center; text-align: center; }
+.zs-row span { color: rgb(255 255 255 / 0.65); font-size: 0.74rem; }
+.zs-row b:first-child { text-align: left; }
+.zs-row b:last-child { text-align: right; }
+.zs-row b.mine { color: var(--accent); }
+.zs-bar { display: flex; height: 8px; border-radius: 999px; overflow: hidden; background: rgb(255 255 255 / 0.1); gap: 2px; }
+.zs-bar i { display: block; height: 100%; background: rgb(255 255 255 / 0.4); transition: width 0.6s ease; }
+.zs-bar i.mine { background: var(--accent); }
+/* The zones as one soft wash, and the effects on the players: blue for Forza!, yellow for an instruction. */
+.zone-wash { position: absolute; inset: 0; pointer-events: none; }
+.zone-slot.forza .jersey { filter: drop-shadow(0 0 7px #3b9cff) drop-shadow(0 0 3px #3b9cff); animation: zone-glow-blue 1.2s ease-in-out infinite; }
+.zone-slot.instructed .jersey { filter: drop-shadow(0 0 8px #facc15) drop-shadow(0 0 3px #facc15); animation: zone-glow-yellow 0.9s ease-in-out infinite; }
+@keyframes zone-glow-blue { 0%, 100% { filter: drop-shadow(0 0 3px #3b9cff); } 50% { filter: drop-shadow(0 0 9px #3b9cff) drop-shadow(0 0 4px #7cc0ff); } }
+@keyframes zone-glow-yellow { 0%, 100% { filter: drop-shadow(0 0 3px #facc15); } 50% { filter: drop-shadow(0 0 10px #facc15) drop-shadow(0 0 4px #fde68a); } }
+@media (prefers-reduced-motion: reduce) { .zone-slot.forza .jersey, .zone-slot.instructed .jersey { animation: none; } }
+/* The zones view as a grid: the statistics row, then the board; the banners (a set piece, the crowd, a goal, the end) lie over the board. */
+.pitch-wrap.text-only.zones { display: grid; justify-items: center; align-items: start; position: relative; padding: 0; background: none; min-height: 0; }
+.pitch-wrap.zones .zone-panel { display: contents; }
+.pitch-wrap.zones .zone-stats { grid-row: 1; grid-column: 1; }
+.pitch-wrap.zones .zone-board { grid-row: 2; grid-column: 1; margin-top: 8px; }
+.pitch-wrap.text-only.zones .setup-banner, .pitch-wrap.text-only.zones .crowd-banner, .pitch-wrap.text-only.zones .replay-badge, .pitch-wrap.text-only.zones .goal-banner { position: static; grid-row: 2; grid-column: 1; align-self: center; justify-self: center; z-index: 5; transform: none; margin-top: 8px; max-width: 92%; box-shadow: 0 4px 14px rgb(0 0 0 / 0.5); }
+.zs-head { all: unset; box-sizing: border-box; display: flex; justify-content: space-between; align-items: center; width: 100%; cursor: pointer; font-weight: 900; letter-spacing: 0.04em; font-size: 0.78rem; }
+.zs-head span { display: inline-flex; align-items: center; gap: 4px; }
+.zs-head b { font-weight: 900; font-size: 0.9rem; }
+.zs-head b.mine { color: var(--accent); }
+.zs-chevron { transition: transform 0.15s; opacity: 0.7; }
+.zs-chevron.open { transform: rotate(180deg); }
+.zone-marks { position: absolute; top: -4px; right: -2px; display: flex; gap: 1px; z-index: 2; pointer-events: none; }
+.zone-mark { display: inline-flex; align-items: center; justify-content: center; min-width: 17px; height: 17px; padding: 0 2px; border-radius: 9px; background: rgb(11 20 48 / 0.85); color: #fff; font-size: 0.62rem; font-weight: 900; gap: 1px; box-shadow: 0 1px 4px rgb(0 0 0 / 0.5); }
+.zone-mark i { font-style: normal; }
+.zone-mark.assist { color: #7cc0ff; }
+.zone-slot .jersey { position: relative; }
+.pitch-wrap.text-only.zones { grid-template-columns: min(100%, 330px); justify-content: center; }
+.pitch-wrap.zones .zone-stats, .pitch-wrap.zones .zone-board { width: 100%; }
+.zone-shout { top: 63%; }
+/* Just the icon: a round button. */
+/* The manager's menu: up or down, always over what's beside it. */
+.manager-pop.up { position: absolute; top: auto; bottom: calc(100% + 6px); left: 0; width: min(320px, calc(100vw - 32px)); margin-top: 0; }
+.manager-pop.down { position: absolute; top: calc(100% + 6px); bottom: auto; left: 0; width: min(320px, calc(100vw - 32px)); margin-top: 0; }
+/* A long comment wraps inside its pill instead of running out of it. */
+.pitch-wrap.text-only.zones .setup-banner, .pitch-wrap.text-only.zones .crowd-banner, .pitch-wrap.text-only.zones .replay-badge { white-space: normal; text-align: center; width: max-content; max-width: 90%; border-radius: 16px; line-height: 1.3; padding: 6px 14px; }
+/* The tap bar on a player: their profile, and the blue "take off". */
+.bench-pick { display: flex; gap: 6px; align-items: stretch; }
+.bench-pick > .pick { flex: 1; min-width: 0; }
+.bench-profile { flex: 0 0 auto; display: grid; place-items: center; width: 40px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); color: inherit; cursor: pointer; }
+/* The tap bar in the Tactics style: a small bar with square-cornered buttons (take off in blue, the profile to the right). */
+/* The match settings: as before, label and choice side by side; the way to watch gets a full-width switch with icons, as in the match menu. */
+.setting-rows dt.view-row { grid-column: 1 / -1; }
+.setting-rows dd.view-row { grid-column: 1 / -1; justify-self: stretch; }
+.setting-rows .manager-view { display: flex; width: 100%; }
+/* The tap bar lies right over the player's name plate (measured), as in Tactics. */
+/* The match settings: the chosen option lit in blue, as in the manager's menu in the match. */
+.setting-rows .speed-group { border: 0; background: rgb(127 127 127 / 0.16); padding: 3px; gap: 2px; }
+.setting-rows .speed-group .chip { border-radius: 999px; font-weight: 700; }
+.setting-rows .speed-group .chip.active { background: var(--accent); color: #fff; }
+/* The take-off button in the Tactics bar's style: the same bar, in blue where Tactics has red. */
+.slot-action.swap { background: #1e8bff; }
+.slot-action.swap:hover { background: #3b9cff; color: #fff; }
+.slot-action:disabled { opacity: 0.5; cursor: default; }
+/* The tap buttons on a player: two round buttons that pop up under the name (Tactics, the zones, the substitutions). */
+.pop-actions { position: absolute; z-index: 6; transform: translateX(-50%); display: flex; gap: 8px; animation: pop-actions-in 0.16s ease-out; }
+.pop-action { width: 38px; height: 38px; padding: 0; border: 0; border-radius: 50%; display: grid; place-items: center; background: var(--chrome, #0b1430); color: #fff; box-shadow: 0 4px 12px rgb(0 0 0 / 0.5); cursor: pointer; }
+.pop-action:hover { filter: brightness(1.2); }
+.pop-action.swap { background: #1e8bff; }
+.pop-action.out { background: #dc2626; }
+.pop-action:disabled { opacity: 0.5; cursor: default; }
+@keyframes pop-actions-in { from { opacity: 0; transform: translateX(-50%) scale(0.5); } to { opacity: 1; transform: translateX(-50%) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .pop-actions { animation: none; } }
+/* The way to watch sits on the same row as its label, with the icons and short names. */
+.setting-rows .manager-view { width: auto; }
+.setting-rows .manager-view .chip { padding: 5px 9px; gap: 4px; }
+.setting-rows .manager-view .chip { padding: 5px 7px; gap: 3px; font-size: 0.8rem; }
+.setting-rows .manager-view .chip .icon { width: 14px; height: 14px; }
+/* Picking several players in the squad to sell at once. */
+.squad-select-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; padding: 8px 10px; border-radius: 12px; background: rgb(30 139 255 / 0.12); }
+.picked-row { background: rgb(30 139 255 / 0.14); }
+.sell-many { display: grid; gap: 6px; margin: 0 0 8px; }
+.sell-many li { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
+.sell-many .num { margin-left: auto; font-weight: 800; }

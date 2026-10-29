@@ -23,13 +23,13 @@ describe("finishing", () => {
           if (!before || before.possession !== frames[j].possession || !before.playerId || before.playerId === frames[j].playerId) break;
           const side = frames[j].possession!;
           const width = side === "home" ? before.y : 100 - before.y;
-          if (progressFor(side, before.x) > 74 && width > 22 && width < 78 && progressFor(side, frames[j].x) < progressFor(side, before.x) - 1) backPasses++;
+          if (frames[j].flight !== "cross" && progressFor(side, before.x) > 74 && width > 22 && width < 78 && progressFor(side, frames[j].x) < progressFor(side, before.x) - 1) backPasses++;
           break;
         }
       }
     }
     expect(shots).toBeGreaterThan(500);
-    expect(backPasses / shots).toBeLessThan(0.03);
+    expect(backPasses).toBe(0);
   }, 120_000);
 
   it("gives the same result whether or not the match is drawn", () => {

@@ -583,8 +583,11 @@ class Replay {
     // How far back a pass may go before it gets unlikely, by the passer's role.
     // In the final third, everyone looks forward (and fired up, everyone everywhere).
     const backTolerance = fired ? 2.5 : progress > 66 ? 5 : fromPos === "ST" || fromPos === "W" || fromPos === "AM" ? 7 : deep ? 18 : 11;
+    // Close to goal (in front of it: free, or nearly) a pass never goes back: on towards goal, or square at the least.
+    const noBack = progress > 70;
     const options = team.onPitch.filter((o) => {
       if (o.id === from) return false;
+      if (noBack && progressFor(team.side, this.spot(team, o.id, true).x) < progress - 1) return false;
       if (team.slots[o.slot].pos !== "GK") return true;
       return deep && progress < 30;
     });
@@ -622,6 +625,12 @@ class Replay {
   private recorder(side: Side): {touches: Frame[]; add: AddTouch} {
     const touches: Frame[] = [];
     const add: AddTouch = (kind, id, at, touchSide = side, flight) => {
+      // A player free in front of goal never plays it back, whichever way the pass was worked out: it goes on or across, never behind the ball.
+      if (kind === "pass" && touchSide === side && flight !== "cross") {
+        const here = progressFor(side, this.ball.x);
+        const across = side === "home" ? this.ball.y : 100 - this.ball.y;
+        if (here > DANGER_DEPTH && across > 22 && across < 78 && progressFor(side, at.x) < here) at = fromSide(side, here, side === "home" ? at.y : 100 - at.y);
+      }
       const touch: Frame = {minute: 0, x: at.x, y: at.y, possession: touchSide, playerId: id, kind, ...(flight ? {flight} : {})};
       touches.push(touch);
       this.ball = at;
@@ -695,7 +704,9 @@ class Replay {
     // From far away, it's played up to whoever is already up there (long if it
     // has to be): no dribble runs half the pitch, and nobody has to sprint 40 m to get it.
     const mates = attacking.onPitch.filter((o) => o.id !== carrier && attacking.slots[o.slot].pos !== "GK");
-    if (carrier && mates.length > 0 && distance(this.ball, runTo) > 22) {
+    // (Not from in front of goal when the set piece is further back: the one with the ball is not played back out.)
+    const awayFromGoal = this.inFrontOfGoal(side) && progressFor(side, runTo.x) < progressFor(side, this.ball.x);
+    if (carrier && mates.length > 0 && distance(this.ball, runTo) > 22 && !awayFromGoal) {
       let to = mates[0].id;
       for (const o of mates) if (distance(this.spot(attacking, o.id, true), runTo) < distance(this.spot(attacking, to, true), runTo)) to = o.id;
       const spot = this.spot(attacking, to, true);
@@ -806,7 +817,11 @@ class Replay {
       }
       const next = this.receiver(attacking, carrier);
       if (!next) break;
-      add("pass", next, this.jitter(this.spot(attacking, next, true), 4));
+      let at = this.jitter(this.spot(attacking, next, true), 4);
+      // Close to goal the ball is never played back, not even by the little scatter of where it ends up.
+      const here = progressFor(side, this.ball.x);
+      if (here > 70 && progressFor(side, at.x) < here) at = fromSide(side, here, side === "home" ? at.y : 100 - at.y);
+      add("pass", next, at);
       lastPasser = carrier;
       carrier = next;
     }
@@ -825,12 +840,12 @@ class Replay {
           // A lay-off to the nearest mate, to a spot still on the edge of the box.
           let to = near[0].id;
           for (const o of near) if (distance(this.spot(attacking, o.id, true), this.ball) < distance(this.spot(attacking, to, true), this.ball)) to = o.id;
-          const at = fromSide(side, clamp(depth + this.rng.range(-3, 3), DANGER_DEPTH + 1, 84), clamp(width + (width < 50 ? 1 : -1) * this.rng.range(10, 18), 24, 76));
+          const at = fromSide(side, clamp(depth + this.rng.range(0, 3), DANGER_DEPTH + 1, Math.max(84, depth)), clamp(width + (width < 50 ? 1 : -1) * this.rng.range(10, 18), 24, 76));
           add("pass", to, at);
           carrier = to;
         } else {
           const across = (width < 50 ? 1 : -1) * this.rng.range(5, 10);
-          add("dribble", carrier, fromSide(side, clamp(depth + this.rng.range(-2, 2), DANGER_DEPTH + 1, 86), clamp(width + across, 24, 76)));
+          add("dribble", carrier, fromSide(side, clamp(depth + this.rng.range(0, 3), DANGER_DEPTH + 1, Math.max(86, depth)), clamp(width + across, 24, 76)));
         }
       }
     }
@@ -916,7 +931,8 @@ class Replay {
       const runAtGoal = outcome.shooterId !== carrier && finalBall !== "cross" && !this.inFrontOfGoal(side) && this.rng.chance(fromDistance ? 0.6 : 0.7);
       if (runAtGoal) {
         const from = progressFor(side, this.ball.x);
-        const runFrom = clamp(shotDepth - (fromDistance ? this.rng.range(5, 8) : this.rng.range(10, 17)), Math.max(from, 50), shotDepth - 4);
+        // Never further back than where the ball already is (a long shot from just inside the zone would otherwise be played back first).
+        const runFrom = Math.max(from, clamp(shotDepth - (fromDistance ? this.rng.range(5, 8) : this.rng.range(10, 17)), Math.max(from, 50), shotDepth - 4));
         add("pass", outcome.shooterId, fromSide(side, runFrom, clamp(shotWidth + this.rng.range(-10, 10), 12, 88)), side, finalBall === "through" ? "through" : undefined);
         add("dribble", outcome.shooterId, box);
       } else {

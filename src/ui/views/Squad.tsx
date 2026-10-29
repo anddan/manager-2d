@@ -7,7 +7,9 @@ import {POSITIONS, TEAM_ROLES, type Player, type TeamRole} from "../../game/type
 import {useT, type TKey} from "../../i18n";
 import {useGame, useGameState} from "../../store";
 import {Avatar} from "../Avatar";
-import {Bar, Card, Face, Flag, FormArrow, PosBadge, StatusIcons, Hint} from "../common";
+import {Bar, Card, Face, Flag, FormArrow, Modal, PosBadge, StatusIcons, Hint} from "../common";
+import {quickSellMany} from "../../game/transfers";
+import {multiSaleBurst, rewardShownLately} from "../effects";
 
 type SortKey = "pos" | "name" | "age" | "ovr" | "form" | "fitness" | "happiness" | "value" | "wage";
 
@@ -44,6 +46,13 @@ export function Squad() {
   const club = userClub(game);
   const [sort, setSort] = useState<SortKey>("ovr");
   const [desc, setDesc] = useState(true);
+  const act = useGame((s) => s.act);
+  const notify = useGame((s) => s.notify);
+  // Picking several players to sell at once.
+  const [selecting, setSelecting] = useState(false);
+  const [picked, setPicked] = useState<string[]>([]);
+  const [confirming, setConfirming] = useState(false);
+  const toggle = (id: string) => setPicked((l) => (l.includes(id) ? l.filter((x) => x !== id) : [...l, id]));
   const players = clubPlayers(game, userClub(game).id).sort((a, b) => {
     const va = sortValue(a, sort);
     const vb = sortValue(b, sort);
@@ -64,11 +73,27 @@ export function Squad() {
   return (
     <div className="stack">
     <TeamRolesCard />
-    <Card title={`${t("nav.squad")} (${players.length})`}>
+    <Card
+      title={`${t("nav.squad")} (${players.length})`}
+      actions={
+        <button className={selecting ? "btn small primary" : "btn small"} aria-pressed={selecting} onClick={() => { setSelecting(!selecting); setPicked([]); }}>
+          <Icon name="check" size={16} /> {iconize(t(selecting ? "squad.selectDone" : "squad.select"))}
+        </button>
+      }
+    >
+      {selecting && (
+        <div className="squad-select-bar">
+          <span className="muted small">{iconize(t("squad.selected", {n: picked.length}))}</span>
+          <button className="btn small primary" disabled={picked.length === 0} onClick={() => setConfirming(true)}>
+            <Icon name="coins" size={16} /> {iconize(t("squad.sellSelected", {n: picked.length}))}
+          </button>
+        </div>
+      )}
       <div className="table-wrap">
         <table className="table">
           <thead>
             <tr>
+              {selecting && <th aria-label={t("squad.select")} />}
               {COLUMNS.map((c) => (
                 <th key={c.key} title={c.key === "ovr" ? t("col.ovrHint") : undefined}>
                   <button className="th-btn" onClick={() => onSort(c.key)}>
@@ -82,7 +107,8 @@ export function Squad() {
           </thead>
           <tbody>
             {players.map((p) => (
-              <tr key={p.id} className="clickable" onClick={() => openPlayer(p.id)}>
+              <tr key={p.id} className={picked.includes(p.id) ? "clickable picked-row" : "clickable"} onClick={() => (selecting ? toggle(p.id) : openPlayer(p.id))}>
+                {selecting && <td><input type="checkbox" className="bench-check" checked={picked.includes(p.id)} onChange={() => toggle(p.id)} onClick={(e) => e.stopPropagation()} aria-label={listName(p)} /></td>}
                 <td><PosBadge pos={p.position} /></td>
                 <td className="name-cell">
                   <Avatar player={p} shirt={club.color} trim={club.color2} size={28} mood={p.happiness} />
@@ -102,6 +128,25 @@ export function Squad() {
           </tbody>
         </table>
       </div>
+      {confirming && (
+        <SellMany
+          ids={picked}
+          onClose={() => setConfirming(false)}
+          onSell={() => {
+            const result = act((g) => quickSellMany(g, picked));
+            setConfirming(false);
+            setSelecting(false);
+            setPicked([]);
+            const total = result.sold.reduce((n, s) => n + s.fee, 0);
+            if (result.sold.length > 0) {
+              notify("toast.soldMany", {n: result.sold.length, fee: total}, "good");
+              // The coins for the whole sale (unless the deals' watcher got in first).
+              if (total > 0 && !rewardShownLately()) multiSaleBurst(null, money(total), result.sold.length);
+            }
+            if (result.failed.length > 0) notify("pl.noBuyer", undefined, "error");
+          }}
+        />
+      )}
       {loanedOut.length > 0 && (
         <>
           <h3>{iconize(t("squad.loanedOut"))}</h3>
@@ -117,6 +162,31 @@ export function Squad() {
       )}
     </Card>
     </div>
+  );
+}
+
+/** The picked players with who takes them for how much (worked out on a copy), and a yes to sell them all. */
+function SellMany({ids, onClose, onSell}: {ids: string[]; onClose: () => void; onSell: () => void}) {
+  const {t, money} = useT();
+  const game = useGameState();
+  const result = quickSellMany(structuredClone(game), ids);
+  const total = result.sold.reduce((n, s) => n + s.fee, 0);
+  return (
+    <Modal compact title={<><Icon name="coins" size={20} /> {iconize(t("squad.sellTitle"))}</>} onClose={onClose}>
+      <ul className="plain-list sell-many">
+        {result.sold.map((s) => (
+          <li key={s.id}>
+            <strong>{listName(game.players[s.id])}</strong> <span className="muted">→ {game.clubs[s.clubId].name}</span> <span className="num">{money(s.fee)}</span>
+          </li>
+        ))}
+        {result.failed.map((id) => <li key={id} className="muted">{listName(game.players[id])}: {iconize(t("pl.noBuyer"))}</li>)}
+      </ul>
+      <p className="strong">{iconize(t("squad.sellTotal", {fee: money(total)}))}</p>
+      <div className="btn-row dialog-actions">
+        <button className="btn" onClick={onClose}>{iconize(t("common.cancel"))}</button>
+        <button className="btn primary" disabled={result.sold.length === 0} onClick={onSell}>{iconize(t("squad.sellYes", {n: result.sold.length}))}</button>
+      </div>
+    </Modal>
   );
 }
 

@@ -274,8 +274,10 @@ export const QUICK_SALE_SHARE = 0.75;
 
 /**
  * The best offer for one of the user's players right now: the league club
- * that would pay most, up to its transfer budget. Null if nobody can make a
- * fair offer (at least half the quick price) or the player can't be sold.
+ * that would pay most, up to its transfer budget. If nobody can make a fair
+ * offer (at least half the quick price) the best club that can pay anything
+ * takes the player anyway, so a player can always be sold (null only if the
+ * player can't be sold at all).
  */
 export function quickSaleOffer(state: GameState, playerId: string): {clubId: string; fee: number} | null {
   const p = state.players[playerId];
@@ -288,7 +290,33 @@ export function quickSaleOffer(state: GameState, playerId: string): {clubId: str
     if (fee < price / 2) continue;
     if (!best || fee > best.fee) best = {clubId: club.id, fee};
   }
-  return best;
+  if (best) return best;
+  // Nobody can pay a fair price, but the player can always go: to the club with room that can pay the most (maybe nothing).
+  let any: {clubId: string; fee: number; room: boolean} | null = null;
+  for (const club of leagueClubs(state)) {
+    if (club.id === state.userClubId) continue;
+    const fee = Math.max(0, Math.min(price, Math.floor(club.transferBudget / 10_000) * 10_000));
+    const room = clubPlayers(state, club.id).length < SQUAD_MAX;
+    if (!any || (room && !any.room) || (room === any.room && fee > any.fee)) any = {clubId: club.id, fee, room};
+  }
+  return any ? {clubId: any.clubId, fee: any.fee} : null;
+}
+
+/** Sells several of the user's players at once, one after the other (each at the best offer there is then). */
+export function quickSellMany(state: GameState, playerIds: string[]): {sold: {id: string; clubId: string; fee: number}[]; failed: string[]} {
+  const sold: {id: string; clubId: string; fee: number}[] = [];
+  const failed: string[] = [];
+  for (const id of playerIds) {
+    const offer = quickSaleOffer(state, id);
+    if (!offer) {
+      failed.push(id);
+      continue;
+    }
+    aiSignTerms(state, state.players[id]);
+    completeTransfer(state, id, offer.clubId, offer.fee);
+    sold.push({id, ...offer});
+  }
+  return {sold, failed};
 }
 
 /** Sells one of the user's players at once to the best offer; an error key if nobody will buy. */

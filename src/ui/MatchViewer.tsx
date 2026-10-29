@@ -21,6 +21,9 @@ import {Icon, iconize, type IconName} from "./Icon";
 import {ClubCrest, TeamOvr} from "./LineupSheet";
 import {useKeepScroll} from "./scrollKeep";
 import {Jersey} from "./Jersey";
+import {GearPicture} from "./Gear";
+import {MATCH_VIEWS, readMatchView, writeMatchView, type MatchView} from "./matchView";
+import {ZonePanel, matchStats, playerMarks, possessionShares, usePlateBar, zoneShares} from "./ZonePanel";
 import {matchClubs} from "../game/kit";
 import {boardSpots} from "./views/Tactics";
 import {FORMATION_IDS, type FormationId} from "../game/types";
@@ -96,7 +99,6 @@ const HALFTIME_REPLAY_MS = 3000;
 const SHOUT_MS = 3200;
 const SET_PIECES_KEY = "manager2d.manualSetPieces";
 const SUBS_KEY = "manager2d.manualSubs";
-const TEXT_ONLY_KEY = "manager2d.textOnly";
 const SPEED_KEY = "manager2d.matchSpeed";
 /** Finishing above this: every shot flies with a tail of fire. */
 const FIRE_FINISHING = 95;
@@ -1758,6 +1760,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   const {t, tx, lang} = useT();
   const game = useGameState();
   const act = useGame((s) => s.act);
+  const openPlayer = useGame((s) => s.openPlayer);
   const ctx = useMemo<Ctx>(
     () => ({
       report,
@@ -1791,6 +1794,12 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   const [shown, setShown] = useState<{sp: SetPiece; outcome?: SetPieceOutcome} | null>(null);
   /** Whose orders are open: the whole team, a player, or none. */
   const [selected, setSelected] = useState<OrdersTarget | null>(null);
+  /** Who is picked to come off when the substitutions open (from a tap on the zones board). */
+  const [subsOut, setSubsOut] = useState<string | null>(null);
+  // Asked to take someone off while play is held (a goal, a set piece): the substitutions open as soon as it's over.
+  const [pendingOpen, setPendingOpen] = useState<{target: OrdersTarget; out?: string} | null>(null);
+  /** Opens the substitutions or the instructions now, or as soon as play is let go (a goal, a set piece). */
+  const openOrders = (target: OrdersTarget, out?: string) => setPendingOpen({target, out});
   const [shouts, setShouts] = useState<Shout[]>([]);
   const [, rerender] = useState(0);
   const done = useRef(new Set<string>());
@@ -1825,14 +1834,11 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
 
   // The manager's menu under the avatar, and the pitch filling the screen.
   const [menuOpen, setMenuOpen] = useState(false);
-  // Watch the pitch, or only follow the commentary (remembered). Commentary only: set pieces are the assistant's.
-  const [textOnly, setTextOnlyState] = useState(() => {
-    try {
-      return localStorage.getItem(TEXT_ONLY_KEY) === "1";
-    } catch {
-      return false;
-    }
-  });
+  // Opens upwards when there's room above the button, otherwise downwards.
+  const [menuUp, setMenuUp] = useState(true);
+  // Watch the pitch, only follow the commentary, or see the zones the ball is in (remembered). Without the pitch, set pieces are the assistant's.
+  const [matchView, setMatchViewState] = useState<MatchView>(() => readMatchView());
+  const textOnly = matchView !== "pitch";
   useEffect(() => {
     if (!live) return;
     if (textOnly) live.manualSetPieces = false;
@@ -1844,15 +1850,9 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
       }
     }
   }, [live, textOnly]);
-  const setTextOnly = (on: boolean) => {
-    setTextOnlyState(on);
-    try {
-      localStorage.setItem(TEXT_ONLY_KEY, on ? "1" : "0");
-      // Commentary only: the set pieces are the assistant's from now on.
-      if (on) localStorage.setItem(SET_PIECES_KEY, "auto");
-    } catch {
-      // Only for this match.
-    }
+  const setMatchView = (v: MatchView) => {
+    setMatchViewState(v);
+    writeMatchView(v);
   };
   const menuRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -2323,6 +2323,10 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   };
 
   // The substitutions dialog: its X cancels what was changed in it, "Klar" keeps it.
+  // Closed: nobody is picked any more.
+  useEffect(() => {
+    if (!selected) setSubsOut(null);
+  }, [selected]);
   const subsStart = useRef(0);
   useEffect(() => {
     if (selected === "subs" && live) subsStart.current = live.allCommands().length;
@@ -2634,6 +2638,14 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   const scoringClub = freeze?.kind === "goal" ? (freeze.side === "home" ? home : away) : undefined;
   const board = boardAt(report, time);
   const atHalftime = freeze?.kind === "halftime";
+  // Asked to take someone off while play is held: the substitutions open as soon as it's over.
+  useEffect(() => {
+    if (pendingOpen && (!freeze || atHalftime)) {
+      setSubsOut(pendingOpen.out ?? null);
+      setSelected(pendingOpen.target);
+      setPendingOpen(null);
+    }
+  }, [pendingOpen, freeze, atHalftime]); // eslint-disable-line react-hooks/exhaustive-deps
   const injuryStop = freeze?.kind === "injury" && live?.stop?.type === "injury" ? live.stop : null;
   const clock = finished ? t("match.ft") : atHalftime ? t("match.ht") : clockLabel(report, time);
   // Closing a live match before the end asks first; yes plays the rest out
@@ -2641,7 +2653,8 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   const close = live && !finished ? () => setConfirmClose(true) : onClose;
 
   const shoutBubble = (() => {
-    if (shouts.length === 0 || !userSide || typeof document === "undefined") return null;
+    // In the zones view the manager calls out at the touchline of the board itself.
+    if (matchView === "zones" || shouts.length === 0 || !userSide || typeof document === "undefined") return null;
     const r = pitchRef.current?.getBoundingClientRect();
     if (!r) return null;
     const bottom = window.innerHeight - r.bottom + (maxed ? 60 : 6);
@@ -2723,7 +2736,38 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
         />
         </div>
       ) : (
-        <div className={`pitch-wrap ${maxed ? "maxed" : ""} ${textOnly ? "text-only" : ""}`} ref={pitchRef}>
+        <div className={`pitch-wrap ${maxed ? "maxed" : ""} ${textOnly ? "text-only" : ""} ${matchView === "zones" ? "zones" : ""}`} ref={pitchRef}>
+          {matchView === "zones" && (() => {
+            // The lineup as in Tactics, the ball's zones behind it and the possession above.
+            const side = userSide;
+            const slots = live && side ? live.team().slots : side ? report.slots?.[side] ?? FORMATIONS[report.formations[side]] : undefined;
+            const lineup = live && side ? live.team().onPitch.map((o) => ({id: o.id, index: o.slot})) : side ? report.lineups[side].map((id, index) => ({id, index})).filter((x) => x.id) : [];
+            const marks = playerMarks(report.events, view.time);
+            const zonePlayers = lineup.flatMap(({id, index}) => {
+              const p = live?.player(id) ?? game.players[id];
+              return p ? [{id, index, name: shortName(p), keeper: slots?.[index]?.pos === "GK", rating: report.ratings?.[id], fitness: p.fitness, gear: p.gear, shin: p.shin, ...marks[id]}] : [];
+            });
+            return (
+              <ZonePanel
+                // The first ten minutes the numbers hold still (they jump back and forth while the play finds its shape).
+                shares={view.time < 10 ? [33, 34, 33] : zoneShares(report.frames ?? [], userSide ?? "home", view.time)}
+                possession={view.time < 10 ? [50, 50] : possessionShares(report.frames ?? [], view.time)}
+                stats={matchStats(report.events, view.time)}
+                forza={forzaOn}
+                instructed={shouts.some((s) => !s.cry && s.playerId === "") ? "all" : shouts.filter((s) => !s.cry && s.playerId).map((s) => s.playerId)}
+                home={home}
+                away={away}
+                mine={userSide}
+                slots={slots}
+                players={zonePlayers}
+                kit={userSide === "away" ? away : home}
+                shout={shouts.length > 0 ? shouts[shouts.length - 1].text : null}
+                managerLook={managerLook}
+                onSubOut={live && !finished ? (id) => openOrders("subs", id) : undefined}
+                onProfile={(id) => openPlayer(id)}
+              />
+            );
+          })()}
           <svg className="pitch" viewBox={viewBox} role="img" aria-label={t("match.pitch")}>
             <Stands home={home} away={away} cheering={(freeze?.kind === "goal" || (freeze?.kind === "fulltime" && decided)) && !replay ? freeze.side : null} boards={(userSide === "away" ? away : home).color} fill={report.crowd?.rate ?? 1} />
             {PITCH}
@@ -2799,7 +2843,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
               <button className="btn small max-forza" onClick={forza} disabled={forzaUsed} title={forzaNote} aria-label={t("match.forza")}>
                 {forzaIcon}<span className="max-forza-label"> {iconize(t("match.forza"))}</span>
               </button>
-              <button className="btn small max-forza" onClick={() => setSelected("team")} disabled={!!freeze && !atHalftime} title={t("match.giveOrders")} aria-label={t("match.giveOrders")}>
+              <button className="btn small max-forza" onClick={() => openOrders("team")} title={t("match.giveOrders")} aria-label={t("match.giveOrders")}>
                 <Icon name="megaphone" size={18} />
               </button>
             </div>
@@ -2880,7 +2924,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
 
       {live && selected === "subs" && !finished && !current && !injuryStop && (
         <MatchDialog title={<><Icon name="swap" size={20} /> {iconize(t("match.subs"))}</>} onClose={cancelSubs}>
-          <SubsPanel live={live} onSub={substitute} onFormation={changeFormation} onSwap={swapPlayers} onPlace={placePlayer} onUndo={undoSub} onClose={() => setSelected(null)} />
+          <SubsPanel live={live} startOut={subsOut} kit={userSide === "away" ? away : home} onSub={substitute} onFormation={changeFormation} onSwap={swapPlayers} onPlace={placePlayer} onUndo={undoSub} onClose={() => setSelected(null)} />
         </MatchDialog>
       )}
       {live && selected && selected !== "subs" && !finished && !current && !injuryStop && (
@@ -2914,22 +2958,24 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
             {live && !finished && (
               // The manager: instructions, and whether set pieces and substitutions are yours or the assistant's.
               <div className="manager-menu" ref={menuRef}>
-                <button className={`btn ctl manager-btn ${menuOpen ? "open" : ""}`} data-tour="orders" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>
+                <button className={`btn ctl manager-btn ${menuOpen ? "open" : ""}`} data-tour="orders" aria-expanded={menuOpen} onClick={(e) => { setMenuUp(e.currentTarget.getBoundingClientRect().top > 380); setMenuOpen(!menuOpen); }}>
                   <ManagerAvatar look={managerLook} size={26} tie={(userSide === "away" ? away : home).color} />
                   <span className="manager-btn-label">{iconize(t("match.manager"))}</span> <span aria-hidden>{menuOpen ? "▲" : "▼"}</span>
                 </button>
                 {menuOpen && (
-                  <div className={textOnly ? "manager-pop down" : "manager-pop"} role="menu">
+                  <div className={menuUp ? "manager-pop up" : "manager-pop down"} role="menu">
                     <span className="speed-group manager-view" role="group">
-                      {([false, true] as const).map((only) => (
-                        <button key={String(only)} className={textOnly === only ? "chip active" : "chip"} onClick={() => setTextOnly(only)}><Icon name={only ? "chat" : "video"} size={16} /> {only ? t("match.viewText") : t("match.viewPitch")}</button>
+                      {MATCH_VIEWS.map((v) => (
+                        <button key={v} className={matchView === v ? "chip active" : "chip"} title={t(`match.view.${v}`)} onClick={() => { setMatchView(v); setMenuOpen(false); }}>
+                          <Icon name={v === "pitch" ? "video" : v === "text" ? "chat" : "chart"} size={16} /> {t(`match.viewShort.${v}`)}
+                        </button>
                       ))}
                     </span>
-                    <button className="manager-item" role="menuitem" disabled={!!freeze && !atHalftime} onClick={() => { setMenuOpen(false); setSelected("subs"); }}>
+                    <button className="manager-item" role="menuitem" onClick={() => { setMenuOpen(false); openOrders("subs"); }}>
                       <span><Icon name="swap" size={18} /> {iconize(t("match.subs"))}</span>
                       <Icon name="chevron" size={16} />
                     </button>
-                    <button className="manager-item" role="menuitem" disabled={!!freeze && !atHalftime} onClick={() => { setMenuOpen(false); setSelected("team"); }}>
+                    <button className="manager-item" role="menuitem" onClick={() => { setMenuOpen(false); openOrders("team"); }}>
                       <span><Icon name="megaphone" size={18} /> {iconize(t("match.giveOrders"))}</span>
                       <Icon name="chevron" size={16} />
                     </button>
@@ -3137,13 +3183,15 @@ function InstructionGrid({value, disabled, onPick, keeper, intro}: {value: (key:
 /** Bench players to bring on, best for the position first. */
 function BenchList({live, pos, onPick, recommend}: {live: LiveMatch; pos?: Parameters<typeof effectiveRating>[1]; onPick: (id: string) => void; recommend?: boolean}) {
   const {t} = useT();
+  // Their profile with the attributes, to judge who should come on.
+  const openPlayer = useGame((s) => s.openPlayer);
   const takenIn = new Set(live.pendingSubs().map((c) => (c.type === "sub" ? c.inId : "")));
   const bench = live.team().bench.filter((id) => !takenIn.has(id)).map((id) => live.player(id)!).filter(Boolean);
   if (pos) bench.sort((a, b) => effectiveRating(b, pos) - effectiveRating(a, pos));
   return (
     <ul className="pick-list">
       {bench.map((b, i) => (
-        <li key={b.id}>
+        <li key={b.id} className="bench-pick">
           <button className="pick" onClick={() => onPick(b.id)}>
             <PosBadge pos={b.position} />
             <span className="pick-name"><Flag code={b.nationality} size={15} /> {listName(b)}</span>
@@ -3151,6 +3199,7 @@ function BenchList({live, pos, onPick, recommend}: {live: LiveMatch; pos?: Param
             <span className="num strong">{pos ? Math.round(effectiveRating(b, pos)) : overall(b)}</span>
             <Bar value={b.fitness} small />
           </button>
+          <button type="button" className="bench-profile" aria-label={t("tac.profile")} title={t("tac.profile")} onClick={() => openPlayer(b.id)}><Icon name="user" size={16} /></button>
         </li>
       ))}
     </ul>
@@ -3301,12 +3350,29 @@ function PlayerOrders({live, playerId, onInstruct}: {live: LiveMatch; playerId: 
  * Substitutions and the formation, laid out like the tactics page: the pitch with the shirts, the
  * bench below. Tap a player on the pitch, then a substitute to bring on.
  */
-function SubsPanel({live, onSub, onFormation, onSwap, onPlace, onUndo, onClose}: {live: LiveMatch; onSub: (outId: string, inId: string) => void; onFormation: (f: FormationId) => void; onSwap: (a: string, b: string) => void; onPlace: (id: string, x: number, y: number) => void; onUndo: (outId: string) => void; onClose: () => void}) {
+function SubsPanel({live, startOut, kit, onSub, onFormation, onSwap, onPlace, onUndo, onClose}: {live: LiveMatch; startOut?: string | null; kit?: Club; onSub: (outId: string, inId: string) => void; onFormation: (f: FormationId) => void; onSwap: (a: string, b: string) => void; onPlace: (id: string, x: number, y: number) => void; onUndo: (outId: string) => void; onClose: () => void}) {
   const {t} = useT();
   const game = useGameState();
-  const club = game.clubs[game.userClubId];
+  // The shirts as worn in this match (home or away kit).
+  const club = kit ?? game.clubs[game.userClubId];
   const team = live.team();
-  const [out, setOut] = useState<string | null>(null);
+  const [out, setOut] = useState<string | null>(startOut ?? null);
+  // A tapped player: the bar with their profile and the blue "take off".
+  const [picked, setPicked] = useState<string | null>(null);
+  const openPlayer = useGame((s) => s.openPlayer);
+  useEffect(() => {
+    if (!picked) return;
+    const away = (e: PointerEvent) => {
+      if (!(e.target as Element | null)?.closest(".slot, .pop-actions")) setPicked(null);
+    };
+    document.addEventListener("pointerdown", away);
+    return () => document.removeEventListener("pointerdown", away);
+  }, [picked]);
+  // Opened from the zones board: scroll down to the substitutes.
+  const benchRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (startOut) setTimeout(() => benchRef.current?.scrollIntoView({block: "start", behavior: "smooth"}), 120);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const formation = live.formation();
   // Changes given but not played yet: shown as they will be.
   const ids = team.onPitch.map((o) => o.id);
@@ -3315,6 +3381,7 @@ function SubsPanel({live, onSub, onFormation, onSwap, onPlace, onUndo, onClose}:
   const byslot = new Map(ids.map((id, k) => [at[k], id]));
   // Drag a shirt onto another to swap them; with a custom formation, onto an empty spot to move it there.
   const board = useRef<HTMLDivElement>(null);
+  const tapBar = usePlateBar(board, picked ? `[data-slot="${at[ids.indexOf(picked)]}"] .plate` : null, out);
   const [ghost, setGhost] = useState<{x: number; y: number; label: string} | null>(null);
   const dragged = useRef(false);
   const startDrag = (e: ReactPointerEvent, id: string, label: string) => {
@@ -3364,8 +3431,11 @@ function SubsPanel({live, onSub, onFormation, onSwap, onPlace, onUndo, onClose}:
           const id = byslot.get(i);
           const p = id ? live.player(id) : undefined;
           return (
-            <button key={i} data-slot={i} className={`slot ${out && out === id ? "selected" : ""} ${id && pendingOut.has(id) ? "out" : ""} ${p ? "" : "empty"}`} style={spots[i]} disabled={!p} onPointerDown={p && !pendingOut.has(p.id) ? (e) => startDrag(e, p.id, shortName(p)) : undefined} onClick={() => { if (dragged.current || !p) return; if (pendingOut.has(p.id)) onUndo(p.id); else if (subsLeft > 0) setOut(out === p.id ? null : p.id); }}>
+            <button key={i} data-slot={i} className={`slot ${out && out === id ? "selected" : ""} ${id && pendingOut.has(id) ? "out" : ""} ${p ? "" : "empty"}`} style={spots[i]} disabled={!p} onPointerDown={p && !pendingOut.has(p.id) ? (e) => startDrag(e, p.id, shortName(p)) : undefined} onClick={() => { if (dragged.current || !p) return; if (pendingOut.has(p.id)) onUndo(p.id); else setPicked(picked === p.id ? null : p.id); }}>
               <Jersey color={club.color} trim={club.color2} pattern={club.pattern} trim3={club.color3} collar={club.collar} sleeves={club.sleeves} keeper={slot.pos === "GK"} number={i + 1} />
+              {/* Boots or gloves in front of the shirt at its lower right, shin guards on the other side (as in Tactics). */}
+              {p?.gear && <span className={p?.gear?.kind === "gloves" ? "slot-gear gloves" : "slot-gear"} aria-hidden><GearPicture item={p.gear} size={p?.gear?.kind === "gloves" ? 22 : 24} /></span>}
+              {p?.shin && <span className="slot-gear slot-shin" aria-hidden><GearPicture item={p.shin} size={15} /></span>}
               {id && pendingOut.has(id) && <span className="slot-undo" title={t("subs.undo")}><Icon name="undo" size={14} /></span>}
               <span className="plate">
                 <span className="plate-name">{p ? shortName(p) : t(`pos.${slot.pos}`)}</span>
@@ -3378,14 +3448,26 @@ function SubsPanel({live, onSub, onFormation, onSwap, onPlace, onUndo, onClose}:
             </button>
           );
         })}
+        {picked && live.player(picked) && (() => {
+          return tapBar ? (
+            <div className="pop-actions" role="toolbar" style={{left: tapBar.left, top: Math.min(tapBar.top + tapBar.height + 4, tapBar.boardHeight - 44)}}>
+              <button type="button" className="pop-action swap" aria-label={t("zones.subOut")} title={t("zones.subOut")} disabled={subsLeft <= 0} onClick={() => { setOut(picked); setPicked(null); }}>
+                <Icon name="swap" size={16} />
+              </button>
+              <button type="button" className="pop-action" aria-label={t("tac.profile")} title={t("tac.profile")} onClick={() => { setPicked(null); openPlayer(picked); }}>
+                <Icon name="user" size={16} />
+              </button>
+            </div>
+          ) : null;
+        })()}
       </div>
       {ghost && <div className="drag-ghost" style={{left: ghost.x, top: ghost.y}}>{ghost.label}</div>}
       <p className="muted small">{iconize(subsLeft > 0 ? t("orders.subsLeft", {n: subsLeft}) : t("orders.noSubs"))}</p>
       {out && live.player(out) ? (
-        <>
+        <div ref={benchRef}>
           <h3>{iconize(t("subs.pickFor", {name: shortName(live.player(out)!)}))}</h3>
           <BenchList live={live} pos={outSlot?.pos} onPick={(inId) => { onSub(out, inId); setOut(null); }} />
-        </>
+        </div>
       ) : (
         <p className="muted small">{iconize(t(pendingOut.size > 0 ? "subs.undoHint" : "subs.hint"))}</p>
       )}

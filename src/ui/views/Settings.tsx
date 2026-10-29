@@ -8,6 +8,7 @@ import {useGame, useGameState} from "../../store";
 import {Card, Hint} from "../common";
 import {isMuted, onMutedChange, setMuted} from "../sound";
 import {BUILD_ID, checkForUpdate} from "../updates";
+import {MATCH_VIEWS, readMatchView, writeMatchView, type MatchView} from "../matchView";
 
 const LANG_NAMES: Record<Lang, string> = {sv: "Svenska", en: "English", es: "Español", it: "Italiano", fr: "Français"};
 
@@ -56,7 +57,8 @@ export function Settings() {
   const [tipsOpen, setTipsOpen] = useState(false);
   const [soundOff, setSoundOff] = useState(isMuted());
   // How a match is played: the way to watch it, how fast, who takes set pieces and changes, the view, buzz and effects.
-  const [textOnly, setTextOnly] = usePref<"0" | "1">("manager2d.textOnly", "0");
+  const [matchView, setMatchViewState] = useState<MatchView>(() => readMatchView());
+  const noPitch = matchView !== "pitch";
   const [speed, setSpeed] = usePref<string>("manager2d.matchSpeed", "1");
   const [setPieces, setSetPieces] = usePref<"auto" | "self">("manager2d.manualSetPieces", "auto");
   const [subs, setSubs] = usePref<"auto" | "self">("manager2d.manualSubs", "auto");
@@ -121,11 +123,19 @@ export function Settings() {
       <Card title={<><Icon name="ball" size={20} /> {iconize(t("settings.match"))}</>}>
         <dl className="kv setting-rows">
           <dt><Icon name="video" size={18} /> {iconize(t("settings.view"))}</dt>
-          <dd><Choice label={t("settings.view")} value={textOnly} onPick={(v) => { setTextOnly(v); if (v === "1") setSetPieces("auto"); }} options={[["0", t("match.viewPitch")], ["1", t("match.viewText")]]} /></dd>
+          <dd>
+            <span className="speed-group manager-view" role="radiogroup" aria-label={t("settings.view")}>
+              {MATCH_VIEWS.map((v) => (
+                <button key={v} type="button" role="radio" aria-checked={matchView === v} className={matchView === v ? "chip active" : "chip"} title={t(`match.view.${v}`)} onClick={() => { setMatchViewState(v); writeMatchView(v); if (v !== "pitch") setSetPieces("auto"); }}>
+                  <Icon name={v === "pitch" ? "video" : v === "text" ? "chat" : "chart"} size={16} /> {t(`match.viewShort.${v}`)}
+                </button>
+              ))}
+            </span>
+          </dd>
           <dt><Icon name="skip" size={18} /> {iconize(t("match.speed"))}</dt>
           <dd><Choice label={t("match.speed")} value={speed} onPick={setSpeed} options={[["1", "1×"], ["2", "2×"], ["3", "3×"], ["4", "4×"], ["5", "5×"]]} /></dd>
           <dt><Icon name="target" size={18} /> {iconize(t("match.setPieces"))}</dt>
-          <dd><Choice label={t("match.setPieces")} value={textOnly === "1" ? "auto" : setPieces} disabled={textOnly === "1"} onPick={setSetPieces} options={[["self", t("match.self")], ["auto", t("match.auto")]]} /></dd>
+          <dd><Choice label={t("match.setPieces")} value={noPitch ? "auto" : setPieces} disabled={noPitch} onPick={setSetPieces} options={[["self", t("match.self")], ["auto", t("match.auto")]]} /></dd>
           <dt><Icon name="swap" size={18} /> {iconize(t("match.subsWho"))}</dt>
           <dd><Choice label={t("match.subsWho")} value={subs} onPick={setSubs} options={[["self", t("match.self")], ["auto", t("match.auto")]]} /></dd>
           <dt><Icon name="eye" size={18} /> {iconize(t("settings.pitchView"))}</dt>
