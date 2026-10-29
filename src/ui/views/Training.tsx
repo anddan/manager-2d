@@ -145,7 +145,7 @@ export function Training() {
                 return (
                   <tr key={p.id}>
                     <td><PosBadge pos={p.position} /></td>
-                    <td><button className="link" onClick={() => openPlayer(p.id)}>{listName(p)}</button>{p.injuryWeeks > 0 && " 🩹"}</td>
+                    <td><button className="link" onClick={() => openPlayer(p.id)}>{listName(p)}</button>{p.injuryWeeks > 0 && <> {iconize("🩹")}</>}</td>
                     <td>{p.age}</td>
                     <td className="num strong">{overall(p)}</td>
                     <td><Bar value={p.fitness} small /></td>

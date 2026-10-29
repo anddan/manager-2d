@@ -2,7 +2,7 @@
 import {wornGear} from "../game/gear";
 // Others: scouting, bids, loans and free-agent offers.
 import {Icon, iconize} from "./Icon";
-import {useState, type ReactNode} from "react";
+import {useRef, useState, type ReactNode} from "react";
 import {profileName, shortName} from "../game/helpers";
 import {DIAMONDS_SCOUT_COST, SCOUT_COST} from "../game/constants";
 import {startNegotiation} from "../game/contracts";
@@ -127,7 +127,7 @@ export function PlayerModal({playerId, preview}: {playerId: string; preview?: {o
               <dt>{iconize(t("pl.apps"))}</dt><dd>{p.stats.apps} ({p.stats.starts})</dd>
               <dt>{iconize(t("pl.goals"))}</dt><dd>{p.stats.goals}</dd>
               <dt>{iconize(t("pl.assists"))}</dt><dd>{p.stats.assists}</dd>
-              <dt>{iconize(t("pl.cards"))}</dt><dd>🟨 {p.stats.yellow} 🟥 {p.stats.red}</dd>
+              <dt>{iconize(t("pl.cards"))}</dt><dd>{iconize(`🟨 ${p.stats.yellow} 🟥 ${p.stats.red}`)}</dd>
               <dt>{iconize(t("pl.avgRating"))}</dt><dd>{p.stats.apps ? (p.stats.ratingSum / p.stats.apps).toFixed(2) : "–"}</dd>
             </dl>
           </Fold>
@@ -406,6 +406,9 @@ function MarketActions({player: p}: {player: Player}) {
   const [weeks, setWeeks] = useState(26);
   const [round, setRound] = useState(0);
   const [result, setResult] = useState<BidResult | null>(null);
+  // The answer takes a moment, shown as waiting on the button, so a click is never missed.
+  const [waiting, setWaiting] = useState(false);
+  const answerRef = useRef<HTMLDivElement>(null);
   const [wageShare, setWageShare] = useState(0.75);
   const known = isKnown(game, p);
   const scouting = game.scoutQueue.includes(p.id);
@@ -429,10 +432,17 @@ function MarketActions({player: p}: {player: Player}) {
   };
 
   const bid = (amount: number) => {
-    const r = evaluateBid(game, {playerId: p.id, fee: amount, upfrontShare: upfront, installmentWeeks: upfront < 1 ? weeks : 0}, round);
-    setRound(round + 1);
-    setResult(r);
-    if (r.status === "accepted") toContract(amount);
+    if (waiting) return;
+    setWaiting(true);
+    setResult(null);
+    setTimeout(() => {
+      const r = evaluateBid(game, {playerId: p.id, fee: amount, upfrontShare: upfront, installmentWeeks: upfront < 1 ? weeks : 0}, round);
+      setRound((n) => n + 1);
+      setResult(r);
+      setWaiting(false);
+      if (r.status === "accepted") toContract(amount);
+      else setTimeout(() => answerRef.current?.scrollIntoView({block: "nearest", behavior: "smooth"}), 50);
+    }, 900);
   };
 
   const loan = () => {
@@ -489,18 +499,19 @@ function MarketActions({player: p}: {player: Player}) {
           </div>
           {overBudget && <p className="callout error">{iconize(t("pl.overTransferBudget"))}</p>}
           <div className="btn-row">
-            <button className="btn primary" disabled={overBudget || fee <= 0} onClick={() => bid(fee)}>{iconize(t("pl.sendBid"))} ({money(fee)})</button>
+            <button className="btn primary" disabled={overBudget || fee <= 0 || waiting} onClick={() => bid(fee)}>{waiting ? <><span className="spinner" aria-hidden /> {iconize(t("common.agentThinking"))}</> : <>{iconize(t("pl.sendBid"))} ({money(fee)})</>}</button>
           </div>
+          <div ref={answerRef} />
           {result?.status === "counter" && (
-            <div className="callout">
+            <div className="callout fresh" key={round}>
               <p>{iconize(t("pl.counter", {club: game.clubs[p.clubId].name, fee: result.fee}))}</p>
               <button className="btn" disabled={result.fee > user.transferBudget} onClick={() => { setFee(result.fee); bid(result.fee); }}>
                 {iconize(t("pl.acceptCounter"))}
               </button>
             </div>
           )}
-          {result?.status === "rejected" && <p className="callout error">{iconize(tx(result.reason))}</p>}
-          {result?.status === "accepted" && <p className="callout good">{iconize(t("pl.bidAccepted"))}</p>}
+          {result?.status === "rejected" && <p className="callout error fresh" key={round}>{iconize(tx(result.reason))}</p>}
+          {result?.status === "accepted" && <p className="callout good fresh">{iconize(t("pl.bidAccepted"))}</p>}
 
           <h3>{iconize(t("pl.loanIn"))}</h3>
           <div className="btn-row">

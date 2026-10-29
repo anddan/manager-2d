@@ -22,12 +22,25 @@ export function ContractModal() {
   const [offer, setOffer] = useState<ContractOffer>(() => ({...neg.demand, wage: Math.round(neg.demand.wage * 0.9 / 50) * 50}));
   const [confirmOver, setConfirmOver] = useState(false);
   const [reply, setReply] = useState<string | null>(null);
+  // The answer takes a moment, shown as waiting on the button; the reply then sits by the button.
+  const [waiting, setWaiting] = useState(false);
+  const [replies, setReplies] = useState(0);
   if (!p) return null;
   const budget = wageBudgetCheck(game, neg.clubId, p.id, offer.wage);
   const close = () => setNegotiation(null);
   const set = <K extends keyof ContractOffer>(key: K, value: ContractOffer[K]) => setOffer({...offer, [key]: value});
 
   const submit = () => {
+    if (waiting) return;
+    setWaiting(true);
+    setReply(null);
+    setTimeout(() => {
+      setWaiting(false);
+      answer();
+    }, 900);
+  };
+
+  const answer = () => {
     const outcome = act((g) => {
       const draft = structuredClone(neg);
       const result = evaluateOffer(g, draft, offer);
@@ -44,6 +57,7 @@ export function ContractModal() {
     } else if (outcome.result.status === "counter") {
       setNegotiation(outcome.draft);
       setReply(t("neg.counter", {wage: outcome.result.demand.wage}));
+      setReplies((n) => n + 1);
     } else {
       // A failed transfer negotiation kills the whole deal.
       notify(neg.kind === "renewal" ? outcome.result.reason : "neg.dealCollapsed", {name: shortName(p)}, "error");
@@ -62,7 +76,6 @@ export function ContractModal() {
     <Modal title={<><Icon name="pen" size={20} /> {iconize(t(`neg.title.${neg.kind}`))}: {fullName(p)}</>} onClose={close}>
       {neg.fee > 0 && <p className="muted">{iconize(t("neg.agreedFee", {fee: neg.fee}))}</p>}
       <p className="muted">{iconize(t("neg.intro", {round: neg.round + 1}))}</p>
-      {reply && <p className="callout">{reply}</p>}
       <div className="form-grid">
         {numberField("wage", 50)}
         <label className="field">
@@ -100,9 +113,10 @@ export function ContractModal() {
           {iconize(t("neg.confirmOver"))}
         </label>
       )}
+      {reply && <p className="callout fresh" key={replies} ref={(el) => el?.scrollIntoView({block: "nearest", behavior: "smooth"})}>{reply}</p>}
       <div className="btn-row dialog-actions">
-        <button className="btn" onClick={close}>{iconize(t("common.cancel"))}</button>
-        <button className="btn primary" disabled={budget.over && !confirmOver} onClick={submit}>{iconize(t("neg.send"))}</button>
+        <button className="btn" disabled={waiting} onClick={close}>{iconize(t("common.cancel"))}</button>
+        <button className="btn primary" disabled={(budget.over && !confirmOver) || waiting} onClick={submit}>{waiting ? <><span className="spinner" aria-hidden /> {iconize(t("common.agentThinking"))}</> : iconize(t("neg.send"))}</button>
       </div>
       <p className="muted small">{iconize(tx("neg.hint"))}</p>
     </Modal>

@@ -45,7 +45,7 @@ export function TrophyCelebration() {
           return (
             <g key={p.id} className={lifting ? "trophy-captain" : "trophy-jump"} style={{animationDelay: `${(i % 4) * 0.12}s`}}>
               <g transform={`translate(${x} 78) scale(${lifting ? 1.05 : 0.95})`}>
-                <Figure look={lookFor(p)} kit={club.color} trim={club.color2} pose="up" mood={100} />
+                <Figure look={lookFor(p)} kit={club.color} trim={club.color2} pattern={club.pattern} collar={club.collar} sleeves={club.sleeves} trim3={club.color3} pose="up" mood={100} />
               </g>
               {lifting && (
                 // The trophy, held up above the captain's head.

@@ -40,8 +40,9 @@ export function spendBurst(kind: "money" | "diamonds" | "energy", label: string,
   const sx = box ? box.left + box.width / 2 : window.innerWidth - 60;
   const sy = box ? box.top + box.height / 2 : 40;
   const end = at && document.contains(at) ? at.getBoundingClientRect() : null;
-  const tx = end ? end.left + end.width / 2 : sx;
-  const ty = end ? end.top + end.height / 2 : sy + 60;
+  // Kept inside the window: with the button gone (a dialog closed) the sum would otherwise sit half off the screen by the counter.
+  const tx = inView(end ? end.left + end.width / 2 : sx, window.innerWidth);
+  const ty = Math.max(70, Math.min(window.innerHeight - 70, end ? end.top + end.height / 2 : sy + 60));
   const icon = kind === "money" ? COINS_SVG : kind === "diamonds" ? DIAMOND_SVG : BOLT_SVG;
   const text = document.createElement("div");
   text.className = kind === "energy" ? "spend-text energy" : "spend-text";
@@ -80,6 +81,11 @@ export function energyBurst(from: Element | null | undefined, amount: number): v
 }
 
 let lastSpend = 0;
+
+/** An x position kept clear of both edges (a sum is about 130 px wide). */
+function inView(x: number, width: number): number {
+  return Math.max(80, Math.min(width - 80, x));
+}
 let lastEnergyText = 0;
 export function spendShownLately(): boolean {
   return Date.now() - lastSpend < 800;
@@ -97,8 +103,8 @@ function rewardBurst(from: Element | null | undefined, label: string, icon: stri
   chime();
   // A button gone from the page (its dialog closed) has no place left: the middle of the screen then.
   const start = from && document.contains(from) ? from.getBoundingClientRect() : undefined;
-  const sx = start ? start.left + start.width / 2 : window.innerWidth / 2;
-  const sy = start ? start.top + start.height / 2 : window.innerHeight / 2;
+  const sx = inView(start ? start.left + start.width / 2 : window.innerWidth / 2, window.innerWidth);
+  const sy = Math.max(70, Math.min(window.innerHeight - 70, start ? start.top + start.height / 2 : window.innerHeight / 2));
   const counter = document.querySelector<HTMLElement>(target);
   const shown = counter && counter.offsetParent !== null ? counter.getBoundingClientRect() : null;
   const tx = shown ? shown.left + shown.width / 2 : window.innerWidth - 36;

@@ -19,7 +19,7 @@ import type {Club, CupFixture, GameState, MatchReport, Player} from "./types";
 /** What of a club goes into the cup: how it looks, how it plays, and its players (picked or on the bench). */
 export interface TeamSnapshot {
   manager: string;
-  club: Pick<Club, "name" | "short" | "color" | "color2" | "color3" | "pattern" | "collar" | "sleeves" | "formation" | "mentality" | "lineup" | "bench" | "capacity" | "reputation"> & {
+  club: Pick<Club, "name" | "short" | "color" | "color2" | "color3" | "away" | "pattern" | "collar" | "sleeves" | "formation" | "mentality" | "lineup" | "bench" | "capacity" | "reputation"> & {
     roles?: Club["roles"];
     customSlots?: Club["customSlots"];
     stadium?: Club["stadium"];
@@ -39,6 +39,7 @@ export function snapshotTeam(state: GameState): TeamSnapshot {
       color: club.color,
       color2: club.color2,
       ...(club.color3 ? {color3: club.color3} : {}),
+      ...(club.away ? {away: {...club.away}} : {}),
       ...(club.pattern ? {pattern: club.pattern} : {}),
       ...(club.collar ? {collar: club.collar} : {}),
       ...(club.sleeves ? {sleeves: club.sleeves} : {}),

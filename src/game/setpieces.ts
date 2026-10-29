@@ -28,6 +28,8 @@ export interface Aim {
 /** What the user chose. Missing parts are decided automatically. */
 export interface SetPieceInput {
   aim?: Aim;
+  /** How well the shot was timed (a bar to stop in the green): 1 perfect, 0 badly. Missing: neither better nor worse. */
+  timing?: number;
   dive?: number;
   target?: CornerTarget;
 }
@@ -83,6 +85,22 @@ export function cornerAttacker(attackers: Player[], target: CornerTarget, takerI
 }
 
 /**
+ * Who goes to each zone: the best for each in turn, nobody twice. It is what the players are shown
+ * doing (who stands where, whose name is on a zone), so the one the manager sees is the one who jumps.
+ */
+export function cornerLineup(attackers: Player[], takerId: string): Partial<Record<CornerTarget, Player>> {
+  const used = new Set<string>([takerId]);
+  const out: Partial<Record<CornerTarget, Player>> = {};
+  for (const zone of ["near", "penalty", "far", "short"] as const) {
+    const who = cornerAttacker(attackers.filter((p) => !used.has(p.id)), zone, takerId);
+    if (!who) continue;
+    used.add(who.id);
+    out[zone] = who;
+  }
+  return out;
+}
+
+/**
  * Resolves a corner. The cross quality comes from the taker; then the best
  * attacker for that zone goes up against the best defender. Far-post balls
  * give the keeper a chance to come and claim. Short corners rarely lose the
@@ -101,7 +119,7 @@ export function resolveCorner(
   const target = input?.target ?? autoTarget;
   const shot: Aim = {x: (u[5] - 0.5) * 1.6, y: 0.2 + u[6] * 0.6};
   const gk = keeper?.attrs.goalkeeping ?? 20;
-  const header = cornerAttacker(attackers, target, taker.id);
+  const header = cornerLineup(attackers, taker.id)[target];
   const marking = (p: Player) => p.attrs.defending * 0.5 + (target === "near" ? p.attrs.pace : p.attrs.physical) * 0.5;
   const defender = defenders.filter((p) => p.position !== "GK").sort((a, b) => marking(b) - marking(a))[0];
   if (!header) return {result: "cleared", shot, dive: 0, target, defenderId: defender?.id};
@@ -138,6 +156,11 @@ export function takerSkill(p: Player, kind: SetPieceKind): number {
 }
 
 /** How far a shot strays from the aim (standard deviation in goal units). */
+/** What a timed shot does to the spread: a perfect one halves it, a poor one makes it half as big again. */
+export function timingFactor(timing?: number): number {
+  return timing === undefined ? 1 : 1.5 - clamp(timing, 0, 1);
+}
+
 export function shotSpread(p: Player, kind: SetPieceKind): number {
   const skill = takerSkill(p, kind);
   return kind === "penalty" ? 0.07 + (100 - skill) * 0.0035 : 0.14 + (100 - skill) * 0.005;
@@ -193,7 +216,7 @@ export function resolveSetPiece(
   }
   const aim = input?.aim ?? autoAim;
 
-  const spread = shotSpread(taker, sp.kind);
+  const spread = shotSpread(taker, sp.kind) * timingFactor(input?.timing);
   const shot: Aim = {x: aim.x + noiseX * spread, y: Math.max(0.02, aim.y + noiseY * spread * 0.8)};
 
   // Penalty keepers guess; on free kicks they see it coming and react.

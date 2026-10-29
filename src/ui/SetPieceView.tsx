@@ -14,6 +14,8 @@ import {
   CORNER_TARGETS,
   WALL,
   cornerAttacker,
+  cornerLineup,
+  timingFactor,
   keeperReach,
   shotSpread,
   type CornerTarget,
@@ -29,6 +31,7 @@ import {Avatar, lookFor} from "./Avatar";
 import {Football} from "./Ball";
 import {Flag} from "./common";
 import {Figure, type Pose} from "./Figure";
+import {crowd, kick} from "./sound";
 
 // Goal in SVG units: posts at x 20 and 100, bar at y 12, ground at y 52.
 const LEFT = 20;
@@ -69,7 +72,53 @@ interface Props {
 }
 
 export function SetPieceView(props: Props) {
-  return props.sp.kind === "corner" ? <CornerView {...props} /> : <ShotView {...props} />;
+  const react = useFeel(props.outcome, props.sp.kind, props.sp.index >= 1000);
+  return (
+    <div className={react ? `sp-feel sp-react-${react}` : "sp-feel"}>
+      {props.sp.kind === "corner" ? <CornerView {...props} /> : <ShotView {...props} />}
+    </div>
+  );
+}
+
+/**
+ * How it feels: the boot on the ball when the kick goes in, the crowd when it lands (an "ooh" for a
+ * save or a miss; the match itself roars for a goal, a shoot-out kick has to do it here), a buzz in the
+ * phone and a shake of the picture. Timed to the animation below. (The whistle is the match's.)
+ */
+function useFeel(outcome: SetPieceOutcome | undefined, kind: SetPiece["kind"], shootout: boolean): string {
+  const [react, setReact] = useState("");
+  useEffect(() => {
+    if (!outcome) return;
+    const corner = kind === "corner";
+    const strike = corner ? 250 : 450;
+    const land = corner ? 250 + 800 + 300 : 450 + (kind === "penalty" ? 380 : 720);
+    const buzz = (p: number | number[]) => {
+      try {
+        navigator.vibrate?.(p);
+      } catch {
+        // No buzz on this device.
+      }
+    };
+    const t1 = setTimeout(() => {
+      kick("shot");
+      buzz(18);
+    }, strike);
+    const t2 = setTimeout(() => {
+      if (outcome.result === "goal") {
+        if (shootout) crowd("goal");
+        buzz([30, 40, 70]);
+      } else if (outcome.result !== "cleared") {
+        crowd("ooh");
+        buzz(outcome.result === "saved" ? 35 : 15);
+      }
+      setReact(outcome.result);
+    }, land);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [outcome, kind, shootout]);
+  return react;
 }
 
 /**
@@ -148,9 +197,38 @@ function ShotView({sp, role, taker, keeper, defenders, shooters, keepers, outcom
   const {t} = useT();
   const svgRef = useRef<SVGSVGElement>(null);
   const [drag, setDrag] = useState<{x: number; y: number} | null>(null);
+  // Shooting: once aimed, a bar to stop in the green for a more exact shot (aim again to start over).
+  const [aimed, setAimed] = useState<{x: number; y: number} | null>(null);
+  const [barAt, setBarAt] = useState(0);
+  const [rated, setRated] = useState<string | null>(null);
+  // Where the marker stopped (0..1): the bar stays up, frozen there, while the shot is taken.
+  const [stoppedAt, setStoppedAt] = useState<number | null>(null);
+  const aimedRef = useRef(aimed);
+  aimedRef.current = aimed;
+  // Time running out with an aim made: it's taken, badly timed.
+  const answer = (input: SetPieceInput | null) => {
+    if (input === null && aimedRef.current) {
+      setStoppedAt(0);
+      setRated(t("sp.timing.weak"));
+      onAnswer({aim: aimedRef.current, timing: 0});
+    } else onAnswer(input);
+  };
   // A penalty is over quickly: a shorter look at the result.
-  const left = useCountdown(outcome, onAnswer, onDone, sp.kind === "penalty" ? 1900 : 2200);
+  const left = useCountdown(outcome, answer, onDone, sp.kind === "penalty" ? 1900 : 2200);
   const now = useFrameTime();
+  // The marker sweeps to and fro (0..1); the green is in the middle.
+  const sweep = ((now - barAt) / 1000) % 2;
+  const markerAt = sweep < 1 ? sweep : 2 - sweep;
+  const liveTiming = 1 - Math.min(1, Math.abs(markerAt - 0.5) / 0.35);
+  // How good the shot is (live while the marker moves, then where it stopped).
+  const shownTiming = stoppedAt === null ? liveTiming : 1 - Math.min(1, Math.abs(stoppedAt - 0.5) / 0.35);
+  const level = shownTiming >= 0.8 ? "perfect" : shownTiming >= 0.45 ? "good" : "weak";
+  const stop = () => {
+    if (!aimed || outcome) return;
+    setStoppedAt(markerAt);
+    setRated(t(liveTiming >= 0.8 ? "sp.timing.perfect" : liveTiming >= 0.45 ? "sp.timing.good" : "sp.timing.weak"));
+    onAnswer({aim: aimed, timing: liveTiming});
+  };
   // When the answer arrived, on the same clock.
   const [struck, setStruck] = useState<number | null>(null);
   const nowRef = useRef(now);
@@ -175,7 +253,10 @@ function ShotView({sp, role, taker, keeper, defenders, shooters, keepers, outcom
   };
   const onUp = () => {
     if (!drag || outcome) return;
-    onAnswer(role === "shooter" ? {aim: {x: drag.x, y: Math.max(0, drag.y)}} : {dive: drag.x});
+    if (role === "shooter") {
+      setAimed({x: drag.x, y: Math.max(0, drag.y)});
+      setBarAt(nowRef.current);
+    } else onAnswer({dive: drag.x});
     setDrag(null);
   };
 
@@ -368,7 +449,7 @@ function ShotView({sp, role, taker, keeper, defenders, shooters, keepers, outcom
               const look = wp ? lookFor(wp) : keeperLook;
               return (
                 <g key={i} transform={`translate(${toSvgX(gx)} ${GROUND + 7 - wallJump}) scale(1.12)`}>
-                  <Figure look={look} kit={keepers.color} trim={keepers.color2} pose="wall" mood={wp?.happiness} />
+                  <Figure look={look} kit={keepers.color} trim={keepers.color2} pattern={keepers.pattern} collar={keepers.collar} sleeves={keepers.sleeves} trim3={keepers.color3} pose="wall" mood={wp?.happiness} />
                 </g>
               );
             })}
@@ -376,13 +457,18 @@ function ShotView({sp, role, taker, keeper, defenders, shooters, keepers, outcom
         )}
 
         {/* Aim */}
-        {role === "shooter" && drag && !outcome && (
-          <g className="sp-aim">
-            <line x1={BALL.x} y1={BALL.y} x2={toSvgX(drag.x)} y2={toSvgY(drag.y)} />
-            <circle cx={toSvgX(drag.x)} cy={toSvgY(drag.y)} r={spread} className="sp-spread" />
-            <circle cx={toSvgX(drag.x)} cy={toSvgY(drag.y)} r={1.2} className="sp-target" />
-          </g>
-        )}
+        {role === "shooter" && (drag ?? aimed) && !outcome && (() => {
+          const at = (drag ?? aimed)!;
+          // While the bar runs the circle shows how good the shot would be right now.
+          const r = spread * (drag ? 1 : timingFactor(liveTiming));
+          return (
+            <g className="sp-aim">
+              <line x1={BALL.x} y1={BALL.y} x2={toSvgX(at.x)} y2={toSvgY(at.y)} />
+              <circle cx={toSvgX(at.x)} cy={toSvgY(at.y)} r={r} className="sp-spread" />
+              <circle cx={toSvgX(at.x)} cy={toSvgY(at.y)} r={1.2} className="sp-target" />
+            </g>
+          );
+        })()}
         {role === "keeper" && drag && !outcome && (
           <line x1={CENTER} y1={GROUND - 12} x2={toSvgX(drag.x)} y2={GROUND - 12} className="sp-dive-arrow" markerEnd="url(#arrow)" />
         )}
@@ -395,18 +481,30 @@ function ShotView({sp, role, taker, keeper, defenders, shooters, keepers, outcom
 
         {/* Taker, from behind */}
         <g transform={`translate(${takerAt.x} ${takerAt.y}) scale(1.05)`} opacity={!outcome && ours && drag ? 0.55 : 1}>
-          <Figure look={takerLook} kit={shooters.color} trim={shooters.color2} facing="back" pose={takerPose} name={shortName(taker)} number={NUMBERS[taker.position]} />
+          <Figure look={takerLook} kit={shooters.color} trim={shooters.color2} pattern={shooters.pattern} collar={shooters.collar} sleeves={shooters.sleeves} trim3={shooters.color3} facing="back" pose={takerPose} name={shortName(taker)} number={NUMBERS[taker.position]} />
         </g>
         {goalNow && <text x={CENTER} y={8} className="sp-goal-flash">{iconize(t("match.goal"))}</text>}
       </svg>
 
       {outcome && showResult ? (
         <p className={`sp-result sp-${outcome.result}`}>{iconize(t(`sp.result.${outcome.result}`))}</p>
+      ) : role === "shooter" && aimed ? (
+        <div className="sp-timing-wrap">
+          <button type="button" className="sp-timing" data-level={level} disabled={outcome !== undefined} onClick={stop} aria-label={t("sp.shoot")}>
+            <span className="sp-timing-track">
+              <span className="sp-timing-sweet" />
+              <span className="sp-timing-ticks" />
+              <span className="sp-timing-marker" style={{left: `${(stoppedAt ?? markerAt) * 100}%`}} />
+            </span>
+            <span className="sp-timing-label">{outcome ? rated ?? "\u00a0" : iconize(t("sp.shoot"))}</span>
+          </button>
+          {!outcome && <p className="muted small">{iconize(t("sp.timingHint"))}</p>}
+        </div>
       ) : outcome ? (
         <p className="sp-result">&nbsp;</p>
       ) : (
         <div className="btn-row">
-          <button className="btn" onClick={() => onAnswer(null)}>{iconize(t("sp.auto"))}</button>
+          <button className="btn" onClick={() => answer(null)}>{iconize(t("sp.auto"))}</button>
         </div>
       )}
     </div>
@@ -447,6 +545,8 @@ function CornerView({sp, taker, attackers = [], defenders = [], keeper, shooters
     if (outcome && struck === null) setStruck(nowRef.current);
   }, [outcome, struck]);
   const flag = sp.wallSide;
+  // Who goes to each zone (the same players that are drawn standing there).
+  const lineup = useMemo(() => cornerLineup(attackers, taker.id), [attackers, taker.id]);
   const flagAt = {x: flag < 0 ? 3 : 117, y: C_GOAL.line + 0.5};
   const chosen = outcome?.target;
   const header = outcome?.headerId ? attackers.find((p) => p.id === outcome.headerId) : undefined;
@@ -560,7 +660,7 @@ function CornerView({sp, taker, attackers = [], defenders = [], keeper, shooters
       y: at.y,
       node: (
         <g key={`a${pl.player.id}`} transform={`translate(${at.x} ${at.y - lift}) scale(${cScale(at.y)})`}>
-          <Figure look={lookFor(pl.player)} kit={shooters.color} trim={shooters.color2} facing="back" pose={pose} name={shortName(pl.player)} number={NUMBERS[pl.player.position]} />
+          <Figure look={lookFor(pl.player)} kit={shooters.color} trim={shooters.color2} pattern={shooters.pattern} collar={shooters.collar} sleeves={shooters.sleeves} trim3={shooters.color3} facing="back" pose={pose} name={shortName(pl.player)} number={NUMBERS[pl.player.position]} />
         </g>
       ),
     });
@@ -571,7 +671,7 @@ function CornerView({sp, taker, attackers = [], defenders = [], keeper, shooters
       y: at.y,
       node: (
         <g key={`d${pl.player.id}`} transform={`translate(${at.x} ${at.y - lift}) scale(${cScale(at.y)})`}>
-          <Figure look={lookFor(pl.player)} kit={keepers.color} trim={keepers.color2} pose={pose} mood={pl.player.happiness} />
+          <Figure look={lookFor(pl.player)} kit={keepers.color} trim={keepers.color2} pattern={keepers.pattern} collar={keepers.collar} sleeves={keepers.sleeves} trim3={keepers.color3} pose={pose} mood={pl.player.happiness} />
         </g>
       ),
     });
@@ -631,7 +731,7 @@ function CornerView({sp, taker, attackers = [], defenders = [], keeper, shooters
         {/* Zones to aim for. */}
         {CORNER_TARGETS.map((z) => {
           const at = C_ZONES[z](flag);
-          const who = cornerAttacker(attackers, z, taker.id);
+          const who = lineup[z];
           return (
             <g
               key={z}
@@ -653,7 +753,7 @@ function CornerView({sp, taker, attackers = [], defenders = [], keeper, shooters
         {!outcome &&
           CORNER_TARGETS.map((z) => {
             const at = C_ZONES[z](flag);
-            const who = cornerAttacker(attackers, z, taker.id);
+            const who = lineup[z];
             const labelY = z === "penalty" ? at.y + 8 : at.y - 13;
             return (
               <g key={`l${z}`} className="zone-tag" onClick={() => pick(z)}>
@@ -668,7 +768,12 @@ function CornerView({sp, taker, attackers = [], defenders = [], keeper, shooters
         <line x1={flagAt.x} y1={flagAt.y} x2={flagAt.x} y2={flagAt.y - 6} className="sp-flag-pole" />
         <path d={`M${flagAt.x} ${flagAt.y - 6} l${flag < 0 ? 3 : -3} 1.2 l${flag < 0 ? -3 : 3} 1.2z`} fill="#fde047" />
         <g transform={`translate(${flagAt.x + (flag < 0 ? -1.5 : 1.5) + takerStep} ${flagAt.y + 1.2}) scale(${cScale(flagAt.y + 1.2)})`}>
-          <Figure look={lookFor(taker)} kit={shooters.color} trim={shooters.color2} facing="back" pose={outcome && e < CROSS_START + 200 ? "kick" : "ready"} name={shortName(taker)} number={NUMBERS[taker.position]} />
+          <Figure look={lookFor(taker)} kit={shooters.color} trim={shooters.color2} pattern={shooters.pattern} collar={shooters.collar} sleeves={shooters.sleeves} trim3={shooters.color3} pose={outcome && e < CROSS_START + 200 ? "kick" : "ready"} />
+          {/* Seen from the front, with a name plate above: the face and the kick, not just a back. */}
+          <g className="sp-taker-tag">
+            <rect x={-8} y={-37.6} width={16} height={4.2} rx={1.1} />
+            <text x={0} y={-34.5}>{shortName(taker).toUpperCase()}</text>
+          </g>
         </g>
         <ellipse cx={ball.x} cy={shadowY} rx={ball.r * 0.8} ry={ball.r * 0.3} fill="#000" opacity={0.25} />
         <g transform={`translate(${ball.x} ${ball.y}) rotate(${spin})`}>

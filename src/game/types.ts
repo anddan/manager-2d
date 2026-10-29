@@ -167,6 +167,16 @@ export type Collar = (typeof COLLARS)[number];
 export const SLEEVES = ["short", "rolled", "long", "none"] as const;
 export type Sleeves = (typeof SLEEVES)[number];
 
+/** A set of shirt colours and style: the home kit is the club's own fields, the away kit is kept apart. */
+export interface Kit {
+  color: string;
+  color2: string;
+  color3?: string;
+  pattern?: ShirtPattern;
+  collar?: Collar;
+  sleeves?: Sleeves;
+}
+
 export interface Club {
   id: string;
   name: string;
@@ -175,6 +185,8 @@ export interface Club {
   color2: string;
   /** A third colour for the collar and cuffs (missing: the detail colour). */
   color3?: string;
+  /** The away kit (missing: the home colours turned round). */
+  away?: Kit;
   /** How the shirt is patterned, in the club's two colours (missing: plain). */
   pattern?: ShirtPattern;
   /** The shirt's neck (missing: round, a U) and sleeves (missing: short). */

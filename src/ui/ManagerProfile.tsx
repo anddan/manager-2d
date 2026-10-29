@@ -9,7 +9,8 @@ import {useT} from "../i18n";
 import {useGame, useGameState} from "../store";
 import {ManagerAvatar, defaultManagerLook} from "./Avatar";
 import {Modal} from "./common";
-import {COLLARS, SHIRT_PATTERNS, SLEEVES, type Collar, type ShirtPattern, type Sleeves} from "../game/types";
+import {awayKit, homeKit} from "../game/kit";
+import {COLLARS, SHIRT_PATTERNS, SLEEVES, type Collar, type Kit, type ShirtPattern, type Sleeves} from "../game/types";
 import {Jersey} from "./Jersey";
 import type {TKey} from "../i18n";
 
@@ -21,12 +22,23 @@ export function ManagerProfile({onClose}: {onClose: () => void}) {
   const official = club.officialName ?? club.name;
   const [nick, setNick] = useState(club.officialName ? club.name : "");
   const [managerName, setManagerName] = useState(game.managerName);
-  const [color, setColor] = useState(club.color);
-  const [color2, setColor2] = useState(club.color2);
-  const [color3, setColor3] = useState<string | undefined>(club.color3);
-  const [collar, setCollar] = useState<Collar>(club.collar ?? "round");
-  const [sleeves, setSleeves] = useState<Sleeves>(club.sleeves ?? "short");
-  const [pattern, setPattern] = useState<ShirtPattern>(club.pattern ?? "solid");
+  // Two kits, home and away, edited one at a time (the toggle picks which).
+  const [which, setWhich] = useState<"home" | "away">("home");
+  const [kits, setKits] = useState<{home: Kit; away: Kit}>(() => ({home: homeKit(club), away: awayKit(club)}));
+  const kit = kits[which];
+  const setKit = (patch: Partial<Kit>) => setKits((k) => ({...k, [which]: {...k[which], ...patch}}));
+  const color = kit.color;
+  const color2 = kit.color2;
+  const color3 = kit.color3;
+  const collar: Collar = kit.collar ?? "round";
+  const sleeves: Sleeves = kit.sleeves ?? "short";
+  const pattern: ShirtPattern = kit.pattern ?? "solid";
+  const setColor = (c: string) => setKit({color: c});
+  const setColor2 = (c: string) => setKit({color2: c});
+  const setColor3 = (c: string | undefined) => setKit({color3: c});
+  const setCollar = (c: Collar) => setKit({collar: c === "round" ? undefined : c});
+  const setSleeves = (c: Sleeves) => setKit({sleeves: c === "short" ? undefined : c});
+  const setPattern = (p: ShirtPattern) => setKit({pattern: p === "solid" ? undefined : p});
   // The club's initials on its crest (up to three letters).
   const [short, setShort] = useState(club.short);
   const trophies = [
@@ -40,12 +52,14 @@ export function ManagerProfile({onClose}: {onClose: () => void}) {
       const c = g.clubs[g.userClubId];
       const who = managerName.trim();
       if (who) g.managerName = who;
-      c.color = color;
-      c.color2 = color2;
-      c.color3 = color3;
-      c.pattern = pattern === "solid" ? undefined : pattern;
-      c.collar = collar === "round" ? undefined : collar;
-      c.sleeves = sleeves === "short" ? undefined : sleeves;
+      const home = kits.home;
+      c.color = home.color;
+      c.color2 = home.color2;
+      c.color3 = home.color3;
+      c.pattern = home.pattern;
+      c.collar = home.collar;
+      c.sleeves = home.sleeves;
+      c.away = {...kits.away};
       const initials = short.trim().toUpperCase();
       if (initials) c.short = initials;
       const name = nick.trim();
@@ -65,7 +79,7 @@ export function ManagerProfile({onClose}: {onClose: () => void}) {
       <section className="mgr-section">
       <h3 className="mgr-section-title"><Icon name="user" size={18} /> {iconize(t("mgr.sectionManager"))}</h3>
       <div className="mgr-head">
-        <ManagerAvatar look={game.managerLook ?? defaultManagerLook(game.managerName)} size={84} tie={color} />
+        <ManagerAvatar look={game.managerLook ?? defaultManagerLook(game.managerName)} size={84} tie={kits.home.color} />
         <div>
           <h3>{managerName.trim() || game.managerName}</h3>
           <p className="muted">{club.officialName ? `${club.name} (${official})` : club.name}</p>
@@ -118,6 +132,18 @@ export function ManagerProfile({onClose}: {onClose: () => void}) {
       <input className="input mgr-initials" value={short} maxLength={3} placeholder={club.short} onChange={(e) => setShort(e.target.value.toUpperCase())} aria-label={t("mgr.initials")} />
 
       <h4><Icon name="palette" size={18} /> {iconize(t("mgr.colors"))}</h4>
+      {/* Home or away: the toggle picks which kit the colours and the shirt below are for. */}
+      <div className="kit-row">
+        <span className="speed-group kit-which" role="group" aria-label={t("mgr.colors")}>
+          {(["home", "away"] as const).map((w) => (
+            <button key={w} type="button" className={which === w ? "chip active" : "chip"} onClick={() => setWhich(w)}>
+              <Jersey color={kits[w].color} trim={kits[w].color2} pattern={kits[w].pattern} trim3={kits[w].color3} collar={kits[w].collar} sleeves={kits[w].sleeves} size={22} /> {t(w === "home" ? "mgr.kitHome" : "mgr.kitAway")}
+            </button>
+          ))}
+        </span>
+        {which === "away" && <button type="button" className="btn small" onClick={() => setKits((k) => ({...k, away: awayKit({...club, away: undefined, color: k.home.color, color2: k.home.color2, color3: k.home.color3, collar: k.home.collar, sleeves: k.home.sleeves})}))}>{iconize(t("mgr.kitAwayReset"))}</button>}
+      </div>
+      {which === "away" && club.away && <p className="muted small">{iconize(t("mgr.kitAwayHint"))}</p>}
       <div className="mgr-colors">
         <span className="crest big" style={{background: color, color: color2}} aria-hidden>{short.trim().toUpperCase() || club.short}</span>
         <div className="mgr-swatch-rows">

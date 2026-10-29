@@ -21,6 +21,7 @@ import {Icon, iconize, type IconName} from "./Icon";
 import {ClubCrest, TeamOvr} from "./LineupSheet";
 import {useKeepScroll} from "./scrollKeep";
 import {Jersey} from "./Jersey";
+import {matchClubs} from "../game/kit";
 import {boardSpots} from "./views/Tactics";
 import {FORMATION_IDS, type FormationId} from "../game/types";
 import {memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode} from "react";
@@ -1114,8 +1115,7 @@ function shootoutTakers(players: Player[], designated?: string): Player[] {
 function Shootout({report, seed, userSide, textOnly, onDone}: {report: MatchReport; seed: number; userSide: Side; textOnly?: boolean; onDone: (score: [number, number]) => void}) {
   const {t} = useT();
   const game = useGameState();
-  const home = game.clubs[report.homeId];
-  const away = game.clubs[report.awayId];
+  const [home, away] = matchClubs(game.clubs[report.homeId], game.clubs[report.awayId]);
   const end = matchLength(report);
   const onPitch = (side: Side) => [...onPitchAt(report, side, end).values()].map((id) => game.players[id]).filter(Boolean);
   const takers = {home: shootoutTakers(onPitch("home"), home.roles?.penalties), away: shootoutTakers(onPitch("away"), away.roles?.penalties)};
@@ -2371,8 +2371,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
     const touch = e.type === "goal" || e.type === "disallowed" ? goalTouch(e) : undefined;
     return !!touch && touch.minute <= time + 1e-6 && scene.reached >= report.frames.indexOf(touch);
   });
-  const home = game.clubs[report.homeId];
-  const away = game.clubs[report.awayId];
+  const [home, away] = matchClubs(game.clubs[report.homeId], game.clubs[report.awayId]);
   const score = {
     home: events.filter((e) => e.type === "goal" && e.side === "home").length,
     away: events.filter((e) => e.type === "goal" && e.side === "away").length,
@@ -3245,7 +3244,7 @@ function TargetSelect({live, target, booked, onTarget}: {live: LiveMatch; target
         <span className="target-row-name">{fullName(p)}</span>
         <PosBadge pos={team.slots[o.slot].pos} />
         <Flag code={p.nationality} />
-        {booked.has(id) && <span aria-hidden>🟨</span>}
+        {booked.has(id) && <span aria-hidden>{iconize("🟨")}</span>}
         {told && <Icon name="megaphone" size={14} />}
       </>
     );

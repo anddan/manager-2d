@@ -6,7 +6,8 @@ export type IconName =
   | "home" | "mail" | "users" | "clipboard" | "dumbbell" | "calendar" | "list" | "trophy" | "stadium"
   | "swap" | "pen" | "wallet" | "boot" | "diamond" | "settings" | "play" | "ball" | "shield" | "info" | "close"
   | "warn" | "fire" | "video" | "gift" | "shin" | "glove" | "dice" | "user" | "text" | "palette" | "megaphone" | "skip" | "coffee" | "stop" | "target" | "star" | "sparkle" | "chart" | "chat" | "handshake" | "trend" | "tag" | "shirt" | "undo" | "check" | "bolt" | "bank" | "sound" | "compass" | "download" | "upload" | "cart" | "hammer" | "run" | "bench" | "moon" | "search" | "inbox" | "eye" | "coins" | "medical" | "plane" | "clip" | "lock" | "flag" | "updown" | "plus" | "male" | "female" | "mixed" | "chevron" | "thumbUp" | "thumbDown" | "debrief" | "hotdog" | "cup" | "scarf"
-  | "faceSmile" | "faceGrin" | "faceNeutral" | "faceWorried" | "faceSad" | "faceAngry" | "faceGrimace" | "faceYawn";
+  | "faceSmile" | "faceGrin" | "faceNeutral" | "faceWorried" | "faceSad" | "faceAngry" | "faceGrimace" | "faceYawn" | "broom"
+  | "party" | "cardYellow" | "cardRed" | "wall" | "plaster" | "sprout" | "trendDown" | "heartBroken" | "sun" | "goal" | "bag" | "chair";
 
 const PATHS: Record<IconName, ReactNode> = {
   home: <><path d="M3 11 12 4l9 7" /><path d="M5 10v10h14V10" /><path d="M10 20v-6h4v6" /></>,
@@ -91,6 +92,20 @@ const PATHS: Record<IconName, ReactNode> = {
   updown: <><path d="M12 3v18M7 8l5-5 5 5M7 16l5 5 5-5" /></>,
   chevron: <path d="M6 9l6 6 6-6" />,
   plus: <path d="M12 5v14M5 12h14" />,
+  // A broom: sweeping the ball away (a cleared ball).
+  broom: <><path d="M20 4l-7.500 7.500" /><path d="M10.500 10.500l3 3-3.200 5.500H4.500l6-8.500Z" /><path d="M8.500 14.500l2 2M6.500 17.500l1.500 1.500" /></>,
+  party: <><path d="M4 20l4.500-12 7.500 7.500L4 20Z" /><path d="M11 6l1 1.500M15 4v2.500M19 8.500l-2 .5M18 14l2.500.5" /><circle cx="17.500" cy="4.500" r="0.8" fill="currentColor" /><circle cx="20" cy="11" r="0.8" fill="currentColor" /></>,
+  cardYellow: <rect x="7" y="3.500" width="10" height="17" rx="2" fill="#facc15" stroke="rgb(0 0 0 / 0.45)" strokeWidth="1.400" transform="rotate(8 12 12)" />,
+  cardRed: <rect x="7" y="3.500" width="10" height="17" rx="2" fill="#ef4444" stroke="rgb(0 0 0 / 0.45)" strokeWidth="1.400" transform="rotate(8 12 12)" />,
+  wall: <><rect x="3" y="5" width="18" height="14" rx="1.500" /><path d="M3 9.700h18M3 14.300h18M9 5v4.700M15 9.700v4.600M9 14.300V19" /></>,
+  plaster: <><rect x="2.500" y="8.500" width="19" height="7" rx="3.500" transform="rotate(-35 12 12)" /><rect x="9" y="9.500" width="6" height="5" transform="rotate(-35 12 12)" /><circle cx="11" cy="12.500" r="0.5" fill="currentColor" /><circle cx="13" cy="11.200" r="0.5" fill="currentColor" /></>,
+  sprout: <><path d="M12 21v-9" /><path d="M12 12c0-3.500-2.500-5.500-6-5.500 0 3.500 2.500 5.500 6 5.500Z" /><path d="M12 14c0-3 2-5 5.500-5 0 3-2 5-5.500 5Z" /></>,
+  trendDown: <><path d="M3 7l6 6 4-4 8 8" /><path d="M15 17h6v-6" /></>,
+  heartBroken: <><path d="M12 20S4 15 4 9.500A4 4 0 0 1 12 7.500a4 4 0 0 1 8 2C20 15 12 20 12 20Z" /><path d="M12 7.500l-2 4 3 1.500-2 4.500" /></>,
+  sun: <><circle cx="12" cy="12" r="4" /><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.600 5.600l1.400 1.400M17 17l1.400 1.400M18.400 5.600L17 7M7 17l-1.400 1.400" /></>,
+  goal: <><path d="M3 19V6h18v13" /><path d="M3 12h18M9 6v13M15 6v13" /></>,
+  bag: <><path d="M5 8h14l-1 12H6L5 8Z" /><path d="M9 8V6a3 3 0 0 1 6 0v2" /></>,
+  chair: <><path d="M7 4v9h10" /><path d="M7 13v7M17 13v7M7 17h10" /></>,
   // Faces, drawn like the rest: a round head, two dots for eyes and a mouth that says how they feel.
   faceSmile: <><circle cx="12" cy="12" r="9" /><circle cx="9" cy="10" r="0.9" fill="currentColor" /><circle cx="15" cy="10" r="0.9" fill="currentColor" /><path d="M8.5 14.5c1 1.4 2.2 2 3.5 2s2.5-.6 3.5-2" /></>,
   faceGrin: <><circle cx="12" cy="12" r="9" /><circle cx="9" cy="10" r="0.9" fill="currentColor" /><circle cx="15" cy="10" r="0.9" fill="currentColor" /><path d="M8 13.5h8c0 2.5-1.8 4.2-4 4.2s-4-1.7-4-4.2Z" /></>,
@@ -115,7 +130,8 @@ const EMOJI_ICONS: Record<string, IconName> = {
   "💎": "diamond", "💠": "diamond", "⚡": "bolt", "💰": "coins", "💸": "coins", "🏆": "trophy", "⚽": "ball", "🎁": "gift",
   "🔍": "search", "🏟️": "stadium", "🏗️": "hammer", "🎬": "video", "🎯": "target", "🔥": "fire", "🧤": "glove", "👟": "boot",
   "⭐": "star", "✅": "check", "❌": "close", "🏦": "bank", "✏️": "pen", "🖊️": "pen", "✍️": "pen", "🎨": "palette", "🔒": "lock",
-  "🏁": "flag", "📋": "clipboard", "🔁": "swap", "🔄": "swap", "🏷️": "tag", "🏋️": "dumbbell", "⚠️": "warn", "📭": "inbox",
+  "🏁": "flag", "📋": "clipboard", "🔁": "swap", "🧹": "broom", "🎉": "party", "💪": "dumbbell", "🟨": "cardYellow", "🟥": "cardRed", "🧱": "wall", "🩹": "plaster", "🌱": "sprout", "📉": "trendDown", "💔": "heartBroken", "☀️": "sun", "🥅": "goal", "🛍️": "bag", "🪑": "chair",
+  "☕": "coffee", "📣": "megaphone", "🚩": "flag", "✨": "sparkle", "🛡️": "shield", "✈️": "plane", "📎": "clip", "🎥": "video", "🌭": "hotdog", "🔭": "search", "✖": "close", "🔄": "swap", "🏷️": "tag", "🏋️": "dumbbell", "⚠️": "warn", "📭": "inbox",
   "😊": "faceSmile", "🙂": "faceSmile", "😀": "faceGrin", "😄": "faceGrin", "😅": "faceGrin", "😁": "faceGrin", "😐": "faceNeutral",
   "😕": "faceWorried", "😟": "faceWorried", "😞": "faceSad", "😔": "faceSad", "😢": "faceSad", "😠": "faceAngry", "😡": "faceAngry",
   "😤": "faceAngry", "👏": "thumbUp", "👍": "thumbUp", "👎": "thumbDown", "🤝": "handshake", "😬": "faceGrimace", "🥱": "faceYawn",

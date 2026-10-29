@@ -147,8 +147,8 @@ export function StatusIcons({player}: {player: Player}) {
   const {t} = useT();
   return (
     <span className="status-icons">
-      {player.injuryWeeks > 0 && <span title={t("status.injured", {weeks: player.injuryWeeks})}>🩹</span>}
-      {player.suspension > 0 && <span title={t("status.suspended")}>🟥</span>}
+      {player.injuryWeeks > 0 && <span title={t("status.injured", {weeks: player.injuryWeeks})}>{iconize("🩹")}</span>}
+      {player.suspension > 0 && <span title={t("status.suspended")}>{iconize("🟥")}</span>}
       {player.transferListed && <span title={t("status.listed")}>🏷️</span>}
       {player.loanListed && <span title={t("status.loanListed")}>🔁</span>}
       {player.wantsToLeave && <span title={t("status.wantsOut")}>✈️</span>}
