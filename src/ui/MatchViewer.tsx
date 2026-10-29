@@ -1848,6 +1848,8 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
     setTextOnlyState(on);
     try {
       localStorage.setItem(TEXT_ONLY_KEY, on ? "1" : "0");
+      // Commentary only: the set pieces are the assistant's from now on.
+      if (on) localStorage.setItem(SET_PIECES_KEY, "auto");
     } catch {
       // Only for this match.
     }

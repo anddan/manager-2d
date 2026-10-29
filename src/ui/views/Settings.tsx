@@ -32,11 +32,11 @@ function usePref<T extends string>(key: string, fallback: T): [T, (v: T) => void
 }
 
 /** Two or more choices in a pill, the chosen one lit. */
-function Choice<T extends string>({value, options, onPick, label}: {value: T; options: readonly (readonly [T, string])[]; onPick: (v: T) => void; label: string}) {
+function Choice<T extends string>({value, options, onPick, label, disabled}: {value: T; options: readonly (readonly [T, string])[]; onPick: (v: T) => void; label: string; disabled?: boolean}) {
   return (
     <span className="speed-group" role="radiogroup" aria-label={label}>
       {options.map(([v, text]) => (
-        <button key={v} type="button" role="radio" aria-checked={value === v} className={value === v ? "chip active" : "chip"} onClick={() => onPick(v)}>{text}</button>
+        <button key={v} type="button" role="radio" aria-checked={value === v} disabled={disabled} className={value === v ? "chip active" : "chip"} onClick={() => onPick(v)}>{text}</button>
       ))}
     </span>
   );
@@ -121,11 +121,11 @@ export function Settings() {
       <Card title={<><Icon name="ball" size={20} /> {iconize(t("settings.match"))}</>}>
         <dl className="kv setting-rows">
           <dt><Icon name="video" size={18} /> {iconize(t("settings.view"))}</dt>
-          <dd><Choice label={t("settings.view")} value={textOnly} onPick={setTextOnly} options={[["0", t("match.viewPitch")], ["1", t("match.viewText")]]} /></dd>
+          <dd><Choice label={t("settings.view")} value={textOnly} onPick={(v) => { setTextOnly(v); if (v === "1") setSetPieces("auto"); }} options={[["0", t("match.viewPitch")], ["1", t("match.viewText")]]} /></dd>
           <dt><Icon name="skip" size={18} /> {iconize(t("match.speed"))}</dt>
           <dd><Choice label={t("match.speed")} value={speed} onPick={setSpeed} options={[["1", "1×"], ["2", "2×"], ["3", "3×"], ["4", "4×"], ["5", "5×"]]} /></dd>
           <dt><Icon name="target" size={18} /> {iconize(t("match.setPieces"))}</dt>
-          <dd><Choice label={t("match.setPieces")} value={setPieces} onPick={setSetPieces} options={[["self", t("match.self")], ["auto", t("match.auto")]]} /></dd>
+          <dd><Choice label={t("match.setPieces")} value={textOnly === "1" ? "auto" : setPieces} disabled={textOnly === "1"} onPick={setSetPieces} options={[["self", t("match.self")], ["auto", t("match.auto")]]} /></dd>
           <dt><Icon name="swap" size={18} /> {iconize(t("match.subsWho"))}</dt>
           <dd><Choice label={t("match.subsWho")} value={subs} onPick={setSubs} options={[["self", t("match.self")], ["auto", t("match.auto")]]} /></dd>
           <dt><Icon name="eye" size={18} /> {iconize(t("settings.pitchView"))}</dt>
