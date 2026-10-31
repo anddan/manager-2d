@@ -5,7 +5,7 @@ import {useState} from "react";
 import {clubSlots} from "../game/constants";
 import {listName, shortName} from "../game/helpers";
 import {repairLineup} from "../game/lineup";
-import {effectiveRating, teamOvr} from "../game/ratings";
+import {effectiveRating, pickCaptain, teamOvr} from "../game/ratings";
 import type {Club, Player} from "../game/types";
 import {useT} from "../i18n";
 import {useGame, useGameState} from "../store";
@@ -22,6 +22,7 @@ export function LineupSheet({club, player, onPick}: {club: SheetClub; player: (i
   const {t} = useT();
   const slots = clubSlots(club as Club);
   const spots = boardSpots(slots);
+  const captainId = pickCaptain(club.roles?.captain, club.lineup.filter(Boolean), Object.fromEntries(club.lineup.flatMap((id) => { const p = player(id); return p ? [[id, p]] : []; })));
   const bench = club.bench.map(player).filter((p): p is Player => !!p);
   return (
     <>
@@ -31,12 +32,11 @@ export function LineupSheet({club, player, onPick}: {club: SheetClub; player: (i
           const p = player(club.lineup[i]);
           return (
             <div key={i} className={p ? "slot" : "slot empty"} style={spots[i]} role={p ? "button" : undefined} onClick={p ? () => onPick(p) : undefined}>
-              {p && club.roles?.captain === p.id && <span className="armband" title={t("roles.captain")}>C</span>}
               {p?.gear && <span className={p.gear.kind === "gloves" ? "slot-gear gloves" : "slot-gear"} aria-hidden><GearPicture item={p.gear} size={p.gear.kind === "gloves" ? 22 : 24} /></span>}
               {p?.shin && <span className="slot-gear slot-shin" aria-hidden><GearPicture item={p.shin} size={15} /></span>}
-              <Jersey color={club.color} trim={club.color2} pattern={club.pattern} trim3={club.color3} collar={club.collar} sleeves={club.sleeves} keeper={slot.pos === "GK"} number={i + 1} />
+              <Jersey color={club.color} trim={club.color2} pattern={club.pattern} trim3={club.color3} collar={club.collar} sleeves={club.sleeves} keeper={slot.pos === "GK"} number={p?.shirt ?? i + 1} captain={!!p && p.id === captainId} />
               <span className="plate">
-                <span className="plate-name">{p ? shortName(p) : t(`pos.${slot.pos}`)}</span>
+                <span className="plate-name">{p ? shortName(p) : t(`pos.${slot.pos}`)}{!!p && p.id === captainId && <small className="cap-c">c</small>}</span>
                 <span className="plate-info">
                   {p && <Flag code={p.nationality} size={13} />}
                   <span>{iconize(t(`pos.${slot.pos}`))}</span>

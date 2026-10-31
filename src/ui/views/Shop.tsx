@@ -79,7 +79,10 @@ export function Shop() {
   const open = (pack: PlayerPackId) => {
     const res = act((g, rng) => openPack(g, rng, pack));
     if ("error" in res) notify(res.error, undefined, "error");
-    else setOpened({playerId: res.playerId, pack});
+    else {
+      setOpened({playerId: res.playerId, pack});
+      if (res.gear) notify("pack.bonusGear", undefined, "good");
+    }
   };
 
   // The diamond pack: four to pick from. Shown while choosing; reopened from the tile if closed.
@@ -92,6 +95,7 @@ export function Shop() {
     const res = act((g, rng) => openDiamondPack(g, rng));
     if ("error" in res) return notify(res.error, undefined, "error");
     if (fresh) setSeq(0);
+    if (res.gear) notify("pack.bonusGear", undefined, "good");
     setChoosing(true);
   };
   const pick = (playerId: string) => {

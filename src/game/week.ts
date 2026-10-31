@@ -8,6 +8,8 @@ import {CUP_WEEKS, DIAMONDS_SEASON, ENERGY_COST_MATCH, FORMATIONS, SEASON_WEEKS}
 import {payPrizeMoney, seasonBoardReview, setSeasonBudgets, weeklyFinances} from "./finance";
 import {assignRoles, createFreeAgents, createPlayer} from "./generate";
 import {finishCupStage, setupCup, userCupResult} from "./cup";
+import {announceAwards, seasonAwards} from "./awards";
+import {nationalWeek, offerNational} from "./national";
 import {weeklyStadium} from "./stadium";
 import {taskProgress} from "./daily";
 import {tutorialMatchSeed} from "./tutorial";
@@ -19,6 +21,7 @@ import {spendEnergy} from "./monetization";
 import {updatePromises, weeklyMorale} from "./morale";
 import {clubStrength, marketValue, overall} from "./ratings";
 import {Rng, clamp} from "./rng";
+import {REHAB_CHANCE} from "./stadium";
 import {weeklyTraining} from "./training";
 import {weeklyTransfers} from "./transfers";
 import {POSITIONS, type Fixture, type GameState, type MatchReport} from "./types";
@@ -49,6 +52,9 @@ export function startWeek(state: GameState, rng: Rng, now: number, opts = {useEn
     if (!p.talent && p.age <= 23 && p.potential - overall(p) >= 8) p.talent = true;
     if (p.injuryWeeks > 0) {
       p.injuryWeeks--;
+      // The rehab centre: now and then a week sooner (our own players).
+      const rehab = p.clubId === state.userClubId ? (state.clubs[state.userClubId].stadium?.rehab ?? 0) : 0;
+      if (p.injuryWeeks > 0 && rehab > 0 && rng.chance(rehab * REHAB_CHANCE)) p.injuryWeeks--;
       if (p.injuryWeeks === 0) p.injury = undefined;
       if (p.injuryWeeks === 0 && p.clubId === state.userClubId) {
         addMessage(state, {kind: "player", key: "msg.recovered", params: {name: playerName(state, p.id)}, action: {type: "player", playerId: p.id}});
@@ -135,6 +141,8 @@ export function finishWeek(state: GameState, rng: Rng): MatchReport | undefined 
   weeklyTransfers(state, rng);
   weeklyStadium(state, played);
   weeklyFinances(state, played);
+  // The national team plays its friendlies and tournament matches.
+  nationalWeek(state, rng);
   for (const p of Object.values(state.players)) p.value = marketValue(p, state.season);
 
   state.monetization.extraTrainingsThisWeek = 0;
@@ -171,6 +179,10 @@ function endSeason(state: GameState, rng: Rng): void {
   const cup = userCupResult(state);
   state.history.push({season: state.season, championId: order[0], userPosition, ...(cup !== undefined ? {cup} : {})});
   if (userPosition === 1) state.celebrations = [...(state.celebrations ?? []), {kind: "league", season: state.season}];
+  // The season's awards (before the stats are cleared and the players a year older).
+  announceAwards(state, seasonAwards(state, order));
+  // A title (the league or the Champions Cup) may bring an offer to coach a country.
+  if ((userPosition === 1 || cup === 4) && !state.national && rng.chance(0.7)) offerNational(state, rng);
   const m = state.monetization;
   m.diamonds += userPosition === 1 ? DIAMONDS_SEASON.champion : userPosition <= 3 ? DIAMONDS_SEASON.top3 : DIAMONDS_SEASON.rest;
   addMessage(state, {

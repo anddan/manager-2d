@@ -6,6 +6,7 @@ import {create} from "zustand";
 import {createContext, useContext} from "react";
 import type {Negotiation} from "./game/contracts";
 import {newGame} from "./game/generate";
+import {fixShirts} from "./game/shirts";
 import {Rng} from "./game/rng";
 import {deleteSave, loadGame, saveGame} from "./game/save";
 import type {GameState, ManagerLook, PlayersGender} from "./game/types";
@@ -22,6 +23,7 @@ export const VIEWS = [
   "table",
   "cup",
   "friends",
+  "national",
   "pals",
   "stadium",
   "transfers",
@@ -77,7 +79,11 @@ function loadLang(): Lang {
 }
 
 export const useGame = create<Store>((set, get) => ({
-  game: loadGame(),
+  game: (() => {
+    const g = loadGame();
+    if (g) fixShirts(g);
+    return g;
+  })(),
   lang: loadLang(),
   view: "overview",
   playerId: null,
@@ -106,6 +112,8 @@ export const useGame = create<Store>((set, get) => ({
     const rng = new Rng(draft.rngState);
     const result = fn(draft, rng);
     draft.rngState = rng.state;
+    // Everyone has a number of their own (new signings, loans back, a changed club).
+    fixShirts(draft);
     saveGame(draft);
     set({game: draft});
     return result;
@@ -114,10 +122,12 @@ export const useGame = create<Store>((set, get) => ({
     const game = newGame(managerName, clubIndex, (Math.random() * 2 ** 32) >>> 0, look, playersGender, leagueId);
     // New players get the guide.
     game.tutorial = {step: 0, v: TUTORIAL_VERSION};
+    fixShirts(game);
     saveGame(game);
     set({game, view: "overview"});
   },
   replace: (game) => {
+    fixShirts(game);
     saveGame(game);
     set({game, view: "overview", playerId: null, matchFixtureId: null, negotiation: null});
   },

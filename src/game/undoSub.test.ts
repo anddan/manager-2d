@@ -28,3 +28,31 @@ describe("undoing a substitution", () => {
     expect(live!.undoSub(out)).toBeUndefined();
   });
 });
+
+describe("moving into an empty place", () => {
+  it("lets a player take the place of someone sent off, leaving his own empty", () => {
+    const g = newGame("Empty", 3, 22);
+    const rng = new Rng(6);
+    let live: LiveMatch | undefined;
+    for (let week = 0; week < 40 && !live; week++) {
+      const started = startWeek(g, rng, Date.now(), {useEnergy: false});
+      if (!started.ok) throw new Error(started.reason);
+      if (started.live) live = new LiveMatch(g);
+      else finishWeek(g, rng);
+    }
+    const team = live!.team();
+    const outfield = team.onPitch.filter((o) => team.slots[o.slot].pos !== "GK");
+    // One is sent off: his place is empty.
+    const gone = outfield[0];
+    const mover = outfield[1];
+    team.onPitch = team.onPitch.filter((o) => o !== gone);
+    const before = live!.previewSlots();
+    live!.command({type: "swap", aId: mover.id, bId: `slot:${gone.slot}`});
+    const after = live!.previewSlots();
+    expect(after[mover.slot]).toEqual(before[gone.slot]);
+    expect(after[gone.slot]).toEqual(before[mover.slot]);
+    // An occupied place is not "empty": nothing happens.
+    live!.command({type: "swap", aId: mover.id, bId: `slot:${outfield[2].slot}`});
+    expect(live!.previewSlots()).toEqual(after);
+  });
+});

@@ -40,9 +40,29 @@ export function ratingAt(player: Player, pos: Position): number {
   return sum;
 }
 
-/** The player's overall at their own position, rounded. */
+/** The player's overall at their own position, rounded, with their boots and gloves on (what is shown everywhere). */
 export function overall(player: Player): number {
+  return Math.round(ratingAt(geared(player), player.position));
+}
+
+/** Their overall without any equipment: what their value and wage are worked out from. */
+export function bareOverall(player: Player): number {
   return Math.round(ratingAt(player, player.position));
+}
+
+/** The captain among `ids`: the chosen one if they are there, otherwise (none chosen, or not playing) the best outfield player. */
+export function pickCaptain(chosen: string | undefined, ids: string[], players: Record<string, Player>): string | undefined {
+  if (chosen && ids.includes(chosen)) return chosen;
+  return ids
+    .filter((id) => players[id] && players[id].position !== "GK")
+    .reduce<string | undefined>((best, id) => (!best || overall(players[id]) > overall(players[best]) ? id : best), undefined);
+}
+
+/** The player of the match: the best rating of the two teams (the first one if they share it). */
+export function playerOfTheMatch(ratings: Record<string, number>): string | undefined {
+  let best: string | undefined;
+  for (const [id, r] of Object.entries(ratings)) if (best === undefined || r > ratings[best]) best = id;
+  return best;
 }
 
 /** 1 at their own position, less elsewhere. */
@@ -58,10 +78,14 @@ export function familiarity(player: Player, pos: Position): number {
 export const FORM_EFFECT = 0.18;
 
 /** What makes up a player's rating on the day in a place: their level there, and each thing that lifts or lowers it. */
-export function dayFormParts(player: Player, pos: Position): {base: number; fitness: number; form: number; morale: number; sharpness: number; attitude: number} {
+export function dayFormParts(player: Player, pos: Position): {base: number; gear: number; position: number; fitness: number; form: number; morale: number; sharpness: number; attitude: number} {
   return {
     // With their boots (or gloves) on: the bonus counts on the day, not in their own rating.
-    base: ratingAt(geared(player), pos) * familiarity(player, pos),
+    base: ratingAt(geared(player), pos),
+    // What the boots and gloves add to that, in points.
+    gear: ratingAt(geared(player), pos) - ratingAt(player, pos),
+    // Out of their own position they lose some of it.
+    position: familiarity(player, pos),
     // A tireless player (Engine) loses a little less to tired legs.
     fitness: hasTrait(player, "engine") ? 0.8 + 0.2 * (player.fitness / 100) : 0.75 + 0.25 * (player.fitness / 100),
     // Form counts a lot: from 18 % below their level in bad form to 18 % above in top form (none at average).
@@ -76,7 +100,7 @@ export function dayFormParts(player: Player, pos: Position): {base: number; fitn
 
 export function effectiveRating(player: Player, pos: Position): number {
   const d = dayFormParts(player, pos);
-  return d.base * d.fitness * d.form * d.morale * d.sharpness * d.attitude;
+  return d.base * d.position * d.fitness * d.form * d.morale * d.sharpness * d.attitude;
 }
 
 /** 13990 -> 14000: values and wages look nicer rounded. */
@@ -89,7 +113,7 @@ function roundNice(n: number): number {
 
 /** Market value from quality, age, potential and contract. */
 export function marketValue(player: Player, season: number): number {
-  const ovr = overall(player);
+  const ovr = bareOverall(player);
   let value = 200_000 * Math.exp(0.12 * (ovr - 50));
   const room = Math.max(0, player.potential - ovr);
   if (player.age <= 23) value *= 1 + room * 0.035 * ((24 - player.age) / 6 + 0.5);
@@ -105,7 +129,7 @@ export function marketValue(player: Player, season: number): number {
 
 /** What a player of this level expects to earn per week. */
 export function expectedWage(player: Player): number {
-  const ovr = overall(player);
+  const ovr = bareOverall(player);
   let wage = 1_600 * Math.exp(0.1 * (ovr - 50));
   if (player.age <= 20) wage *= 0.7;
   if (player.age >= 32) wage *= 0.85;

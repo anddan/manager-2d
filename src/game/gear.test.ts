@@ -2,22 +2,24 @@
 import {describe, expect, it} from "vitest";
 import {newGame} from "./generate";
 import {buyGear, equipGear, sellGear, unequipGear} from "./gear";
-import {effectiveRating, overall} from "./ratings";
+import {bareOverall, effectiveRating, overall} from "./ratings";
 import {completeTransfer, quickSaleOffer, quickSell} from "./transfers";
 
 describe("boots and gloves", () => {
-  it("lift the player on the day, not their own rating", () => {
+  it("lift the player on the day and in their shown overall, not in their bare level (value and wage)", () => {
     const g = newGame("Gear", 3, 11);
     const p = Object.values(g.players).find((x) => x.clubId === g.userClubId && x.position === "ST")!;
     const before = effectiveRating(p, "ST");
     const ovr = overall(p);
+    const bare = bareOverall(p);
     g.monetization.diamonds = 1000;
     expect(buyGear(g, {kind: "shooting", tier: "gold"})).toBeNull();
     expect(g.gearBag).toHaveLength(1);
     expect(equipGear(g, p.id, 0)).toBeNull();
     expect(g.gearBag).toHaveLength(0);
     expect(effectiveRating(g.players[p.id], "ST")).toBeGreaterThan(before);
-    expect(overall(g.players[p.id])).toBe(ovr);
+    expect(overall(g.players[p.id])).toBeGreaterThan(ovr);
+    expect(bareOverall(g.players[p.id])).toBe(bare);
     unequipGear(g, p.id);
     expect(g.players[p.id].gear).toBeUndefined();
     expect(g.gearBag).toHaveLength(1);

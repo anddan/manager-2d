@@ -1164,9 +1164,16 @@ export function createMatch(
         const next = team.slots.slice();
         if (c.type === "swap") {
           const a = team.onPitch.find((o) => o.id === c.aId);
-          const b = team.onPitch.find((o) => o.id === c.bId);
-          if (!a || !b || a === b) continue;
-          [next[a.slot], next[b.slot]] = [next[b.slot], next[a.slot]];
+          if (c.bId.startsWith("slot:")) {
+            // An empty place (someone sent off): the player takes it, and his own place is left empty.
+            const empty = Number(c.bId.slice(5));
+            if (!a || !next[empty] || team.onPitch.some((o) => o.slot === empty) || team.slots[a.slot].pos === "GK" || next[empty].pos === "GK") continue;
+            [next[a.slot], next[empty]] = [next[empty], next[a.slot]];
+          } else {
+            const b = team.onPitch.find((o) => o.id === c.bId);
+            if (!a || !b || a === b) continue;
+            [next[a.slot], next[b.slot]] = [next[b.slot], next[a.slot]];
+          }
         } else {
           const o = team.onPitch.find((p) => p.id === c.playerId);
           // The keeper stays in goal.

@@ -2,13 +2,14 @@
 // the team attacks) with the share of the match the ball has been in each, so far. Light grey for little,
 // darker grey the more it has been there. The user's team always attacks upwards. Under each player's name:
 // the match rating and how fit they are.
-import {useEffect, useLayoutEffect, useRef, useState, type RefObject} from "react";
+import {useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject} from "react";
 import type {Frame, MatchEvent, Side} from "../game/types";
 import type {Slot} from "../game/constants";
 import {progressFor} from "../game/pitch";
 import {useT} from "../i18n";
 import {Icon} from "./Icon";
 import {Jersey} from "./Jersey";
+import {Football} from "./Ball";
 import {GearPicture} from "./Gear";
 import type {GearItem} from "../game/gear";
 import {ManagerAvatar} from "./Avatar";
@@ -85,6 +86,20 @@ export interface ZonePlayer {
   /** Boots or gloves, and shin guards. */
   gear?: GearItem;
   shin?: GearItem;
+  /** Sent off: greyed out, with the red card. */
+  sentOff?: boolean;
+  /** Has the ball (or is about to take the set piece). */
+  hasBall?: boolean;
+  /** Came on as a substitute (not in the starting eleven). */
+  subbedOn?: boolean;
+  /** Their shirt number. */
+  shirt?: number;
+  /** The player of the match (a star at the name, once the match is over). */
+  motm?: boolean;
+  /** Wears the armband. */
+  captain?: boolean;
+  /** Just scored (yellow glow) or set up the goal (blue). */
+  goalGlow?: "scorer" | "assist";
   /** Goals, assists and cards so far (shown as small icons on the shirt). */
   goals?: number;
   assists?: number;
@@ -108,8 +123,18 @@ export function playerMarks(events: MatchEvent[], upTo: number): Record<string, 
 }
 
 /** Shots, shots on target and corners for each side [home, away] up to a time. */
-export function matchStats(events: MatchEvent[], upTo: number): {shots: [number, number]; onTarget: [number, number]; corners: [number, number]} {
-  const out = {shots: [0, 0] as [number, number], onTarget: [0, 0] as [number, number], corners: [0, 0] as [number, number]};
+export interface MatchStatsData {
+  shots: [number, number];
+  onTarget: [number, number];
+  corners: [number, number];
+  penalties: [number, number];
+  yellow: [number, number];
+  red: [number, number];
+}
+
+export function matchStats(events: MatchEvent[], upTo: number): MatchStatsData {
+  const pair = () => [0, 0] as [number, number];
+  const out: MatchStatsData = {shots: pair(), onTarget: pair(), corners: pair(), penalties: pair(), yellow: pair(), red: pair()};
   for (const e of events) {
     if (e.minute - 1 > upTo || !e.side) continue;
     const i = e.side === "home" ? 0 : 1;
@@ -118,8 +143,52 @@ export function matchStats(events: MatchEvent[], upTo: number): {shots: [number,
       out.onTarget[i]++;
     } else if (e.type === "missed" || e.type === "blocked") out.shots[i]++;
     else if (e.type === "corner") out.corners[i]++;
+    else if (e.type === "penalty") out.penalties[i]++;
+    else if (e.type === "yellow") out.yellow[i]++;
+    else if (e.type === "red") out.red[i]++;
   }
   return out;
+}
+
+/** The statistics so far, in one neutral style (the user's side in the accent colour): folded up to the two sides and who has the ball, opened for the rest. */
+export function MatchStats({possession, stats, home, away, mine}: {
+  possession: [number, number];
+  stats: MatchStatsData;
+  home: {short: string};
+  away: {short: string};
+  mine?: Side;
+}) {
+  const {t} = useT();
+  const [open, setOpen] = useState(false);
+  const row = (label: string, values: [ReactNode, ReactNode], suffix = "") => (
+    <div className="zs-row">
+      <b className={mine === "home" ? "mine" : undefined}>{values[0]}{suffix}</b>
+      <span>{label}</span>
+      <b className={mine === "away" ? "mine" : undefined}>{values[1]}{suffix}</b>
+    </div>
+  );
+  const cards = (i: 0 | 1) => (
+    <span className="zs-cards"><Icon name="cardYellow" size={13} /> {stats.yellow[i]} <Icon name="cardRed" size={13} /> {stats.red[i]}</span>
+  );
+  return (
+    <div className="zone-stats match-stats">
+      <button type="button" className="zs-head" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        <span>{mine === "home" && <Icon name="user" size={13} />} {home.short} <b className={mine === "home" ? "mine" : undefined}>{possession[0]} %</b></span>
+        <span className={open ? "zs-chevron open" : "zs-chevron"}><Icon name="chevron" size={16} /></span>
+        <span><b className={mine === "away" ? "mine" : undefined}>{possession[1]} %</b> {away.short} {mine === "away" && <Icon name="user" size={13} />}</span>
+      </button>
+      {open && row(t("match.possession"), possession, " %")}
+      <div className="zs-bar" role="img" aria-label={`${t("match.possession")}: ${home.short} ${possession[0]} %, ${away.short} ${possession[1]} %`}>
+        <i className={mine === "home" ? "mine" : undefined} style={{width: `${possession[0]}%`}} />
+        <i className={mine === "away" ? "mine" : undefined} style={{width: `${possession[1]}%`}} />
+      </div>
+      {open && row(t("zones.shots"), stats.shots)}
+      {open && row(t("zones.onTarget"), stats.onTarget)}
+      {open && row(t("zones.corners"), stats.corners)}
+      {open && row(t("zones.penalties"), stats.penalties)}
+      {open && row(t("zones.cards"), [cards(0), cards(1)])}
+    </div>
+  );
 }
 
 /**
@@ -162,10 +231,8 @@ function useSmoothed(target: number[]): number[] {
   return shown;
 }
 
-export function ZonePanel({shares, possession, stats, home, away, mine, slots, players, kit, shout, managerLook, onSubOut, onProfile, forza, instructed}: {
+export function ZonePanel({shares, home, away, mine, slots, players, kit, shout, managerLook, onSubOut, onProfile, forza, instructed}: {
   shares: [number, number, number];
-  possession: [number, number];
-  stats: {shots: [number, number]; onTarget: [number, number]; corners: [number, number]};
   home: ClubKit;
   away: ClubKit;
   mine?: Side;
@@ -188,8 +255,6 @@ export function ZonePanel({shares, possession, stats, home, away, mine, slots, p
   const [picked, setPicked] = useState<string | null>(null);
   const board = useRef<HTMLDivElement>(null);
   const bar = usePlateBar(board, picked ? `[data-pid="${picked}"] .plate` : null, players);
-  // The statistics start folded up: just the two sides and who has the ball.
-  const [statsOpen, setStatsOpen] = useState(false);
   // The zones' colours ease towards their share (top: where the team attacks).
   const soft = useSmoothed([shares[2], shares[1], shares[0]]);
   const bands = [
@@ -208,94 +273,79 @@ export function ZonePanel({shares, possession, stats, home, away, mine, slots, p
     return () => document.removeEventListener("pointerdown", away);
   }, [picked]);
   const pickedPlayer = players?.find((p) => p.id === picked);
-  // One row of the statistics: the home value, what it is, the away value; the user's side lit.
-  const row = (label: string, values: [number, number], suffix = "") => (
-    <div className="zs-row">
-      <b className={mine === "home" ? "mine" : undefined}>{values[0]}{suffix}</b>
-      <span>{label}</span>
-      <b className={mine === "away" ? "mine" : undefined}>{values[1]}{suffix}</b>
-    </div>
-  );
   return (
     <figure className="zone-panel">
-      {/* The statistics so far, in one neutral style: the user's side in the accent colour. */}
-      <div className="zone-stats">
-        <button type="button" className="zs-head" aria-expanded={statsOpen} onClick={() => setStatsOpen((o) => !o)}>
-          <span>{mine === "home" && <Icon name="user" size={13} />} {home.short} <b className={mine === "home" ? "mine" : undefined}>{possession[0]} %</b></span>
-          <span className={statsOpen ? "zs-chevron open" : "zs-chevron"}><Icon name="chevron" size={16} /></span>
-          <span><b className={mine === "away" ? "mine" : undefined}>{possession[1]} %</b> {away.short} {mine === "away" && <Icon name="user" size={13} />}</span>
-        </button>
-        {statsOpen && row(t("match.possession"), possession, " %")}
-        <div className="zs-bar" role="img" aria-label={`${t("match.possession")}: ${home.short} ${possession[0]} %, ${away.short} ${possession[1]} %`}>
-          <i className={mine === "home" ? "mine" : undefined} style={{width: `${possession[0]}%`}} />
-          <i className={mine === "away" ? "mine" : undefined} style={{width: `${possession[1]}%`}} />
-        </div>
-        {statsOpen && row(t("zones.shots"), stats.shots)}
-        {statsOpen && row(t("zones.onTarget"), stats.onTarget)}
-        {statsOpen && row(t("zones.corners"), stats.corners)}
-      </div>
-      <div ref={board} className="pitch-board zone-board" role="group" aria-label={t("zones.title")} onClick={(e) => e.target === e.currentTarget && setPicked(null)}>
-        {/* The three zones as one soft wash: the colour of each at its middle, blending between them. */}
-        <div className="zone-wash" style={{background: `linear-gradient(to bottom, ${washStop(bands[0].tone)} 0%, ${washStop(bands[0].tone)} 12%, ${washStop(bands[1].tone)} 50%, ${washStop(bands[2].tone)} 88%, ${washStop(bands[2].tone)} 100%)`}} />
-        <div className="pitch-lines" aria-hidden />
-        <span className="zone-box top" aria-hidden />
-        <span className="zone-box bottom" aria-hidden />
-        {["tl", "tr", "bl", "br"].map((c) => <span key={c} className={`zone-corner ${c}`} aria-hidden />)}
-        {bands.map((b, i) => (
+      <div className="zone-frame">
+        <div ref={board} className="pitch-board zone-board" role="group" aria-label={t("zones.title")} onClick={(e) => e.target === e.currentTarget && setPicked(null)}>
+          {/* The three zones as one soft wash: the colour of each at its middle, blending between them. */}
+          <div className="zone-wash" style={{background: `linear-gradient(to bottom, ${washStop(bands[0].tone)} 0%, ${washStop(bands[0].tone)} 12%, ${washStop(bands[1].tone)} 50%, ${washStop(bands[2].tone)} 88%, ${washStop(bands[2].tone)} 100%)`}} />
+          <div className="pitch-lines" aria-hidden />
+          <span className="zone-box top" aria-hidden />
+          <span className="zone-box bottom" aria-hidden />
+          {["tl", "tr", "bl", "br"].map((c) => <span key={c} className={`zone-corner ${c}`} aria-hidden />)}
+          {bands.map((band, i) => (
           <div key={i} className="zone-label" style={{top: `${i * (100 / 3) + 100 / 6}%`}}>
-            <span className="zone-pct">{b.share} %</span>
-            <span className="zone-name">{b.label}</span>
+            <span className="zone-pct">{band.share} %</span>
+            <span className="zone-name">{band.label}</span>
           </div>
         ))}
         {/* The lineup, as in Tactics, with the rating and the fitness under each name. */}
-        {kit && players?.map((p) => {
-          const glow = instructed === "all" || instructed?.includes(p.id) ? "instructed" : forza ? "forza" : "";
-          return (
-            <div key={p.id} data-pid={p.id} className={`slot zone-slot ${picked === p.id ? "picked" : ""} ${glow}`} style={spots[p.index]} role="button" tabIndex={0} onClick={() => onSubOut && setPicked(picked === p.id ? null : p.id)} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSubOut && setPicked(picked === p.id ? null : p.id)}>
-              <Jersey color={kit.color} trim={kit.color2} pattern={kit.pattern} trim3={kit.color3} collar={kit.collar} sleeves={kit.sleeves} keeper={p.keeper} number={p.index + 1} />
-              {/* Boots or gloves in front of the shirt at its lower right, shin guards on the other side (as in Tactics). */}
-              {p.gear && <span className={p.gear.kind === "gloves" ? "slot-gear gloves" : "slot-gear"} aria-hidden><GearPicture item={p.gear} size={p.gear.kind === "gloves" ? 22 : 24} /></span>}
-              {p.shin && <span className="slot-gear slot-shin" aria-hidden><GearPicture item={p.shin} size={15} /></span>}
-              {(p.goals || p.assists || p.yellow || p.red) ? (
-                <span className="zone-marks" aria-hidden>
-                  {p.goals ? <span className="zone-mark">{<Icon name="ball" size={13} />}{p.goals > 1 ? <i>{p.goals}</i> : null}</span> : null}
-                  {p.assists ? <span className="zone-mark assist">{<Icon name="boot" size={13} />}{p.assists > 1 ? <i>{p.assists}</i> : null}</span> : null}
-                  {p.yellow ? <span className="zone-mark">{<Icon name="cardYellow" size={13} />}</span> : null}
-                  {p.red ? <span className="zone-mark">{<Icon name="cardRed" size={13} />}</span> : null}
-                </span>
-              ) : null}
-              <span className="plate">
-                <span className="plate-name">{p.name}</span>
-                <span className="plate-info">
-                  <strong className={p.rating === undefined ? "" : p.rating >= 7 ? "good" : p.rating < 6 ? "bad" : ""}>{p.rating === undefined ? "–" : p.rating.toFixed(1)}</strong>
-                  <span className="zone-fit" title={`${Math.round(p.fitness)}`}>
-                    <i className={p.fitness < 35 ? "bad" : p.fitness < 60 ? "mid" : "good"} style={{width: `${Math.max(4, Math.min(100, p.fitness))}%`}} />
+          {kit && players?.map((p) => {
+            const glow = instructed === "all" || instructed?.includes(p.id) ? "instructed" : forza ? "forza" : "";
+            return (
+              <div key={p.id} data-pid={p.id} className={`slot zone-slot ${picked === p.id ? "picked" : ""} ${glow} ${p.sentOff ? "sent-off" : ""} ${p.goalGlow ? `goal-${p.goalGlow}` : ""}`} style={spots[p.index]} role="button" tabIndex={p.sentOff ? -1 : 0} aria-disabled={p.sentOff} onClick={() => onSubOut && !p.sentOff && setPicked(picked === p.id ? null : p.id)} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSubOut && !p.sentOff && setPicked(picked === p.id ? null : p.id)}>
+                <Jersey color={kit.color} trim={kit.color2} pattern={kit.pattern} trim3={kit.color3} collar={kit.collar} sleeves={kit.sleeves} keeper={p.keeper} number={p.shirt ?? p.index + 1} captain={p.captain} />
+                {/* Boots or gloves in front of the shirt at its lower right, shin guards on the other side (as in Tactics). */}
+                {p.gear && <span className={p.gear.kind === "gloves" ? "slot-gear gloves" : "slot-gear"} aria-hidden><GearPicture item={p.gear} size={p.gear.kind === "gloves" ? 22 : 24} /></span>}
+                {p.shin && <span className="slot-gear slot-shin" aria-hidden><GearPicture item={p.shin} size={15} /></span>}
+                {p.subbedOn && <span className="zone-subbed" title={t("match.subs")} aria-hidden><Icon name="swap" size={11} /></span>}
+                {p.hasBall && (
+                  <span className="zone-ball" aria-hidden>
+                    <svg viewBox="-3 -3 6 6" width={18} height={18}><Football r={2.5} /></svg>
+                  </span>
+                )}
+                {(p.goals || p.assists || p.yellow || p.red) ? (
+                  <span className="zone-marks" aria-hidden>
+                    {p.goals ? <span className="zone-mark">{<Icon name="ball" size={13} />}{p.goals > 1 ? <i>{p.goals}</i> : null}</span> : null}
+                    {p.assists ? <span className="zone-mark assist">{<Icon name="boot" size={13} />}{p.assists > 1 ? <i>{p.assists}</i> : null}</span> : null}
+                    {p.yellow ? <span className="zone-mark">{<Icon name="cardYellow" size={13} />}</span> : null}
+                    {p.red ? <span className="zone-mark">{<Icon name="cardRed" size={13} />}</span> : null}
+                  </span>
+                ) : null}
+                <span className="plate">
+                  <span className="plate-name">{p.motm && <span className="zone-motm" title="★"><Icon name="star" size={11} /></span>}{p.name}{p.captain && <small className="cap-c">c</small>}</span>
+                  <span className="plate-info">
+                    <strong className={p.rating === undefined ? "" : p.rating >= 7 ? "good" : p.rating < 6 ? "bad" : ""}>{p.rating === undefined ? "–" : p.rating.toFixed(1)}</strong>
+                    <span className="zone-fit" title={`${Math.round(p.fitness)}`}>
+                      <i className={p.fitness < 35 ? "bad" : p.fitness < 60 ? "mid" : "good"} style={{width: `${Math.max(4, Math.min(100, p.fitness))}%`}} />
+                    </span>
                   </span>
                 </span>
-              </span>
-            </div>
-          );
-        })}
-        {/* A tapped player: take them off. */}
-        {onSubOut && pickedPlayer && bar && (
-          <div className="pop-actions" role="toolbar" style={{left: bar.left, top: Math.min(bar.top + bar.height + 4, bar.boardHeight - 44)}}>
-            <button type="button" className="pop-action swap" aria-label={t("zones.subOut")} title={t("zones.subOut")} onClick={() => { setPicked(null); onSubOut(pickedPlayer.id); }}>
-              <Icon name="swap" size={16} />
-            </button>
-            {onProfile && (
-              <button type="button" className="pop-action" aria-label={t("tac.profile")} title={t("tac.profile")} onClick={() => { setPicked(null); onProfile(pickedPlayer.id); }}>
-                <Icon name="user" size={16} />
-              </button>
-            )}
-          </div>
-        )}
-        {/* The manager at the touchline, calling out an instruction. */}
+              </div>
+            );
+          })}
+          {/* The manager at the touchline, calling out an instruction. */}
         {shout && managerLook && (
           <div className="zone-shout" role="status">
             <ManagerAvatar look={managerLook} size={36} tie={(mine === "away" ? away : home).color} />
             <span className="zone-shout-bubble">{shout}</span>
           </div>
         )}
+        {/* A tapped player: take them off. */}
+          {onSubOut && pickedPlayer && bar && (
+            <div className="pop-actions" role="toolbar" style={{left: bar.left, top: Math.min(bar.top + bar.height + 4, bar.boardHeight - 44)}}>
+              <button type="button" className="pop-action swap" aria-label={t("zones.subOut")} title={t("zones.subOut")} onClick={() => { setPicked(null); onSubOut(pickedPlayer.id); }}>
+                <Icon name="swap" size={16} />
+              </button>
+              {onProfile && (
+                <button type="button" className="pop-action" aria-label={t("tac.profile")} title={t("tac.profile")} onClick={() => { setPicked(null); onProfile(pickedPlayer.id); }}>
+                  <Icon name="user" size={16} />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+  
       </div>
     </figure>
   );

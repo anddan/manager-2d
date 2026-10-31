@@ -11,7 +11,8 @@ describe("quick sale", () => {
     const p = clubPlayers(g, g.userClubId)[0];
     const offer = quickSaleOffer(g, p.id);
     expect(offer).not.toBeNull();
-    expect(offer!.fee).toBe(0);
+    // Never for nothing: at least half the quick price is what the market pays.
+    expect(offer!.fee).toBeGreaterThanOrEqual(10_000);
     expect(quickSell(g, p.id)).toBeNull();
     expect(g.players[p.id].clubId).not.toBe(g.userClubId);
   });

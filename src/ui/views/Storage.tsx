@@ -1,5 +1,6 @@
 // The kit room: boots and gloves in the bag (put one on a player straight from
 // here), and who is wearing what (take it off again).
+import {diamondBurst, moneyBurst, pressedElement} from "../effects";
 import {Icon, iconize} from "../Icon";
 import {useState} from "react";
 import {gearResale, sellGear, equipGear, gearFits, gearIn, gearSlot, unequipGear, wornGear, type GearItem, type GearSlot, groupBag} from "../../game/gear";
@@ -37,9 +38,13 @@ export function Storage() {
   const sellingItem = selling === null ? undefined : bag[selling];
   const sell = () => {
     if (selling === null) return;
+    const from = pressedElement();
+    const back = sellingItem ? gearResale(sellingItem) : {};
     const err = act((g) => sellGear(g, selling));
     setSelling(null);
     notify(err ?? "storage.sold", undefined, err ? "error" : "good");
+    if (!err && back.diamonds) diamondBurst(from, back.diamonds);
+    else if (!err && back.money) moneyBurst(from, money(back.money));
   };
   const resale = (item: GearItem) => {
     const back = gearResale(item);

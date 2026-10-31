@@ -93,6 +93,12 @@ export interface Player {
   lastName: string;
   /** What the manager calls them; shown instead of their name everywhere but their profile. */
   nickname?: string;
+  /** Their shirt number in the club (no two in a club share one). */
+  shirt?: number;
+  /** The number they want, if they care; not getting it makes them a little unhappy. */
+  wantShirt?: number;
+  /** The wish has been drawn (so a player who doesn't care isn't drawn again). */
+  wishSet?: boolean;
   /** Boots (or a keeper's gloves) worn: a bonus on a couple of attributes while they're on. */
   gear?: GearItem;
   /** Shin guards worn: a bonus, and fewer injuries. */
@@ -318,7 +324,7 @@ export type MatchCommand =
   | {minute: number; type: "forza"}
   /** A new formation for the managed team: the players on the pitch are moved to the best places in it. */
   | {minute: number; type: "formation"; formation: FormationId}
-  /** Two players on the pitch swap places. */
+  /** Two players on the pitch swap places (`bId` "slot:N": a player takes an empty place, e.g. after a red card, and leaves his own empty). */
   | {minute: number; type: "swap"; aId: string; bId: string}
   /** A player takes another spot on the pitch (a custom formation): x along the pitch from own goal, y across. */
   | {minute: number; type: "place"; playerId: string; x: number; y: number};
@@ -399,7 +405,31 @@ export type MessageAction =
   | {type: "incomingBid"; bidId: string}
   | {type: "transferRequest"; playerId: string}
   | {type: "contract"; playerId: string}
-  | {type: "match"; fixtureId: string};
+  | {type: "match"; fixtureId: string}
+  | {type: "nationalOffer"; country: string};
+
+/** One match of the national team. `what`: "friendly", or "wc.qf" … "ec.final". */
+export interface NationalResult {
+  season: number;
+  week: number;
+  opponent: string;
+  what: string;
+  /** Goals [ours, theirs]. */
+  goals: [number, number];
+  pens?: [number, number];
+  scorers: string[];
+}
+
+/** The manager's second job: coach of a country (see national.ts). */
+export interface NationalJob {
+  country: string;
+  since: number;
+  formation: FormationId;
+  mentality: Mentality;
+  results: NationalResult[];
+  /** The tournament this season: which, and the three countries met on the way (while the team is still in it). */
+  tournament?: {comp: "wc" | "ec"; season: number; rivals: string[]; alive: boolean};
+}
 
 export interface Message {
   id: string;
@@ -412,6 +442,8 @@ export interface Message {
   action?: MessageAction;
   /** Set once an action like accepting a bid is done. */
   resolved?: boolean;
+  /** Lit up so it is not missed (an award for one of ours). */
+  highlight?: boolean;
 }
 
 export interface IncomingBid {
@@ -530,6 +562,8 @@ export interface GameState {
   training: {focus: TrainingFocus; intensity: Intensity; auto?: boolean};
   monetization: Monetization;
   history: SeasonHistory[];
+  /** The country the manager coaches besides the club, if any. */
+  national?: NationalJob;
   nextId: number;
   /** Set between starting a match week and finishing it. Missing in old saves. */
   liveMatch?: LiveMatchState | null;
@@ -558,7 +592,7 @@ export interface GameState {
   /** Friends' players looked at with a code and kept to decide on later (by code). */
   friendLooks?: Record<string, FriendSaleEntry>;
   /** Trophies won and not celebrated yet (shown once, then removed). */
-  celebrations?: {kind: "league" | "cup"; season: number}[];
+  celebrations?: ({kind: "league" | "cup"; season: number} | {kind: "award"; season: number; awards: {key: "player" | "keeper" | "talent" | "manager"; playerId?: string; name: string}[]})[];
   /** Set when the manager is sacked: the game is over. */
   gameOver?: {season: number; week: number; reason: "debt"};
   /** The last few post-match team talks, oldest first: the same words every week wear thin. */

@@ -7,14 +7,15 @@ import {BENCH_SIZE, clubSlots, roleAt, type Slot} from "../../game/constants";
 import {CUP_STAGES} from "../../game/cup";
 import {fixtureWeek, isCupFixture, listName, nextUserFixture, shortName, userClub} from "../../game/helpers";
 import {isAvailable, pickBestLineup} from "../../game/lineup";
-import {clubPlayers, effectiveRating, familiarity, teamOvr} from "../../game/ratings";
+import {clubPlayers, effectiveRating, familiarity, pickCaptain, teamOvr} from "../../game/ratings";
+import {ManagerProfile} from "../ManagerProfile";
 import {FORMATION_IDS, MENTALITIES, type FormationId, type Mentality, type Player} from "../../game/types";
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
 import {Bar, Card, Flag, FormArrow, Modal, PosBadge, StatusIcons, Hint} from "../common";
 import {Avatar} from "../Avatar";
 import {Jersey} from "../Jersey";
-import {kitFor} from "../../game/kit";
+import {kitFor, matchClubs} from "../../game/kit";
 import {GearPicture} from "../Gear";
 import {ClubSheet} from "../LineupSheet";
 
@@ -73,8 +74,15 @@ export function Tactics() {
   // The shirts as they will be worn in the next match: the home kit at home, the away kit away.
   const nextFixture = nextUserFixture(game);
   const playingAway = !!nextFixture && nextFixture.awayId === club.id;
-  const kit = kitFor(club, playingAway);
+  const worn = nextFixture ? matchClubs(game.clubs[nextFixture.homeId], game.clubs[nextFixture.awayId])[playingAway ? 1 : 0] : null;
+  const kit = worn ?? kitFor(club, playingAway);
+  // Away, unless the visitors had to change into their home colours to tell the shirts apart.
+  const wearingAway = playingAway && !(worn && worn.color === club.color && worn.color2 === club.color2);
   const slots = clubSlots(club);
+  // The captain: the chosen one if they start, otherwise the best outfield player of the eleven.
+  const captainId = pickCaptain(club.roles?.captain, club.lineup.filter((id) => id && game.players[id]?.clubId === club.id), game.players);
+  // The kit badge opens the kits (home or away, whichever it shows).
+  const [kitOpen, setKitOpen] = useState(false);
   const custom = !!club.customSlots;
   const spots = boardSpots(slots);
   const [selected, setSelected] = useState<number | null>(null);
@@ -341,10 +349,9 @@ export function Tactics() {
                 // A shirt with someone in it opens their profile (where they can be taken out); an empty spot, the picker.
                 onClick={() => !drag.justDropped() && (p && p.clubId === club.id ? setActions(actions === i ? null : i) : (setActions(null), setSelected(selected === i ? null : i)))}
               >
-                {p && !bad && club.roles?.captain === p.id && <span className="armband" title={t("roles.captain")}>C</span>}
                 {out ? (
                   <>
-                    <Jersey color={kit.color} trim={kit.color2} pattern={kit.pattern} trim3={kit.color3} collar={kit.collar} sleeves={kit.sleeves} keeper={slot.pos === "GK"} number={i + 1} />
+                    <Jersey color={kit.color} trim={kit.color2} pattern={kit.pattern} trim3={kit.color3} collar={kit.collar} sleeves={kit.sleeves} keeper={slot.pos === "GK"} number={p?.shirt ?? i + 1} />
                     <span className="slot-out" title={p.injuryWeeks > 0 ? t("tac.injured") : t("tac.suspended")}>{iconize(p.injuryWeeks > 0 ? "🩹" : "🟥")}</span>
                   </>
                 ) : bad ? (
@@ -355,11 +362,11 @@ export function Tactics() {
                     {p?.gear && <span className={p.gear.kind === "gloves" ? "slot-gear gloves" : "slot-gear"} aria-hidden><GearPicture item={p.gear} size={p.gear.kind === "gloves" ? 22 : 24} /></span>}
                     {/* Shin guards on the other side. */}
                     {p?.shin && <span className="slot-gear slot-shin" aria-hidden><GearPicture item={p.shin} size={15} /></span>}
-                    <Jersey color={kit.color} trim={kit.color2} pattern={kit.pattern} trim3={kit.color3} collar={kit.collar} sleeves={kit.sleeves} keeper={slot.pos === "GK"} number={i + 1} />
+                    <Jersey color={kit.color} trim={kit.color2} pattern={kit.pattern} trim3={kit.color3} collar={kit.collar} sleeves={kit.sleeves} keeper={slot.pos === "GK"} number={p?.shirt ?? i + 1} captain={p?.id === captainId} />
                   </>
                 )}
                 <span className="plate">
-                  <span className="plate-name">{p && (!bad || out) ? shortName(p) : t(`pos.${slot.pos}`)}</span>
+                  <span className="plate-name">{p && (!bad || out) ? shortName(p) : t(`pos.${slot.pos}`)}{p && !bad && p.id === captainId && <small className="cap-c">c</small>}</span>
                   <span className="plate-info">
                     {p && !bad && <Flag code={p.nationality} size={13} />}
                     <span>{iconize(t(`pos.${slot.pos}`))}</span>
@@ -385,7 +392,8 @@ export function Tactics() {
             );
           })()}
         </div>
-        <p className="kit-badge"><Jersey color={kit.color} trim={kit.color2} pattern={kit.pattern} trim3={kit.color3} collar={kit.collar} sleeves={kit.sleeves} size={22} /> {iconize(t(playingAway ? "tac.kitAway" : "tac.kitHome"))}</p>
+        <p className="kit-badge"><button type="button" className="kit-badge-btn" onClick={() => setKitOpen(true)} title={t("mgr.colors")}><Jersey color={kit.color} trim={kit.color2} pattern={kit.pattern} trim3={kit.color3} collar={kit.collar} sleeves={kit.sleeves} size={22} /> {iconize(t(wearingAway ? "tac.kitAway" : "tac.kitHome"))} <Icon name="pen" size={14} /></button></p>
+        {kitOpen && <ManagerProfile kit={wearingAway ? "away" : "home"} onClose={() => setKitOpen(false)} />}
       </Card>
       {drag.ghost && <div className="drag-ghost" style={{left: drag.ghost.x, top: drag.ghost.y}}>{drag.ghost.label}</div>}
 

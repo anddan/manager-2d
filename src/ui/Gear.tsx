@@ -8,7 +8,6 @@ import {chime} from "./sound";
 import {useState} from "react";
 import {GEAR_ATTRS, GEAR_KIND_COLOR, GEAR_KINDS, SHIN_PROTECT, gearIn, gearSlot, type GearSlot, GEAR_PRICE, GEAR_TIERS, GEAR_PACK, buyGear, openGearPack, equipGear, gearBonus, gearFits, unequipGear, type GearItem, type GearKind, type GearTier, groupBag} from "../game/gear";
 import type {Attribute, Player} from "../game/types";
-import {freeBootsOffered, takeFreeBoots} from "../game/tutorial";
 import {useT} from "../i18n";
 import {useGame, useGameState} from "../store";
 
@@ -159,15 +158,16 @@ export function GearShop() {
   };
   const cash = game.clubs[game.userClubId].cash;
   const diamonds = game.monetization.diamonds;
-  // The guide's present: basic boots are free while it shows the Shop.
-  const free = freeBootsOffered(game);
   const buy = (item: GearItem) => {
-    if (free && item.tier === "common" && gearSlot(item.kind) === "feet" && item.kind !== "gloves") {
-      act((g) => takeFreeBoots(g, item.kind));
-      return notify("gear.freeTaken", undefined, "good");
-    }
-    const err = act((g) => buyGear(g, item));
-    notify(err ?? "gear.bought", undefined, err ? "error" : "good");
+    // The bag's last piece is the one just bought.
+    const res = act((g, rng) => {
+      const e = buyGear(g, item, rng);
+      return {err: e, got: e ? undefined : g.gearBag![g.gearBag!.length - 1]};
+    });
+    if (res.err || !res.got) return notify(res.err ?? "gear.none", undefined, "error");
+    // Every purchase is shown (with its perk, if it came with one).
+    chime();
+    setOpened(res.got);
   };
   return (
     <>
@@ -202,13 +202,12 @@ export function GearShop() {
       <div className="gear-cards">
         {GEAR_TIERS.map((tier) => {
           const price = GEAR_PRICE[tier];
-          const gift = free && tier === "common" && kind !== "gloves" && kind !== "shin";
-          const afford = gift || (price.diamonds ? diamonds >= price.diamonds : cash >= (price.money ?? 0));
+          const afford = (price.diamonds ? diamonds >= price.diamonds : cash >= (price.money ?? 0));
           return (
-            <div key={tier} className={gift ? "gear-offer free" : "gear-offer"}>
+            <div key={tier} className="gear-offer">
               <GearCard item={{kind, tier}} />
               <button className="ppack-btn" disabled={!afford} onClick={() => buy({kind, tier})}>
-                {gift ? <><Icon name="gift" size={18} /> {iconize(t("gear.free"))}</> : iconize(`${price.diamonds ? `💎 ${price.diamonds}` : `💰 ${money(price.money ?? 0)}`} · ${t("gear.buy")}`)}
+                {iconize(`${price.diamonds ? `💎 ${price.diamonds}` : `💰 ${money(price.money ?? 0)}`} · ${t("gear.buy")}`)}
               </button>
             </div>
           );

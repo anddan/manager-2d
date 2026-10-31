@@ -6,9 +6,10 @@ import {spendEnergy} from "../../game/monetization";
 import {clubPlayers, overall} from "../../game/ratings";
 import {extraTraining, FOCUS_ATTRIBUTES, trainingPlan} from "../../game/training";
 import {ATTRIBUTES, INTENSITIES, POSITIONS, TRAINING_FOCUSES, type Attribute, type Intensity, type Player, type TrainingFocus} from "../../game/types";
+import {useState} from "react";
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
-import {FocusPicker} from "../FocusPicker";
+import {FocusModal, FocusPicker} from "../FocusPicker";
 import {Bar, Card, Delta, PosBadge, SortTh, sortRows, useSort, Hint} from "../common";
 
 type TrainingSort = "pos" | "name" | "age" | "ovr" | "fitness" | "change" | "focus";
@@ -28,6 +29,11 @@ export function Training() {
   const act = useGame((s) => s.act);
   const notify = useGame((s) => s.notify);
   const openPlayer = useGame((s) => s.openPlayer);
+  // Picking several players to give the same individual training at once (as in the squad).
+  const [selecting, setSelecting] = useState(false);
+  const [picked, setPicked] = useState<string[]>([]);
+  const [choosing, setChoosing] = useState(false);
+  const toggle = (id: string) => setPicked((l) => (l.includes(id) ? l.filter((x) => x !== id) : [...l, id]));
   const club = userClub(game);
   const {focus, intensity, auto} = game.training;
   // What this week's training will be (the assistant's pick on auto).
@@ -130,11 +136,40 @@ export function Training() {
         <button className="btn primary" disabled={extrasLeft <= 0} onClick={extra}><Icon name="bolt" size={18} /> {iconize(t("train.extraButton"))}</button>
       </Card>
 
-      <Card title={t("train.lastWeek")} className="span-2">
+      <Card
+        title={t("train.lastWeek")}
+        className="span-2"
+        actions={
+          <button className={selecting ? "btn small primary" : "btn small"} aria-pressed={selecting} onClick={() => { setSelecting(!selecting); setPicked([]); }}>
+            <Icon name="check" size={16} /> {iconize(t(selecting ? "squad.selectDone" : "squad.select"))}
+          </button>
+        }
+      >
+        {selecting && (
+          <div className="squad-select-bar">
+            <span className="muted small">{iconize(t("squad.selected", {n: picked.length}))}</span>
+            <button className="btn small" onClick={() => setPicked(picked.length === squad.length ? [] : squad.map((p) => p.id))}>{iconize(t("train.selectAll"))}</button>
+            <button className="btn small primary" disabled={picked.length === 0} onClick={() => setChoosing(true)}>
+              <Icon name="target" size={16} /> {iconize(t("train.setFocus", {n: picked.length}))}
+            </button>
+          </div>
+        )}
+        {choosing && (
+          <FocusModal
+            onClose={() => setChoosing(false)}
+            onPick={(f) => {
+              act((g) => { for (const id of picked) g.players[id].individualFocus = f; });
+              setChoosing(false);
+              setSelecting(false);
+              setPicked([]);
+            }}
+          />
+        )}
         <div className="table-wrap">
           <table className="table">
             <thead>
               <tr>
+                {selecting && <th aria-label={t("squad.select")} />}
                 {th("pos", t("col.pos"), false)}{th("name", t("col.name"), false)}{th("age", t("col.age"), false)}{th("ovr", t("col.ovr"), true, t("col.ovrHint"))}
                 {th("fitness", t("col.fitness"))}{th("change", t("train.change"))}<th>{iconize(t("train.biggest"))}</th>{th("focus", t("pl.individualFocus"), false)}
               </tr>
@@ -143,7 +178,8 @@ export function Training() {
               {sortRows(squad, (p) => trainingValue(p, sort.key), sort.desc).map((p) => {
                 const changes = ATTRIBUTES.map((a) => ({a, d: p.weeklyChange[a] ?? 0})).filter((c) => Math.abs(c.d) >= 0.05).sort((x, y) => Math.abs(y.d) - Math.abs(x.d));
                 return (
-                  <tr key={p.id}>
+                  <tr key={p.id} className={picked.includes(p.id) ? "picked-row" : undefined} onClick={selecting ? () => toggle(p.id) : undefined}>
+                    {selecting && <td><input type="checkbox" className="bench-check" checked={picked.includes(p.id)} onChange={() => toggle(p.id)} onClick={(e) => e.stopPropagation()} aria-label={listName(p)} /></td>}
                     <td><PosBadge pos={p.position} /></td>
                     <td><button className="link" onClick={() => openPlayer(p.id)}>{listName(p)}</button>{p.injuryWeeks > 0 && <> {iconize("🩹")}</>}</td>
                     <td>{p.age}</td>

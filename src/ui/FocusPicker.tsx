@@ -22,6 +22,25 @@ export const FOCUS_ICONS: Record<Attribute | "rest", IconName> = {
   rest: "moon",
 };
 
+/** The choices for an individual focus, in a dialog (one player, or several picked at once). */
+export function FocusModal({current, onPick, onClose}: {current?: Focus; onPick: (f: Focus) => void; onClose: () => void}) {
+  const {t} = useT();
+  const label = (f: Focus) => (f === "rest" ? t("train.rest") : f ? t(`attr.${f}`) : t("common.none"));
+  const choices: Focus[] = [null, "rest", ...ATTRIBUTES];
+  return (
+    <Modal compact title={iconize(t("pl.individualFocus"))} onClose={onClose}>
+      <div className="focus-choices">
+        {choices.map((f) => (
+          <button key={f ?? "none"} type="button" className={current !== undefined && f === current ? "focus-choice on" : "focus-choice"} onClick={() => onPick(f)}>
+            <Icon name={f ? FOCUS_ICONS[f] : "close"} size={20} />
+            <span>{iconize(label(f))}</span>
+          </button>
+        ))}
+      </div>
+    </Modal>
+  );
+}
+
 export function FocusPicker({player: p, compact}: {player: Player; compact?: boolean}) {
   const {t} = useT();
   const act = useGame((s) => s.act);

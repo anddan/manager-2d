@@ -27,3 +27,22 @@ export function writeMatchView(view: MatchView): void {
     // Only for now.
   }
 }
+
+const RATINGS_KEY = "manager2d.showRatings";
+
+/** Whether the players' match ratings are shown (on to begin with). */
+export function readShowRatings(): boolean {
+  try {
+    return localStorage.getItem(RATINGS_KEY) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+export function writeShowRatings(on: boolean): void {
+  try {
+    localStorage.setItem(RATINGS_KEY, on ? "1" : "0");
+  } catch {
+    // Only for now.
+  }
+}

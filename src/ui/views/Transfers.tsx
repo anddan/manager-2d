@@ -1,3 +1,4 @@
+import {moneyBurst, pressedElement} from "../effects";
 import {useState} from "react";
 import {Icon, iconize} from "../Icon";
 import {fullName, listName, shortName, userClub} from "../../game/helpers";
@@ -146,7 +147,10 @@ export function BidCard({bidId}: {bidId: string}) {
   const p = game.players[bid.playerId];
   const club = game.clubs[bid.fromClubId];
   const respond = (action: "accept" | "reject" | "counter") => {
+    const from = pressedElement();
     const key = act((g, rng) => respondToBid(g, rng, bidId, action, counter));
+    // A player sold: the coins fly to the club's money.
+    if (key === "tr.sold" && bid && bid.fee > 0) moneyBurst(from, money(bid.fee));
     notify(key, {name: shortName(p), club: club.name}, key === "tr.sold" || key === "tr.loanDone" ? "good" : "info");
   };
   return (

@@ -104,9 +104,11 @@ export function assignToSlots(state: GameState, ids: string[], slots: Slot[]): n
 export function pickBestLineup(
   state: GameState,
   club: Club,
-  slots: Slot[]
+  slots: Slot[],
+  /** Pick from these instead of the club's players (the national team). */
+  players?: Player[]
 ): {lineup: string[]; bench: string[]} {
-  const pool = Object.values(state.players).filter((p) => p.clubId === club.id && isAvailable(p));
+  const pool = players ?? Object.values(state.players).filter((p) => p.clubId === club.id && isAvailable(p));
   const used = new Set<string>();
   const lineup: string[] = new Array(slots.length).fill("");
   // Every place weighed against every player at once: a 100 forward on the bench plays out wide

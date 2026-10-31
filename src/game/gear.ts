@@ -94,7 +94,7 @@ export function geared(p: Player): Player {
 }
 
 /** Buys a pair into the kit bag. Returns an error key, or null. */
-export function buyGear(state: GameState, item: GearItem): string | null {
+export function buyGear(state: GameState, item: GearItem, rng?: Rng): string | null {
   const price = GEAR_PRICE[item.tier];
   if (price.diamonds) {
     if (state.monetization.diamonds < price.diamonds) return "shop.notEnoughDiamonds";
@@ -103,7 +103,10 @@ export function buyGear(state: GameState, item: GearItem): string | null {
     if (state.clubs[state.userClubId].cash < price.money) return "gear.noMoney";
     book(state, state.userClubId, "equipment", -price.money);
   }
-  (state.gearBag ??= []).push({...item});
+  const bought: GearItem = {...item};
+  // Now and then the piece comes with a perk (shown like a kit pack's).
+  if (rng && !bought.perk && rng.next() < BOUGHT_PERK_CHANCE) bought.perk = rollPerk(rng, bought.kind);
+  (state.gearBag ??= []).push(bought);
   return null;
 }
 
@@ -172,15 +175,31 @@ export function groupBag(bag: GearItem[]): {item: GearItem; index: number; count
  */
 export const GEAR_PACK = {price: 60} as const;
 const PACK_TIERS: Record<GearTier, number> = {common: 34, silver: 34, gold: 22, special: 10};
-const PERK_SIZES: [number, number][] = [[1, 36], [2, 28], [3, 16], [4, 10], [5, 6], [7, 3], [10, 1]];
+const PERK_SIZES: [number, number][] = [[1, 30], [2, 24], [3, 16], [4, 11], [5, 8], [7, 5], [10, 3], [14, 2], [20, 1]];
 const PERK_ATTRS: Attribute[] = ["pace", "finishing", "passing", "technique", "defending", "physical", "stamina", "vision"];
+
+/** A perk for a piece of this kind: an extra on one attribute. */
+function rollPerk(rng: Rng, kind: GearKind): {attr: Attribute; n: number} {
+  const n = rng.weighted(PERK_SIZES, ([, w]) => w)[0];
+  const attr = kind === "gloves" ? rng.pick<Attribute>(["goalkeeping", "vision", "physical"]) : rng.pick(PERK_ATTRS);
+  return {attr, n};
+}
 
 export function rollGearPack(rng: Rng): GearItem {
   const kind = rng.pick([...GEAR_KINDS]);
   const tier = rng.weighted([...GEAR_TIERS], (t) => PACK_TIERS[t]);
-  const n = rng.weighted(PERK_SIZES, ([, w]) => w)[0];
-  const attr = kind === "gloves" ? rng.pick<Attribute>(["goalkeeping", "vision", "physical"]) : rng.pick(PERK_ATTRS);
-  return {kind, tier, perk: {attr, n}};
+  return {kind, tier, perk: rollPerk(rng, kind)};
+}
+
+/** The chance that a piece bought in the shop turns out to carry a perk. */
+export const BOUGHT_PERK_CHANCE = 0.1;
+
+/** A small chance that a player pack also holds a piece of kit (with a perk): it goes in the bag. The piece, if there was one. */
+export function rollBonusGear(state: GameState, rng: Rng, chance: number): GearItem | undefined {
+  if (rng.next() >= chance) return undefined;
+  const item = rollGearPack(rng);
+  (state.gearBag ??= []).push(item);
+  return item;
 }
 
 /** Opens a kit pack for diamonds: the piece goes in the bag. The piece, or an error key. */

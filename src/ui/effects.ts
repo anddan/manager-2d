@@ -23,6 +23,11 @@ export function moneyBurst(from: Element | null | undefined, label: string, coin
   rewardBurst(from, `+${label}`, COINS_SVG, ".hud-cash", coins, " coins");
 }
 
+/** What was just pressed (the sale's button), so a sale's coins fly from there. */
+export function pressedElement(): Element | null {
+  return typeof document === "undefined" ? null : document.activeElement;
+}
+
 /**
  * Several players sold at once: a big burst of coins (more the more players) and a till that rings
  * once for each, one after the other. (The deals' watcher sees this one has been shown and keeps quiet.)

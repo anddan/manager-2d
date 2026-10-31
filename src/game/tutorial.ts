@@ -2,13 +2,12 @@
 // to show off the game (a penalty to take, and a win).
 import {simulateMatch} from "./match";
 import {Rng} from "./rng";
-import type {GearKind} from "./gear";
 import type {Fixture, GameState, Side} from "./types";
 
 /** The guide's steps, in order (the UI has the words and what moves each one on). */
-export const TUTORIAL_STEPS = ["welcome", "tactics", "bestXI", "lineup", "formation", "club", "names", "kit", "kitBuy", "kitBag", "kitGive", "kitPick", "play", "match", "orders", "setpieces", "forza", "talk", "toOverview", "daily"] as const;
+export const TUTORIAL_STEPS = ["welcome", "tactics", "bestXI", "play", "match", "rating", "subs", "talk", "toOverview", "daily"] as const;
 /** Bumped whenever the steps change, so saves can be moved to the same place in the new order. */
-export const TUTORIAL_VERSION = 7;
+export const TUTORIAL_VERSION = 8;
 /** The steps of earlier versions (1 is a save without a version). */
 const OLD_STEPS: Record<number, readonly string[]> = {
   1: ["welcome", "tactics", "bestXI", "lineup", "formation", "play", "match", "orders", "setpieces", "zoom", "talk", "daily"],
@@ -17,6 +16,7 @@ const OLD_STEPS: Record<number, readonly string[]> = {
   4: ["welcome", "tactics", "bestXI", "lineup", "formation", "club", "names", "kit", "kitGive", "play", "match", "orders", "setpieces", "talk", "daily"],
   5: ["welcome", "tactics", "bestXI", "lineup", "formation", "club", "names", "kit", "kitBuy", "kitBag", "kitGive", "play", "match", "orders", "setpieces", "talk", "daily"],
   6: ["welcome", "tactics", "bestXI", "lineup", "formation", "club", "names", "kit", "kitBuy", "kitBag", "kitGive", "play", "match", "orders", "setpieces", "forza", "talk", "daily"],
+  7: ["welcome", "tactics", "bestXI", "lineup", "formation", "club", "names", "kit", "kitBuy", "kitBag", "kitGive", "kitPick", "play", "match", "orders", "setpieces", "forza", "talk", "toOverview", "daily"],
 };
 export type TutorialStep = (typeof TUTORIAL_STEPS)[number];
 
@@ -25,8 +25,6 @@ export interface Tutorial {
   step: number;
   /** The first match has been picked (only once). */
   firstMatch?: boolean;
-  /** The free pair of boots from the Shop has been picked up (only once). */
-  kit?: boolean;
   /** Which order of steps `step` counts in (missing: the first one). */
   v?: number;
 }
@@ -40,21 +38,6 @@ export function upgradeTutorial(state: GameState): void {
   const later = old.slice(t.step).map((s) => (TUTORIAL_STEPS as readonly string[]).indexOf(s)).find((i) => i >= 0);
   t.step = later ?? TUTORIAL_STEPS.length;
   t.v = TUTORIAL_VERSION;
-}
-
-/** On the guide's Shop step, basic boots are free: the guide's present, picked up by the player. */
-export function freeBootsOffered(state: GameState): boolean {
-  const t = state.tutorial;
-  return !!t && !t.kit && TUTORIAL_STEPS[t.step] === "kitBuy";
-}
-
-/** Picks up the free pair (once): into the kit room, and the guide moves on. */
-export function takeFreeBoots(state: GameState, kind: GearKind): void {
-  const t = state.tutorial;
-  if (!t || !freeBootsOffered(state)) return;
-  t.kit = true;
-  (state.gearBag ??= []).push({kind, tier: "common"});
-  tutorialNext(state, "kitBuy");
 }
 
 /** Moves the guide on from a step (only if it's on that step). */

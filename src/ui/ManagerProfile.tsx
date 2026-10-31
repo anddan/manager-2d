@@ -2,7 +2,7 @@
 // can be changed here, the club given a nickname (the way players can: shown
 // everywhere, with the real name kept alongside in brackets here) and its colours.
 import {Icon, iconize} from "./Icon";
-import {useState} from "react";
+import {useEffect, useRef, useState} from "react";
 import {CUP_ROUNDS} from "../game/cup";
 import {leaguePosition} from "../game/league";
 import {useT} from "../i18n";
@@ -15,7 +15,7 @@ import {COLLARS, SHIRT_PATTERNS, SLEEVES, type Collar, type Kit, type ShirtPatte
 import {Jersey} from "./Jersey";
 import type {TKey} from "../i18n";
 
-export function ManagerProfile({onClose}: {onClose: () => void}) {
+export function ManagerProfile({onClose, kit: startKit}: {onClose: () => void; kit?: "home" | "away"}) {
   const {t, tx, money, lang} = useT();
   const game = useGameState();
   const act = useGame((s) => s.act);
@@ -28,7 +28,12 @@ export function ManagerProfile({onClose}: {onClose: () => void}) {
   const [lookOpen, setLookOpen] = useState(false);
   const [look, setLook] = useState(() => game.managerLook ?? defaultManagerLook(game.managerName));
   // Two kits, home and away, edited one at a time (the toggle picks which).
-  const [which, setWhich] = useState<"home" | "away">("home");
+  const [which, setWhich] = useState<"home" | "away">(startKit ?? "home");
+  // Opened from the kit badge: scroll down to the kits.
+  const kitHead = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (startKit) setTimeout(() => kitHead.current?.scrollIntoView({block: "start", behavior: "smooth"}), 150);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [kits, setKits] = useState<{home: Kit; away: Kit}>(() => ({home: homeKit(club), away: awayKit(club)}));
   const kit = kits[which];
   const setKit = (patch: Partial<Kit>) => setKits((k) => ({...k, [which]: {...k[which], ...patch}}));
@@ -144,7 +149,7 @@ export function ManagerProfile({onClose}: {onClose: () => void}) {
       <h4><Icon name="text" size={18} /> {iconize(t("mgr.initials"))}</h4>
       <input className="input mgr-initials" value={short} maxLength={3} placeholder={club.short} onChange={(e) => setShort(e.target.value.toUpperCase())} aria-label={t("mgr.initials")} />
 
-      <h4><Icon name="palette" size={18} /> {iconize(t("mgr.colors"))}</h4>
+      <h4 ref={kitHead}><Icon name="palette" size={18} /> {iconize(t("mgr.colors"))}</h4>
       {/* Home or away: the toggle picks which kit the colours and the shirt below are for. */}
       <div className="kit-row">
         <span className="speed-group kit-which" role="group" aria-label={t("mgr.colors")}>

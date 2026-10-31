@@ -28,30 +28,18 @@ const STEPS: Record<TutorialStep, StepSpec> = {
   welcome: {next: true},
   tactics: {target: "nav:tactics"},
   bestXI: {target: '[data-tour="best-xi"]', showWhen: '[data-tour="best-xi"]', onClick: true},
-  lineup: {target: ".pitch-board", showWhen: ".pitch-board", next: true},
-  formation: {target: '[data-tour="formation"]', showWhen: '[data-tour="formation"]', next: true},
-  // Waits for any dialog (the kit room's player picker) to be closed.
+  // Waits for any dialog to be closed.
   play: {target: ".continue", showWhen: "body:not(:has(.modal-backdrop))"},
   match: {target: ".speed-group", showWhen: ".match-controls", next: true},
-  orders: {target: '[data-tour="orders"]', showWhen: '[data-tour="orders"]', next: true},
-  setpieces: {target: '[data-tour="orders"]', showWhen: '[data-tour="orders"]', next: true},
-  forza: {target: '[data-tour="orders"]', showWhen: '[data-tour="orders"]', next: true},
+  // The players on the board: their match rating and energy.
+  rating: {target: ".zone-board, .pitch-wrap", showWhen: ".match-controls", next: true},
+  // The manager's menu: the substitutions.
+  subs: {target: '[data-tour="orders"]', showWhen: '[data-tour="orders"]', next: true},
   // Only the choices and buttons, not the (i) above them (its help would open out of place).
   talk: {target: ".tt-body", showWhen: ".tt-options"},
   // After the match: back to the overview in the menu, where the last step is.
   toOverview: {target: "nav:overview", showWhen: "body:not(:has(.modal-backdrop))"},
   daily: {target: ".daily-tasks", showWhen: ".daily-tasks", next: true},
-  // Tapping the manager opens the profile, where the club's name, initials and colours are changed.
-  club: {target: ".topbar-manager", next: true, onClick: true},
-  // Waits for the profile to be closed again.
-  names: {target: "nav:squad", showWhen: "body:not(:has(.modal-backdrop))", next: true},
-  // The present: to the Shop, pick up free boots, to the kit room, give them to a player.
-  kit: {target: "nav:shop"},
-  kitBuy: {target: ".gear-offer.free .ppack-btn", showWhen: ".gear-offer.free"},
-  kitBag: {target: "nav:storage"},
-  kitGive: {target: ".storage-actions .btn.primary", showWhen: ".storage-actions .btn.primary", onClick: true},
-  // In the picker: the best player for them, at the top (the rest greyed out).
-  kitPick: {target: ".give-picker .pick-row:first-child .pick", showWhen: ".give-picker", onClick: true},
 };
 
 /**
@@ -86,9 +74,6 @@ export function TutorialCoach() {
   useEffect(() => {
     if (!game || !step) return;
     if (step === "tactics" && view === "tactics") act((g) => tutorialNext(g, "tactics"));
-    // The present: done in the Shop, then in the kit room.
-    if (step === "kit" && view === "shop") act((g) => tutorialNext(g, "kit"));
-    if (step === "kitBag" && view === "storage") act((g) => tutorialNext(g, "kitBag"));
     if (step === "toOverview" && view === "overview") act((g) => tutorialNext(g, "toOverview"));
     if (step === "play" && game.liveMatch) act((g) => tutorialNext(g, "play"));
     // The talk is over once the match has closed.
@@ -96,22 +81,10 @@ export function TutorialCoach() {
       if (game.reports.length > 0) act((g) => tutorialNext(g, "talk"));
     }
     // A match finished without its steps being seen (skipped through): on to the talk.
-    if ((step === "match" || step === "orders" || step === "setpieces" || step === "forza") && !game.liveMatch && game.reports.length > 0) {
+    if ((step === "match" || step === "rating" || step === "subs") && !game.liveMatch && game.reports.length > 0) {
       act((g) => { if (g.tutorial) g.tutorial.step = TUTORIAL_STEPS.indexOf("talk"); });
     }
   });
-
-  // The picker closed without a pick: back to the button that opens it. Checked a moment later,
-  // since the step moves on as the button is tapped, a little before the picker has opened.
-  useEffect(() => {
-    if (step !== "kitPick") return;
-    const id = setInterval(() => {
-      if (!document.querySelector(".give-picker") && document.querySelector(".storage-actions")) {
-        act((g) => { if (g.tutorial && TUTORIAL_STEPS[g.tutorial.step] === "kitPick") g.tutorial.step = TUTORIAL_STEPS.indexOf("kitGive"); });
-      }
-    }, 700);
-    return () => clearInterval(id);
-  }, [step, act]);
 
   // Follow the target around (it may move, open later or close).
   useLayoutEffect(() => {

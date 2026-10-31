@@ -37,6 +37,8 @@ export function happinessFactors(state: GameState, p: Player): HappinessFactor[]
   if (p.brokenPromises > 0) factors.push({key: "brokenPromise", value: -12 * p.brokenPromises});
   const yearsLeft = p.contract.expiresSeason - state.season;
   if (yearsLeft <= 0 && ROLE_RANK[deserved] >= 2) factors.push({key: "contract", value: -6});
+  // Their shirt number: the one they wanted lifts them a little, not getting it dampens them.
+  if (p.wantShirt !== undefined && p.shirt !== undefined) factors.push({key: "shirt", value: p.shirt === p.wantShirt ? 2 : -3});
   factors.push({key: "relation", value: (p.relation - 50) * 0.2});
   return factors.filter((f) => Math.abs(f.value) >= 0.5).map((f) => ({...f, value: Math.round(f.value)}));
 }

@@ -1,10 +1,12 @@
 // Player details. Own players: condition, mood, talks, focus, listing.
+import {moneyBurst, pressedElement} from "./effects";
+import {setShirt, shirtHolder} from "../game/shirts";
 import {wornGear} from "../game/gear";
 // Others: scouting, bids, loans and free-agent offers.
 import {Icon, iconize} from "./Icon";
 import {useRef, useState, type ReactNode} from "react";
 import {profileName, shortName} from "../game/helpers";
-import {DIAMONDS_SCOUT_COST, SCOUT_COST} from "../game/constants";
+import {DIAMONDS_SCOUT_COST, SCOUT_COST, clubSlots} from "../game/constants";
 import {startNegotiation} from "../game/contracts";
 import {happinessFactors, answerTransferRequest, talkToPlayer, TALKS} from "../game/morale";
 import {
@@ -18,7 +20,7 @@ import {
   scoutPlayer,
   type BidResult,
 } from "../game/transfers";
-import {ATTRIBUTES, type ManagerLook, type Player} from "../game/types";
+import {ATTRIBUTES, type ManagerLook, type Player, type Position} from "../game/types";
 import {useT} from "../i18n";
 import {useGame, useGameState} from "../store";
 import {Bar, Delta, Face, Flag, FormArrow, Modal, NumberInput, Ovr, PosBadge, StatusIcons, Hint} from "./common";
@@ -30,7 +32,7 @@ import {TraitChips} from "./Traits";
 import {FocusPicker} from "./FocusPicker";
 import {SellToFriend} from "./FriendSale";
 import {totalGearBonus} from "../game/gear";
-import {dayFormParts, effectiveRating} from "../game/ratings";
+import {dayFormParts, effectiveRating, familiarity} from "../game/ratings";
 
 /**
  * A player's profile. With `preview` it only shows them (a friend's player for sale, lent into
@@ -50,6 +52,9 @@ export function PlayerModal({playerId, preview}: {playerId: string; preview?: {o
   // Boots or gloves on: their bonus shown beside the attribute.
   const gear = totalGearBonus(p);
   // Opened from their spot in the tactics: they can be taken out of it from here.
+  // Opened from a spot in the tactics: the position they play there (maybe not their own).
+  const spotPos = !preview && slot !== null ? clubSlots(game.clubs[game.userClubId])[slot]?.pos : undefined;
+  const playsAs = spotPos && spotPos !== p.position ? spotPos : undefined;
   const inSpot = !preview && slot !== null && game.clubs[game.userClubId].lineup[slot] === p.id;
   const takeOut = () => {
     act((g) => {
@@ -74,11 +79,15 @@ export function PlayerModal({playerId, preview}: {playerId: string; preview?: {o
         <PlayerCard game={game} player={p} />
         <div className="player-head">
           <dl className="pm-facts">
-            <div className="pm-fact"><dt>{iconize(t("pl.position"))}</dt><dd><PosBadge pos={p.position} /></dd></div>
+            <div className="pm-fact"><dt>{iconize(t("pl.position"))}</dt><dd><PosBadge pos={p.position} />{playsAs && own && <> <span className="muted">→</span> <PosBadge pos={playsAs} /> <Effect factor={familiarity(p, playsAs)} /></>}</dd></div>
             <div className="pm-fact" title={t("col.ovrHint")}><dt>{iconize(t("col.ovr"))}</dt><dd className="strong"><Ovr game={game} player={p} /></dd></div>
             <div className="pm-fact"><dt>{iconize(t("pl.nation"))}</dt><dd><Flag code={p.nationality} named size={18} /></dd></div>
             <div className="pm-fact"><dt>{iconize(t("col.age"))}</dt><dd>{iconize(t("pl.age", {age: p.age}))}</dd></div>
-            <div className="pm-fact wide"><dt>{iconize(t("pl.club"))}</dt><dd>{club ? club.name : t("pl.freeAgent")}</dd></div>
+            <div className={p.shirt !== undefined && p.clubId ? "pm-fact" : "pm-fact wide"}><dt>{iconize(t("pl.club"))}</dt><dd>{club ? club.name : t("pl.freeAgent")}</dd></div>
+            {/* The shirt number shares the row with the club. */}
+            {p.shirt !== undefined && p.clubId && (
+              <div className="pm-fact"><dt>{iconize(t("pl.shirt"))}</dt><dd>{own && !p.loan ? <ShirtPicker player={p} /> : <span className="strong">{p.shirt}</span>}</dd></div>
+            )}
           </dl>
           {own && <Nickname key={p.id} player={p} />}
           {known && <TraitChips player={p} />}
@@ -106,7 +115,7 @@ export function PlayerModal({playerId, preview}: {playerId: string; preview?: {o
         </section>
 
         <section>
-          {own && <Condition player={p} />}
+          {own && <Condition player={p} pos={playsAs ?? p.position} />}
           {/* The kit (boots, gloves, shin guards), before the statistics. */}
           {own && p.clubId === game.userClubId && (
             <Fold title={<><Icon name="shirt" size={20} /> {iconize(t("gear.equipment"))}{wornGear(p).length > 0 && <span className="fold-count"> ({wornGear(p).length})</span>}</>}>
@@ -137,6 +146,29 @@ export function PlayerModal({playerId, preview}: {playerId: string; preview?: {o
 
       {preview ? <div className="btn-row dialog-actions pm-preview-actions">{preview.footer}</div> : own ? <OwnActions player={p} /> : <MarketActions player={p} />}
     </Modal>
+  );
+}
+
+/** Their shirt number: a list of 1–99 (a number someone has says who; picking it swaps), and what they wish for. */
+function ShirtPicker({player: p}: {player: Player}) {
+  const {t} = useT();
+  const game = useGameState();
+  const act = useGame((s) => s.act);
+  const wish = p.wantShirt;
+  return (
+    <span className="shirt-pick">
+      <select aria-label={t("pl.shirt")} value={p.shirt} onChange={(e) => act((g) => setShirt(g, p.id, Number(e.target.value)))}>
+        {Array.from({length: 99}, (_, i) => i + 1).map((n) => {
+          const holder = n === p.shirt ? undefined : shirtHolder(game, p.clubId!, n, p.id);
+          return <option key={n} value={n}>{n}{n === wish ? " ★" : ""}{holder ? ` · ${shortName(holder)}` : ""}</option>;
+        })}
+      </select>
+      {wish !== undefined && (
+        <small className={p.shirt === wish ? "shirt-got" : "shirt-wish"} title={t(p.shirt === wish ? "pl.shirtGot" : "pl.shirtWants", {n: wish})}>
+          <Icon name={p.shirt === wish ? "check" : "warn"} size={14} /> {wish}
+        </small>
+      )}
+    </span>
   );
 }
 
@@ -177,11 +209,11 @@ function Nickname({player: p}: {player: Player}) {
   );
 }
 
-function Condition({player: p}: {player: Player}) {
+function Condition({player: p, pos}: {player: Player; pos: Position}) {
   const {t, tx} = useT();
   const game = useGameState();
   const factors = happinessFactors(game, p);
-  const d = dayFormParts(p, p.position);
+  const d = dayFormParts(p, pos);
   return (
     <>
       {/* The (i) right by the heading (a profile has no card head to put it in). */}
@@ -199,6 +231,8 @@ function Condition({player: p}: {player: Player}) {
       <h3 className="inline-hint-head">{iconize(t("pl.condition"))} <Hint>{iconize(t("pl.dayFormHint"))}</Hint></h3>
       {/* Each part with what it does to the rating on the day, and the result at the bottom. */}
       <dl className="kv bars">
+        {pos !== p.position && <><dt>{iconize(t("pl.playsAs"))}</dt><dd><PosBadge pos={p.position} /> <span className="muted">→</span> <PosBadge pos={pos} /> <Effect factor={d.position} /></dd></>}
+        {d.gear >= 0.5 && <><dt>{iconize(t("gear.equipment"))}</dt><dd><span className="effect-pct up">+{Math.round(d.gear)}</span></dd></>}
         <dt>{iconize(t("col.form"))}</dt><dd><FormArrow form={p.form} size={20} /> <Effect factor={d.form} /></dd>
         <dt>{iconize(t("col.fitness"))}</dt><dd><Bar value={p.fitness} /> <Effect factor={d.fitness} /></dd>
         <dt>{iconize(t("pl.morale"))}</dt><dd><Bar value={p.morale} /> <Effect factor={d.morale} /></dd>
@@ -206,7 +240,7 @@ function Condition({player: p}: {player: Player}) {
         <dt>{iconize(t("col.happiness"))}</dt><dd><Bar value={p.happiness} /> <Face value={p.happiness} /> <Effect factor={d.attitude} /></dd>
         <dt>{iconize(t("pl.relation"))}</dt><dd><Bar value={p.relation} /></dd>
         <dt className="strong">{iconize(t("pl.dayForm"))}</dt>
-        <dd className="day-form">{Math.round(d.base)} <span className="muted">→</span> <strong>{Math.round(effectiveRating(p, p.position))}</strong></dd>
+        <dd className="day-form">{Math.round(d.base - d.gear)} <span className="muted">→</span> <strong>{Math.round(effectiveRating(p, pos))}</strong></dd>
       </dl>
 
       {factors.length > 0 && (
@@ -369,9 +403,11 @@ export function QuickSale({player: p, onSold}: {player: Player; onSold?: () => v
   if (!offer) return <p className="muted small">{iconize(t("pl.noBuyer"))}</p>;
   const club = game.clubs[offer.clubId].name;
   const sell = () => {
+    const from = pressedElement();
     const err = act((g) => quickSell(g, p.id));
     if (err) return notify(err, undefined, "error");
     notify("toast.sold", {name: shortName(p), club, fee: offer.fee}, "good");
+    if (offer.fee > 0) moneyBurst(from, money(offer.fee));
     openPlayer(null);
     onSold?.();
   };

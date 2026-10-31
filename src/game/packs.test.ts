@@ -69,7 +69,7 @@ describe("the diamond pack", () => {
       expect(overall(g.players[id])).toBeLessThanOrEqual(DIAMOND_PACK.max + 1);
     }
     // Opening again before picking shows the same four, for free.
-    expect(openDiamondPack(g, new Rng(6))).toEqual(res);
+    expect(openDiamondPack(g, new Rng(6))).toEqual({playerIds: (res as {playerIds: string[]}).playerIds});
     expect(club.cash).toBe(20_000_000 - DIAMOND_PACK.price);
     const [pick, ...rest] = res.playerIds;
     expect(pickFromPack(g, pick)).toBe(true);

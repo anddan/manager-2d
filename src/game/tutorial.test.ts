@@ -37,9 +37,12 @@ describe("the guide", () => {
     g.tutorial = {step: 7, v: 3}; // "play" in the third order: after the new kit steps now.
     upgradeTutorial(g);
     expect(TUTORIAL_STEPS[g.tutorial.step]).toBe("play");
+    g.tutorial = {step: 12, v: 7}; // "play" in the seventh order: still there.
+    upgradeTutorial(g);
+    expect(TUTORIAL_STEPS[g.tutorial.step]).toBe("play");
     g.tutorial = {step: 5, v: TUTORIAL_VERSION}; // Already today's order.
     upgradeTutorial(g);
-    expect(TUTORIAL_STEPS[g.tutorial.step]).toBe("club");
+    expect(TUTORIAL_STEPS[g.tutorial.step]).toBe("rating");
   });
 
   it("picks a first match with a penalty for the user's side and a win", () => {

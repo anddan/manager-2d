@@ -244,8 +244,8 @@ export class LiveMatch {
     let f: FormationId | undefined = this.teams[this.userSide].club.customSlots ? undefined : this.teams[this.userSide].club.formation;
     for (const c of this.commands) {
       if (c.type === "formation") f = c.formation;
-      // A swap or a move makes it a custom one.
-      if (c.type === "swap" || c.type === "place") f = undefined;
+      // Swapping two players (or moving one into an empty place) keeps the formation; moving one about freely makes it a custom one.
+      if (c.type === "place") f = undefined;
     }
     return f;
   }
@@ -268,10 +268,18 @@ export class LiveMatch {
         });
       } else if (c.type === "swap") {
         const a = team.onPitch.find((o) => o.id === c.aId);
-        const b = team.onPitch.find((o) => o.id === c.bId);
-        if (a && b && a !== b) {
-          slots = slots.slice();
-          [slots[a.slot], slots[b.slot]] = [slots[b.slot], slots[a.slot]];
+        if (c.bId.startsWith("slot:")) {
+          const empty = Number(c.bId.slice(5));
+          if (a && slots[empty] && !team.onPitch.some((o) => o.slot === empty) && slots[a.slot].pos !== "GK" && slots[empty].pos !== "GK") {
+            slots = slots.slice();
+            [slots[a.slot], slots[empty]] = [slots[empty], slots[a.slot]];
+          }
+        } else {
+          const b = team.onPitch.find((o) => o.id === c.bId);
+          if (a && b && a !== b) {
+            slots = slots.slice();
+            [slots[a.slot], slots[b.slot]] = [slots[b.slot], slots[a.slot]];
+          }
         }
       } else if (c.type === "place") {
         const o = team.onPitch.find((p) => p.id === c.playerId);

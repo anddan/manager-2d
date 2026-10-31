@@ -55,7 +55,7 @@ function Pattern({pattern, color, base}: {pattern: ShirtPattern; color: string; 
   }
 }
 
-export function Jersey({color, trim, number, size = 44, keeper, pattern, trim3, collar = "round", sleeves = "short"}: {color: string; trim: string; number?: number; size?: number; keeper?: boolean; pattern?: ShirtPattern; trim3?: string; collar?: Collar; sleeves?: Sleeves}) {
+export function Jersey({color, trim, number, size = 44, keeper, pattern, trim3, collar = "round", sleeves = "short", captain}: {color: string; trim: string; number?: number; size?: number; keeper?: boolean; pattern?: ShirtPattern; trim3?: string; collar?: Collar; sleeves?: Sleeves; captain?: boolean}) {
   const body = keeper ? "#16a34a" : color;
   const edge = keeper ? "#facc15" : trim3 ?? trim;
   const clip = useId();
@@ -103,6 +103,30 @@ export function Jersey({color, trim, number, size = 44, keeper, pattern, trim3, 
         <path d={sleeves === "long" ? "M2 30.5 L7 30.5 M33 30.5 L38 30.5" : "M1.8 12 L5.4 17.2 M38.2 12 L34.6 17.2"} stroke={edge} strokeWidth={1.4} />
       )}
       <path d="M9 17 L9 37 Q11 37.4 13 37.6 L13 12 Z" fill="#000" opacity={0.12} />
+      {captain && (
+        // The captain's armband: a yellow band round the left arm (the right one as the shirt is seen from the front).
+        <g clipPath={`url(#${clip})`}>
+          <g transform="translate(40 0) scale(-1 1)" strokeLinecap="butt">
+            {sleeves === "long" ? (
+              <>
+                <path d="M1 20.4 L10 20.4" stroke="rgb(0 0 0 / 0.55)" strokeWidth={5} />
+                <path d="M1 20.4 L10 20.4" stroke="#fff" strokeWidth={3.8} />
+              </>
+            ) : sleeves === "none" ? (
+              <>
+                <path d="M8 13 L15 13" stroke="rgb(0 0 0 / 0.55)" strokeWidth={5} />
+                <path d="M8 13 L15 13" stroke="#fff" strokeWidth={3.8} />
+              </>
+            ) : (
+              <>
+                <path d="M2.6 8.4 L8 17.4" stroke="rgb(0 0 0 / 0.55)" strokeWidth={5} />
+                <path d="M2.6 8.4 L8 17.4" stroke="#fff" strokeWidth={3.8} />
+              </>
+            )}
+          </g>
+          <text x={sleeves === "long" ? 34.6 : sleeves === "none" ? 32.4 : 34.8} y={sleeves === "long" ? 21.7 : sleeves === "none" ? 14.3 : 14.6} textAnchor="middle" fontSize={3.8} fontWeight={900} fill="#111">C</text>
+        </g>
+      )}
       {number !== undefined && (
         // On a pattern the number gets a dark outline so it stays readable on either colour.
         <text x={20} y={27.5} textAnchor="middle" fontSize={12} fontWeight={900} fill={patterned && !trim3 ? "#fff" : edge} stroke={patterned ? "rgb(0 0 0 / 0.7)" : "rgb(0 0 0 / 0.25)"} strokeWidth={patterned ? 1 : 0.3} paintOrder="stroke">

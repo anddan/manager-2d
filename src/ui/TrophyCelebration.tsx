@@ -3,10 +3,12 @@
 import {Icon, iconize} from "./Icon";
 import {useMemo} from "react";
 import {useT} from "../i18n";
+import type {TKey} from "../i18n";
 import {useGame, useGameState} from "../store";
 import {lookFor} from "./Avatar";
 import {Figure} from "./Figure";
 import {Confetti} from "./MatchViewer";
+import {Avatar} from "./Avatar";
 
 export function TrophyCelebration() {
   const {t} = useT();
@@ -25,6 +27,28 @@ export function TrophyCelebration() {
   const colors = useMemo(() => [club.color, club.color2, "#fde047", "#ffffff"], [club.color, club.color2]);
   if (!next) return null;
   const done = () => act((g) => { g.celebrations = g.celebrations?.slice(1); });
+  // An award for one of ours: the winners, lit up, with confetti.
+  if (next.kind === "award") {
+    return (
+      <div className="trophy-overlay award-overlay" role="dialog" aria-label={t("award.celebrate")}>
+        <Confetti colors={colors} />
+        <h1 className="trophy-title"><Icon name="star" size={22} /> {iconize(t("award.celebrate"))}</h1>
+        <p className="trophy-text">{iconize(t("award.celebrateText", {season: next.season}))}</p>
+        <ul className="award-winners">
+          {next.awards.map((a) => {
+            const p = a.playerId ? game.players[a.playerId] : undefined;
+            return (
+              <li key={a.key} className="award-winner">
+                {p ? <Avatar player={p} shirt={club.color} trim={club.color2} size={64} mood={10} /> : <span className="award-winner-icon"><Icon name="star" size={36} /></span>}
+                <span className="award-winner-text"><small>{iconize(t(`award.${a.key}` as TKey))}</small><strong>{a.name}</strong></span>
+              </li>
+            );
+          })}
+        </ul>
+        <button className="btn primary big" onClick={done}>{iconize(t("trophy.continue"))} ▶</button>
+      </div>
+    );
+  }
   const middle = Math.floor(team.length / 2);
   const width = 160;
   const step = Math.min(13, (width - 20) / Math.max(1, team.length - 1));

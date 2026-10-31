@@ -39,6 +39,7 @@ import {Tactics} from "./views/Tactics";
 import {Training} from "./views/Training";
 import {Transfers} from "./views/Transfers";
 import {Storage} from "./views/Storage";
+import {National} from "./views/National";
 import {CodeSalesPage, FriendSalesWatcher} from "./FriendSale";
 import {useFriendCupBadge} from "./friendCupBadge";
 import {Pals} from "./views/Pals";
@@ -57,6 +58,7 @@ const ICONS: Record<View, IconName> = {
   table: "list",
   cup: "trophy",
   friends: "users",
+  national: "flag",
   pals: "user",
   stadium: "stadium",
   transfers: "swap",
@@ -76,13 +78,16 @@ const NAV_GROUPS: {id: "home" | "team" | "matches" | "club"; icon: IconName; vie
   {id: "club", icon: "shield", views: ["finance", "transfers", "shop", "settings"]},
 ];
 /** Pages shown as a sub-tab of another (three tabs fit a phone): Contracts under Squad, Arena under Finance. */
-const SUB_PAGES: Partial<Record<View, View[]>> = {squad: ["squad", "contracts"], transfers: ["transfers", "codes"], finance: ["finance", "stadium"], cup: ["cup", "friends"]};
+const SUB_PAGES: Partial<Record<View, View[]>> = {squad: ["squad", "contracts"], transfers: ["transfers", "codes"], finance: ["finance", "stadium"], cup: ["cup", "friends", "national"]};
+/** The national team's page is only there once the manager coaches a country (set as the menu is drawn). */
+let NATIONAL_ON = false;
+const pagesOf = (v: View): View[] => (SUB_PAGES[v] ?? [v]).filter((p) => p !== "national" || NATIONAL_ON);
 /** The tab a page sits under (itself, or the page it's a sub-tab of). */
 const tabOf = (v: View): View => (Object.entries(SUB_PAGES).find(([, subs]) => subs!.includes(v))?.[0] as View | undefined) ?? v;
 /** The group a page is in. */
 const groupOf = (v: View) => NAV_GROUPS.find((g) => g.views.includes(tabOf(v)));
 /** Every page a group holds, sub-tabs too (for the guide to find a page's group). */
-const groupPages = (g: (typeof NAV_GROUPS)[number]) => g.views.flatMap((v) => SUB_PAGES[v] ?? [v]);
+const groupPages = (g: (typeof NAV_GROUPS)[number]) => g.views.flatMap((v) => pagesOf(v));
 
 const SCREENS: Record<View, () => React.JSX.Element> = {
   overview: Overview,
@@ -94,6 +99,7 @@ const SCREENS: Record<View, () => React.JSX.Element> = {
   table: Table,
   cup: Cup,
   friends: FriendCup,
+  national: National,
   pals: Pals,
   stadium: Stadium,
   transfers: Transfers,
@@ -203,6 +209,7 @@ const badgeClass = (v: View) => (BLUE_BADGES.includes(v) ? "badge blue" : "badge
  */
 function Nav() {
   const {t} = useT();
+  NATIONAL_ON = !!useGameState().national;
   const view = useGame((s) => s.view);
   const setView = useGame((s) => s.setView);
   const badges = useBadges();
@@ -269,12 +276,13 @@ function Nav() {
 /** The pages of the group being shown, as pill tabs on top of the page. */
 function GroupTabs() {
   const {t} = useT();
+  NATIONAL_ON = !!useGameState().national;
   const view = useGame((s) => s.view);
   const setView = useGame((s) => s.setView);
   const badges = useBadges();
   const group = groupOf(view);
   const tab = tabOf(view);
-  const subs = SUB_PAGES[tab];
+  const subs = SUB_PAGES[tab] ? pagesOf(tab) : undefined;
   // The chosen tab scrolled into sight (the row may be wider than a phone).
   const row = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -291,7 +299,7 @@ function GroupTabs() {
             <span>{iconize(t(`nav.${v}`))}</span>
             {/* The tab counts its sub-pages too (red: to do, blue: reminders). */}
             {[false, true].map((blue) => {
-              const n = (SUB_PAGES[v] ?? [v]).filter((p) => BLUE_BADGES.includes(p) === blue).reduce((k, p) => k + (badges[p] ?? 0), 0);
+              const n = pagesOf(v).filter((p) => BLUE_BADGES.includes(p) === blue).reduce((k, p) => k + (badges[p] ?? 0), 0);
               return n > 0 ? <span key={String(blue)} className={blue ? "badge blue" : "badge"}>{n}</span> : null;
             })}
           </button>

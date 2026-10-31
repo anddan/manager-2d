@@ -2,6 +2,7 @@
 // intensity, facilities, form and morale. Older players decline.
 import {NATURAL_GAIN_SHARE, TRAINING_BASE_GAIN, TRAINING_INJURY_CHANCE} from "./constants";
 import {leagueClubs} from "./helpers";
+import {GYM_BOOST, TRAINING_BOOST} from "./stadium";
 import {injure} from "./injuries";
 import {hasTrait} from "./traits";
 import {overall} from "./ratings";
@@ -82,14 +83,18 @@ export function trainPlayer(rng: Rng, club: Club, p: Player, given: TrainOptions
   const session = opts.extraSession ? 0.5 : 1;
   // A late bloomer keeps developing past the age most stop.
   const late = p.age >= 24 && hasTrait(p, "late") ? 1.35 : 1;
-  const base = TRAINING_BASE_GAIN * ageFactor(p.age) * late * room * quality * intensity.gain * mood * minutes * session;
+  // The training ground helps everything grow; the gym the physical side on top (the user's club builds them in the stadium).
+  const ground = 1 + TRAINING_BOOST * (club.stadium?.training ?? 0);
+  const gym = 1 + GYM_BOOST * (club.stadium?.gym ?? 0);
+  const base = TRAINING_BASE_GAIN * ageFactor(p.age) * late * room * quality * intensity.gain * mood * minutes * session * ground;
 
   for (const attr of ATTRIBUTES) {
     let delta = 0;
     // Natural development touches everything a little.
     const share = (focus[attr] ?? 0) + NATURAL_GAIN_SHARE / ATTRIBUTES.length;
     const individual = p.individualFocus === attr ? 0.35 : 0;
-    if (base > 0) delta += base * (share + individual) * rng.range(0.5, 1.5);
+    const physical = attr === "pace" || attr === "stamina" || attr === "physical";
+    if (base > 0) delta += base * (share + individual) * rng.range(0.5, 1.5) * (physical ? gym : 1);
     if (!opts.extraSession) delta -= decline(p.age, attr) * rng.range(0.6, 1.4);
     // An overall above potential can't keep climbing.
     if (delta > 0 && ovr >= p.potential) delta = 0;

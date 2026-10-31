@@ -291,11 +291,12 @@ export function quickSaleOffer(state: GameState, playerId: string): {clubId: str
     if (!best || fee > best.fee) best = {clubId: club.id, fee};
   }
   if (best) return best;
-  // Nobody can pay a fair price, but the player can always go: to the club with room that can pay the most (maybe nothing).
+  // Nobody can pay a fair price, but the player can always go: to the club with room that can pay the most, never for less than half the price (never for nothing).
+  const floor = Math.max(10_000, Math.floor(price / 2 / 10_000) * 10_000);
   let any: {clubId: string; fee: number; room: boolean} | null = null;
   for (const club of leagueClubs(state)) {
     if (club.id === state.userClubId) continue;
-    const fee = Math.max(0, Math.min(price, Math.floor(club.transferBudget / 10_000) * 10_000));
+    const fee = Math.max(floor, Math.min(price, Math.floor(club.transferBudget / 10_000) * 10_000));
     const room = clubPlayers(state, club.id).length < SQUAD_MAX;
     if (!any || (room && !any.room) || (room === any.room && fee > any.fee)) any = {clubId: club.id, fee, room};
   }

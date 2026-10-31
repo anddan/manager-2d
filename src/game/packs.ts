@@ -4,6 +4,7 @@
 import {SQUAD_MAX, SQUAD_TEMPLATE} from "./constants";
 import {taskProgress} from "./daily";
 import {createPlayer} from "./generate";
+import {rollBonusGear, type GearItem} from "./gear";
 import {book} from "./helpers";
 import type {Rng} from "./rng";
 import {POSITIONS, type GameState} from "./types";
@@ -30,14 +31,16 @@ function packLevel(rng: Rng, min: number, max: number): number {
  * from (kept in \`state.packChoice\` until one is picked, so closing the game
  * doesn't lose them). An error key if it can't be bought (nothing is spent).
  */
-export function openDiamondPack(state: GameState, rng: Rng): {playerIds: string[]} | {error: string} {
+export function openDiamondPack(state: GameState, rng: Rng): {playerIds: string[]; gear?: GearItem} | {error: string} {
   if (state.packChoice) return {playerIds: state.packChoice};
   const club = state.clubs[state.userClubId];
   if (club.cash < DIAMOND_PACK.price) return {error: "pack.noMoney"};
   const squad = Object.values(state.players).filter((p) => p.clubId === state.userClubId).length;
   if (squad >= SQUAD_MAX) return {error: "shop.squadFull"};
   book(state, club.id, "transfers", -DIAMOND_PACK.price);
-  return {playerIds: drawDiamondChoice(state, rng)};
+  const playerIds = drawDiamondChoice(state, rng);
+  // Now and then a piece of kit comes with it.
+  return {playerIds, gear: rollBonusGear(state, rng, 0.25)};
 }
 
 /** The diamond pack's four to pick from (kept in `state.packChoice`), however it was paid for. */
@@ -68,7 +71,7 @@ export function pickFromPack(state: GameState, playerId: string): boolean {
 }
 
 /** Opens a pack: the new player's id, or an error key (nothing is spent then). */
-export function openPack(state: GameState, rng: Rng, id: PlayerPackId): {playerId: string} | {error: string} {
+export function openPack(state: GameState, rng: Rng, id: PlayerPackId): {playerId: string; gear?: GearItem} | {error: string} {
   const pack = PLAYER_PACKS[id];
   const m = state.monetization;
   if (m.diamonds < pack.price) return {error: "shop.notEnoughDiamonds"};
@@ -83,5 +86,6 @@ export function openPack(state: GameState, rng: Rng, id: PlayerPackId): {playerI
   player.contract.expiresSeason = state.season + 3;
   state.scouted[player.id] = state.absWeek;
   taskProgress(state, "pack");
-  return {playerId: player.id};
+  // A small chance of a piece of kit as well.
+  return {playerId: player.id, gear: rollBonusGear(state, rng, 0.08)};
 }

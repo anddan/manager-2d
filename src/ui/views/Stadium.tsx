@@ -12,7 +12,10 @@ import {
   setItemPrice,
   shopTakings,
   type SaleItem,
+  GYM_BOOST,
+  REHAB_CHANCE,
   STAND_MAX,
+  TRAINING_BOOST,
   STAND_SEATS,
   STANDS,
   buildWeeks,
@@ -89,7 +92,7 @@ function StadiumBuilder() {
       <Card title={picked ? partName(picked) : t("stadium.title")}>
         {!picked && <p className="muted">{iconize(t("stadium.pick"))}</p>}
         <ul className="stadium-parts">
-          {([...STANDS, "kiosks", "shop"] as StadiumPart[]).map((part) => {
+          {([...STANDS, "kiosks", "shop", "training", "gym", "rehab"] as StadiumPart[]).map((part) => {
             const level = partLevel(st, part);
             const max = partMax(part);
             const cost = upgradeCost(st, part);
@@ -98,12 +101,18 @@ function StadiumBuilder() {
               ? t("stadium.standGain", {n: STAND_SEATS[part]})
               : part === "kiosks"
                 ? t("stadium.kioskGain", {spend: kioskTakings(st, 1000, Math.min(level + 1, max)) / 1000})
-                : t("stadium.shopGain", {weekly: shopTakings(st, Math.min(level + 1, max))});
+                : part === "shop"
+                  ? t("stadium.shopGain", {weekly: shopTakings(st, Math.min(level + 1, max))})
+                  : part === "training"
+                    ? t("stadium.trainGain", {pct: Math.round(TRAINING_BOOST * Math.min(level + 1, max) * 100)})
+                    : part === "gym"
+                      ? t("stadium.gymGain", {pct: Math.round(GYM_BOOST * Math.min(level + 1, max) * 100)})
+                      : t("stadium.rehabGain", {pct: Math.round(REHAB_CHANCE * Math.min(level + 1, max) * 100)});
             const building = st.project?.part === part;
             return (
               <li key={part} className={`stadium-part ${open ? "open" : ""}`}>
                 <button className="stadium-part-head" onClick={() => setPicked(open ? null : part)} aria-expanded={open}>
-                  <span className="stadium-part-icon" aria-hidden>{isStand(part) ? "🪑" : part === "kiosks" ? "🌭" : "🛍️"}</span>
+                  <span className="stadium-part-icon" aria-hidden>{part === "training" ? <Icon name="run" size={20} /> : part === "gym" ? <Icon name="dumbbell" size={20} /> : part === "rehab" ? <Icon name="medical" size={20} /> : isStand(part) ? "🪑" : part === "kiosks" ? "🌭" : "🛍️"}</span>
                   <span className="stadium-part-name">{partName(part)}</span>
                   <span className="stadium-levels" aria-label={t("stadium.level", {level, max})}>
                     {Array.from({length: max}, (_, i) => <span key={i} className={i < level ? "on" : building && i === level ? "building" : ""} />)}
@@ -112,6 +121,8 @@ function StadiumBuilder() {
                 {open && (
                   <div className="stadium-part-body">
                     <p className="small">{iconize(t("stadium.level", {level, max}))}{cost !== undefined && <> · {gain}</>}</p>
+                    {/* What this part does. */}
+                    <p className="muted small stadium-part-info"><Icon name="info" size={14} /> {iconize(t(`stadium.help.${isStand(part) ? "stands" : part}` as TKey))}</p>
                     {cost === undefined ? (
                       <p className="strong">{iconize(t("stadium.maxed"))}</p>
                     ) : (
@@ -249,9 +260,9 @@ function StadiumHelp() {
     <>
       <p>{iconize(t("stadium.help.intro"))}</p>
       <dl className="tt-help">
-        {(["stands", "kiosks", "shop", "match"] as const).map((k) => (
+        {(["stands", "kiosks", "shop", "training", "gym", "rehab", "match"] as const).map((k) => (
           <div key={k}>
-            <dt><Icon name={k === "stands" ? "stadium" : k === "kiosks" ? "coins" : k === "shop" ? "shirt" : "ball"} size={16} /> {iconize(t(`stadium.help.${k}.title`))}</dt>
+            <dt><Icon name={k === "stands" ? "stadium" : k === "kiosks" ? "coins" : k === "shop" ? "shirt" : k === "training" || k === "gym" ? "dumbbell" : k === "rehab" ? "medical" : "ball"} size={16} /> {iconize(t(`stadium.help.${k}.title`))}</dt>
             <dd>{iconize(t(`stadium.help.${k}`))}</dd>
           </div>
         ))}
