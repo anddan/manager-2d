@@ -1,7 +1,7 @@
 // The national team: the country's best players (whatever club they play for), picked automatically for
 // the formation and mood the manager chooses. A few friendlies a year, and the Euros / World Cup in the
 // last weeks of the season in their years.
-import {iconize} from "../Icon";
+import {Icon, iconize} from "../Icon";
 import {nationalKit, nationalSquad, nextNationalWeek, tournamentOf} from "../../game/national";
 import {FORMATION_IDS, MENTALITIES, type FormationId, type Mentality} from "../../game/types";
 import type {TKey} from "../../i18n";
@@ -50,6 +50,30 @@ export function National() {
         </p>
         <LineupSheet club={sheet} player={(id) => game.players[id]} onPick={(p) => openPlayer(p.id)} />
       </Card>
+      {job.tournament && job.tournament.season === game.season && (() => {
+        const tr = job.tournament!;
+        const group = tr.groups.find((g) => g.includes(job.country));
+        const rows = group ? [...group].sort((x, y) => tr.table[y].pts - tr.table[x].pts || tr.table[y].gf - tr.table[y].ga - (tr.table[x].gf - tr.table[x].ga) || tr.table[y].gf - tr.table[x].gf) : [];
+        return (
+          <Card title={<>{iconize(t(`national.comp.${tr.comp}` as TKey))} {game.season}</>}>
+            {tr.champion && <p className="strong"><Icon name="trophy" size={18} /> {iconize(t("national.champion", {country: `nat.${tr.champion}`}))}</p>}
+            {!tr.champion && tr.bracket.length > 0 && <p className="muted small">{iconize(t("national.stillIn", {n: tr.bracket.length}))}</p>}
+            <table className="table national-table">
+              <thead><tr><th /><th>{t("national.pl")}</th><th>+/-</th><th>{t("national.pts")}</th></tr></thead>
+              <tbody>
+                {rows.map((c) => (
+                  <tr key={c} className={c === job.country ? "mine" : undefined}>
+                    <td><Flag code={c} size={16} /> {t(`nat.${c}` as TKey)}</td>
+                    <td className="num">{tr.table[c].pl}</td>
+                    <td className="num">{tr.table[c].gf - tr.table[c].ga}</td>
+                    <td className="num strong">{tr.table[c].pts}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+        );
+      })()}
       <Card title={iconize(t("national.results"))}>
         {job.results.length === 0 ? (
           <Empty>{iconize(t("national.noResults"))}</Empty>

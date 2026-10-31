@@ -427,8 +427,19 @@ export interface NationalJob {
   formation: FormationId;
   mentality: Mentality;
   results: NationalResult[];
-  /** The tournament this season: which, and the three countries met on the way (while the team is still in it). */
-  tournament?: {comp: "wc" | "ec"; season: number; rivals: string[]; alive: boolean};
+  /** The tournament this season (32 countries: eight groups of four, then the last sixteen, quarter-finals, semi-finals, final). */
+  tournament?: {
+    comp: "wc" | "ec";
+    season: number;
+    /** Still in it (false once out, or when it is over). */
+    alive: boolean;
+    /** The groups (country codes), and each country's table. */
+    groups: string[][];
+    table: Record<string, {pl: number; gf: number; ga: number; pts: number}>;
+    /** The countries still in the knockout, in pairing order (empty during the groups). */
+    bracket: string[];
+    champion?: string;
+  };
 }
 
 export interface Message {

@@ -2665,3 +2665,5 @@ button.manager-item:hover:not(:disabled) { background: rgb(127 127 127 / 0.18); 
 @media (max-width: 600px) {
   .topbar { grid-template-columns: minmax(0, 1fr) minmax(44px, auto) auto; }
 }
+
+.national-table tr.mine td { background: rgb(250 204 21 / 0.14); font-weight: 800; }

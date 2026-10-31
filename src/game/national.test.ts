@@ -27,8 +27,16 @@ describe("national team", () => {
       g.week = w;
       nationalWeek(g, rng);
     }
-    const tournamentGames = g.national!.results.filter((r) => r.what !== "friendly").length;
-    expect(tournamentGames).toBeGreaterThanOrEqual(1);
-    expect(tournamentGames).toBeLessThanOrEqual(3);
+    const t = g.national!.tournament!;
+    // 32 countries in eight groups of four, and a champion after the last week.
+    expect(t.groups).toHaveLength(8);
+    expect(new Set(t.groups.flat()).size).toBe(32);
+    expect(t.groups.every((grp) => grp.length === 4)).toBe(true);
+    expect(t.champion).toBeTruthy();
+    // Three group matches, and then as many knockout matches as we kept winning (at most four).
+    const played = g.national!.results.filter((r) => r.what !== "friendly");
+    expect(played.length).toBeGreaterThanOrEqual(3);
+    expect(played.length).toBeLessThanOrEqual(7);
+    expect(played.filter((r) => r.what.endsWith(".g"))).toHaveLength(3);
   });
 });
