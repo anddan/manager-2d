@@ -330,7 +330,7 @@ export function Tactics() {
             </select>
           </label>
         </div>
-        <p className="muted small">{iconize(t(`tac.${club.mentality}Hint`))}</p>
+        {club.mentality !== "balanced" && <p className="muted small">{iconize(t(`tac.${club.mentality}Hint`))}</p>}
 
         <div ref={board} className={`pitch-board ${custom ? "custom" : ""}`} data-free={custom ? "" : undefined} role="group" aria-label={t("tac.pitch")} onClick={(e) => e.target === e.currentTarget && setActions(null)}>
           <div className="pitch-lines" aria-hidden />

@@ -5,7 +5,7 @@ import {Icon, type IconName, iconize} from "./Icon";
 import {clubSlots, ENERGY_MAX, MIN_PLAYERS} from "../game/constants";
 import {fixtureWeek, nextUserFixture, userClub} from "../game/helpers";
 import {lineupProblems, pickBestLineup} from "../game/lineup";
-import {Modal} from "./common";
+import {CrestOf, Modal} from "./common";
 import {dailyToCollect, ensureDaily} from "../game/daily";
 import {claimDailyBonus, msToNextEnergy, regenerateEnergy} from "../game/monetization";
 import {finishWeek, startWeek} from "../game/week";
@@ -85,7 +85,7 @@ const NAV_GROUPS: {id: "home" | "team" | "matches" | "club"; icon: IconName; vie
   {id: "club", icon: "shield", views: ["finance", "transfers", "shop", "settings"]},
 ];
 /** Pages shown as a sub-tab of another (three tabs fit a phone): Contracts under Squad, Arena under Finance. */
-const SUB_PAGES: Partial<Record<View, View[]>> = {squad: ["squad", "contracts"], transfers: ["transfers", "codes"], finance: ["finance", "stadium"], cup: ["cup", "friends", "national", "tournament"]};
+const SUB_PAGES: Partial<Record<View, View[]>> = {squad: ["squad", "contracts", "national"], transfers: ["transfers", "codes"], finance: ["finance", "stadium"], cup: ["cup", "friends", "tournament"]};
 /** The national team's page is only there once the manager coaches a country (set as the menu is drawn). */
 let NATIONAL_ON = false;
 /** The tournament's page (the World Cup or the Euros of the year, e.g. "VM 2028") only in a year with one, once the manager coaches a country. */
@@ -465,7 +465,7 @@ function TopBar() {
       {/* The club (to its tactics) and, right after it, the manager (to their profile). */}
       <div className="topbar-id">
         <button className="topbar-club" onClick={() => setView("tactics")} title={t("nav.tactics")}>
-          <span className="crest" style={{background: club.color, color: club.color2}}>{club.short}</span>
+          <CrestOf club={club} />
           <span className="topbar-club-text">
             <strong>{club.name}</strong>
             <small className="topbar-when">{iconize(t("top.seasonWeek", {season: game.season, week: game.week}))}</small>

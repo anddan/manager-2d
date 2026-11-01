@@ -183,7 +183,7 @@ export function teamOvr(state: GameState, clubId: string): number {
     .map((id, i) => {
       const p = state.players[id];
       // As shown on each player in the line-up: today's rating there (form, fitness, kit…).
-      return p && p.clubId === clubId && slots[i] ? effectiveRating(p, slots[i].pos) : null;
+      return p && (p.clubId === clubId || clubId.startsWith("nat:")) && slots[i] ? effectiveRating(p, slots[i].pos) : null;
     })
     .filter((r): r is number => r !== null);
   // The average over all eleven places on the pitch: an empty place counts as 0.

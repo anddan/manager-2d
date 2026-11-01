@@ -127,13 +127,14 @@ export function National() {
       )}
       <Card
         title={<><Flag code={job.country} size={22} /> {t(`nat.${job.country}` as TKey)} <span className="team-ovr" title={t("tac.teamOvrHint")}>{iconize(t("tac.teamOvr"))} <strong>{ovr}</strong></span></>}
-        actions={<button type="button" className="btn small" title={t("national.leave")} aria-label={t("national.leave")} onClick={() => setLeaving(true)}><Icon name="close" size={14} /> {t("national.leaveShort")}</button>}
+        actions={
+          <>
+            <button className="btn small" onClick={() => act((g) => clearNationalLineup(g))} disabled={!!job.lineup && job.lineup.every((id) => !id)}>{iconize(t("tac.clearAll"))}</button>
+            <button className="btn small" onClick={() => act((g) => { g.national!.lineup = undefined; })}>{iconize(t("tac.auto"))}</button>
+          </>
+        }
       >
         <Hint>{iconize(t("national.hint"))}</Hint>
-        <div className="btn-row national-actions">
-          <button className="btn small" onClick={() => act((g) => clearNationalLineup(g))} disabled={!!job.lineup && job.lineup.every((id) => !id)}>{iconize(t("tac.clearAll"))}</button>
-          <button className="btn small" onClick={() => act((g) => { g.national!.lineup = undefined; })}>{iconize(t("tac.auto"))}</button>
-        </div>
         <div className="tac-pickers">
           <label className="field">
             <span>{iconize(t("tac.formation"))}</span>
@@ -205,6 +206,9 @@ export function National() {
           </ul>
         )}
       </Card>
+      <div className="btn-row national-leave">
+        <button type="button" className="btn danger" onClick={() => setLeaving(true)}><Icon name="close" size={16} /> {t("national.leave")}</button>
+      </div>
     </div>
   );
 }

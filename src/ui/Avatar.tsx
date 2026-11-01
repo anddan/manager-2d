@@ -623,12 +623,12 @@ export function Face({look, mood = 60, neck = false}: {look: Look; mood?: number
 
 /** A player's portrait; the face follows their happiness unless `mood` is given. */
 export function Avatar({player, shirt, trim, size = 96, mood}: {player: Player; shirt: string; trim: string; size?: number; mood?: number}) {
-  return <KitAvatar look={lookFor(player)} keeper={player.position === "GK"} shirt={shirt} trim={trim} size={size} mood={mood ?? player.happiness} />;
+  return <KitAvatar look={lookFor(player)} keeper={player.position === "GK"} shirt={shirt} trim={trim} size={size} mood={mood ?? player.happiness} physical={player.attrs.physical} />;
 }
 
 /** A player's face and shoulders in the kit, for any look (the look editor draws with it too). */
-export function KitAvatar({look, keeper = false, shirt, trim, size = 96, mood = 70}: {look: Look; keeper?: boolean; shirt: string; trim: string; size?: number; mood?: number}) {
-  if (readAvatarStyle() === "toon") return <ToonKitAvatar look={look} keeper={keeper} shirt={shirt} trim={trim} size={size} mood={mood} />;
+export function KitAvatar({look, keeper = false, shirt, trim, size = 96, mood = 70, physical}: {look: Look; keeper?: boolean; shirt: string; trim: string; size?: number; mood?: number; physical?: number}) {
+  if (readAvatarStyle() === "toon") return <ToonKitAvatar look={look} keeper={keeper} shirt={shirt} trim={trim} size={size} mood={mood} physical={physical} />;
   const kit = keeper ? "#16a34a" : shirt;
   const kitTrim = keeper ? "#facc15" : trim;
   return (

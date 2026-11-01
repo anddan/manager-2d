@@ -798,6 +798,7 @@ export const fr: Record<keyof typeof sv, string> = {
   "mgr.color2": "Couleur secondaire",
   "mgr.color3": "Troisième couleur (col, poignets)",
   "mgr.color3Reset": "Comme la couleur de détail",
+  "mgr.kitReset": "Réinitialiser",
   "mgr.kitHome": "Domicile",
   "mgr.kitAway": "Extérieur",
   "tac.kitHome": "Maillot domicile",

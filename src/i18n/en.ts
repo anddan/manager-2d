@@ -809,6 +809,7 @@ export const en: Record<keyof typeof sv, string> = {
   "mgr.color2": "Trim colour",
   "mgr.color3": "Third colour (collar, cuffs)",
   "mgr.color3Reset": "Same as detail colour",
+  "mgr.kitReset": "Reset",
   "mgr.kitHome": "Home",
   "mgr.kitAway": "Away",
   "tac.kitHome": "Home kit",

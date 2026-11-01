@@ -2759,3 +2759,10 @@ button.manager-item:hover:not(:disabled) { background: rgb(127 127 127 / 0.18); 
 
 /* The tournament card: the host and how many are left, close together. */
 .grid p.tight { margin: 0 0 2px; }
+
+/* The kit cards have just the name (no flags beside it), so it is not squeezed into the first narrow column of the player card's name row. */
+.gear-card .fut-name { display: block; text-align: center; }
+
+/* A country's flag where a club's badge would be. */
+.crest-flag { display: inline-flex; align-items: center; justify-content: center; background: none !important; border: 0 !important; box-shadow: none !important; }
+.crest-flag-btn { background: none; border: 0; padding: 0; cursor: pointer; display: inline-flex; }

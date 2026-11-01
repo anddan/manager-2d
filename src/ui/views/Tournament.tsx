@@ -19,7 +19,7 @@ export function Tournament() {
   const tr = job.tournament && job.tournament.season === game.season ? job.tournament : undefined;
   const [tree, setTree] = useState(false);
   // Only the manager's own group (off to begin with), like the cup.
-  const [onlyMine, setOnlyMine] = useState(false);
+  const [onlyMine, setOnlyMine] = useState(true);
   type Pair = {a: string; b: string; ga: number; gb: number; w: string};
   const played = tr?.rounds ?? [];
   const rounds: {done: boolean; known: boolean; pairs: Pair[]}[] = [0, 1, 2, 3].map((i) => {
@@ -59,29 +59,6 @@ export function Tournament() {
             })}
           </ul>
         </Card>
-      )}
-      {tr?.stats && Object.keys(tr.stats).length > 0 && (
-        <>
-          {([["goals", "national.scorers"], ["assists", "national.assistLeague"]] as const).map(([field, title]) => {
-            const other = field === "goals" ? "assists" : "goals";
-            const list = Object.values(tr.stats!).filter((s) => s[field] > 0).sort((x, y) => y[field] - x[field] || y[other] - x[other] || x.name.localeCompare(y.name)).slice(0, 10);
-            return (
-              <Card key={field} title={<><Icon name={field === "goals" ? "ball" : "boot"} size={20} /> {iconize(t(title as TKey))}</>}>
-                <table className="table national-table">
-                  <tbody>
-                    {list.map((s, i) => (
-                      <tr key={s.name + s.country} className={s.country === job.country ? "mine" : undefined}>
-                        <td className="num">{i + 1}</td>
-                        <td><Flag code={s.country} size={15} /> {s.name}</td>
-                        <td className="num strong">{s[field]}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </Card>
-            );
-          })}
-        </>
       )}
       {tr && (tr.rounds?.length || tr.bracket.length > 0) ? (
         <Card
@@ -158,6 +135,29 @@ export function Tournament() {
             ))}
           </div>
         </Card>
+      )}
+      {tr?.stats && Object.keys(tr.stats).length > 0 && (
+        <>
+          {([["goals", "national.scorers"], ["assists", "national.assistLeague"]] as const).map(([field, title]) => {
+            const other = field === "goals" ? "assists" : "goals";
+            const list = Object.values(tr.stats!).filter((s) => s[field] > 0).sort((x, y) => y[field] - x[field] || y[other] - x[other] || x.name.localeCompare(y.name)).slice(0, 10);
+            return (
+              <Card key={field} title={<><Icon name={field === "goals" ? "ball" : "boot"} size={20} /> {iconize(t(title as TKey))}</>}>
+                <table className="table national-table">
+                  <tbody>
+                    {list.map((s, i) => (
+                      <tr key={s.name + s.country} className={s.country === job.country ? "mine" : undefined}>
+                        <td className="num">{i + 1}</td>
+                        <td><Flag code={s.country} size={15} /> {s.name}</td>
+                        <td className="num strong">{s[field]}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </Card>
+            );
+          })}
+        </>
       )}
     </div>
   );

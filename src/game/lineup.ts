@@ -152,7 +152,8 @@ export function repairLineup(state: GameState, club: Club): boolean {
   const slots = clubSlots(club);
   const valid = (id: string | undefined) => {
     const p = id ? state.players[id] : undefined;
-    return !!p && p.clubId === club.id && isAvailable(p);
+    // (A country's team in a national match: its players belong to their real clubs.)
+    return !!p && (p.clubId === club.id || club.id.startsWith("nat:")) && isAvailable(p);
   };
   let changed = false;
   const lineup = slots.map((_, i) => (valid(club.lineup[i]) ? club.lineup[i] : ""));

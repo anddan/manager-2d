@@ -7,7 +7,7 @@ export type IconName =
   | "swap" | "pen" | "wallet" | "boot" | "diamond" | "diamondLine" | "settings" | "play" | "ball" | "shield" | "info" | "close"
   | "warn" | "fire" | "video" | "gift" | "shin" | "glove" | "dice" | "user" | "text" | "palette" | "megaphone" | "skip" | "coffee" | "stop" | "target" | "star" | "sparkle" | "chart" | "chat" | "handshake" | "trend" | "tag" | "shirt" | "undo" | "check" | "bolt" | "bank" | "sound" | "compass" | "download" | "upload" | "cart" | "hammer" | "run" | "bench" | "moon" | "search" | "inbox" | "eye" | "coins" | "medical" | "plane" | "clip" | "lock" | "flag" | "updown" | "plus" | "male" | "female" | "mixed" | "chevron" | "thumbUp" | "thumbDown" | "debrief" | "hotdog" | "cup" | "scarf"
   | "faceSmile" | "faceGrin" | "faceNeutral" | "faceWorried" | "faceSad" | "faceAngry" | "faceGrimace" | "faceYawn" | "broom"
-  | "party" | "cardYellow" | "cardRed" | "wall" | "plaster" | "sprout" | "trendDown" | "heartBroken" | "sun" | "goal" | "bag" | "chair";
+  | "globe" | "party" | "cardYellow" | "cardRed" | "wall" | "plaster" | "sprout" | "trendDown" | "heartBroken" | "sun" | "goal" | "bag" | "chair";
 
 const PATHS: Record<IconName, ReactNode> = {
   home: <><path d="M3 11 12 4l9 7" /><path d="M5 10v10h14V10" /><path d="M10 20v-6h4v6" /></>,
@@ -22,7 +22,8 @@ const PATHS: Record<IconName, ReactNode> = {
   swap: <><path d="M4 8h14l-3-3M20 16H6l3 3" /></>,
   pen: <><path d="M4 20h4L19 9l-4-4L4 16v4Z" /><path d="m13 7 4 4" /></>,
   wallet: <><rect x="3" y="6" width="18" height="14" rx="2" /><path d="M3 10h18" /><path d="M16 15h2" /><path d="M6 6l9-3 1 3" /></>,
-  boot: <><path d="M3.500 13V7.500a1.200 1.200 0 0 1 2.400 0V5.500a1.200 1.200 0 0 1 2.400 0V7a1.200 1.200 0 0 1 2.400 0v3.500l-.5 2.500Q9.500 14.500 7.500 14.500h-2q-2 0-2-1.500Z" /><path d="M4 14.500V17h5v-2.500" /><path d="M11 21v-4.500l2.600-.9 1.700 1.700q2.900.4 5.200 1.800 1 .6 1 1.800V21Z" /><path d="M11 19.200h10.500" /></>,
+  // Just a shoe (a boot with its studs), big in the square.
+  boot: <g transform="translate(-16.500 -19.100) scale(1.700)"><path vectorEffect="non-scaling-stroke" d="M11 21v-4.500l2.600-.9 1.700 1.700q2.900.4 5.200 1.800 1 .6 1 1.800V21Z" /><path vectorEffect="non-scaling-stroke" d="M11 19.200h10.500" /><path vectorEffect="non-scaling-stroke" d="M12.500 21v1.200M15 21v1.200M17.500 21v1.200M20 21v1.200" /></g>,
   diamondLine: <><path d="M6 4h12l3 5-9 11L3 9l3-5Z" /><path d="M3 9h18M9 4l3 16M15 4l-3 16" /></>,
   diamond: (
     <g stroke="none" strokeLinejoin="round">
@@ -146,6 +147,7 @@ const PATHS: Record<IconName, ReactNode> = {
   faceSad: <><circle cx="12" cy="12" r="9" /><circle cx="9" cy="10" r="0.9" fill="currentColor" /><circle cx="15" cy="10" r="0.9" fill="currentColor" /><path d="M8 17c1.2-2 2.5-2.8 4-2.8s2.8.8 4 2.8" /></>,
   faceAngry: <><circle cx="12" cy="12" r="9" /><circle cx="9" cy="10" r="0.9" fill="currentColor" /><circle cx="15" cy="10" r="0.9" fill="currentColor" /><path d="M7.4 7.6l3.6 1.8M16.6 7.6L13 9.4" /><path d="M9 16.2c1-1 2-1.5 3-1.5s2 .5 3 1.5" /></>,
   faceGrimace: <><circle cx="12" cy="12" r="9" /><circle cx="9" cy="10" r="0.9" fill="currentColor" /><circle cx="15" cy="10" r="0.9" fill="currentColor" /><rect x="7.5" y="13.4" width="9" height="3.6" rx="1.4" /><path d="M10.5 13.4v3.6M13.5 13.4v3.6" /></>,
+  globe: <><circle cx="12" cy="12" r="9" /><path d="M3 12h18" /><path d="M12 3c-3.200 2.600-3.200 15.400 0 18M12 3c3.200 2.600 3.200 15.400 0 18" /></>,
   faceYawn: <><circle cx="12" cy="12" r="9" /><path d="M7.5 10h3M13.5 10h3" /><ellipse cx="12" cy="16" rx="2.3" ry="2.8" /></>,
 };
 
@@ -159,7 +161,7 @@ export function Icon({name, size = 22}: {name: IconName; size?: number}) {
 
 /** The emoji that stand for something (money, energy, a cup…) and the icon drawn instead. */
 const EMOJI_ICONS: Record<string, IconName> = {
-  "💎": "diamond", "💠": "diamond", "⚡": "bolt", "💰": "coins", "💸": "coins", "🏆": "trophy", "⚽": "ball", "🎁": "gift",
+  "🌍": "globe", "🌎": "globe", "🌏": "globe", "💎": "diamond", "💠": "diamond", "⚡": "bolt", "💰": "coins", "💸": "coins", "🏆": "trophy", "⚽": "ball", "🎁": "gift",
   "🔍": "search", "🏟️": "stadium", "🏗️": "hammer", "🎬": "video", "🎯": "target", "🔥": "fire", "🧤": "glove", "👟": "boot",
   "⭐": "star", "✅": "check", "❌": "close", "🏦": "bank", "✏️": "pen", "🖊️": "pen", "✍️": "pen", "🎨": "palette", "🔒": "lock",
   "🏁": "flag", "📋": "clipboard", "🔁": "swap", "🧹": "broom", "🎉": "party", "💪": "dumbbell", "🟨": "cardYellow", "🟥": "cardRed", "🧱": "wall", "🩹": "plaster", "🌱": "sprout", "📉": "trendDown", "💔": "heartBroken", "☀️": "sun", "🥅": "goal", "🛍️": "bag", "🪑": "chair",

@@ -451,7 +451,8 @@ export function ToonHead({look, mood = 70}: {look: Look; mood?: number}) {
 }
 
 /** A player's portrait in the kit: the head, a short neck, a V-neck shirt with a badge, hands on the hips. */
-export function ToonKitAvatar({look, keeper = false, shirt, trim, size = 96, mood = 70}: {look: Look; keeper?: boolean; shirt: string; trim: string; size?: number; mood?: number}) {
+export function ToonKitAvatar({look, keeper = false, shirt, trim, size = 96, mood = 70, physical}: {look: Look; keeper?: boolean; shirt: string; trim: string; size?: number; mood?: number; /** The player's physical attribute: the higher, the broader the shoulders and the body (missing: as usual). */ physical?: number}) {
+  const broad = physical === undefined ? 1 : Math.max(0.9, Math.min(1.18, 0.9 + ((physical - 30) / 60) * 0.28));
   const kit = keeper ? "#16a34a" : shirt;
   const kitTrim = keeper ? "#facc15" : trim;
   const skin = warm(look.skin);
@@ -459,7 +460,13 @@ export function ToonKitAvatar({look, keeper = false, shirt, trim, size = 96, moo
   return (
     <svg viewBox="0 0 100 100" width={size} height={size} className="avatar" aria-hidden>
       <g transform="translate(6 7) scale(0.88)"><HairBack style={look.style} hair={look.hair} highlights={look.highlights} /></g>
-      <g strokeLinejoin="round" strokeLinecap="round">
+      <g strokeLinejoin="round" strokeLinecap="round" transform={broad === 1 ? undefined : `translate(50 0) scale(${broad.toFixed(3)} 1) translate(-50 0)`}>
+        {/* A dark border round the outside of the shirt (not the bare arms), so a shirt in the card's own colour still stands out from it. */}
+        <g fill={INK} stroke={INK} strokeWidth={2.600}>
+          <path d="M30 76 Q38 70.500 50 70.500 Q62 70.500 70 76 L72 100 L28 100Z" />
+          <path d="M30.500 75.500 Q23 77 21 87.500 L30 91.500Z" />
+          <path d="M69.500 75.500 Q77 77 79 87.500 L70 91.500Z" />
+        </g>
         {/* The shoulders with the arms hanging at the sides: a short sleeve with a trim band, a bit of bare arm below. */}
         {[false, true].map((mirror) => (
           <g key={String(mirror)} transform={mirror ? "translate(100 0) scale(-1 1)" : undefined}>

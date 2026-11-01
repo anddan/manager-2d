@@ -81,14 +81,17 @@ function loadLang(): Lang {
   return (LANGS as readonly string[]).includes(nav) ? (nav as Lang) : "sv";
 }
 
+const savedGame = (() => {
+  const g = loadGame();
+  if (g) fixShirts(g);
+  return g;
+})();
+
 export const useGame = create<Store>((set, get) => ({
-  game: (() => {
-    const g = loadGame();
-    if (g) fixShirts(g);
-    return g;
-  })(),
+  game: savedGame,
   lang: loadLang(),
-  view: "overview",
+  // A national match under way when the app was closed: back to the national page (the club pages are not for a country).
+  view: savedGame?.nationalMatch ? "national" : "overview",
   playerId: null,
   profileSlot: null,
   profileNational: false,

@@ -62,7 +62,7 @@ import {useGame, useGameState} from "../store";
 import {Avatar, ManagerAvatar, defaultManagerLook} from "./Avatar";
 import {Football} from "./Ball";
 import {spendEnergy} from "../game/monetization";
-import {Bar, Flag, FormArrow, Modal, PosBadge, Hint} from "./common";
+import {Bar, CrestOf, Flag, FormArrow, Modal, PosBadge, Hint} from "./common";
 import {SetPieceView} from "./SetPieceView";
 import {VideoAd} from "./VideoAd";
 import {diamondBurst, effectsOn, energySpent} from "./effects";
@@ -1211,7 +1211,7 @@ function Shootout({report, seed, userSide, textOnly: viewIsText, onDone}: {repor
     const pending = Math.max(0, 5 - mine.length);
     return (
       <div className="shootout-row">
-        <span className="crest tiny" style={{background: (s === "home" ? home : away).color}} /> <strong>{(s === "home" ? home : away).short}</strong>
+        <CrestOf club={s === "home" ? home : away} className="crest tiny" /> <strong>{(s === "home" ? home : away).short}</strong>
         {mine.map((g, i) => <span key={i} className={g ? "pen scored" : "pen missed"}>{g ? "✓" : "✗"}</span>)}
         {Array.from({length: pending}, (_, i) => <span key={"p" + i} className="pen">○</span>)}
       </div>
@@ -2962,9 +2962,9 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
           {/* Maximised: the score and the clock on the pitch, see-through like the buttons. */}
           {maxed && (
             <div className="max-score" aria-live="polite">
-              <span className="crest" style={{background: home.color, color: home.color2}}>{home.short}</span>
+              <CrestOf club={home} />
               <strong className="max-score-goals">{score.home} – {score.away}</strong>
-              <span className="crest" style={{background: away.color, color: away.color2}}>{away.short}</span>
+              <CrestOf club={away} />
               {shootoutScore && <small>{iconize(t("fx.penalties", {h: shootoutScore[0], a: shootoutScore[1]}))}</small>}
               <span className="max-score-clock">{clock}{board > 0 && !atHalftime && !finished ? ` +${board}` : ""}</span>
             </div>
@@ -2972,9 +2972,9 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
           {/* Maximised: the score and the clock on the pitch, see-through like the buttons. */}
           {maxed && (
             <div className="max-score" aria-live="polite">
-              <span className="crest" style={{background: home.color, color: home.color2}}>{home.short}</span>
+              <CrestOf club={home} />
               <strong className="max-score-goals">{score.home} – {score.away}</strong>
-              <span className="crest" style={{background: away.color, color: away.color2}}>{away.short}</span>
+              <CrestOf club={away} />
               {shootoutScore && <small>{iconize(t("fx.penalties", {h: shootoutScore[0], a: shootoutScore[1]}))}</small>}
               <span className="max-score-clock">{clock}{board > 0 && !atHalftime && !finished ? ` +${board}` : ""}</span>
             </div>
@@ -3020,9 +3020,9 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
       {live && atHalftime && !selected && !replay && (
         <MatchDialog title={<><Icon name="coffee" size={20} /> {iconize(t("match.halftime"))}</>} onClose={startSecondHalf}>
           <div className="ht-score">
-            <span className="crest" style={{background: home.color, color: home.color2}}>{home.short}</span>
+            <CrestOf club={home} />
             <strong>{score.home} – {score.away}</strong>
-            <span className="crest" style={{background: away.color, color: away.color2}}>{away.short}</span>
+            <CrestOf club={away} />
           </div>
           <ul className="plain-list small ht-goals">
             {events.filter((e) => e.type === "goal").map((e, i) => (

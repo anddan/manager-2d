@@ -813,6 +813,7 @@ export const sv = {
   "mgr.color2": "Detaljfärg",
   "mgr.color3": "Tredje färg (krage, muddar)",
   "mgr.color3Reset": "Som detaljfärgen",
+  "mgr.kitReset": "Återställ",
   "mgr.kitHome": "Hemma",
   "mgr.kitAway": "Borta",
   "tac.kitHome": "Hemmaställ",

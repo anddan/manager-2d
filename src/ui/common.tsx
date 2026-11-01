@@ -110,6 +110,12 @@ export function PosBadge({pos}: {pos: Position}) {
 }
 
 /** Flag with the country's name as tooltip; `named` also writes the name out. */
+/** A club's badge: its colours and letters, or the flag when it is a country (a national match). */
+export function CrestOf({club, className = "crest"}: {club: {id: string; short: string; color: string; color2: string}; className?: string}) {
+  if (club.id.startsWith("nat:")) return <span className={`${className} crest-flag`} aria-hidden><Flag code={club.short} size={className.includes("big") ? 44 : className.includes("tiny") ? 16 : 26} /></span>;
+  return <span className={className} style={{background: club.color, color: club.color2}}>{club.short}</span>;
+}
+
 export function Flag({code, named, size}: {code: string; named?: boolean; size?: number}) {
   const {tx} = useT();
   const name = tx(`nat.${code}`);

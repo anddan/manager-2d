@@ -9,7 +9,7 @@ import {effectiveRating, pickCaptain, teamOvr} from "../game/ratings";
 import type {Club, Player} from "../game/types";
 import {useT} from "../i18n";
 import {useGame, useGameState} from "../store";
-import {Flag, FormArrow, Modal, PosBadge} from "./common";
+import {CrestOf, Flag, FormArrow, Modal, PosBadge} from "./common";
 import {GearPicture} from "./Gear";
 import {Icon, iconize} from "./Icon";
 import {Jersey} from "./Jersey";
@@ -166,7 +166,7 @@ export function ClubSheet({clubId, onClose}: {clubId: string; onClose: () => voi
   const club = structuredClone(real);
   repairLineup(game, club);
   return (
-    <Modal title={<><span className="crest tiny" style={{background: club.color}} /> {club.name}</>} onClose={onClose}>
+    <Modal title={<><CrestOf club={club} className="crest tiny" /> {club.name}</>} onClose={onClose}>
       <p className="muted small sheet-meta">
         {club.formation} · {iconize(t(`tac.${club.mentality}`))}
         <span className="team-ovr">{iconize(t("tac.teamOvr"))} <strong>{teamOvr({...game, clubs: {...game.clubs, [club.id]: club}}, club.id)}</strong></span>
@@ -201,6 +201,16 @@ export function ClubCrest({clubId, className = "crest"}: {clubId: string; classN
   const c = game.clubs[clubId];
   if (!c) return null;
   const style = {background: c.color, color: c.color2};
+  if (clubId.startsWith("nat:") && clubId !== game.userClubId) {
+    // A country: its flag, and tap for its players.
+    return (
+      <>
+        <button type="button" className="crest-flag-btn" title={t("tac.seeTeam")} onClick={() => setOpen(true)}><CrestOf club={c} className={className} /></button>
+        {open && <ClubSheet clubId={clubId} onClose={() => setOpen(false)} />}
+      </>
+    );
+  }
+  if (clubId.startsWith("nat:")) return <CrestOf club={c} className={className} />;
   if (clubId === game.userClubId) return <span className={className} style={style}>{c.short}</span>;
   return (
     <>

@@ -12,6 +12,7 @@ import {Stepper, stepTo} from "./ManagerEditor";
 import {ManagerEditor} from "./ManagerEditor";
 import {Modal} from "./common";
 import {awayKit, homeKit} from "../game/kit";
+import {LEAGUES} from "../game/leagues";
 import {COLLARS, SHIRT_PATTERNS, SLEEVES, type Collar, type Kit, type ShirtPattern, type Sleeves} from "../game/types";
 import {Jersey} from "./Jersey";
 
@@ -39,6 +40,13 @@ export function ManagerProfile({onClose, kit: startKit}: {onClose: () => void; k
     if (startKit) setTimeout(() => kitHead.current?.scrollIntoView({block: "start", behavior: "smooth"}), 150);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [kits, setKits] = useState<{home: Kit; away: Kit}>(() => ({home: homeKit(club), away: awayKit(club)}));
+  // The club's own colours from the start (a plain shirt), else the kit as it was when this opened.
+  const [opened] = useState<Kit>(() => homeKit(club));
+  const original = LEAGUES.flatMap((l) => l.clubs).find((c) => c.name === (club.officialName ?? club.name));
+  const defaultHome: Kit = original ? {color: original.color, color2: original.color2} : opened;
+  const resetHome = () => setKits((k) => ({...k, home: defaultHome}));
+  // Only offered once something is changed from the default.
+  const homeChanged = (Object.keys({...defaultHome, ...kits.home}) as (keyof Kit)[]).some((key) => (kits.home[key] ?? undefined) !== (defaultHome[key] ?? undefined));
   const kit = kits[which];
   const setKit = (patch: Partial<Kit>) => setKits((k) => ({...k, [which]: {...k[which], ...patch}}));
   const color = kit.color;
@@ -195,6 +203,7 @@ export function ManagerProfile({onClose, kit: startKit}: {onClose: () => void; k
             </button>
           ))}
         </span>
+        {which === "home" && homeChanged && <button type="button" className="btn small" onClick={resetHome}><Icon name="undo" size={16} /> {iconize(t("mgr.kitReset"))}</button>}
         {which === "away" && <button type="button" className="btn small" onClick={() => setKits((k) => ({...k, away: awayKit({...club, away: undefined, color: k.home.color, color2: k.home.color2, color3: k.home.color3, collar: k.home.collar, sleeves: k.home.sleeves})}))}>{iconize(t("mgr.kitAwayReset"))}</button>}
       </div>
       {which === "away" && club.away && <p className="muted small">{iconize(t("mgr.kitAwayHint"))}</p>}
