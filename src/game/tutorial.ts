@@ -5,9 +5,9 @@ import {Rng} from "./rng";
 import type {Fixture, GameState, Side} from "./types";
 
 /** The guide's steps, in order (the UI has the words and what moves each one on). */
-export const TUTORIAL_STEPS = ["welcome", "tactics", "bestXI", "play", "match", "rating", "subs", "talk", "toOverview", "daily"] as const;
+export const TUTORIAL_STEPS = ["welcome", "tactics", "bestXI", "gift", "play", "match", "rating", "subs", "talk", "toOverview", "daily"] as const;
 /** Bumped whenever the steps change, so saves can be moved to the same place in the new order. */
-export const TUTORIAL_VERSION = 8;
+export const TUTORIAL_VERSION = 9;
 /** The steps of earlier versions (1 is a save without a version). */
 const OLD_STEPS: Record<number, readonly string[]> = {
   1: ["welcome", "tactics", "bestXI", "lineup", "formation", "play", "match", "orders", "setpieces", "zoom", "talk", "daily"],
@@ -16,11 +16,14 @@ const OLD_STEPS: Record<number, readonly string[]> = {
   4: ["welcome", "tactics", "bestXI", "lineup", "formation", "club", "names", "kit", "kitGive", "play", "match", "orders", "setpieces", "talk", "daily"],
   5: ["welcome", "tactics", "bestXI", "lineup", "formation", "club", "names", "kit", "kitBuy", "kitBag", "kitGive", "play", "match", "orders", "setpieces", "talk", "daily"],
   6: ["welcome", "tactics", "bestXI", "lineup", "formation", "club", "names", "kit", "kitBuy", "kitBag", "kitGive", "play", "match", "orders", "setpieces", "forza", "talk", "daily"],
+  8: ["welcome", "tactics", "bestXI", "play", "match", "rating", "subs", "talk", "toOverview", "daily"],
   7: ["welcome", "tactics", "bestXI", "lineup", "formation", "club", "names", "kit", "kitBuy", "kitBag", "kitGive", "kitPick", "play", "match", "orders", "setpieces", "forza", "talk", "toOverview", "daily"],
 };
 export type TutorialStep = (typeof TUTORIAL_STEPS)[number];
 
 export interface Tutorial {
+  /** The guide's present, a free pair of boots, has been put in the kit bag (only once). */
+  kit?: boolean;
   /** Index into TUTORIAL_STEPS; past the end means done. */
   step: number;
   /** The first match has been picked (only once). */
@@ -38,6 +41,14 @@ export function upgradeTutorial(state: GameState): void {
   const later = old.slice(t.step).map((s) => (TUTORIAL_STEPS as readonly string[]).indexOf(s)).find((i) => i >= 0);
   t.step = later ?? TUTORIAL_STEPS.length;
   t.v = TUTORIAL_VERSION;
+}
+
+/** The guide's present: a free pair of basic boots in the kit bag, once. */
+export function giveGuideBoots(state: GameState): void {
+  const t = state.tutorial;
+  if (!t || t.kit) return;
+  t.kit = true;
+  (state.gearBag ??= []).push({kind: "speed", tier: "common"});
 }
 
 /** Moves the guide on from a step (only if it's on that step). */

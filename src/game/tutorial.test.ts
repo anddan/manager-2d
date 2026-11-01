@@ -42,7 +42,7 @@ describe("the guide", () => {
     expect(TUTORIAL_STEPS[g.tutorial.step]).toBe("play");
     g.tutorial = {step: 5, v: TUTORIAL_VERSION}; // Already today's order.
     upgradeTutorial(g);
-    expect(TUTORIAL_STEPS[g.tutorial.step]).toBe("rating");
+    expect(TUTORIAL_STEPS[g.tutorial.step]).toBe("match");
   });
 
   it("picks a first match with a penalty for the user's side and a win", () => {

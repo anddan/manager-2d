@@ -49,13 +49,13 @@ const moodOf = (m: number): Mood => (m >= 75 ? "elated" : m >= 55 ? "happy" : m 
 
 /** The face shapes: oval (straight cheeks down to a long jaw and a small chin), round, a strong square jaw, pointed; "cleft" is the oval with a dimple. */
 const HEADS: Record<string, string> = {
-  oval: "M33 22 Q32 12.500 50 12 Q68 12.500 67 22 Q69.500 31 68.500 40 L66.500 53 Q62.500 62.500 57 66 Q50.500 69.500 44 66 Q38.500 62.500 33.500 53 L31.500 40 Q30.500 31 33 22Z",
+  oval: "M31.500 40 C29.500 23 34 10.500 50 10.500 C66 10.500 70.500 23 68.500 40 L66.500 53 Q62.500 62.500 57 66 Q50.500 69.500 44 66 Q38.500 62.500 33.500 53Z",
   // A fuller jaw with a softer chin.
-  round: "M33 22 Q32 12.500 50 12 Q68 12.500 67 22 Q69.500 31 68.500 40 Q69.500 52 64 61 Q58 68.500 50 69 Q42 68.500 36 61 Q30.500 52 31.500 40 Q30.500 31 33 22Z",
+  round: "M33 22 Q31 11 50 10.500 Q69 11 67 22 Q69.500 31 68.500 40 Q69.500 52 64 61 Q58 68.500 50 69 Q42 68.500 36 61 Q30.500 52 31.500 40 Q30.500 31 33 22Z",
   // A square, strong jaw.
-  jaw: "M33 22 Q32 12.500 50 12 Q68 12.500 67 22 Q69.500 31 68.500 40 L68.200 56 Q66.500 65.500 61 68.200 Q56 69.800 50 69.800 Q44 69.800 39 68.200 Q33.500 65.500 31.800 56 L31.500 40 Q30.500 31 33 22Z",
+  jaw: "M33 22 Q31 11 50 10.500 Q69 11 67 22 Q69.500 31 68.500 40 L68.200 56 Q66.500 65.500 61 68.200 Q56 69.800 50 69.800 Q44 69.800 39 68.200 Q33.500 65.500 31.800 56 L31.500 40 Q30.500 31 33 22Z",
   // A narrower, longer chin.
-  pointed: "M33 22 Q32 12.500 50 12 Q68 12.500 67 22 Q69.500 31 68.500 40 L65.500 53 Q60 63 54 70 Q50 74 46 70 Q40 63 34.500 53 L31.500 40 Q30.500 31 33 22Z",
+  pointed: "M33 22 Q31 11 50 10.500 Q69 11 67 22 Q69.500 31 68.500 40 L65.500 53 Q60 63 54 70 Q50 74 46 70 Q40 63 34.500 53 L31.500 40 Q30.500 31 33 22Z",
 };
 /** Ears change a little with the face: smaller on a round face, longer on a pointed one. */
 const EARS: Record<string, {rx: number; ry: number; cy: number; tilt?: number}> = {
@@ -69,15 +69,15 @@ const EARS: Record<string, {rx: number; ry: number; cy: number; tilt?: number}> 
 // Every face shape has the same head: the shapes differ in the ears and the brows (see EARS and BROWS).
 for (const k of ["round", "jaw", "cleft"]) HEADS[k] = HEADS.oval;
 // The fourth shape is the same head a little wider at the cheeks (a few pixels each side).
-HEADS.pointed = "M33 22 Q32 12.500 50 12 Q68 12.500 67 22 Q70 31 70 41 L67.800 53 Q62.500 62.500 57 66 Q50.500 69.500 44 66 Q38.500 62.500 32.200 53 L30 41 Q30 31 33 22Z";
+HEADS.pointed = "M30 41 C28.500 23 33.500 10.500 50 10.500 C66.500 10.500 71.500 23 70 41 L67.800 53 Q62.500 62.500 57 66 Q50.500 69.500 44 66 Q38.500 62.500 32.200 53Z";
 /** The brows by face shape: how thick, and how much they tilt (positive: lower at the inner end). */
-const BROWS: Record<string, {thick: number; tilt: number; short?: number; lift?: number}> = {
+const BROWS: Record<string, {thick: number; tilt: number; short?: number; lift?: number; apart?: number}> = {
   oval: {thick: 1, tilt: 0},
   round: {thick: 0.850, tilt: -0.600},
   jaw: {thick: 1.300, tilt: 0.700},
   pointed: {thick: 0.750, tilt: 1.100},
   // Shorter brows, set higher up.
-  cleft: {thick: 0.950, tilt: -0.200, short: 3, lift: 1.800},
+  cleft: {thick: 0.950, tilt: -0.200, short: 3, lift: 1.800, apart: 2.200},
 };
 const headOf = (look: Look) => HEADS[look.shape ?? "oval"] ?? HEADS.oval;
 
@@ -121,7 +121,7 @@ interface HairShape {
 }
 
 /** A smooth cap of hair with the hairline across the forehead (the base of the longer styles). */
-const CAP = "M31.500 37 L30 27 Q29 15 40 10 Q50 7 60 10 Q71 15 70 27 L68.800 38 L67 31 Q65 25 50 24.500 Q35 25 33 31Z";
+const CAP = "M31.500 37 L30 27 Q28.500 11 50 9 Q71.500 11 70 27 L68.800 38 L67 31 Q65 25 50 24.500 Q35 25 33 31Z";
 
 function hairShape(style: string): HairShape | null {
   switch (style) {
@@ -129,7 +129,7 @@ function hairShape(style: string): HairShape | null {
       return null;
     case "buzz":
       // Cropped close: the whole top of the head in the hair colour, a little lighter.
-      return {paths: ["M31 36 Q29.500 12.500 50 12 Q70.500 12.500 69 36 Q66 25 50 24.500 Q34 25 31 36Z"], opacity: 0.8};
+      return {paths: ["M31 36 Q28 9 50 8 Q72 9 69 36 Q66 25 50 24.500 Q34 25 31 36Z"], opacity: 0.8};
     case "afro":
       return {paths: ["M29 40 Q27 9 50 6 Q73 9 71 40 L68.800 38 L67 31 Q65 25 50 24.500 Q35 25 33 31 L31.200 38Z"], circles: [[30, 24, 7], [32, 14, 8], [41, 7, 9], [50, 5, 9.500], [59, 7, 9], [68, 14, 8], [70, 24, 7], [50, 15, 9]]};
     case "curly":
@@ -142,28 +142,28 @@ function hairShape(style: string): HairShape | null {
     }
     case "mohawk":
       // Shaved sides (a light stubble over the whole top) and the strip in the middle.
-      return {paths: ["M31 36 Q29.500 12.500 50 12 Q70.500 12.500 69 36 Q66 25 50 24.500 Q34 25 31 36Z"], opacity: 0.4, extra: ["M43.500 24 L44.500 11 L47.500 13 L49 4 L51 4 L52.500 13 L55.500 11 L56.500 24Z"]};
+      return {paths: ["M31 36 Q28 9 50 8 Q72 9 69 36 Q66 25 50 24.500 Q34 25 31 36Z"], opacity: 0.4, extra: ["M43.500 24 L44.500 11 L47.500 13 L49 4 L51 4 L52.500 13 L55.500 11 L56.500 24Z"]};
     case "spiky":
       return {paths: ["M31.500 38 L29.500 27 Q28 21 31 16 L29.500 8 L37 13 L38.500 3.500 L45 11.500 L50 1.500 L55 11.500 L61.500 3.500 L63 13 L70.500 8 L69 16 Q72 21 70.500 27 L68.800 38 L67 31 Q65 25 50 24.500 Q35 25 33 31Z"], lines: ["M38 14 L40 24 M50 11 L50 23 M62 14 L60 24"]};
     case "quiff":
       return {paths: ["M31.500 37 L29.500 26 Q27 12 40 6 Q52 1 64 7 Q74 12 70.500 27 L68.800 38 L67 31 Q65 25 50 24 Q35 25 33 31Z"], lines: ["M36 18 Q46 8 62 10"]};
     case "swept":
-      return {paths: ["M31.500 37 L29.500 27 Q28 14 42 9 Q58 5 68 14 Q72 20 70 30 L68.800 38 Q66 28 56 27 Q44 26 34.500 34Z"], lines: ["M34 22 Q48 12 66 16", "M40 28 Q52 20 66 24"]};
+      return {paths: ["M31.500 37 L29.500 27 Q27 10 50 7.500 Q73 10 70 30 L68.800 38 Q66 28 56 27 Q44 26 34.500 34Z"], lines: ["M34 22 Q48 12 66 16", "M40 28 Q52 20 66 24"]};
     case "sidepart":
-      return {paths: ["M31.500 37 L29.500 27 Q29 14 44 10 Q60 8 68 16 Q71.500 22 70 30 L68.800 38 L67 31 Q62 25 50 24.500 Q40 24 36 28 Q34 31 33 33Z"], lines: ["M42 10.500 Q40 18 41 25"]};
+      return {paths: ["M31.500 37 L29.500 27 Q28 10.500 50 8.500 Q72 10.500 70 30 L68.800 38 L67 31 Q62 25 50 24.500 Q40 24 36 28 Q34 31 33 33Z"], lines: ["M42 10.500 Q40 18 41 25"]};
     case "fade":
       return {paths: ["M36 30 L35 14 Q50 8 65 14 L64 30 Q50 25 36 30Z"], lines: ["M36 22 L64 22"]};
     case "pixie":
-      return {paths: ["M31.500 37 L29.500 27 Q28 14 42 9 Q58 6 68 14 Q72 22 69.500 34 L67 36 Q64 29 55 27 L48 31 L42 26 L36 30 L34 36Z"]};
+      return {paths: ["M31.500 37 L29.500 27 Q27 10.500 50 8 Q73 10.500 69.500 34 L67 36 Q64 29 55 27 L48 31 L42 26 L36 30 L34 36Z"]};
     // Short twists on top, faded sides.
     case "jamal":
-      return {paths: ["M31.500 37 Q29.500 12 50 11 Q70.500 12 68.500 37 Q66 25 50 24.500 Q34 25 31.500 37Z"], opacity: 0.4, extra: ["M34 29 L33 17 Q50 9 67 17 L66 29 Q50 23 34 29Z"], extraCircles: [[38, 14, 3.600], [44, 10, 3.800], [50, 8.500, 3.800], [56, 10, 3.800], [62, 14, 3.600], [41, 19, 3.600], [47, 17, 3.600], [53, 17, 3.600], [59, 19, 3.600]]};
+      return {paths: ["M31.500 37 Q28 9 50 8 Q72 9 68.500 37 Q66 25 50 24.500 Q34 25 31.500 37Z"], opacity: 0.4, extra: ["M34 29 L33 17 Q50 9 67 17 L66 29 Q50 23 34 29Z"], extraCircles: [[38, 14, 3.600], [44, 10, 3.800], [50, 8.500, 3.800], [56, 10, 3.800], [62, 14, 3.600], [41, 19, 3.600], [47, 17, 3.600], [53, 17, 3.600], [59, 19, 3.600]]};
     // Gelled up and forward at the front, short faded sides.
     case "cristiano":
-      return {paths: ["M31.500 37 Q29.500 12 50 11 Q70.500 12 68.500 37 Q66 25 50 24.500 Q34 25 31.500 37Z"], opacity: 0.45, extra: ["M34.500 30 L33.500 18 Q35 6 48 3.500 Q62 3.500 66.500 15 L65.500 30 Q58 20 50 21 Q42 20 34.500 30Z"], lines: ["M38 17 Q46 8 58 9", "M42 22 Q50 14 62 14"]};
+      return {paths: ["M31.500 37 Q28 9 50 8 Q72 9 68.500 37 Q66 25 50 24.500 Q34 25 31.500 37Z"], opacity: 0.45, extra: ["M34.500 30 L33.500 18 Q35 6 48 3.500 Q62 3.500 66.500 15 L65.500 30 Q58 20 50 21 Q42 20 34.500 30Z"], lines: ["M38 17 Q46 8 58 9", "M42 22 Q50 14 62 14"]};
     // A neat side parting, short on the sides, a little volume on top.
     case "messi":
-      return {paths: ["M31.500 37 Q29.500 12 50 11 Q70.500 12 68.500 37 Q66 25 50 24.500 Q34 25 31.500 37Z"], opacity: 0.5, extra: ["M33 31 L32 19 Q40 8 54 8.500 Q66 9.500 68 20 L67.500 31 Q60 22 48 22 Q38 23 33 31Z"], lines: ["M44 9 Q41 17 43 22", "M50 10 Q58 11 64 16"]};
+      return {paths: ["M31.500 37 Q28 9 50 8 Q72 9 68.500 37 Q66 25 50 24.500 Q34 25 31.500 37Z"], opacity: 0.5, extra: ["M33 31 L32 19 Q40 8 54 8.500 Q66 9.500 68 20 L67.500 31 Q60 22 48 22 Q38 23 33 31Z"], lines: ["M44 9 Q41 17 43 22", "M50 10 Q58 11 64 16"]};
     // Long hair pulled up into a bun, a lock hanging down each side.
     case "haaland":
       return {paths: [CAP], circles: [[50, 5.500, 6]], lines: ["M42 11 L45 24 M58 11 L55 24"]};
@@ -176,7 +176,7 @@ function hairShape(style: string): HairShape | null {
     case "braids":
       return {paths: [CAP], lines: ["M40 11 L40 26 M50 8 L50 25 M60 11 L60 26"]};
     case "bob":
-      return {paths: ["M31.500 37 L29.500 27 Q29 14 42 9 Q58 6 68 14 Q72 20 70.500 30 L68.800 38 Q64 28 50 27 Q36 28 33 33Z"]};
+      return {paths: ["M31.500 37 L29.500 27 Q27.500 10.500 50 8 Q72.500 10.500 70.500 30 L68.800 38 Q64 28 50 27 Q36 28 33 33Z"]};
     case "ponytail":
       return {paths: [CAP]};
     case "bun":
@@ -224,11 +224,25 @@ function HairTop({style, hair, highlights}: {style: string; hair: string; highli
 
 /** The mouth: a small smirk for a middling mood, a smile with teeth when happy, a frown when low. */
 function Mouth({mood}: {mood: Mood}) {
-  if (mood === "elated" || mood === "happy") {
+  if (mood === "elated") {
+    // Delighted: white teeth, sitting low as before, not so wide.
     return (
       <g strokeLinejoin="round" strokeLinecap="round">
-        <path d="M41 54 Q50 57 59.500 54 Q58 61.500 50 62 Q42.500 61.500 41 54Z" fill="#fff" stroke={INK} strokeWidth={0.700} />
-        <path d="M42.500 58 Q50 60 58 58" fill="none" stroke="#d9b8ae" strokeWidth={0.400} />
+        <path d="M44.500 61 Q50 62.600 55.500 61 Q50 61.700 44.500 61Z" fill="#000" opacity={0.16} />
+        <path d="M42 54.200 Q50 56.900 58.500 54.200 Q57.200 59.200 50 59.500 Q42.800 59.200 42 54.200Z" fill="#fff" stroke={INK} strokeWidth={0.700} />
+        <path d="M43.300 56.700 Q50 58.300 57.200 56.700" fill="none" stroke="#d9b8ae" strokeWidth={0.400} />
+        <path d="M41.700 53.500 Q40.800 53.100 40.500 52.200 M58.800 53.500 Q59.700 53.100 60 52.200" fill="none" stroke={INK} strokeWidth={0.700} />
+      </g>
+    );
+  }
+  if (mood === "happy") {
+    // Happy: the same, smaller and narrower.
+    return (
+      <g strokeLinejoin="round" strokeLinecap="round">
+        <path d="M46 59.300 Q50 60.400 54 59.300 Q50 59.900 46 59.300Z" fill="#000" opacity={0.14} />
+        <path d="M43.400 54.600 Q50 56.800 56.600 54.600 Q55.500 58.400 50 58.700 Q44.500 58.400 43.400 54.600Z" fill="#fff" stroke={INK} strokeWidth={0.650} />
+        <path d="M44.400 56.500 Q50 57.700 55.600 56.500" fill="none" stroke="#d9b8ae" strokeWidth={0.350} />
+        <path d="M43.100 54 Q42.400 53.700 42.100 53 M56.900 54 Q57.600 53.700 57.900 53" fill="none" stroke={INK} strokeWidth={0.600} />
       </g>
     );
   }
@@ -259,8 +273,11 @@ function ToonFace({look, mood}: {look: Look; mood: Mood}) {
     const th = shape.thick;
     const tilt = (mood === "upset" ? 1.600 : mood === "sad" ? -1.600 : look.brows * 0.4) + shape.tilt;
     const sh = shape.short ?? 0;
-    const up = shape.lift ?? 0;
-    return `M${x(36 + sh)} ${37.400 - tilt - up} Q${x(41.500 + sh / 2)} ${33 + tilt - up} ${x(48.700)} ${36.400 + tilt - up} L${x(48.900)} ${36.400 + 2.400 * th + tilt - up} Q${x(42 + sh / 2)} ${33.800 + 2.200 * th + tilt - up} ${x(36.400 + sh)} ${37.400 + 2.200 * th - tilt - up}Z`;
+    const ap = shape.apart ?? 0;
+    // All brows sit a little higher (clear of the eyes), the outer ends a little more.
+    const up = (shape.lift ?? 0) + 1.300;
+    const out = 0.900;
+    return `M${x(36 + sh)} ${37.400 - tilt - up - out} Q${x(41.500 + sh / 2)} ${33 + tilt - up} ${x(48.700 - ap)} ${36.400 + tilt - up} L${x(48.900 - ap)} ${36.400 + 2.400 * th + tilt - up} Q${x(42 + sh / 2)} ${33.800 + 2.200 * th + tilt - up} ${x(36.400 + sh)} ${37.400 + 2.200 * th - tilt - up - out}Z`;
   };
   const eyes = [41.900, 58.100] as const;
   const ear = EARS[look.shape ?? "oval"] ?? EARS.oval;
@@ -334,7 +351,7 @@ function ToonFace({look, mood}: {look: Look; mood: Mood}) {
       <ellipse cx={50.200} cy={49.800} rx={5.200} ry={2.500} fill={nose} />
       <Mouth mood={mood} />
       {/* A small shadow under the lip. */}
-      <path d="M47.500 63.400 Q50.500 64.600 53.500 63.400" fill="none" stroke={shade(skin, -0.25)} strokeWidth={0.500} />
+      <path d="M47.500 61.400 Q50.500 62.600 53.500 61.400" fill="none" stroke={shade(skin, -0.25)} strokeWidth={0.500} />
     </g>
   );
 }
@@ -349,10 +366,17 @@ export function ToonKitAvatar({look, keeper = false, shirt, trim, size = 96, moo
     <svg viewBox="0 0 100 100" width={size} height={size} className="avatar" aria-hidden>
       <g transform="translate(6 7) scale(0.88)"><HairBack style={look.style} hair={look.hair} /></g>
       <g strokeLinejoin="round" strokeLinecap="round">
+        {/* The shoulders with the arms hanging at the sides: a short sleeve with a trim band, a bit of bare arm below. */}
+        {[false, true].map((mirror) => (
+          <g key={String(mirror)} transform={mirror ? "translate(100 0) scale(-1 1)" : undefined}>
+            <path d="M23 91 Q21.500 96 23 100 L29.500 100 L30 92Z" fill={skin} stroke={INK} strokeWidth={0.600} />
+            <path d="M30.500 75.500 Q23 77 21 87.500 L30 91.500Z" fill={kit} stroke={INK} strokeWidth={0.600} />
+            <path d="M21.300 88.500 L29.700 92.300" stroke={kitTrim} strokeWidth={1.400} strokeLinecap="butt" fill="none" />
+          </g>
+        ))}
         {/* The shoulders and torso: the same stance as the manager's, in the kit, with a trim band at each sleeve. */}
         <path d="M30 76 Q38 70.500 50 70.500 Q62 70.500 70 76 L72 100 L28 100Z" fill={kit} stroke={INK} strokeWidth={0.700} />
         <path d="M60 71.500 Q66 73 70 76 L72 100 L62 100Z" fill="#000" opacity={0.14} />
-        <path d="M29.500 90 L34 89 M70.500 90 L66 89" fill="none" stroke={kitTrim} strokeWidth={1.600} strokeLinecap="butt" />
         {/* The neck and the V collar. */}
         <path d="M43 62 L43 71 Q50 79 57 71 L57 62Z" fill={skin} />
         <path d="M43 62 L43 70.500 M57 62 L57 70.500" fill="none" stroke={INK} strokeWidth={0.600} />

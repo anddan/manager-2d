@@ -553,6 +553,7 @@ export const en: Record<keyof typeof sv, string> = {
   "tour.setpieces": "🎯 The manager's menu also lets you pick Me or Auto for set pieces and for who makes the substitutions. Me: you take penalties, free kicks and corners and pick the replacement for an injury. Auto: the assistant does it. To take set pieces yourself, pick Match at the top – in Zones and Text the assistant takes them.",
   "tour.forza": "🔥 The manager's menu also has Forza! The team gets a {pct} % boost for {minutes} minutes: straight at goal, shooting harder. The first time in a match is free, then it costs {energy} ⚡.",
   "tour.next": "Next",
+  "tour.gift": "🎁 A present for the team: a free pair of boots! They're already in the kit room (tap it in the menu) – give them to a player for extra points on a couple of attributes.",
   "tour.subs": "🔁 Tap the manager and choose Substitutions. Tap a player and pick a substitute, or drag two players to swap places. You can make a few changes a match – fresh legs help.",
   "tour.rating": "📊 Under each player you see the match rating (higher is better, green is good) and an energy bar. When the energy runs out they play worse – keep an eye on it and take tired players off!",
   "tour.done": "Let's go!",

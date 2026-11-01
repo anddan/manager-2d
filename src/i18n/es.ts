@@ -553,6 +553,7 @@ export const es: Record<keyof typeof sv, string> = {
   "tour.setpieces": "🎯 En el menú del míster también eliges Yo o Auto para el balón parado y para quién hace los cambios. Yo: tiras penaltis, faltas y córners y eliges el reemplazo por lesión. Auto: lo hace el asistente. Para lanzar tú el balón parado, elige Partido arriba: en Zonas y Texto lo hace el asistente.",
   "tour.forza": "🔥 En el menú del entrenador también está Forza: el equipo recibe un impulso del {pct} % durante {minutes} minutos y va directo a portería, chutando más fuerte. La primera vez en un partido es gratis; después cuesta {energy} ⚡.",
   "tour.next": "Siguiente",
+  "tour.gift": "🎁 ¡Un regalo para el equipo: unas botas gratis! Ya están en Equipación (tócala en el menú): dáselas a un jugador y tendrá puntos extra en un par de atributos.",
   "tour.subs": "🔁 Toca al entrenador y elige Cambios. Toca a un jugador y elige un suplente, o arrastra a dos jugadores para que cambien de sitio. Puedes hacer unos cuantos cambios por partido: piernas frescas ayudan.",
   "tour.rating": "📊 Bajo cada jugador ves la nota del partido (más alta es mejor, verde es buena) y una barra de energía. Cuando se acaba la energía juegan peor: ¡vigílala y cambia a los cansados!",
   "tour.done": "¡Vamos!",

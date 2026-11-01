@@ -542,6 +542,7 @@ export const fr: Record<keyof typeof sv, string> = {
   "tour.setpieces": "🎯 Dans le menu du coach, tu choisis aussi Moi ou Auto pour les coups de pied arrêtés et pour qui fait les changements. Moi : tu tires penaltys, coups francs et corners et tu choisis le remplaçant en cas de blessure. Auto : l'adjoint s'en occupe. Pour les tirer toi-même, choisis Match en haut : en Zones et Texte, l'adjoint s'en charge.",
   "tour.forza": "🔥 Le menu de l'entraîneur a aussi Forza ! L'équipe reçoit un boost de {pct} % pendant {minutes} minutes : droit au but, des tirs plus forts. La première fois dans un match est gratuite, ensuite ça coûte {energy} ⚡.",
   "tour.next": "Suivant",
+  "tour.gift": "🎁 Un cadeau pour l'équipe : une paire de crampons gratuite ! Elle est déjà dans l'Équipement (touche-le dans le menu) : donne-la à un joueur pour des points en plus sur quelques attributs.",
   "tour.subs": "🔁 Touche l'entraîneur et choisis Remplacements. Touche un joueur et choisis un remplaçant, ou fais glisser deux joueurs pour les échanger. Tu peux faire quelques changements par match : des jambes fraîches aident.",
   "tour.rating": "📊 Sous chaque joueur tu vois la note du match (plus haute = mieux, vert = bon) et une barre d'énergie. Quand l'énergie baisse, ils jouent moins bien : surveille-la et remplace les joueurs fatigués !",
   "tour.done": "C'est parti !",

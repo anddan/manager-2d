@@ -34,7 +34,7 @@ export function pressedElement(): Element | null {
  */
 export function multiSaleBurst(from: Element | null | undefined, label: string, players: number): void {
   moneyBurst(from, label, Math.min(26, 8 + players * 4));
-  for (let i = 1; i < players && i < 8; i++) setTimeout(() => kaching(), i * 170);
+  for (let i = 1; i < players && i < 8; i++) setTimeout(() => { try { kaching(); } catch { /* no sound */ } }, i * 170);
 }
 
 /**
@@ -49,7 +49,7 @@ export function spendBurst(kind: "money" | "diamonds" | "energy", label: string,
   lastSpend = Date.now();
   if (!effectsOn()) return;
   // Energy isn't paid for: a whoosh-less burst, the till only for money and diamonds.
-  if (kind !== "energy") kaching();
+  if (kind !== "energy") { try { kaching(); } catch { /* the sound must never stop the picture */ } }
   const counter = document.querySelector<HTMLElement>(kind === "money" ? ".hud-cash" : kind === "diamonds" ? ".hud-diamonds" : ".hud-energy");
   const box = counter && counter.offsetParent !== null ? counter.getBoundingClientRect() : null;
   const sx = box ? box.left + box.width / 2 : window.innerWidth - 60;
@@ -98,6 +98,16 @@ export function energyBurst(from: Element | null | undefined, amount: number): v
 let lastSpend = 0;
 
 /** The flying coins, diamonds and energy can be turned off in the settings. */
+// The effects are on to begin with: a device that had them switched off before gets them on once (and can switch them off again).
+try {
+  if (typeof localStorage !== "undefined" && localStorage.getItem("manager2d.effectsDefault") !== "on") {
+    localStorage.setItem("manager2d.effects", "on");
+    localStorage.setItem("manager2d.effectsDefault", "on");
+  }
+} catch {
+  // Only for now.
+}
+
 export function effectsOn(): boolean {
   try {
     return localStorage.getItem("manager2d.effects") !== "off";
@@ -125,7 +135,7 @@ function rewardBurst(from: Element | null | undefined, label: string, icon: stri
   if (typeof document === "undefined") return;
   lastReward = Date.now();
   if (!effectsOn()) return;
-  chime();
+  try { chime(); } catch { /* the sound must never stop the picture */ }
   // A button gone from the page (its dialog closed) has no place left: the middle of the screen then.
   const start = from && document.contains(from) ? from.getBoundingClientRect() : undefined;
   const sx = inView(start ? start.left + start.width / 2 : window.innerWidth / 2, window.innerWidth);

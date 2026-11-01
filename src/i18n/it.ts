@@ -542,6 +542,7 @@ export const it: Record<keyof typeof sv, string> = {
   "tour.setpieces": "🎯 Nel menu dell'allenatore scegli anche Io o Auto per i calci piazzati e per chi fa i cambi. Io: batti tu rigori, punizioni e calci d'angolo e scegli il sostituto per un infortunio. Auto: ci pensa il vice. Per batterli tu, scegli Partita in alto: in Zone e Testo se ne occupa il vice.",
   "tour.forza": "🔥 Nel menu dell'allenatore c'è anche Forza! La squadra riceve una spinta del {pct} % per {minutes} minuti: dritta verso la porta, tiri più forti. La prima volta in una partita è gratis, poi costa {energy} ⚡.",
   "tour.next": "Avanti",
+  "tour.gift": "🎁 Un regalo per la squadra: un paio di scarpini gratis! Sono già in Equipaggiamento (toccalo nel menu): dalli a un giocatore per avere punti extra in un paio di caratteristiche.",
   "tour.subs": "🔁 Tocca l'allenatore e scegli Sostituzioni. Tocca un giocatore e scegli un sostituto, oppure trascina due giocatori per scambiarli di posto. Puoi fare qualche cambio a partita: gambe fresche aiutano.",
   "tour.rating": "📊 Sotto ogni giocatore vedi il voto della partita (più alto è meglio, verde è buono) e una barra dell'energia. Quando l'energia finisce giocano peggio: tienila d'occhio e sostituisci chi è stanco!",
   "tour.done": "Andiamo!",

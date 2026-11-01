@@ -557,6 +557,7 @@ export const sv = {
   "tour.setpieces": "🎯 I managerns meny väljer du också Själv eller Auto för fasta situationer och för vem som byter. Själv: du slår straffar, frisparkar och hörnor och väljer ersättare vid skador. Auto: assistenten sköter det. Vill du slå fasta situationer själv väljer du Match överst – i Zoner och Text sköter assistenten dem.",
   "tour.forza": "🔥 I managerns meny finns också Forza! Laget får {pct} % boost i {minutes} minuter: de går rakt på mål och skjuter hårdare. Första gången i en match är gratis, sedan kostar det {energy} ⚡.",
   "tour.next": "Nästa",
+  "tour.gift": "🎁 En present till laget: ett par skor gratis! De ligger redan i Utrustning (tryck på den i menyn) – ge dem till en spelare, så får han extra poäng på ett par egenskaper.",
   "tour.subs": "🔁 Tryck på managern och välj Byten. Tryck på en spelare och välj en avbytare, eller dra två spelare för att byta plats. Du kan byta några gånger per match – byten gör laget friskare.",
   "tour.rating": "📊 Under varje spelare ser du matchbetyget (högre är bättre, grönt är bra) och en energistapel. När energin tar slut spelar de sämre – håll koll och byt ut trötta spelare!",
   "tour.done": "Kör igång!",

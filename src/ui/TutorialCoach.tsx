@@ -3,7 +3,7 @@
 // themselves once it's done (open Tactics, pick the best XI, a match starts…).
 import {iconize} from "./Icon";
 import {useEffect, useLayoutEffect, useState, type ReactNode} from "react";
-import {TUTORIAL_STEPS, tutorialNext, tutorialSkip, type TutorialStep} from "../game/tutorial";
+import {TUTORIAL_STEPS, giveGuideBoots, tutorialNext, tutorialSkip, type TutorialStep} from "../game/tutorial";
 import {ENERGY_COST_FORZA} from "../game/constants";
 import {FORZA} from "../game/match";
 import {fixtureWeek, nextUserFixture} from "../game/helpers";
@@ -28,6 +28,8 @@ const STEPS: Record<TutorialStep, StepSpec> = {
   welcome: {next: true},
   tactics: {target: "nav:tactics"},
   bestXI: {target: '[data-tour="best-xi"]', showWhen: '[data-tour="best-xi"]', onClick: true},
+  // A present: a free pair of boots, put in the kit room (pointed out in the menu).
+  gift: {target: "nav:storage", next: true},
   // Waits for any dialog to be closed.
   play: {target: ".continue", showWhen: "body:not(:has(.modal-backdrop))"},
   match: {target: ".speed-group", showWhen: ".match-controls", next: true},
@@ -74,6 +76,8 @@ export function TutorialCoach() {
   useEffect(() => {
     if (!game || !step) return;
     if (step === "tactics" && view === "tactics") act((g) => tutorialNext(g, "tactics"));
+    // The present is put in the bag as the step comes up.
+    if (step === "gift" && !game.tutorial?.kit) act((g) => giveGuideBoots(g));
     if (step === "toOverview" && view === "overview") act((g) => tutorialNext(g, "toOverview"));
     if (step === "play" && game.liveMatch) act((g) => tutorialNext(g, "play"));
     // The talk is over once the match has closed.
