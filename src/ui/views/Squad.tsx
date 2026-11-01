@@ -39,6 +39,9 @@ function sortValue(p: Player, key: SortKey): number | string {
   }
 }
 
+/** The columns shown before "Show more". */
+const LESS: string[] = ["pos", "name", "ovr", "form", "fitness"];
+
 export function Squad() {
   const {t, money} = useT();
   const game = useGameState();
@@ -49,6 +52,8 @@ export function Squad() {
   const act = useGame((s) => s.act);
   const notify = useGame((s) => s.notify);
   // Picking several players to sell at once.
+  // Less to begin with (on a phone): position, name, rating, form and fitness; "Show more" adds age, mood, value, wage, contract and role.
+  const [more, setMore] = useState(false);
   const [selecting, setSelecting] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
   const [confirming, setConfirming] = useState(false);
@@ -76,9 +81,12 @@ export function Squad() {
     <Card
       title={`${t("nav.squad")} (${players.length})`}
       actions={
-        <button className={selecting ? "btn small primary" : "btn small"} aria-pressed={selecting} onClick={() => { setSelecting(!selecting); setPicked([]); }}>
-          <Icon name="check" size={16} /> {iconize(t(selecting ? "squad.selectDone" : "squad.select"))}
-        </button>
+        <>
+          <button type="button" className="btn small" aria-expanded={more} onClick={() => setMore(!more)}>{iconize(t(more ? "tbl.showLess" : "tbl.showMore"))}</button>
+          <button className={selecting ? "btn small primary" : "btn small"} aria-pressed={selecting} onClick={() => { setSelecting(!selecting); setPicked([]); }}>
+            <Icon name="check" size={16} /> {iconize(t(selecting ? "squad.selectDone" : "squad.select"))}
+          </button>
+        </>
       }
     >
       {selecting && (
@@ -94,15 +102,15 @@ export function Squad() {
           <thead>
             <tr>
               {selecting && <th aria-label={t("squad.select")} />}
-              {COLUMNS.map((c) => (
+              {COLUMNS.filter((c) => more || LESS.includes(c.key)).map((c) => (
                 <th key={c.key} title={c.key === "ovr" ? t("col.ovrHint") : undefined}>
                   <button className="th-btn" onClick={() => onSort(c.key)}>
                     {iconize(t(c.label))}{sort === c.key ? (desc ? " ▼" : " ▲") : ""}
                   </button>
                 </th>
               ))}
-              <th>{iconize(t("col.contract"))}</th>
-              <th>{iconize(t("col.role"))}</th>
+              {more && <th>{iconize(t("col.contract"))}</th>}
+              {more && <th>{iconize(t("col.role"))}</th>}
             </tr>
           </thead>
           <tbody>
@@ -114,15 +122,15 @@ export function Squad() {
                   <Avatar player={p} shirt={club.color} trim={club.color2} size={28} mood={p.happiness} />
                   <Flag code={p.nationality} /> {listName(p)} <StatusIcons player={p} />
                 </td>
-                <td>{p.age}</td>
+                {more && <td>{p.age}</td>}
                 <td className="num strong">{overall(p)}</td>
                 <td><FormArrow form={p.form} /></td>
                 <td><Bar value={p.fitness} small /></td>
-                <td><Face value={p.happiness} /></td>
-                <td className="num">{money(p.value)}</td>
-                <td className="num">{money(p.contract.wage)}</td>
-                <td className="num">{p.contract.expiresSeason}</td>
-                <td>{iconize(t(`role.${p.contract.role}`))}</td>
+                {more && <td><Face value={p.happiness} /></td>}
+                {more && <td className="num">{money(p.value)}</td>}
+                {more && <td className="num">{money(p.contract.wage)}</td>}
+                {more && <td className="num">{p.contract.expiresSeason}</td>}
+                {more && <td>{iconize(t(`role.${p.contract.role}`))}</td>}
               </tr>
             ))}
           </tbody>
