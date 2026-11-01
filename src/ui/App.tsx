@@ -40,6 +40,8 @@ import {Training} from "./views/Training";
 import {Transfers} from "./views/Transfers";
 import {Storage} from "./views/Storage";
 import {National} from "./views/National";
+import {Tournament} from "./views/Tournament";
+import {tournamentOf} from "../game/national";
 import {dueNationalMatch, startNationalMatch} from "../game/national";
 import {DecisionsDialog} from "./DecisionsDialog";
 import {pendingDecisions, readForceDecisions} from "./decisions";
@@ -62,6 +64,7 @@ const ICONS: Record<View, IconName> = {
   cup: "trophy",
   friends: "users",
   national: "flag",
+  tournament: "trophy",
   pals: "user",
   stadium: "stadium",
   transfers: "swap",
@@ -69,7 +72,8 @@ const ICONS: Record<View, IconName> = {
   contracts: "pen",
   finance: "wallet",
   storage: "boot",
-  shop: "diamond",
+  // The Shop keeps the old outlined diamond in the menu.
+  shop: "diamondLine",
   settings: "settings",
 };
 
@@ -81,10 +85,13 @@ const NAV_GROUPS: {id: "home" | "team" | "matches" | "club"; icon: IconName; vie
   {id: "club", icon: "shield", views: ["finance", "transfers", "shop", "settings"]},
 ];
 /** Pages shown as a sub-tab of another (three tabs fit a phone): Contracts under Squad, Arena under Finance. */
-const SUB_PAGES: Partial<Record<View, View[]>> = {squad: ["squad", "contracts"], transfers: ["transfers", "codes"], finance: ["finance", "stadium"], cup: ["cup", "friends", "national"]};
+const SUB_PAGES: Partial<Record<View, View[]>> = {squad: ["squad", "contracts"], transfers: ["transfers", "codes"], finance: ["finance", "stadium"], cup: ["cup", "friends", "national", "tournament"]};
 /** The national team's page is only there once the manager coaches a country (set as the menu is drawn). */
 let NATIONAL_ON = false;
-const pagesOf = (v: View): View[] => (SUB_PAGES[v] ?? [v]).filter((p) => p !== "national" || NATIONAL_ON);
+/** The tournament's page (the World Cup or the Euros of the year, e.g. "VM 2028") only in a year with one, once the manager coaches a country. */
+let TOURNAMENT_LABEL: string | null = null;
+const pagesOf = (v: View): View[] => (SUB_PAGES[v] ?? [v]).filter((p) => (p !== "national" || NATIONAL_ON) && (p !== "tournament" || (NATIONAL_ON && TOURNAMENT_LABEL !== null)));
+const navLabel = (v: View, t: (k: never) => string) => (v === "tournament" ? TOURNAMENT_LABEL ?? "" : iconize(t(`nav.${v}` as never)));
 /** The tab a page sits under (itself, or the page it's a sub-tab of). */
 const tabOf = (v: View): View => (Object.entries(SUB_PAGES).find(([, subs]) => subs!.includes(v))?.[0] as View | undefined) ?? v;
 /** The group a page is in. */
@@ -103,6 +110,7 @@ const SCREENS: Record<View, () => React.JSX.Element> = {
   cup: Cup,
   friends: FriendCup,
   national: National,
+  tournament: Tournament,
   pals: Pals,
   stadium: Stadium,
   transfers: Transfers,
@@ -212,7 +220,9 @@ const badgeClass = (v: View) => (BLUE_BADGES.includes(v) ? "badge blue" : "badge
  */
 function Nav() {
   const {t} = useT();
-  NATIONAL_ON = !!useGameState().national;
+  const natGame = useGameState();
+  NATIONAL_ON = !!natGame.national;
+  TOURNAMENT_LABEL = tournamentOf(natGame.season) ? `${t(`national.comp.${tournamentOf(natGame.season)}` as never)} ${natGame.season}` : null;
   const view = useGame((s) => s.view);
   const setView = useGame((s) => s.setView);
   const badges = useBadges();
@@ -257,7 +267,7 @@ function Nav() {
                   onClick={(e) => { e.stopPropagation(); setView(v); setOpen(null); window.scrollTo({top: 0}); }}
                 >
                   <span className="arc-circle"><Icon name={ICONS[v]} /></span>
-                  <span className="arc-label">{iconize(t(`nav.${v}`))}</span>
+                  <span className="arc-label">{navLabel(v, t)}</span>
                   {(badges[v] ?? 0) > 0 && <span className={badgeClass(v)}>{badges[v]}</span>}
                 </button>
               );
@@ -299,7 +309,7 @@ function GroupTabs() {
         {group.views.filter((v) => v !== "settings").map((v) => (
           <button key={v} role="tab" aria-selected={v === tab} data-tour={`nav-${v}`} className={v === tab ? "pill-tab active" : "pill-tab"} onClick={() => setView(v)}>
             <Icon name={ICONS[v]} size={18} />
-            <span>{iconize(t(`nav.${v}`))}</span>
+            <span>{navLabel(v, t)}</span>
             {/* The tab counts its sub-pages too (red: to do, blue: reminders). */}
             {[false, true].map((blue) => {
               const n = pagesOf(v).filter((p) => BLUE_BADGES.includes(p) === blue).reduce((k, p) => k + (badges[p] ?? 0), 0);
@@ -319,7 +329,7 @@ function GroupTabs() {
           {subs.map((v) => (
             <button key={v} role="tab" aria-selected={v === view} data-tour={`nav-${v}`} className={v === view ? "real-tab active" : "real-tab"} onClick={() => setView(v)}>
               <Icon name={ICONS[v]} size={18} />
-              <span>{iconize(t(`nav.${v}`))}</span>
+              <span>{navLabel(v, t)}</span>
               {(badges[v] ?? 0) > 0 && <span className={badgeClass(v)}>{badges[v]}</span>}
             </button>
           ))}

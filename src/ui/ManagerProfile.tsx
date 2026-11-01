@@ -8,12 +8,12 @@ import {leaguePosition} from "../game/league";
 import {useT} from "../i18n";
 import {useGame, useGameState} from "../store";
 import {ManagerAvatar, defaultManagerLook, managerMoodFactors} from "./Avatar";
+import {Stepper, stepTo} from "./ManagerEditor";
 import {ManagerEditor} from "./ManagerEditor";
 import {Modal} from "./common";
 import {awayKit, homeKit} from "../game/kit";
 import {COLLARS, SHIRT_PATTERNS, SLEEVES, type Collar, type Kit, type ShirtPattern, type Sleeves} from "../game/types";
 import {Jersey} from "./Jersey";
-import type {TKey} from "../i18n";
 
 export function ManagerProfile({onClose, kit: startKit}: {onClose: () => void; kit?: "home" | "away"}) {
   const {t, tx, money, lang} = useT();
@@ -26,6 +26,10 @@ export function ManagerProfile({onClose, kit: startKit}: {onClose: () => void; k
   const [managerName, setManagerName] = useState(game.managerName);
   // How the manager looks: changed here with the same editor as when the game began.
   const [lookOpen, setLookOpen] = useState(false);
+  // The trophies and the seasons fold out in the same way.
+  const [trophiesOpen, setTrophiesOpen] = useState(false);
+  const [careerOpen, setCareerOpen] = useState(false);
+  const [boughtOpen, setBoughtOpen] = useState(false);
   const [look, setLook] = useState(() => game.managerLook ?? defaultManagerLook(game.managerName));
   // Two kits, home and away, edited one at a time (the toggle picks which).
   const [which, setWhich] = useState<"home" | "away">(startKit ?? "home");
@@ -117,35 +121,57 @@ export function ManagerProfile({onClose, kit: startKit}: {onClose: () => void; k
       </button>
       {lookOpen && <ManagerEditor look={look} onChange={setLook} />}
 
-      <h4><Icon name="trophy" size={18} /> {iconize(t("mgr.trophies"))}</h4>
-      {trophies.length === 0 ? (
-        <p className="muted">{iconize(t("mgr.noTrophies"))}</p>
-      ) : (
-        <ul className="mgr-trophies">
-          {trophies.map((tr, i) => <li key={i}><Icon name="trophy" size={18} /> {iconize(tx(tr.key, {season: tr.season}))}</li>)}
+      <button type="button" className="mgr-fold" aria-expanded={trophiesOpen} onClick={() => setTrophiesOpen((o) => !o)}>
+        <Icon name="trophy" size={18} /> <span>{iconize(t("mgr.trophies"))}{trophies.length > 0 ? ` (${trophies.length})` : ""}</span>
+        <span className={trophiesOpen ? "mgr-fold-chevron open" : "mgr-fold-chevron"}><Icon name="chevron" size={18} /></span>
+      </button>
+      {trophiesOpen && (
+        <div className="mgr-fold-body">
+        {trophies.length === 0 ? (
+          <p className="muted">{iconize(t("mgr.noTrophies"))}</p>
+        ) : (
+          <ul className="mgr-trophies">
+            {trophies.map((tr, i) => <li key={i}><Icon name="trophy" size={18} /> {iconize(tx(tr.key, {season: tr.season}))}</li>)}
+          </ul>
+        )}
+
+        </div>
+      )}
+
+      <button type="button" className="mgr-fold" aria-expanded={careerOpen} onClick={() => setCareerOpen((o) => !o)}>
+        <Icon name="list" size={18} /> <span>{iconize(t("mgr.career"))} ({game.history.length + 1})</span>
+        <span className={careerOpen ? "mgr-fold-chevron open" : "mgr-fold-chevron"}><Icon name="chevron" size={18} /></span>
+      </button>
+      {careerOpen && (
+        <div className="mgr-fold-body">
+        <ul className="mgr-career">
+          <li>
+            <strong>{game.season}</strong> {iconize(t("mgr.now", {position: leaguePosition(game, club.id)}))}
+          </li>
+          {[...game.history].reverse().map((h) => (
+            <li key={h.season}>
+              <strong>{h.season}</strong> {iconize(t("mgr.position", {position: h.userPosition}))}
+              {h.cup !== undefined && <> · {iconize(t("cup.name"))}: {cupText(h.cup)}</>}
+            </li>
+          ))}
         </ul>
+        </div>
       )}
 
       {/* What's been bought in the shop with real money. */}
-      <h4><Icon name="cart" size={18} /> {iconize(t("mgr.bought"))}</h4>
-      <dl className="kv mgr-bought">
-        <dt>{iconize(t("mgr.boughtDiamonds"))}</dt><dd><Icon name="diamond" size={16} /> {game.purchases?.diamonds ?? 0}</dd>
-        <dt>{iconize(t("mgr.boughtMoney"))}</dt><dd><Icon name="coins" size={16} /> {money(game.purchases?.money ?? 0)}</dd>
-        <dt>{iconize(t("mgr.boughtCost"))}</dt><dd>{new Intl.NumberFormat(lang, {style: "currency", currency: "EUR"}).format(game.purchases?.eur ?? 0)}</dd>
-      </dl>
-
-      <h4><Icon name="list" size={18} /> {iconize(t("mgr.career"))}</h4>
-      <ul className="mgr-career">
-        <li>
-          <strong>{game.season}</strong> {iconize(t("mgr.now", {position: leaguePosition(game, club.id)}))}
-        </li>
-        {[...game.history].reverse().map((h) => (
-          <li key={h.season}>
-            <strong>{h.season}</strong> {iconize(t("mgr.position", {position: h.userPosition}))}
-            {h.cup !== undefined && <> · {iconize(t("cup.name"))}: {cupText(h.cup)}</>}
-          </li>
-        ))}
-      </ul>
+      <button type="button" className="mgr-fold" aria-expanded={boughtOpen} onClick={() => setBoughtOpen((o) => !o)}>
+        <Icon name="cart" size={18} /> <span>{iconize(t("mgr.bought"))}</span>
+        <span className={boughtOpen ? "mgr-fold-chevron open" : "mgr-fold-chevron"}><Icon name="chevron" size={18} /></span>
+      </button>
+      {boughtOpen && (
+        <div className="mgr-fold-body">
+        <dl className="kv mgr-bought">
+          <dt>{iconize(t("mgr.boughtDiamonds"))}</dt><dd><Icon name="diamond" size={16} /> {game.purchases?.diamonds ?? 0}</dd>
+          <dt>{iconize(t("mgr.boughtMoney"))}</dt><dd><Icon name="coins" size={16} /> {money(game.purchases?.money ?? 0)}</dd>
+          <dt>{iconize(t("mgr.boughtCost"))}</dt><dd>{new Intl.NumberFormat(lang, {style: "currency", currency: "EUR"}).format(game.purchases?.eur ?? 0)}</dd>
+        </dl>
+        </div>
+      )}
 
       </section>
 
@@ -181,30 +207,10 @@ export function ManagerProfile({onClose, kit: startKit}: {onClose: () => void; k
           {color3 && <button type="button" className="btn small" onClick={() => setColor3(undefined)}>{iconize(t("mgr.color3Reset"))}</button>}
         {/* The shirt: plain or patterned, in the two colours above. */}
         <h4><Icon name="shirt" size={18} /> {iconize(t("mgr.shirt"))}</h4>
-        <div className="shirt-patterns" role="radiogroup" aria-label={t("mgr.shirt")}>
-          {SHIRT_PATTERNS.map((p) => (
-            <button key={p} type="button" role="radio" aria-checked={p === pattern} className={p === pattern ? "shirt-pattern on" : "shirt-pattern"} onClick={() => setPattern(p)} title={t(`shirt.${p}` as TKey)}>
-              <Jersey color={color} trim={color2} pattern={p} trim3={color3} collar={collar} sleeves={sleeves} size={44} />
-              <span>{iconize(t(`shirt.${p}` as TKey))}</span>
-            </button>
-          ))}
-        </div>
-        <div className="shirt-patterns" role="radiogroup" aria-label={t("mgr.collar")}>
-          {COLLARS.map((o) => (
-            <button key={o} type="button" role="radio" aria-checked={o === collar} className={o === collar ? "shirt-pattern on" : "shirt-pattern"} onClick={() => setCollar(o)}>
-              <Jersey color={color} trim={color2} pattern={pattern} trim3={color3} size={44} collar={o} sleeves={sleeves} />
-              <span>{iconize(t(`collar.${o}` as TKey))}</span>
-            </button>
-          ))}
-        </div>
-        <div className="shirt-patterns" role="radiogroup" aria-label={t("mgr.sleeves")}>
-          {SLEEVES.map((o) => (
-            <button key={o} type="button" role="radio" aria-checked={o === sleeves} className={o === sleeves ? "shirt-pattern on" : "shirt-pattern"} onClick={() => setSleeves(o)}>
-              <Jersey color={color} trim={color2} pattern={pattern} trim3={color3} size={44} collar={collar} sleeves={o} />
-              <span>{iconize(t(`sleeves.${o}` as TKey))}</span>
-            </button>
-          ))}
-        </div>
+        <div className="shirt-preview"><Jersey color={color} trim={color2} pattern={pattern} trim3={color3} collar={collar} sleeves={sleeves} size={96} /></div>
+        <Stepper label={t("mgr.shirt")} onStep={(by) => setPattern(SHIRT_PATTERNS[stepTo(SHIRT_PATTERNS.length, SHIRT_PATTERNS.indexOf(pattern), by)])} />
+        <Stepper label={t("mgr.collar")} onStep={(by) => setCollar(COLLARS[stepTo(COLLARS.length, COLLARS.indexOf(collar), by)])} />
+        <Stepper label={t("mgr.sleeves")} onStep={(by) => setSleeves(SLEEVES[stepTo(SLEEVES.length, SLEEVES.indexOf(sleeves), by)])} />
         </div>
       </div>
       </section>
@@ -225,18 +231,14 @@ const SWATCHES = ["#dc2626", "#ea580c", "#f59e0b", "#facc15", "#16a34a", "#0f766
 
 function ColorRow({label, value, onPick}: {label: string; value: string; onPick: (c: string) => void}) {
   const {t} = useT();
+  const index = SWATCHES.indexOf(value.toLowerCase());
   return (
-    <div className="mgr-swatch-row">
-      <span className="small muted mgr-swatch-label">{label}</span>
-      <div className="mgr-swatches" role="radiogroup" aria-label={label}>
-        {SWATCHES.map((c) => (
-          <button key={c} className={`mgr-swatch ${value.toLowerCase() === c ? "on" : ""}`} style={{background: c}} role="radio" aria-checked={value.toLowerCase() === c} aria-label={c} onClick={() => onPick(c)} />
-        ))}
-        <label className="mgr-swatch mgr-swatch-own" title={t("mgr.ownColor")}>
-          <input type="color" value={value} aria-label={t("mgr.ownColor")} onChange={(e) => onPick(e.target.value)} />
-          <span aria-hidden>+</span>
-        </label>
-      </div>
-    </div>
+    <Stepper label={label} onStep={(by) => onPick(SWATCHES[stepTo(SWATCHES.length, index, by)])}>
+      <span className="mgr-swatch on" style={{background: value}} aria-hidden />
+      <label className="mgr-swatch mgr-swatch-own" title={t("mgr.ownColor")}>
+        <input type="color" value={value} aria-label={t("mgr.ownColor")} onChange={(e) => onPick(e.target.value)} />
+        <span aria-hidden>+</span>
+      </label>
+    </Stepper>
   );
 }

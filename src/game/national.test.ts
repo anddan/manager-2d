@@ -74,3 +74,28 @@ describe("a national match played live", () => {
     expect(g.national!.results).toHaveLength(1);
   });
 });
+
+describe("the tournament record", () => {
+  it("keeps the knockout rounds, lists what is coming, and queues a podium for a medal", async () => {
+    const {upcomingNational} = await import("./national");
+    let podiums = 0;
+    for (let seed = 1; seed <= 12; seed++) {
+      const g = newGame("Cup", 3, 70 + seed);
+      const rng = new Rng(seed);
+      acceptNational(g, nations(g)[0].code);
+      g.season = 4;
+      g.week = 1;
+      expect(upcomingNational(g).length).toBeGreaterThan(2);
+      for (const w of TOURNAMENT_WEEKS) {
+        g.week = w;
+        nationalWeek(g, rng);
+      }
+      const t = g.national!.tournament!;
+      // Round of 16, quarter-finals, semi-finals, final: 8, 4, 2, 1 matches (the last rounds only if we stayed in).
+      expect((t.rounds ?? []).map((r) => r.length)).toEqual([8, 4, 2, 1]);
+      expect(t.champion).toBeTruthy();
+      podiums += (g.celebrations ?? []).filter((c) => c.kind === "tournament").length;
+    }
+    expect(podiums).toBeGreaterThan(0);
+  });
+});

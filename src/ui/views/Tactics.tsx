@@ -501,7 +501,7 @@ function useDrag(onDrop: (playerId: string, fromSlot: number | null, to: DropTar
 }
 
 /** True on phones and narrow windows (where the list sits below the pitch). */
-function useNarrow(): boolean {
+export function useNarrow(): boolean {
   const query = "(max-width: 899px)";
   const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && !!window.matchMedia?.(query).matches);
   useEffect(() => {

@@ -34,7 +34,8 @@ const FEMALE_STYLES = ["long", "ponytail", "bun", "bob", "braids", "curly", "afr
 // so everyone's generated look stays as it was.
 export const HAIR_STYLES = [...MALE_STYLES, "ponytail", "bun", "bob", "braids", "pixie", "topknot", "quiff", "swept", "coils", "halfup", "fade", "dreads", "jamal", "cristiano", "messi", "haaland"] as const;
 export type HairStyle = (typeof HAIR_STYLES)[number];
-export const FACE_SHAPES = ["oval", "round", "jaw", "pointed", "cleft"] as const;
+// The last two are the first and the fourth head again, with thinner brows.
+export const FACE_SHAPES = ["oval", "round", "jaw", "pointed", "cleft", "oval2", "pointed2", "wide", "dimple", "wideDimple", "narrow", "square"] as const;
 export type FaceShape = (typeof FACE_SHAPES)[number];
 /** Headband colours to pick from. */
 export const HEADBANDS = ["#f8fafc", "#111827", "#dc2626", "#2563eb", "#facc15", "#16a34a", "#ec4899", "#7c3aed"];
@@ -56,6 +57,9 @@ export interface Look {
   /** Blond highlights in the hair. */
   highlights?: boolean;
   shape?: FaceShape;
+  /** The ears and the brows (missing: the ones the face shape had before they were chosen on their own). */
+  ears?: string;
+  browStyle?: string;
   /** A headband in this colour. */
   headband?: string;
   /** Eye colour; missing means brown. */
@@ -93,6 +97,8 @@ export function lookFor(p: Player): Look {
     lashes: own.lashes,
     highlights: own.highlights,
     shape: (FACE_SHAPES as readonly string[]).includes(own.shape ?? "") ? (own.shape as FaceShape) : undefined,
+    ears: own.ears,
+    browStyle: own.browStyle,
     headband: own.headband,
   };
 }
@@ -166,6 +172,8 @@ export function managerFace(m: ManagerLook): Look {
     lashes: m.lashes,
     highlights: m.highlights,
     shape: (FACE_SHAPES as readonly string[]).includes(m.shape ?? "") ? (m.shape as FaceShape) : undefined,
+    ears: m.ears,
+    browStyle: m.browStyle,
     headband: m.headband,
   };
 }
@@ -440,6 +448,13 @@ const HEADS: Record<FaceShape, string> = {
   // The oval, with a dimple in the chin (drawn below).
   cleft: HEAD,
   jaw: "M29 44 Q28 21 50 20 Q72 21 71 44 L70.500 57 L66 66 Q63 70.500 58 70.800 L42 70.800 Q37 70.500 34 66 L29.500 57Z",
+  wide: "M29 44 Q28 21 50 20 Q72 21 71 44 Q70 56 61 65 Q55 72 50 74 Q45 72 39 65 Q30 56 29 44Z",
+  dimple: HEAD,
+  narrow: HEAD,
+  square: HEAD,
+  wideDimple: "M29 44 Q28 21 50 20 Q72 21 71 44 Q70 56 61 65 Q55 72 50 74 Q45 72 39 65 Q30 56 29 44Z",
+  oval2: HEAD,
+  pointed2: "M29 44 Q28 21 50 20 Q72 21 71 44 Q70 56 61 65 Q55 72 50 74 Q45 72 39 65 Q30 56 29 44Z",
 };
 
 /** Shading shared by every face (no colours of its own, so one set of ids serves all). */
@@ -628,12 +643,12 @@ export function KitAvatar({look, keeper = false, shirt, trim, size = 96, mood = 
 /** A player's look in the editor's shape (it edits the manager's look, which has a suit too). */
 export function editableLook(p: Player): ManagerLook {
   const l = lookFor(p);
-  return {skin: l.skin, hair: l.hair, style: l.style, beard: l.beard, eyes: l.eyes, glasses: !!l.glasses, lashes: !!l.lashes, highlights: !!l.highlights, shape: l.shape, headband: l.headband, suit: "#1f2937"};
+  return {skin: l.skin, hair: l.hair, style: l.style, beard: l.beard, eyes: l.eyes, glasses: !!l.glasses, lashes: !!l.lashes, highlights: !!l.highlights, shape: l.shape, ears: l.ears, browStyle: l.browStyle, headband: l.headband, suit: "#1f2937"};
 }
 
 /** The editor's look back into a full look (with the face's fixed details from the player). */
 export function lookFromEditor(p: Player, m: ManagerLook): Look {
-  return {...lookFor({...p, look: {skin: m.skin, hair: m.hair, style: m.style, beard: m.beard, eyes: m.eyes, glasses: m.glasses, lashes: m.lashes, highlights: m.highlights, shape: m.shape, headband: m.headband}})};
+  return {...lookFor({...p, look: {skin: m.skin, hair: m.hair, style: m.style, beard: m.beard, eyes: m.eyes, glasses: m.glasses, lashes: m.lashes, highlights: m.highlights, shape: m.shape, ears: m.ears, browStyle: m.browStyle, headband: m.headband}})};
 }
 
 /** The manager in a suit and tie. */

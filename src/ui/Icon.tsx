@@ -4,7 +4,7 @@ import type {ReactNode} from "react";
 
 export type IconName =
   | "home" | "mail" | "users" | "clipboard" | "dumbbell" | "calendar" | "list" | "trophy" | "stadium"
-  | "swap" | "pen" | "wallet" | "boot" | "diamond" | "settings" | "play" | "ball" | "shield" | "info" | "close"
+  | "swap" | "pen" | "wallet" | "boot" | "diamond" | "diamondLine" | "settings" | "play" | "ball" | "shield" | "info" | "close"
   | "warn" | "fire" | "video" | "gift" | "shin" | "glove" | "dice" | "user" | "text" | "palette" | "megaphone" | "skip" | "coffee" | "stop" | "target" | "star" | "sparkle" | "chart" | "chat" | "handshake" | "trend" | "tag" | "shirt" | "undo" | "check" | "bolt" | "bank" | "sound" | "compass" | "download" | "upload" | "cart" | "hammer" | "run" | "bench" | "moon" | "search" | "inbox" | "eye" | "coins" | "medical" | "plane" | "clip" | "lock" | "flag" | "updown" | "plus" | "male" | "female" | "mixed" | "chevron" | "thumbUp" | "thumbDown" | "debrief" | "hotdog" | "cup" | "scarf"
   | "faceSmile" | "faceGrin" | "faceNeutral" | "faceWorried" | "faceSad" | "faceAngry" | "faceGrimace" | "faceYawn" | "broom"
   | "party" | "cardYellow" | "cardRed" | "wall" | "plaster" | "sprout" | "trendDown" | "heartBroken" | "sun" | "goal" | "bag" | "chair";
@@ -22,8 +22,19 @@ const PATHS: Record<IconName, ReactNode> = {
   swap: <><path d="M4 8h14l-3-3M20 16H6l3 3" /></>,
   pen: <><path d="M4 20h4L19 9l-4-4L4 16v4Z" /><path d="m13 7 4 4" /></>,
   wallet: <><rect x="3" y="6" width="18" height="14" rx="2" /><path d="M3 10h18" /><path d="M16 15h2" /><path d="M6 6l9-3 1 3" /></>,
-  boot: <><path d="M3 17.500V8.500c0-.8.6-1.300 1.400-1.300h3.300L9 10.500c.4.900 1 1.300 2 1.500l4.500 1c2.600.600 5.500 1.600 5.500 4.500V18H3Z" /><path d="M3 20.500h18M11 12l1.300-1.800M13.700 12.600 15 10.800" /></>,
-  diamond: <><path d="M6 4h12l3 5-9 11L3 9l3-5Z" /><path d="M3 9h18M9 4l3 16M15 4l-3 16" /></>,
+  boot: <><path d="M3.500 13V7.500a1.200 1.200 0 0 1 2.400 0V5.500a1.200 1.200 0 0 1 2.400 0V7a1.200 1.200 0 0 1 2.400 0v3.500l-.5 2.500Q9.500 14.500 7.500 14.500h-2q-2 0-2-1.500Z" /><path d="M4 14.500V17h5v-2.500" /><path d="M11 21v-4.500l2.600-.9 1.700 1.700q2.900.4 5.200 1.800 1 .6 1 1.800V21Z" /><path d="M11 19.200h10.500" /></>,
+  diamondLine: <><path d="M6 4h12l3 5-9 11L3 9l3-5Z" /><path d="M3 9h18M9 4l3 16M15 4l-3 16" /></>,
+  diamond: (
+    <g stroke="none" strokeLinejoin="round">
+      <path d="M6 3.500h12l4.500 6.500L12 21.500 1.500 10Z" fill="currentColor" />
+      <path d="M6 3.500h12l4.500 6.500h-21Z" fill="#fff" opacity={0.3} />
+      <path d="M1.500 10h21L12 21.500Z" fill="#000" opacity={0.18} />
+      <path d="M12 21.500 7.500 10h9Z" fill="#fff" opacity={0.2} />
+      <path d="M6 3.500 8.500 10M18 3.500 15.500 10M12 3.500V10" fill="none" stroke="#fff" strokeOpacity={0.5} strokeWidth={0.8} />
+      <path d="M6 3.500h12l4.500 6.500L12 21.500 1.500 10Z" fill="none" stroke="#000" strokeOpacity={0.28} strokeWidth={0.9} />
+      <path d="M7.800 5h3.600L9.300 8.600Z" fill="#fff" opacity={0.8} />
+    </g>
+  ),
   settings: <><path d="M12.2 2h-.4a2 2 0 0 0-2 2v.2a2 2 0 0 1-1 1.7l-.4.3a2 2 0 0 1-2 0l-.2-.1a2 2 0 0 0-2.7.7l-.2.4a2 2 0 0 0 .7 2.7l.2.1a2 2 0 0 1 1 1.7v.5a2 2 0 0 1-1 1.7l-.2.1a2 2 0 0 0-.7 2.7l.2.4a2 2 0 0 0 2.7.7l.2-.1a2 2 0 0 1 2 0l.4.3a2 2 0 0 1 1 1.7v.2a2 2 0 0 0 2 2h.4a2 2 0 0 0 2-2v-.2a2 2 0 0 1 1-1.7l.4-.3a2 2 0 0 1 2 0l.2.1a2 2 0 0 0 2.7-.7l.2-.4a2 2 0 0 0-.7-2.7l-.2-.1a2 2 0 0 1-1-1.7v-.5a2 2 0 0 1 1-1.7l.2-.1a2 2 0 0 0 .7-2.7l-.2-.4a2 2 0 0 0-2.7-.7l-.2.1a2 2 0 0 1-2 0l-.4-.3a2 2 0 0 1-1-1.7V4a2 2 0 0 0-2-2Z" /><circle cx="12" cy="12" r="3" /></>,
   play: <path d="M8 5v14l11-7L8 5Z" fill="currentColor" />,
   ball: <><circle cx="12" cy="12" r="9" /><path d="m12 7 4 3-1.5 4.5h-5L8 10l4-3Z" /><path d="M12 3v4M16 10l4.5-1.5M14.5 14.5l2.5 4M9.5 14.5 7 18.5M8 10 3.5 8.5" /></>,
@@ -69,7 +80,15 @@ const PATHS: Record<IconName, ReactNode> = {
   shirt: <path d="m8 3-5 3 2 5 2-1v11h10V10l2 1 2-5-5-3c-.5 1.5-2 2.5-4 2.5S8.5 4.5 8 3Z" />,
   undo: <><path d="M9 14 4 9l5-5" /><path d="M4 9h10a6 6 0 0 1 0 12h-3" /></>,
   check: <path d="m4 12 5 5L20 6" />,
-  bolt: <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" />,
+  bolt: (
+    <g stroke="none" strokeLinejoin="round">
+      <path d="M13.500 1.500 4 13.500h6.500L9 22.500l11-13.500h-6.500Z" fill="currentColor" />
+      <path d="M13.500 1.500 4 13.500h6.500l1.800-12Z" fill="#fff" opacity={0.34} />
+      <path d="M13.500 9h6.500L9 22.500l1.500-9h3.500Z" fill="#000" opacity={0.2} />
+      <path d="M13.500 1.500 4 13.500h6.500L9 22.500l11-13.500h-6.500Z" fill="none" stroke="#000" strokeOpacity={0.28} strokeWidth={0.9} />
+      <path d="M12.500 4.200 7.200 11.600h2.600Z" fill="#fff" opacity={0.7} />
+    </g>
+  ),
   bank: <><path d="M3 9 12 4l9 5H3Z" /><path d="M5 9v9M10 9v9M14 9v9M19 9v9M3 20h18" /></>,
   sound: <><path d="M4 9v6h4l5 4V5L8 9H4Z" /><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12" /></>,
   compass: <><circle cx="12" cy="12" r="9" /><path d="m15.5 8.5-2 5-5 2 2-5 5-2Z" /></>,
@@ -83,7 +102,20 @@ const PATHS: Record<IconName, ReactNode> = {
   search: <><circle cx="11" cy="11" r="6.5" /><path d="m16 16 5 5" /></>,
   inbox: <><path d="M3 13h5l1.5 3h5L16 13h5" /><path d="M5 5h14l2 8v6H3v-6l2-8Z" /></>,
   eye: <><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></>,
-  coins: <><ellipse cx="12" cy="6" rx="7" ry="3" /><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6" /></>,
+  coins: (
+    <g stroke="none">
+      {[15.500, 10.500, 5.500].map((cy) => (
+        <g key={cy}>
+          <path d={`M4 ${cy}v3a8 3.200 0 0 0 16 0v-3Z`} fill="currentColor" />
+          <path d={`M4 ${cy}v3a8 3.200 0 0 0 16 0v-3Z`} fill="#000" opacity={0.26} />
+          <ellipse cx={12} cy={cy} rx={8} ry={3.200} fill="currentColor" />
+          <ellipse cx={12} cy={cy} rx={8} ry={3.200} fill="#fff" opacity={0.28} />
+          <ellipse cx={12} cy={cy} rx={5.500} ry={2} fill="none" stroke="#000" strokeOpacity={0.22} strokeWidth={0.7} />
+          <path d={`M4.600 ${cy - 0.600}a8 3.200 0 0 1 6-2.400`} fill="none" stroke="#fff" strokeOpacity={0.7} strokeWidth={0.9} />
+        </g>
+      ))}
+    </g>
+  ),
   medical: <><rect x="3" y="3" width="18" height="18" rx="4" /><path d="M12 8v8M8 12h8" /></>,
   plane: <path d="M21 4 3 11l7 2 2 7 9-16ZM10 13l5-4" />,
   clip: <path d="M8 12V7a4 4 0 0 1 8 0v9a6 6 0 0 1-12 0V9" />,

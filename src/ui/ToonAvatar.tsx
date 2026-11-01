@@ -58,31 +58,104 @@ const HEADS: Record<string, string> = {
   pointed: "M33 22 Q31 11 50 10.500 Q69 11 67 22 Q69.500 31 68.500 40 L65.500 53 Q60 63 54 70 Q50 74 46 70 Q40 63 34.500 53 L31.500 40 Q30.500 31 33 22Z",
 };
 /** Ears change a little with the face: smaller on a round face, longer on a pointed one. */
+/** What the head, the ears and the brows are for a look: the three choices, or what the older face shape stood for. */
+export function faceParts(look: {shape?: string; ears?: string; browStyle?: string}): {wide: boolean; dimple: boolean; ears: string; brows: string} {
+  const s = look.shape ?? "oval";
+  const legacyEars: Record<string, string> = {round: "tilted", jaw: "big", pointed: "long", pointed2: "long", cleft: "tilted"};
+  const legacyBrows: Record<string, string> = {round: "soft", jaw: "thick", pointed: "angled", pointed2: "thinAngled", cleft: "high", oval2: "thin"};
+  return {
+    wide: ["pointed", "pointed2", "cleft", "wide", "wideDimple"].includes(s),
+    dimple: ["cleft", "dimple", "wideDimple"].includes(s),
+    ears: look.ears ?? legacyEars[s] ?? "normal",
+    brows: look.browStyle ?? legacyBrows[s] ?? "normal",
+  };
+}
+
 const EARS: Record<string, {rx: number; ry: number; cy: number; tilt?: number}> = {
+  normal: {rx: 3.500, ry: 6.200, cy: 43.500},
+  small: {rx: 3.200, ry: 5.600, cy: 44.500},
+  tilted: {rx: 3.500, ry: 6, cy: 42.500, tilt: 16},
+  long: {rx: 3.800, ry: 7, cy: 43},
+  big: {rx: 3.600, ry: 6.400, cy: 44},
   oval: {rx: 3.500, ry: 6.200, cy: 43.500},
   // Sticking out and up: the top of each ear leans away from the head.
   round: {rx: 3.500, ry: 6, cy: 42.500, tilt: 16},
   jaw: {rx: 3.600, ry: 6.400, cy: 44},
   pointed: {rx: 3.800, ry: 7, cy: 43},
   cleft: {rx: 3.500, ry: 6, cy: 42.500, tilt: 16},
+  oval2: {rx: 3.500, ry: 6.200, cy: 43.500},
+  pointed2: {rx: 3.800, ry: 7, cy: 43},
 };
 // Every face shape has the same head: the shapes differ in the ears and the brows (see EARS and BROWS).
-for (const k of ["round", "jaw", "cleft"]) HEADS[k] = HEADS.oval;
+for (const k of ["round", "jaw", "oval2"]) HEADS[k] = HEADS.oval;
 // The fourth shape is the same head a little wider at the cheeks (a few pixels each side).
 HEADS.pointed = "M30 41 C28.500 23 33.500 10.500 50 10.500 C66.500 10.500 71.500 23 70 41 L67.800 53 Q62.500 62.500 57 66 Q50.500 69.500 44 66 Q38.500 62.500 32.200 53Z";
+HEADS.pointed2 = HEADS.pointed;
+// The fifth face (the dimple) has the fourth's head, with its own ears and brows.
+HEADS.cleft = HEADS.pointed;
 /** The brows by face shape: how thick, and how much they tilt (positive: lower at the inner end). */
 const BROWS: Record<string, {thick: number; tilt: number; short?: number; lift?: number; apart?: number}> = {
+  normal: {thick: 1, tilt: 0},
+  thin: {thick: 0.600, tilt: 0},
+  thick: {thick: 1.300, tilt: 0.700},
+  soft: {thick: 0.850, tilt: -0.600},
+  angled: {thick: 0.750, tilt: 1.100},
+  thinAngled: {thick: 0.550, tilt: 1.100},
+  high: {thick: 0.950, tilt: -0.200, short: 3, lift: 1.800, apart: 2.200},
   oval: {thick: 1, tilt: 0},
   round: {thick: 0.850, tilt: -0.600},
   jaw: {thick: 1.300, tilt: 0.700},
   pointed: {thick: 0.750, tilt: 1.100},
   // Shorter brows, set higher up.
   cleft: {thick: 0.950, tilt: -0.200, short: 3, lift: 1.800, apart: 2.200},
+  // The first and the fourth face again, with thinner brows.
+  oval2: {thick: 0.600, tilt: 0},
+  pointed2: {thick: 0.550, tilt: 1.100},
 };
-const headOf = (look: Look) => HEADS[look.shape ?? "oval"] ?? HEADS.oval;
+// A slimmer head: narrower cheeks and a longer, more pointed chin.
+HEADS.narrow = "M31 41 C29.500 23 35 10.500 50 10.500 C65 10.500 70.500 23 69 41 L66.500 53 Q62 63 56 68 Q50 72 44 68 Q38 63 33.500 53Z";
+// A strong, square jaw: the cheeks go straight down to an angled jaw and a broad, flat chin.
+HEADS.square = "M30 41 C28.500 23 33.500 10.500 50 10.500 C66.500 10.500 71.500 23 70 41 L69.500 55 Q69 59.500 63 66 L58.500 68.800 Q50 70.500 41.500 68.800 L37 66 Q31 59.500 30.500 55Z";
+const headOf = (look: Look) => (look.shape === "narrow" ? HEADS.narrow : look.shape === "square" ? HEADS.square : faceParts(look).wide ? HEADS.pointed : HEADS.oval);
 
 /** Hair behind the head (long styles). */
-export function HairBack({style, hair}: {style: string; hair: string}) {
+/** The outline of the hair hanging down behind the head (the longer styles), for the highlights to be cut to. */
+const BACK_SHAPE: Record<string, string> = {
+  long: "M30 24 Q26 56 30 78 L70 78 Q74 56 70 24Z",
+  halfup: "M30 24 Q26 56 30 78 L70 78 Q74 56 70 24Z",
+  dreads: "M30 24 Q26 56 30 80 L70 80 Q74 56 70 24Z",
+  braids: "M30 24 Q27 56 31 80 L69 80 Q73 56 70 24Z",
+  bob: "M30 24 Q27 50 31 64 L69 64 Q73 50 70 24Z",
+  ponytail: "M62 14 Q80 16 76 44 Q74 56 68 62 Q70 44 64 28Z",
+  haaland: "M30.500 28 Q26.500 50 31 72 L39 67 Q35.500 50 36.500 30Z M69.500 28 Q73.500 50 69 72 L61 67 Q64.500 50 63.500 30Z",
+};
+
+/** The hair behind the head, with the blond highlights as strands running down it. */
+export function HairBack({style, hair, highlights}: {style: string; hair: string; highlights?: boolean}) {
+  const uid = useId();
+  const d = BACK_SHAPE[style];
+  if (!d) return null;
+  return (
+    <g>
+      <BackShape style={style} hair={hair} />
+      {highlights && (
+        <>
+          <clipPath id={`${uid}-back`}>
+            <path d={d} />
+          </clipPath>
+          <g clipPath={`url(#${uid}-back)`} fill="none" stroke="#e3c27a" strokeLinecap="round">
+            {[29, 32, 35, 38, 41, 44, 47, 50, 53, 56, 59, 62, 65, 68, 71].map((x, i) => {
+              const lean = [-6, 4, -2, 7, -5, 2, -7, 5, -3, 6, -4, 3, -6, 4, -2][i];
+              return <path key={x} d={`M${x} 26 Q${x + lean} 52 ${x - lean * 0.6} 80`} strokeOpacity={i % 2 ? 0.5 : 0.7} strokeWidth={i % 3 === 0 ? 1.500 : 1} />;
+            })}
+          </g>
+        </>
+      )}
+    </g>
+  );
+}
+
+function BackShape({style, hair}: {style: string; hair: string}) {
   if (style === "dreads") {
     return (
       <g>
@@ -157,7 +230,13 @@ function hairShape(style: string): HairShape | null {
       return {paths: ["M31.500 37 L29.500 27 Q27 10.500 50 8 Q73 10.500 69.500 34 L67 36 Q64 29 55 27 L48 31 L42 26 L36 30 L34 36Z"]};
     // Short twists on top, faded sides.
     case "jamal":
-      return {paths: ["M31.500 37 Q28 9 50 8 Q72 9 68.500 37 Q66 25 50 24.500 Q34 25 31.500 37Z"], opacity: 0.4, extra: ["M34 29 L33 17 Q50 9 67 17 L66 29 Q50 23 34 29Z"], extraCircles: [[38, 14, 3.600], [44, 10, 3.800], [50, 8.500, 3.800], [56, 10, 3.800], [62, 14, 3.600], [41, 19, 3.600], [47, 17, 3.600], [53, 17, 3.600], [59, 19, 3.600]]};
+      return {
+        paths: ["M31.500 37 Q28 9 50 8 Q72 9 68.500 37 Q66 25 50 24.500 Q34 25 31.500 37Z"],
+        opacity: 0.4,
+        extra: ["M33.500 30 L32.500 15 Q50 4 67.500 15 L66.500 30 Q50 22 33.500 30Z"],
+        extraCircles: [[36, 10.500, 3.700], [42, 7.500, 3.900], [49, 6.500, 4], [56, 7.500, 3.900], [63, 10.500, 3.700], [33.500, 16.500, 3.700], [39.500, 14, 4], [46, 12.500, 4], [53, 12.500, 4], [60, 14, 4], [66.500, 16.500, 3.700], [35.500, 22, 3.600], [42, 19.500, 3.900], [49, 18.500, 4], [56, 19.500, 3.900], [62.500, 22, 3.600], [38.500, 27, 3], [60, 27, 3]],
+        lines: ["M36 14 Q39 11 42 13", "M46 9 Q50 7 54 9", "M57 13 Q60 11 63 13", "M40 20 Q44 17 48 19", "M52 19 Q56 17 60 20"],
+      };
     // Gelled up and forward at the front, short faded sides.
     case "cristiano":
       return {paths: ["M31.500 37 Q28 9 50 8 Q72 9 68.500 37 Q66 25 50 24.500 Q34 25 31.500 37Z"], opacity: 0.45, extra: ["M34.500 30 L33.500 18 Q35 6 48 3.500 Q62 3.500 66.500 15 L65.500 30 Q58 20 50 21 Q42 20 34.500 30Z"], lines: ["M38 17 Q46 8 58 9", "M42 22 Q50 14 62 14"]};
@@ -182,7 +261,8 @@ function hairShape(style: string): HairShape | null {
     case "bun":
       return {paths: [CAP], circles: [[50, 5, 6.500]]};
     case "topknot":
-      return {paths: ["M34 30 L33 17 Q50 9 67 17 L66 30 Q50 25 34 30Z"], circles: [[50, 6, 5]]};
+      // Shaved sides (the short stubble over the whole crown), the hair gathered on top into a knot.
+      return {paths: ["M31.500 37 Q28 9 50 8 Q72 9 68.500 37 Q66 25 50 24.500 Q34 25 31.500 37Z"], opacity: 0.4, extra: ["M33.500 30 L33 17 Q50 9 67 17 L66.500 30 Q50 24 33.500 30Z"], extraCircles: [[50, 6, 5.500]]};
     default:
       // short: the quiff with a tall tuft at the front left, swept right.
       return {paths: ["M31.500 37 L29.500 26 Q28.500 17 31.500 10.500 L33 8.500 L39.800 2.800 L38 12 L43.500 8 Q55 6.500 62 12 Q66.500 14.500 68 18.500 Q70 23 69.500 30 L68.800 38.500 L67 31 Q65 25 58 24 Q50 23.500 42.500 25 Q36.500 26.500 34.500 33Z"]};
@@ -215,7 +295,11 @@ function HairTop({style, hair, highlights}: {style: string; hair: string; highli
       </g>
       {highlights && (
         <g clipPath={`url(#${uid}-hair)`} fill="none" stroke="#e3c27a" strokeOpacity={0.5} strokeWidth={1} strokeLinecap="round">
-          {[30, 36, 42, 48, 54, 60, 66, 72].map((x) => <path key={x} d={`M${x + 5} 0 L${x - 7} 42`} />)}
+          {[29, 32, 35, 38, 41, 44, 47, 50, 53, 56, 59, 62, 65, 68, 71].map((x, i) => {
+            // Thin strands over the whole head of hair, some leaning left, some right.
+            const lean = [-8, 5, -3, 7, -6, 3, -8, 4, -4, 8, -5, 3, -7, 6, -4][i];
+            return <path key={x} d={`M${x - lean / 3} 2 Q${x + lean * 0.8} 20 ${x + lean} 46`} strokeOpacity={i % 2 ? 0.5 : 0.75} strokeWidth={i % 3 === 0 ? 1.500 : 1} />;
+          })}
         </g>
       )}
     </g>
@@ -269,7 +353,7 @@ function ToonFace({look, mood}: {look: Look; mood: Mood}) {
   // A brow: thick, arched, higher at the inner end (`side` -1 left, 1 right; the left is drawn, the right mirrors it).
   const brow = (side: -1 | 1) => {
     const x = (v: number) => (side === -1 ? v : 100 - v);
-    const shape = BROWS[look.shape ?? "oval"] ?? BROWS.oval;
+    const shape = BROWS[faceParts(look).brows] ?? BROWS.normal;
     const th = shape.thick;
     const tilt = (mood === "upset" ? 1.600 : mood === "sad" ? -1.600 : look.brows * 0.4) + shape.tilt;
     const sh = shape.short ?? 0;
@@ -280,7 +364,7 @@ function ToonFace({look, mood}: {look: Look; mood: Mood}) {
     return `M${x(36 + sh)} ${37.400 - tilt - up - out} Q${x(41.500 + sh / 2)} ${33 + tilt - up} ${x(48.700 - ap)} ${36.400 + tilt - up} L${x(48.900 - ap)} ${36.400 + 2.400 * th + tilt - up} Q${x(42 + sh / 2)} ${33.800 + 2.200 * th + tilt - up} ${x(36.400 + sh)} ${37.400 + 2.200 * th - tilt - up - out}Z`;
   };
   const eyes = [41.900, 58.100] as const;
-  const ear = EARS[look.shape ?? "oval"] ?? EARS.oval;
+  const ear = EARS[faceParts(look).ears] ?? EARS.normal;
   return (
     <g strokeLinejoin="round" strokeLinecap="round">
       {/* The ears, with the inside darker. */}
@@ -305,7 +389,7 @@ function ToonFace({look, mood}: {look: Look; mood: Mood}) {
       <path d={headOf(look)} fill="none" stroke={INK} strokeWidth={0.600} />
       {/* A faint jaw bone: a soft line from each ear down towards the chin. */}
       <path d="M34 49 Q36.500 60 45 65.500 M66 49 Q63.500 60 55 65.500" fill="none" stroke={shade(skin, -0.22)} strokeWidth={0.600} strokeLinecap="round" opacity={look.shape === "jaw" ? 0.85 : 0.5} />
-      {look.shape === "cleft" && <path d="M50 66 L50 68.200" stroke={shade(skin, -0.3)} strokeWidth={0.700} />}
+      {faceParts(look).dimple && <path d="M50 66 L50 68.200" stroke={shade(skin, -0.3)} strokeWidth={0.700} />}
       {look.beard === "stubble" && <path d="M32.500 48 Q35 66 50 69 Q65 66 67.500 48 Q62 58 56 58 Q50 57 44 58 Q38 58 32.500 48Z" fill={look.hair} opacity={0.28} />}
       {look.beard === "beard" && (
         <path d="M31.800 46 Q33 68 50 71 Q67 68 68.200 46 Q64 55 58.500 56.500 Q50 55 41.500 56.500 Q36 55 31.800 46Z" fill={look.hair} stroke={INK} strokeWidth={0.500} />
@@ -360,7 +444,7 @@ function ToonFace({look, mood}: {look: Look; mood: Mood}) {
 export function ToonHead({look, mood = 70}: {look: Look; mood?: number}) {
   return (
     <>
-      <HairBack style={look.style} hair={look.hair} />
+      <HairBack style={look.style} hair={look.hair} highlights={look.highlights} />
       <ToonFace look={look} mood={moodOf(mood)} />
     </>
   );
@@ -374,7 +458,7 @@ export function ToonKitAvatar({look, keeper = false, shirt, trim, size = 96, moo
   const shadow = shade(skin, -0.12);
   return (
     <svg viewBox="0 0 100 100" width={size} height={size} className="avatar" aria-hidden>
-      <g transform="translate(6 7) scale(0.88)"><HairBack style={look.style} hair={look.hair} /></g>
+      <g transform="translate(6 7) scale(0.88)"><HairBack style={look.style} hair={look.hair} highlights={look.highlights} /></g>
       <g strokeLinejoin="round" strokeLinecap="round">
         {/* The shoulders with the arms hanging at the sides: a short sleeve with a trim band, a bit of bare arm below. */}
         {[false, true].map((mirror) => (
@@ -401,19 +485,22 @@ export function ToonKitAvatar({look, keeper = false, shirt, trim, size = 96, moo
 }
 
 /** The manager in a suit and tie. */
-export function ToonManagerAvatar({look, suit, tie, size = 96, mood = 70}: {look: Look; suit: string; tie: string; size?: number; mood?: number}) {
+export function ToonManagerAvatar({look, suit, tie: _tie, size = 96, mood = 70}: {look: Look; suit: string; tie?: string; size?: number; mood?: number}) {
   const skin = warm(look.skin);
   const shadow = shade(skin, -0.12);
   return (
     <svg viewBox="0 0 100 100" width={size} height={size} className="avatar" aria-hidden>
-      <g transform="translate(6 7) scale(0.88)"><HairBack style={look.style} hair={look.hair} /></g>
+      <g transform="translate(6 7) scale(0.88)"><HairBack style={look.style} hair={look.hair} highlights={look.highlights} /></g>
       <g strokeLinejoin="round" strokeLinecap="round">
+        {/* The arms hang down in the suit sleeves (no skin shows), a little darker than the jacket. */}
+        <path d="M31 75.500 Q23 77 21.500 88 L20.500 100 L30 100 L32.500 86Z M69 75.500 Q77 77 78.500 88 L79.500 100 L70 100 L67.500 86Z" fill={shade(suit, -0.1)} />
+        <path d="M31 75.500 Q23 77 21.500 88 L20.500 100 M69 75.500 Q77 77 78.500 88 L79.500 100" fill="none" stroke={INK} strokeWidth={0.700} />
         <path d="M30 76 Q38 70.500 50 70.500 Q62 70.500 70 76 L72 100 L28 100Z" fill={suit} stroke={INK} strokeWidth={0.700} />
         <path d="M43 62 L43 71 Q50 79 57 71 L57 62Z" fill={skin} />
         <path d="M43 62 L43 70.500 M57 62 L57 70.500" fill="none" stroke={INK} strokeWidth={0.600} />
         <path d="M43 62 L43 66.500 Q50 70.500 57 66.500 L57 62Z" fill={shadow} />
         <path d="M42 71 L50 82 L58 71 L50 74Z" fill="#f8fafc" stroke={INK} strokeWidth={0.500} />
-        <path d="M48.500 74 L51.500 74 L52.500 83 L50 87 L47.500 83Z" fill={tie} stroke={INK} strokeWidth={0.500} />
+        <path d="M48.500 74 L51.500 74 L52.500 83 L50 87 L47.500 83Z" fill="#dc2626" stroke={INK} strokeWidth={0.500} />
         <path d="M36 73 L43 71.500 L48 87 L42 100 L32 100Z M64 73 L57 71.500 L52 87 L58 100 L68 100Z" fill="#000" opacity={0.2} />
       </g>
       <g transform="translate(6 7) scale(0.88)"><ToonFace look={look} mood={moodOf(mood)} /></g>

@@ -2,6 +2,7 @@
 import {moneyBurst, pressedElement} from "./effects";
 import {setShirt, shirtHolder} from "../game/shirts";
 import {wornGear} from "../game/gear";
+import {nationalSlots, setNationalSlot, shownSquad} from "../game/national";
 // Others: scouting, bids, loans and free-agent offers.
 import {Icon, iconize} from "./Icon";
 import {useRef, useState, type ReactNode} from "react";
@@ -43,21 +44,29 @@ export function PlayerModal({playerId, preview}: {playerId: string; preview?: {o
   const game = useGameState();
   const openPlayer = useGame((s) => s.openPlayer);
   const slot = useGame((s) => s.profileSlot);
+  const fromNational = useGame((s) => s.profileNational);
   const act = useGame((s) => s.act);
   const p = game.players[playerId];
   if (!p) return null;
   const own = !preview && (p.clubId === game.userClubId || p.loan?.parentClubId === game.userClubId);
   const known = !!preview || isKnown(game, p);
+  // A player of the country the manager coaches: their kit can be handled from here, whatever club they play for.
+  const national = !preview && !!game.national && p.nationality === game.national.country && !!p.clubId;
   const club = p.clubId ? game.clubs[p.clubId] : null;
   // Boots or gloves on: their bonus shown beside the attribute.
   const gear = totalGearBonus(p);
   // Opened from their spot in the tactics: they can be taken out of it from here.
   // Opened from a spot in the tactics: the position they play there (maybe not their own).
-  const spotPos = !preview && slot !== null ? clubSlots(game.clubs[game.userClubId])[slot]?.pos : undefined;
+  const nat = fromNational && !!game.national;
+  const spotPos = !preview && slot !== null ? (nat ? nationalSlots(game.national!)[slot]?.pos : clubSlots(game.clubs[game.userClubId])[slot]?.pos) : undefined;
   const playsAs = spotPos && spotPos !== p.position ? spotPos : undefined;
-  const inSpot = !preview && slot !== null && game.clubs[game.userClubId].lineup[slot] === p.id;
+  const inSpot = !preview && slot !== null && (nat ? shownSquad(game, game.national!).lineup[slot] === p.id : game.clubs[game.userClubId].lineup[slot] === p.id);
   const takeOut = () => {
     act((g) => {
+      if (nat) {
+        if (slot !== null) setNationalSlot(g, slot, "");
+        return;
+      }
       const c = g.clubs[g.userClubId];
       c.lineup = c.lineup.map((id, i) => (i === slot ? "" : id));
     });
@@ -117,13 +126,13 @@ export function PlayerModal({playerId, preview}: {playerId: string; preview?: {o
         <section>
           {own && <Condition player={p} pos={playsAs ?? p.position} />}
           {/* The kit (boots, gloves, shin guards), before the statistics. */}
-          {own && p.clubId === game.userClubId && (
+          {((own && p.clubId === game.userClubId) || national) && (
             <Fold title={<><Icon name="shirt" size={20} /> {iconize(t("gear.equipment"))}{wornGear(p).length > 0 && <span className="fold-count"> ({wornGear(p).length})</span>}</>}>
               <GearPanel player={p} />
             </Fold>
           )}
           {/* A player looked at before buying: what kit they come with (just to see). */}
-          {!own && (p.gear || p.shin) && (
+          {!(own && p.clubId === game.userClubId) && !national && (p.gear || p.shin) && (
             <Fold open title={<><Icon name="shirt" size={20} /> {iconize(t("gear.equipment"))}</>}>
               <div className="gear-cards">
                 {p.gear && <GearCard item={p.gear} small />}
@@ -377,7 +386,7 @@ function LookEditor({player: p}: {player: Player}) {
   const draw = (look: ManagerLook, size: number) => <KitAvatar look={lookFromEditor(p, look)} keeper={keeper} shirt={club.color} trim={club.color2} size={size} />;
   const set = (look: ManagerLook) =>
     act((g) => {
-      g.players[p.id].look = {skin: look.skin, hair: look.hair, style: look.style, beard: look.beard, eyes: look.eyes, glasses: look.glasses, lashes: look.lashes, highlights: look.highlights, shape: look.shape, headband: look.headband};
+      g.players[p.id].look = {skin: look.skin, hair: look.hair, style: look.style, beard: look.beard, eyes: look.eyes, glasses: look.glasses, lashes: look.lashes, highlights: look.highlights, shape: look.shape, ears: look.ears, browStyle: look.browStyle, headband: look.headband};
     });
   return (
     <Fold title={<><Icon name="palette" size={20} /> {iconize(t("pl.look"))}</>}>

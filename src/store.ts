@@ -24,6 +24,7 @@ export const VIEWS = [
   "cup",
   "friends",
   "national",
+  "tournament",
   "pals",
   "stadium",
   "transfers",
@@ -49,12 +50,14 @@ interface Store {
   playerId: string | null;
   /** The tactics spot the open profile was opened from (it can then take them out of it). */
   profileSlot: number | null;
+  /** The slot belongs to the national eleven, not the club's. */
+  profileNational: boolean;
   matchFixtureId: string | null;
   negotiation: Negotiation | null;
   toast: Toast | null;
   setLang: (lang: Lang) => void;
   setView: (view: View) => void;
-  openPlayer: (id: string | null, slot?: number) => void;
+  openPlayer: (id: string | null, slot?: number, national?: boolean) => void;
   watchMatch: (fixtureId: string | null) => void;
   setNegotiation: (neg: Negotiation | null) => void;
   notify: (key: string, params?: Params, tone?: Toast["tone"]) => void;
@@ -88,6 +91,7 @@ export const useGame = create<Store>((set, get) => ({
   view: "overview",
   playerId: null,
   profileSlot: null,
+  profileNational: false,
   matchFixtureId: null,
   negotiation: null,
   toast: null,
@@ -101,7 +105,7 @@ export const useGame = create<Store>((set, get) => ({
     set({lang});
   },
   setView: (view) => set({view, playerId: null}),
-  openPlayer: (playerId, slot) => set({playerId, profileSlot: slot ?? null}),
+  openPlayer: (playerId, slot, national) => set({playerId, profileSlot: slot ?? null, profileNational: !!national}),
   watchMatch: (matchFixtureId) => set({matchFixtureId}),
   setNegotiation: (negotiation) => set({negotiation}),
   notify: (key, params, tone = "info") => set({toast: {key, params, tone}}),

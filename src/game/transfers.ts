@@ -19,7 +19,8 @@ import {POSITIONS, type Club, type GameState, type IncomingBid, type Player, typ
 
 /** The user knows their own players and the ones they've scouted. */
 export function isKnown(state: GameState, p: Player): boolean {
-  return p.clubId === state.userClubId || state.scouted[p.id] !== undefined;
+  // The country the manager coaches: their players are known too, whatever club they play for.
+  return p.clubId === state.userClubId || state.scouted[p.id] !== undefined || (!!state.national && p.nationality === state.national.country);
 }
 
 /** Fuzzy overall shown for unscouted players: a stable range around the truth. */

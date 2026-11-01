@@ -3,15 +3,15 @@
 // play for, picked automatically for the formation the manager chooses. The team plays a few friendlies a
 // year, and a knockout tournament (the Euros in the years after a World Cup's two years, the World Cup
 // every fourth year) in the last weeks of the season. Matches are played out in the background.
-import {FORMATIONS, SEASON_WEEKS} from "./constants";
+import {FORMATIONS, SEASON_WEEKS, roleAt, type Slot} from "./constants";
 import {NATIONALITIES} from "./names";
-import {addMessage} from "./helpers";
+import {addMessage, fullName} from "./helpers";
 import {isAvailable, pickBestLineup} from "./lineup";
 import {effectiveRating, overall} from "./ratings";
 import {Rng} from "./rng";
 import {createPlayer} from "./generate";
 import {simulateMatch} from "./match";
-import type {Club, CupFixture, FormationId, GameState, NationalJob, NationalResult, Player, Position} from "./types";
+import type {Club, CupFixture, FormationId, GameState, NationalJob, NationalResult, Player, Position, ShirtPattern} from "./types";
 
 /** A country needs this many players in the game to have a team. */
 const NATION_MIN = 14;
@@ -49,25 +49,114 @@ export function nationalPool(state: GameState, country: string): Player[] {
 }
 
 /** The eleven and the bench for the formation, picked from the country's players. */
-export function nationalSquad(state: GameState, country: string, formation: FormationId): {lineup: string[]; bench: string[]} {
-  return pickBestLineup(state, {id: `nat:${country}`} as never, FORMATIONS[formation], nationalPool(state, country));
+export function nationalSquad(state: GameState, country: string, formation: FormationId, slots?: readonly Slot[]): {lineup: string[]; bench: string[]} {
+  return pickBestLineup(state, {id: `nat:${country}`} as never, (slots ?? FORMATIONS[formation]) as Slot[], nationalPool(state, country));
 }
 
-/** The colours of a country's shirt (the same every time). */
-const KITS: [string, string][] = [
-  ["#1d4ed8", "#facc15"], ["#dc2626", "#ffffff"], ["#16a34a", "#ffffff"], ["#facc15", "#1d4ed8"], ["#ffffff", "#dc2626"], ["#0f172a", "#f97316"],
-  ["#7c3aed", "#fde047"], ["#0ea5e9", "#ffffff"], ["#ea580c", "#0f172a"], ["#be123c", "#facc15"], ["#047857", "#fde047"], ["#1e3a8a", "#ffffff"],
-];
-export function nationalKit(country: string): {color: string; color2: string} {
+/** The places of the national team: its formation, or the ones dragged about. */
+export function nationalSlots(job: {formation: FormationId; customSlots?: Slot[]}): readonly Slot[] {
+  return job.customSlots ?? FORMATIONS[job.formation];
+}
+
+/** The eleven as shown to the manager: the ones picked (empty places stay empty until the match), else the best. */
+export function shownSquad(state: GameState, job: NationalJob): {lineup: string[]; bench: string[]} {
+  if (!job.lineup) return nationalSquad(state, job.country, job.formation, job.customSlots);
+  return {lineup: nationalSlots(job).map((_, i) => job.lineup![i] ?? ""), bench: nationalLineup(state, job).bench};
+}
+
+/** Puts a player in a place (the one who was there takes the other's place); "" empties it. */
+export function setNationalSlot(state: GameState, slot: number, id: string): void {
+  const job = state.national;
+  if (!job) return;
+  const next = [...(job.lineup ?? shownSquad(state, job).lineup)];
+  while (next.length < nationalSlots(job).length) next.push("");
+  if (id) {
+    const at = next.indexOf(id);
+    if (at >= 0) next[at] = next[slot] ?? "";
+  }
+  next[slot] = id;
+  job.lineup = next;
+}
+
+/** Everybody out of the eleven. */
+export function clearNationalLineup(state: GameState): void {
+  if (state.national) state.national.lineup = nationalSlots(state.national).map(() => "");
+}
+
+/** The formation, or "custom": the places as they are now, to be dragged about. */
+export function setNationalFormation(state: GameState, value: string): void {
+  const job = state.national;
+  if (!job) return;
+  if (value === "custom") {
+    job.customSlots = nationalSlots(job).map((s) => ({...s}));
+    return;
+  }
+  delete job.customSlots;
+  job.formation = value as FormationId;
+  job.lineup = undefined;
+}
+
+/** A place dragged to a spot on the pitch (in percent from the left and the top); the keeper stays in goal. */
+export function moveNationalSlot(state: GameState, i: number, left: number, top: number): void {
+  const job = state.national;
+  if (!job?.customSlots || i === 0) return;
+  const x = Math.round(Math.max(10, Math.min(80, 5 + (1 - (top - 8) / 79) * 71)));
+  const y = Math.round(Math.max(5, Math.min(95, 50 + (left - 50) / 0.95)));
+  job.customSlots[i] = {pos: roleAt(x, y), x, y};
+}
+
+/**
+ * The eleven for the formation: the ones the manager picked (if they are still there to pick), the empty places
+ * filled with the best of the rest, so a team is never sent out with gaps.
+ */
+export function nationalLineup(state: GameState, job: NationalJob): {lineup: string[]; bench: string[]} {
+  const best = nationalSquad(state, job.country, job.formation, job.customSlots);
+  if (!job.lineup) return best;
+  const pool = new Set(nationalPool(state, job.country).map((p) => p.id));
+  const used = new Set<string>();
+  const lineup = best.lineup.map((_, i) => {
+    const picked = job.lineup![i];
+    if (picked && pool.has(picked) && !used.has(picked)) {
+      used.add(picked);
+      return picked;
+    }
+    return "";
+  });
+  const spare = [...best.lineup, ...best.bench].filter((id) => !used.has(id));
+  const filled = lineup.map((id) => {
+    if (id) return id;
+    const next = spare.find((s) => !used.has(s));
+    if (next) used.add(next);
+    return next ?? "";
+  });
+  return {lineup: filled, bench: best.bench.filter((id) => !used.has(id))};
+}
+
+/** The home shirts of the countries: the colours and the pattern they really play in (Croatia in red and white checks, Argentina in stripes). */
+const KITS: Record<string, {color: string; color2: string; pattern?: ShirtPattern}> = {
+  SE: {color: "#facc15", color2: "#1d4ed8"}, NO: {color: "#dc2626", color2: "#1e3a8a"}, DK: {color: "#dc2626", color2: "#ffffff"},
+  FI: {color: "#ffffff", color2: "#1d4ed8"}, ES: {color: "#dc2626", color2: "#facc15"}, BR: {color: "#facc15", color2: "#16a34a"},
+  AR: {color: "#75aadb", color2: "#ffffff", pattern: "stripes"}, DE: {color: "#ffffff", color2: "#0f172a"}, NL: {color: "#f97316", color2: "#0f172a"},
+  GB: {color: "#ffffff", color2: "#1e3a8a"}, FR: {color: "#1e3a8a", color2: "#ffffff"}, US: {color: "#ffffff", color2: "#1e3a8a"},
+  IT: {color: "#2563eb", color2: "#ffffff"}, NG: {color: "#16a34a", color2: "#ffffff"}, PT: {color: "#b91c1c", color2: "#15803d"},
+  BE: {color: "#dc2626", color2: "#facc15"}, HR: {color: "#dc2626", color2: "#ffffff", pattern: "checks"}, PL: {color: "#ffffff", color2: "#dc2626"},
+  CH: {color: "#dc2626", color2: "#ffffff"}, AT: {color: "#dc2626", color2: "#ffffff"}, IS: {color: "#1d4ed8", color2: "#dc2626"},
+  RS: {color: "#b91c1c", color2: "#1e3a8a"}, TR: {color: "#dc2626", color2: "#ffffff"}, UY: {color: "#7dd3fc", color2: "#0f172a"},
+  CO: {color: "#facc15", color2: "#1e3a8a"}, MX: {color: "#15803d", color2: "#dc2626"}, JP: {color: "#1d4ed8", color2: "#ffffff"},
+  KR: {color: "#dc2626", color2: "#1e3a8a"}, MA: {color: "#dc2626", color2: "#15803d"}, SN: {color: "#ffffff", color2: "#16a34a"},
+  GH: {color: "#ffffff", color2: "#facc15"}, CI: {color: "#f97316", color2: "#16a34a"}, CM: {color: "#16a34a", color2: "#dc2626"},
+};
+export function nationalKit(country: string): {color: string; color2: string; pattern?: ShirtPattern} {
+  const known = KITS[country];
+  if (known) return known;
   let h = 5;
   for (const c of country) h = (h * 33 + c.charCodeAt(0)) >>> 0;
-  const [color, color2] = KITS[h % KITS.length];
-  return {color, color2};
+  const palette = ["#1d4ed8", "#dc2626", "#16a34a", "#facc15", "#7c3aed", "#0ea5e9"];
+  return {color: palette[h % palette.length], color2: "#ffffff"};
 }
 
 /** How strong the national eleven is: their average rating in the places they fill. */
-function elevenStrength(state: GameState, ids: string[], formation: FormationId): number {
-  const slots = FORMATIONS[formation];
+function elevenStrength(state: GameState, ids: string[], slots: readonly Slot[]): number {
   const rated = ids.map((id, i) => (state.players[id] ? effectiveRating(state.players[id], slots[i].pos) : 0)).filter((v) => v > 0);
   return rated.length ? rated.reduce((s, v) => s + v, 0) / rated.length : 40;
 }
@@ -104,11 +193,21 @@ function codeHash(code: string): number {
   return h;
 }
 
-/** How strong every country is: the ones with a real team by their players, the rest by a fixed made-up level. */
+/** How strong the countries are in real life (about the world ranking): the starting point, so Spain and Argentina are not weaker than Finland. */
+const REAL_LEVEL: Record<string, number> = {
+  ES: 74, FR: 74, AR: 74, BR: 73, GB: 73, DE: 72, PT: 72, NL: 71, BE: 69, IT: 70, HR: 68, UY: 67, CO: 66, MA: 66, SN: 65, JP: 65,
+  CH: 64, DK: 64, MX: 63, US: 63, KR: 62, NO: 63, AT: 62, RS: 61, PL: 61, TR: 61, SE: 62, NG: 60, CI: 60, GH: 58, CM: 57, FI: 55, IS: 54,
+};
+
+/** How strong every country is: mostly its real-life level, with the players it has in this game making up the rest. */
 function strengths(state: GameState): Map<string, number> {
   const real = new Map(nations(state).map((n) => [n.code, n.strength]));
   const out = new Map<string, number>();
-  for (const code of Object.keys(NATIONALITIES)) out.set(code, real.get(code) ?? 48 + (codeHash(code) % 18));
+  for (const code of Object.keys(NATIONALITIES)) {
+    const base = REAL_LEVEL[code] ?? 48 + (codeHash(code) % 18);
+    const players = real.get(code);
+    out.set(code, players === undefined ? base : base * 0.6 + players * 0.4);
+  }
   return out;
 }
 
@@ -138,6 +237,77 @@ function standingsOf(group: string[], table: Record<string, {pl: number; gf: num
 }
 
 const MATCHDAYS = [[[0, 1], [2, 3]], [[0, 2], [1, 3]], [[0, 3], [1, 2]]];
+
+type Tournament = NonNullable<NationalJob["tournament"]>;
+type Scorer = {key: string; name: string; pos: string; score: number; assist: number};
+
+/** How likely each place is to score and to set up a goal. */
+const SCORE_WEIGHT: Record<string, number> = {ST: 10, W: 6, AM: 6, CM: 3, FB: 1, CB: 1, GK: 0.05};
+const ASSIST_WEIGHT: Record<string, number> = {ST: 3, W: 7, AM: 8, CM: 5, FB: 3, CB: 0.5, GK: 0.05};
+const MADE_UP_PLACES = ["ST", "ST", "W", "W", "AM", "CM", "CM", "FB", "CB", "GK"];
+
+const asScorer = (p: Player): Scorer => ({key: p.id, name: fullName(p), pos: p.position, score: (SCORE_WEIGHT[p.position] ?? 1) * (p.attrs.finishing / 60) ** 2, assist: ASSIST_WEIGHT[p.position] ?? 1});
+
+/** The players of a country who score and set up goals: its own best eleven, or made-up ones when it has no team. */
+function scorersOf(state: GameState, country: string): Scorer[] {
+  if (nationalPool(state, country).length >= NATION_MIN) {
+    return nationalSquad(state, country, "4-3-3").lineup.filter((id) => state.players[id]).map((id) => asScorer(state.players[id]));
+  }
+  const names = NATIONALITIES[country];
+  return MADE_UP_PLACES.map((pos, i) => {
+    const r = new Rng(codeHash(country) * 31 + i);
+    return {key: `${country}#${i}`, name: names ? `${r.pick(names.first)} ${r.pick(names.last)}` : `${country} ${i + 1}`, pos, score: (SCORE_WEIGHT[pos] ?? 1) * 1.1, assist: ASSIST_WEIGHT[pos] ?? 1};
+  });
+}
+
+/** A country's goals in a tournament match, handed out to its players (the ones who really scored, where those are known). */
+function creditGoals(state: GameState, t: Tournament, rng: Rng, country: string, goals: number, known?: string[]): void {
+  if (goals <= 0) return;
+  const side = scorersOf(state, country);
+  const stats = (t.stats ??= {});
+  const entry = (s: Scorer) => (stats[s.key] ??= {name: s.name, country, pos: s.pos, goals: 0, assists: 0});
+  for (let i = 0; i < goals; i++) {
+    const given = known?.[i] && state.players[known[i]] ? asScorer(state.players[known[i]]) : undefined;
+    const scorer = given ?? rng.weighted(side, (s) => s.score);
+    entry(scorer).goals++;
+    if (rng.chance(0.7)) {
+      const others = side.filter((s) => s.key !== scorer.key);
+      if (others.length) entry(rng.weighted(others, (s) => s.assist)).assists++;
+    }
+  }
+}
+
+/** The awards when the final has been played: the top scorer, most assists, the best player and the best goalkeeper. */
+function tournamentAwards(state: GameState, t: Tournament): void {
+  const stats = t.stats ?? {};
+  const keys = Object.keys(stats);
+  if (keys.length === 0) return;
+  const last = (r: number) => new Set((t.rounds?.[r] ?? []).flatMap((p) => [p.a, p.b]));
+  const finalists = last(3);
+  const semis = last(2);
+  const bonus = (c: string) => (c === t.champion ? 6 : finalists.has(c) ? 4 : semis.has(c) ? 2 : 0);
+  const top = (score: (k: string) => number) => keys.reduce((best, k) => (score(k) > score(best) ? k : best), keys[0]);
+  const scorer = top((k) => stats[k].goals * 10 + stats[k].assists);
+  const assists = top((k) => stats[k].assists * 10 + stats[k].goals);
+  const player = top((k) => stats[k].goals * 3 + stats[k].assists * 2 + bonus(stats[k].country));
+  // The goalkeeper of the semi-finalist that let in the fewest (per match).
+  const conceded = (c: string) => {
+    let ga = t.table[c]?.ga ?? 0;
+    let pl = t.table[c]?.pl ?? 0;
+    for (const round of t.rounds ?? []) for (const p of round) if (p.a === c || p.b === c) { ga += p.a === c ? p.gb : p.ga; pl++; }
+    return ga / Math.max(1, pl);
+  };
+  const best = [...semis].sort((x, y) => conceded(x) - conceded(y))[0];
+  let keeper: string | undefined;
+  if (best) {
+    const gk = scorersOf(state, best).find((s) => s.pos === "GK");
+    if (gk) {
+      stats[gk.key] ??= {name: gk.name, country: best, pos: "GK", goals: 0, assists: 0};
+      keeper = gk.key;
+    }
+  }
+  t.awards = {scorer, assists, player, keeper};
+}
 
 /** Plays whatever the national team has this week (called once for each week that is played). */
 export function nationalWeek(state: GameState, rng: Rng): void {
@@ -181,6 +351,9 @@ export function nationalWeek(state: GameState, rng: Rng): void {
           const r = simulate(rng, strength.get(a)!, strength.get(b)!, false);
           [ga, gb] = [r.ga, r.gb];
         }
+        const known = t.alive && (a === job.country || b === job.country) ? job.results[0]?.scorers : undefined;
+        creditGoals(state, t, rng, a, ga, a === job.country ? known : undefined);
+        creditGoals(state, t, rng, b, gb, b === job.country ? known : undefined);
         for (const [code, f, ag] of [[a, ga, gb], [b, gb, ga]] as const) {
           const row = t.table[code];
           row.pl++;
@@ -206,25 +379,44 @@ export function nationalWeek(state: GameState, rng: Rng): void {
   // A knockout round: the last sixteen (3), quarter-finals (4), semi-finals (5), the final (6).
   const name = KNOCKOUT_NAMES[step - 3];
   const next: string[] = [];
+  const round: {a: string; b: string; ga: number; gb: number; w: string}[] = [];
   for (let i = 0; i < t.bracket.length; i += 2) {
     const a = t.bracket[i];
     const b = t.bracket[i + 1];
     let aWins: boolean;
+    let ga = 0;
+    let gb = 0;
     if (t.alive && (a === job.country || b === job.country)) {
       const other = a === job.country ? b : a;
       const won = recorded(job, state) ?? userMatch(state, rng, job, other, `${t.comp}.${name}`, true, strength);
       const ours = won[0] > won[1] || (won[0] === won[1] && won[2]);
       aWins = a === job.country ? ours : !ours;
+      [ga, gb] = a === job.country ? [won[0], won[1]] : [won[1], won[0]];
       if (!ours) {
         t.alive = false;
         addMessage(state, {kind: "news", key: "msg.nationalOut", params: {country: `nat.${job.country}`, comp: `national.comp.${t.comp}`}});
       }
-    } else aWins = simulate(rng, strength.get(a)!, strength.get(b)!, true).aWins;
+    } else {
+      const r = simulate(rng, strength.get(a)!, strength.get(b)!, true);
+      aWins = r.aWins;
+      ga = r.ga;
+      gb = r.gb;
+    }
+    const known = a === job.country || b === job.country ? job.results[0]?.scorers : undefined;
+    creditGoals(state, t, rng, a, ga, a === job.country ? known : undefined);
+    creditGoals(state, t, rng, b, gb, b === job.country ? known : undefined);
+    round.push({a, b, ga, gb, w: aWins ? a : b});
     next.push(aWins ? a : b);
   }
+  t.rounds = [...(t.rounds ?? []), round];
   t.bracket = next;
   if (step === 6) {
     t.champion = next[0];
+    tournamentAwards(state, t);
+    // The manager's country on the podium: the champion, the beaten finalist (silver), a beaten semi-finalist (bronze).
+    const lost = (r: number) => (t.rounds?.[r] ?? []).some((p) => (p.a === job.country || p.b === job.country) && p.w !== job.country);
+    const place = next[0] === job.country ? 1 : lost(3) ? 2 : lost(2) ? 3 : 0;
+    if (place) state.celebrations = [...(state.celebrations ?? []), {kind: "tournament", season: state.season, comp: t.comp, place: place as 1 | 2 | 3, country: job.country}];
     const ours = next[0] === job.country;
     t.alive = false;
     if (ours) state.monetization.diamonds += TOURNAMENT_WINNER_DIAMONDS;
@@ -234,6 +426,21 @@ export function nationalWeek(state: GameState, rng: Rng): void {
       params: {country: `nat.${next[0]}`, comp: `national.comp.${t.comp}`, diamonds: TOURNAMENT_WINNER_DIAMONDS},
       highlight: ours,
     });
+    const aw = t.awards;
+    const st = t.stats;
+    if (aw && st && aw.scorer && aw.assists && aw.player && aw.keeper) {
+      addMessage(state, {
+        kind: "news",
+        key: "msg.tournamentAwards",
+        params: {
+          comp: `national.comp.${t.comp}`, season: state.season,
+          scorer: st[aw.scorer].name, scorerCountry: `nat.${st[aw.scorer].country}`, scorerGoals: st[aw.scorer].goals,
+          assister: st[aw.assists].name, assisterCountry: `nat.${st[aw.assists].country}`, assisterN: st[aw.assists].assists,
+          player: st[aw.player].name, playerCountry: `nat.${st[aw.player].country}`,
+          keeper: st[aw.keeper].name, keeperCountry: `nat.${st[aw.keeper].country}`,
+        },
+      });
+    }
   }
 }
 
@@ -242,8 +449,8 @@ export function nationalWeek(state: GameState, rng: Rng): void {
  * against, won on penalties] (a drawn knockout goes to penalties).
  */
 function userMatch(state: GameState, rng: Rng, job: NationalJob, opponent: string, what: string, knockout: boolean, strength: Map<string, number>): [number, number, boolean] {
-  const squad = nationalSquad(state, job.country, job.formation);
-  const ours = elevenStrength(state, squad.lineup, job.formation);
+  const squad = nationalLineup(state, job);
+  const ours = elevenStrength(state, squad.lineup, nationalSlots(job));
   // A more attacking line-up scores and lets in a bit more.
   const attack = job.mentality === "attacking" ? 1.12 : job.mentality === "defensive" ? 0.9 : 1;
   const defence = job.mentality === "attacking" ? 1.1 : job.mentality === "defensive" ? 0.88 : 1;
@@ -274,6 +481,11 @@ function userMatch(state: GameState, rng: Rng, job: NationalJob, opponent: strin
   return [us, them, won];
 }
 
+/** The country the tournament is played in (the same every time it is asked for the season). */
+export function tournamentHost(season: number): string {
+  return new Rng(season * 97 + 5).pick(Object.keys(NATIONALITIES));
+}
+
 /** English names for the countries' teams while they play a match. */
 const COUNTRY_NAMES: Record<string, string> = {
   SE: "Sweden", NO: "Norway", DK: "Denmark", FI: "Finland", ES: "Spain", BR: "Brazil", AR: "Argentina", DE: "Germany", NL: "Netherlands", GB: "England",
@@ -283,8 +495,8 @@ const COUNTRY_NAMES: Record<string, string> = {
 };
 
 /** Who the friendly is against (the same every time it is asked for this week). */
-function friendlyOpponent(state: GameState, job: NationalJob, strength: Map<string, number>): string {
-  return new Rng(state.season * 131 + state.week).pick([...strength.keys()].filter((c) => c !== job.country && (strength.get(c) ?? 0) >= 55));
+function friendlyOpponent(state: GameState, job: NationalJob, strength: Map<string, number>, week = state.week): string {
+  return new Rng(state.season * 131 + week).pick([...strength.keys()].filter((c) => c !== job.country && (strength.get(c) ?? 0) >= 55));
 }
 
 /** What this week's match was, if it has been played live already (goals for us, against, and whether we won). */
@@ -320,7 +532,7 @@ export function dueNationalMatch(state: GameState): {what: string; opponent: str
 }
 
 /** A country as a club for the length of a match (the user's club as the base for everything a club needs). */
-function natClub(base: Club, code: string, formation: FormationId, mentality: Club["mentality"], lineup: string[], bench: string[]): Club {
+function natClub(base: Club, code: string, formation: FormationId, mentality: Club["mentality"], lineup: string[], bench: string[], customSlots?: readonly Slot[]): Club {
   const kit = nationalKit(code);
   return {
     ...structuredClone(base),
@@ -331,7 +543,7 @@ function natClub(base: Club, code: string, formation: FormationId, mentality: Cl
     color2: kit.color2,
     color3: undefined,
     away: undefined,
-    pattern: undefined,
+    pattern: kit.pattern,
     collar: undefined,
     sleeves: undefined,
     formation,
@@ -339,7 +551,7 @@ function natClub(base: Club, code: string, formation: FormationId, mentality: Cl
     lineup,
     bench,
     roles: undefined,
-    customSlots: undefined,
+    customSlots: customSlots?.map((s) => ({...s})),
     officialName: undefined,
     stadium: undefined,
     installments: [],
@@ -359,7 +571,7 @@ export function startNationalMatch(state: GameState, rng: Rng): string | null {
   if (!job || !due) return "national.nothing";
   const strength = strengths(state);
   const base = state.clubs[state.userClubId];
-  const ours = nationalSquad(state, job.country, job.formation);
+  const ours = nationalLineup(state, job);
   // The other country: its own players if it has a team, otherwise a squad made up for the match.
   const tempPlayers: string[] = [];
   let theirs: {lineup: string[]; bench: string[]};
@@ -381,7 +593,7 @@ export function startNationalMatch(state: GameState, rng: Rng): string | null {
     });
     theirs = pickBestLineup(state, {id: `nat:${due.opponent}`} as never, FORMATIONS["4-4-2"], made);
   }
-  const mine = natClub(base, job.country, job.formation, job.mentality, ours.lineup, ours.bench);
+  const mine = natClub(base, job.country, job.formation, job.mentality, ours.lineup, ours.bench, job.customSlots);
   const other = natClub(base, due.opponent, "4-4-2", "balanced", theirs.lineup, theirs.bench);
   state.clubs[mine.id] = mine;
   state.clubs[other.id] = other;
@@ -420,6 +632,35 @@ export function finishNationalMatch(state: GameState, rng: Rng): void {
     key: "msg.nationalMatch",
     params: {what: `national.what.${nm.what}`, country: `nat.${job.country}`, opponent: `nat.${nm.opponent}`, score: `${us}–${them}${pens ? ` (${pens[0]}–${pens[1]})` : ""}`},
   });
+}
+
+/** The international matches still to come this season (the opponent where it is known by now). */
+export function upcomingNational(state: GameState): {week: number; what: string; opponent?: string}[] {
+  const job = state.national;
+  if (!job) return [];
+  const strength = strengths(state);
+  const out: {week: number; what: string; opponent?: string}[] = [];
+  const playedWeek = (week: number) => job.results.some((r) => r.season === state.season && r.week === week);
+  for (const week of FRIENDLY_WEEKS) if (week >= state.week && !playedWeek(week)) out.push({week, what: "friendly", opponent: friendlyOpponent(state, job, strength, week)});
+  const tournament = tournamentOf(state.season);
+  const t = job.tournament && job.tournament.season === state.season ? job.tournament : undefined;
+  if (tournament && (!t || (t.alive && !t.champion))) {
+    const nextKnockout = 3 + (t?.rounds?.length ?? 0);
+    TOURNAMENT_WEEKS.forEach((week, step) => {
+      if (week < state.week || playedWeek(week)) return;
+      if (step <= 2) {
+        const groups = t?.groups ?? drawGroups(state, new Rng(state.season * 7919 + 13), job.country);
+        const group = groups.find((g) => g.includes(job.country));
+        const me = group?.indexOf(job.country) ?? -1;
+        const pair = MATCHDAYS[step].find(([i, j]) => i === me || j === me);
+        out.push({week, what: `${tournament}.g`, opponent: group && pair ? group[pair[0] === me ? pair[1] : pair[0]] : undefined});
+      } else {
+        const i = step === nextKnockout ? (t?.bracket.indexOf(job.country) ?? -1) : -1;
+        out.push({week, what: `${tournament}.${KNOCKOUT_NAMES[step - 3]}`, opponent: i >= 0 ? t!.bracket[i % 2 === 0 ? i + 1 : i - 1] : undefined});
+      }
+    });
+  }
+  return out.sort((x, y) => x.week - y.week);
 }
 
 /** The week (of this season) of the next international match, if there is one left. */

@@ -1,3 +1,6 @@
+import {Flag} from "../common";
+import {upcomingNational} from "../../game/national";
+import type {TKey} from "../../i18n";
 import {useState} from "react";
 import type {ReactNode} from "react";
 import {Icon, iconize} from "../Icon";
@@ -63,8 +66,23 @@ export function Fixtures() {
     </div>
   );
 
+  const national = upcomingNational(game);
   return (
     <>
+      {/* The national team's matches to come (when the manager coaches a country). */}
+      {game.national && national.length > 0 && (
+        <Card title={<><Flag code={game.national.country} size={20} /> {iconize(t("national.upcoming"))}</>}>
+          <ul className="plain-list national-upcoming">
+            {national.map((m) => (
+              <li key={m.week}>
+                <span className="muted small">{iconize(t("cup.week", {week: m.week}))}</span>
+                <strong>{iconize(t(`national.what.${m.what}` as TKey))}</strong>
+                {m.opponent && <span><Flag code={m.opponent} size={15} /> {t(`nat.${m.opponent}` as TKey)}</span>}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
       <Card
         title={t("nav.fixtures")}
         actions={

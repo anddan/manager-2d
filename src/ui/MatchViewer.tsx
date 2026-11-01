@@ -1227,11 +1227,11 @@ function Shootout({report, seed, userSide, textOnly: viewIsText, onDone}: {repor
           <span className="shootout-score">{home.short} – {away.short}</span>
         </div>
         {viewIsText && (
-          <div className="manager-item manager-toggle">
-            <span><Icon name="target" size={18} /> {iconize(t("so.takeLabel"))}</span>
-            <span className="speed-group" role="group" aria-label={t("so.takeLabel")}>
+          <div className="so-mode">
+            <span className="muted small"><Icon name="target" size={16} /> {iconize(t("so.takeLabel"))}</span>
+            <span className="speed-group manager-view" role="radiogroup" aria-label={t("so.takeLabel")}>
               {([true, false] as const).map((self) => (
-                <button key={String(self)} type="button" className={takeThem === self ? "chip active" : "chip"} onClick={() => setTakeThem(self)}>{self ? t("match.self") : t("match.auto")}</button>
+                <button key={String(self)} type="button" role="radio" aria-checked={takeThem === self} className={takeThem === self ? "chip active" : "chip"} onClick={() => setTakeThem(self)}>{self ? t("match.self") : t("match.auto")}</button>
               ))}
             </span>
           </div>
@@ -1666,15 +1666,17 @@ function TeamTalkDialog({report, motmId, onDone}: {report: MatchReport; motmId?:
   const icons: Record<TeamTalk, IconName> = {praise: "star", calm: "target", demand: "fire", disappointed: "warn"};
   // One of ours was the player of the match: confetti in the club's colours and a chime when the talk opens.
   const motmOurs = !!motmId && game.players[motmId]?.clubId === game.userClubId;
+  // The confetti and the chime are for a win (with one of ours the player of the match).
+  const celebrate = motmOurs && verdict.result === "W";
   const motmClub = game.clubs[game.userClubId];
   const openPlayer = useGame((s) => s.openPlayer);
   useEffect(() => {
-    if (motmOurs && effectsOn()) chime();
+    if (celebrate && effectsOn()) chime();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <MatchDialog title={<><Icon name="debrief" size={20} /> {iconize(t("tt.title"))}</>} onClose={() => onDone()}>
       {/* One of ours was the player of the match: said first, with a little sparkle. */}
-      {motmOurs && effectsOn() && createPortal(<div className="motm-confetti"><Confetti colors={[motmClub.color, motmClub.color2, "#facc15"]} /></div>, document.body)}
+      {celebrate && effectsOn() && createPortal(<div className="motm-confetti"><Confetti colors={[motmClub.color, motmClub.color2, "#facc15"]} /></div>, document.body)}
       {motmOurs && motmId && (
         <p className="tt-motm"><span className="tt-motm-star"><Icon name="star" size={18} /></span> {iconize(t("motm.title"))}: <button type="button" className="link" onClick={() => openPlayer(motmId)}>{fullName(game.players[motmId])}</button> ({(report.ratings[motmId] ?? 0).toFixed(1)})</p>
       )}

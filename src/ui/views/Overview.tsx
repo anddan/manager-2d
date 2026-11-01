@@ -8,7 +8,9 @@ import {clubPlayers, teamOvr, wageBill} from "../../game/ratings";
 import {useT} from "../../i18n";
 import {DailyTasks} from "../DailyTasks";
 import {useGame, useGameState} from "../../store";
-import {Card, Empty, Face, PlayerLink} from "../common";
+import {Card, Empty, Face, Flag, PlayerLink} from "../common";
+import {dueNationalMatch} from "../../game/national";
+import type {TKey} from "../../i18n";
 
 export function Overview() {
   const {t, tx, money} = useT();
@@ -17,6 +19,8 @@ export function Overview() {
   const watchMatch = useGame((s) => s.watchMatch);
   const club = userClub(game);
   const next = nextUserFixture(game);
+  // A national match this week is the next match (it is played with the usual play button).
+  const natDue = game.national ? dueNationalMatch(game) : null;
   const position = leaguePosition(game, club.id);
   const squad = clubPlayers(game, club.id);
   const injured = squad.filter((p) => p.injuryWeeks > 0 || p.suspension > 0);
@@ -31,7 +35,15 @@ export function Overview() {
       <BoardWarningBanner />
       <DailyTasks />
       <Card title={t("ov.nextMatch")}>
-        {next ? (
+        {natDue && game.national ? (
+          <div className="ov-next">
+            <div className="ov-next-what"><Icon name="ball" size={20} /> {iconize(t(`national.what.${natDue.what}` as TKey))}</div>
+            <div className="team"><Flag code={game.national.country} size={44} /><span>{t(`nat.${game.national.country}` as TKey)}</span></div>
+            <span className="vs">–</span>
+            <div className="team"><Flag code={natDue.opponent} size={44} /><span>{t(`nat.${natDue.opponent}` as TKey)}</span></div>
+            <button className="btn" onClick={() => setView("national")}><Icon name="clipboard" size={18} /> {iconize(t("nav.national"))}</button>
+          </div>
+        ) : next ? (
           <div className="ov-next">
             {/* What it is first, a little bigger: the cup round or the league round. */}
             <div className="ov-next-what">{isCupFixture(next) ? <><Icon name="trophy" size={20} /> {iconize(t("cup.name"))} · {iconize(t(CUP_STAGES[next.stage]))}</> : t("ov.round", {round: next.round})}</div>

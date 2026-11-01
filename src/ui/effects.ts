@@ -7,10 +7,9 @@ import {chime, kaching} from "./sound";
  * when it's hidden, on phones), which then gives a pulse.
  */
 /** The line icons (as in the menus) drawn in the effects, which are made outside React. */
-const svg = (paths: string) => `<svg class="icon" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
-const DIAMOND_SVG = svg(`<path d="M6 4h12l3 5-9 11L3 9l3-5Z" /><path d="M3 9h18M9 4l3 16M15 4l-3 16" />`);
-const COINS_SVG = svg(`<ellipse cx="12" cy="6" rx="7" ry="3" /><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6" />`);
-const BOLT_SVG = svg(`<path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" />`);
+const DIAMOND_SVG = `<svg class="icon" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true"><path d="M6 3.5h12l4.5 6.5L12 21.5 1.5 10Z" fill="currentColor"/><path d="M6 3.5h12l4.5 6.5h-21Z" fill="#fff" opacity=".3"/><path d="M1.5 10h21L12 21.5Z" fill="#000" opacity=".18"/><path d="M12 21.5 7.5 10h9Z" fill="#fff" opacity=".2"/><path d="M6 3.5h12l4.5 6.5L12 21.5 1.5 10Z" fill="none" stroke="#000" stroke-opacity=".28" stroke-width=".9" stroke-linejoin="round"/><path d="M7.8 5h3.6L9.3 8.6Z" fill="#fff" opacity=".8"/></svg>`;
+const COINS_SVG = `<svg class="icon" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true">${[15.5, 10.5, 5.5].map((cy) => `<path d="M4 ${cy}v3a8 3.2 0 0 0 16 0v-3Z" fill="currentColor"/><path d="M4 ${cy}v3a8 3.2 0 0 0 16 0v-3Z" fill="#000" opacity=".26"/><ellipse cx="12" cy="${cy}" rx="8" ry="3.2" fill="currentColor"/><ellipse cx="12" cy="${cy}" rx="8" ry="3.2" fill="#fff" opacity=".28"/><ellipse cx="12" cy="${cy}" rx="5.5" ry="2" fill="none" stroke="#000" stroke-opacity=".22" stroke-width=".7"/>`).join("")}</svg>`;
+const BOLT_SVG = `<svg class="icon" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true"><path d="M13.5 1.5 4 13.5h6.5L9 22.5l11-13.5h-6.5Z" fill="currentColor"/><path d="M13.5 1.5 4 13.5h6.5l1.8-12Z" fill="#fff" opacity=".34"/><path d="M13.5 9H20L9 22.5l1.5-9h3.5Z" fill="#000" opacity=".2"/><path d="M13.5 1.5 4 13.5h6.5L9 22.5l11-13.5h-6.5Z" fill="none" stroke="#000" stroke-opacity=".28" stroke-width=".9" stroke-linejoin="round"/></svg>`;
 
 export function diamondBurst(from: Element | null | undefined, amount: number): void {
   if (amount <= 0) return;

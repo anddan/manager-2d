@@ -106,7 +106,7 @@ export interface Player {
   /** The id their looks are drawn from, when they came from another game (their id here is new). */
   lookId?: string;
   /** A look the manager picked (skin, hair, beard…); missing means the one the player came with. */
-  look?: {skin: string; hair: string; style: string; beard: string; eyes?: string; glasses?: boolean; lashes?: boolean; highlights?: boolean; shape?: string; headband?: string};
+  look?: {skin: string; hair: string; style: string; beard: string; eyes?: string; glasses?: boolean; lashes?: boolean; highlights?: boolean; shape?: string; ears?: string; browStyle?: string; headband?: string};
   age: number;
   /** "f" for women; missing means a man (older saves only had men). */
   gender?: "f";
@@ -427,6 +427,10 @@ export interface NationalJob {
   since: number;
   formation: FormationId;
   mentality: Mentality;
+  /** The eleven the manager has picked (player ids by place, "" for an empty place); missing: the best eleven. */
+  lineup?: string[];
+  /** A free-form formation (the places dragged about on the pitch), instead of the formation. */
+  customSlots?: Slot[];
   results: NationalResult[];
   /** The tournament this season (32 countries: eight groups of four, then the last sixteen, quarter-finals, semi-finals, final). */
   tournament?: {
@@ -439,7 +443,13 @@ export interface NationalJob {
     table: Record<string, {pl: number; gf: number; ga: number; pts: number}>;
     /** The countries still in the knockout, in pairing order (empty during the groups). */
     bracket: string[];
+    /** The knockout rounds already played: who met, the goals, and who went on. */
+    rounds?: {a: string; b: string; ga: number; gb: number; w: string}[][];
     champion?: string;
+    /** Who scored and set up the goals, all through the tournament (every country's players; made-up ones for the countries without a team). */
+    stats?: Record<string, {name: string; country: string; pos: string; goals: number; assists: number}>;
+    /** The awards when it is over: keys into the stats. */
+    awards?: {scorer?: string; assists?: string; player?: string; keeper?: string};
   };
 }
 
@@ -530,8 +540,11 @@ export interface ManagerLook {
   lashes?: boolean;
   /** Blond highlights in the hair. */
   highlights?: boolean;
-  /** The shape of the face: oval (the default), round or a strong jaw. */
+  /** The shape of the head (oval, wide, with or without a dimple in the chin; older saves have the older face shapes). */
   shape?: string;
+  /** The ears and the brows, chosen on their own (missing: the ones the older face shape had). */
+  ears?: string;
+  browStyle?: string;
   /** A headband in this colour (missing: none). */
   headband?: string;
   /** Eye colour; missing means brown. */
@@ -618,7 +631,7 @@ export interface GameState {
   /** Friends' players looked at with a code and kept to decide on later (by code). */
   friendLooks?: Record<string, FriendSaleEntry>;
   /** Trophies won and not celebrated yet (shown once, then removed). */
-  celebrations?: ({kind: "league" | "cup"; season: number} | {kind: "award"; season: number; awards: {key: "player" | "keeper" | "talent" | "manager"; playerId?: string; name: string}[]})[];
+  celebrations?: ({kind: "league" | "cup"; season: number} | {kind: "tournament"; season: number; comp: "wc" | "ec"; place: 1 | 2 | 3; country: string} | {kind: "award"; season: number; awards: {key: "player" | "keeper" | "talent" | "manager"; playerId?: string; name: string}[]})[];
   /** Set when the manager is sacked: the game is over. */
   gameOver?: {season: number; week: number; reason: "debt"};
   /** The last few post-match team talks, oldest first: the same words every week wear thin. */
