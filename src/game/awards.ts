@@ -58,15 +58,21 @@ export function announceAwards(state: GameState, awards: SeasonAwards): void {
   const mine = (id?: string) => !!id && state.players[id]?.clubId === state.userClubId;
   const label = (id?: string) => {
     const p = id ? state.players[id] : undefined;
-    return p ? `${fullName(p)} (${p.clubId ? state.clubs[p.clubId].short : "–"})` : "–";
+    return p ? `${fullName(p)} (${p.clubId ? state.clubs[p.clubId].name : "–"})` : "–";
   };
   const managerMine = awards.managerClub === state.userClubId;
-  const ours: {key: AwardKey; playerId?: string; name: string}[] = [
-    ...(mine(awards.player) ? [{key: "player" as const, playerId: awards.player, name: fullName(state.players[awards.player!])}] : []),
-    ...(mine(awards.keeper) ? [{key: "keeper" as const, playerId: awards.keeper, name: fullName(state.players[awards.keeper!])}] : []),
-    ...(mine(awards.talent) ? [{key: "talent" as const, playerId: awards.talent, name: fullName(state.players[awards.talent!])}] : []),
-    ...(managerMine ? [{key: "manager" as const, name: state.managerName}] : []),
+  // Everybody who wins one, with their team; the ones that are ours are marked.
+  const winner = (key: AwardKey, id?: string) => {
+    const p = id ? state.players[id] : undefined;
+    return p ? [{key, playerId: id, name: fullName(p), team: p.clubId ? state.clubs[p.clubId].name : undefined, mine: mine(id)}] : [];
+  };
+  const everyone: {key: AwardKey; playerId?: string; name: string; team?: string; mine?: boolean}[] = [
+    ...winner("player", awards.player),
+    ...winner("keeper", awards.keeper),
+    ...winner("talent", awards.talent),
+    ...(awards.managerClub ? [{key: "manager" as const, name: managerMine ? state.managerName : state.clubs[awards.managerClub].name, team: state.clubs[awards.managerClub].name, mine: managerMine}] : []),
   ];
+  const ours = everyone.filter((a) => a.mine);
   addMessage(state, {
     kind: "news",
     key: "msg.awards",
@@ -80,5 +86,5 @@ export function announceAwards(state: GameState, awards: SeasonAwards): void {
     },
     action: {type: "ack"},
   });
-  if (ours.length > 0) state.celebrations = [...(state.celebrations ?? []), {kind: "award", season: state.season, awards: ours}];
+  if (ours.length > 0) state.celebrations = [...(state.celebrations ?? []), {kind: "award", season: state.season, awards: everyone}];
 }

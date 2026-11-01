@@ -1,4 +1,4 @@
-import {useState} from "react";
+import {useEffect, useState} from "react";
 import {Icon, type IconName, iconize} from "../Icon";
 import {shortName} from "../../game/helpers";
 import {answerTransferRequest} from "../../game/morale";
@@ -81,6 +81,10 @@ export function AwardsList({message: m}: {message: Message}) {
     {key: "manager", icon: "star", name: String(p.manager), id: "", mine: p.managerMine === 1},
   ];
   const winners = rows.filter((r) => r.id && game.players[r.id]);
+  // Seen is enough: the awards never need an answer.
+  useEffect(() => {
+    if (!m.resolved) act((g) => { const msg = g.inbox.find((x) => x.id === m.id); if (msg) msg.resolved = true; });
+  }, [m.id, m.resolved, act]);
   return (
     <>
     <ul className="awards-list">
@@ -101,11 +105,6 @@ export function AwardsList({message: m}: {message: Message}) {
             <PlayerCard game={game} player={game.players[r.id]} />
           </button>
         ))}
-      </div>
-    )}
-    {!m.resolved && (
-      <div className="inbox-action">
-        <button className="btn small" onClick={() => act((g) => { const msg = g.inbox.find((x) => x.id === m.id); if (msg) msg.resolved = true; })}>{iconize(t("award.ok"))}</button>
       </div>
     )}
     </>

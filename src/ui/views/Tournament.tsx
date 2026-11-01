@@ -5,7 +5,7 @@ import {Icon, iconize} from "../Icon";
 import {TOURNAMENT_WEEKS, tournamentHost, tournamentOf} from "../../game/national";
 import type {TKey} from "../../i18n";
 import {useT} from "../../i18n";
-import {useGameState} from "../../store";
+import {useGame, useGameState} from "../../store";
 import {Card, Empty, Flag} from "../common";
 
 const ROUNDS = ["national.round.r16", "national.round.qf", "national.round.sf", "national.round.final"] as const;
@@ -14,9 +14,13 @@ export function Tournament() {
   const {t} = useT();
   const game = useGameState();
   const job = game.national;
-  const comp = tournamentOf(game.season);
+  const openPlayer = useGame((s) => s.openPlayer);
+  // This year's, or else the last one played (so the winner and the tables can be looked at after it is over, also when out of it).
+  const tr = job?.tournament;
+  const comp = tr?.comp ?? tournamentOf(game.season);
   if (!job || !comp) return <Card title={t("nav.cup")}><Empty>{iconize(t("national.none"))}</Empty></Card>;
-  const tr = job.tournament && job.tournament.season === game.season ? job.tournament : undefined;
+  const year = tr?.season ?? game.season;
+  const comingUp = tournamentOf(game.season) !== null && year !== game.season;
   const [tree, setTree] = useState(false);
   // Only the manager's own group (off to begin with), like the cup.
   const [onlyMine, setOnlyMine] = useState(true);
@@ -32,13 +36,16 @@ export function Tournament() {
   const row = (c: string) => <span className={c === job.country ? "strong" : undefined}><Flag code={c} size={15} /> {name(c)}</span>;
   return (
     <div className="grid">
-      <Card title={<><Icon name="trophy" size={20} /> {iconize(t(`national.comp.${comp}` as TKey))} {game.season}</>}>
-        <p className="muted tight"><Flag code={tournamentHost(game.season)} size={16} /> {iconize(t("national.host", {country: `nat.${tournamentHost(game.season)}`}))}</p>
+      <Card title={<><Icon name="trophy" size={20} /> {iconize(t(`national.comp.${comp}` as TKey))} {year}</>}>
+        <p className="muted tight"><Flag code={tournamentHost(year)} size={16} /> {iconize(t("national.host", {country: `nat.${tournamentHost(year)}`}))}</p>
+        {comingUp && <p className="muted small tight">{iconize(t("national.drawAt", {week: TOURNAMENT_WEEKS[0]}))}</p>}
         {!tr ? (
           <p className="muted">{iconize(t("national.drawAt", {week: TOURNAMENT_WEEKS[0]}))}</p>
         ) : (
           <>
             {tr.champion && <p className="strong"><Icon name="trophy" size={18} /> {iconize(t("national.champion", {country: `nat.${tr.champion}`}))}</p>}
+            {/* The two in the final, once they are known (also when we are out of it). */}
+            {!tr.champion && tr.bracket.length === 2 && <p className="strong"><Icon name="trophy" size={18} /> {iconize(t("national.round.final"))}: {row(tr.bracket[0])} <span className="muted">–</span> {row(tr.bracket[1])}</p>}
             {!tr.champion && <p className="muted small tight">{iconize(t("national.stillIn", {n: tr.bracket.length > 0 ? tr.bracket.length : 32}))}</p>}
           </>
         )}
@@ -53,7 +60,7 @@ export function Tournament() {
               return (
                 <li key={k} className={s.country === job.country ? "mine" : undefined}>
                   <span className="muted">{iconize(t(`national.award.${k}` as TKey))}</span>
-                  <span className="strong"><Flag code={s.country} size={15} /> {s.name}</span>
+                  <span className="strong"><Flag code={s.country} size={15} /> {id && game.players[id] ? <button type="button" className="link" onClick={() => openPlayer(id)}>{s.name}</button> : s.name}</span>
                 </li>
               );
             })}
@@ -70,18 +77,19 @@ export function Tournament() {
           }
         >
           {tree ? (
-            // The bracket: one column for each round (the last sixteen on the left, the final on the right), a box for each match.
-            <div className="ko-tree">
-              {rounds.map((round, i) => (
-                <div key={i} className="ko-col">
-                  <h4>{iconize(t(ROUNDS[i] as TKey))}</h4>
+            // The bracket from both sides in to the final in the middle: the last sixteen at the edges, then the quarter-finals,
+            // the semi-finals, and the final in the centre (flags and country codes, so all seven columns fit a phone).
+            <div className="ko-tree sym">
+              {([[0, 0, 4], [1, 0, 2], [2, 0, 1], [3, 0, 1], [2, 1, 2], [1, 2, 4], [0, 4, 8]] as const).map(([r, from, to], col) => (
+                <div key={col} className={r === 3 ? "ko-col final" : "ko-col"}>
+                  <h4 title={t(ROUNDS[r] as TKey)}>{iconize(t(ROUNDS[r] as TKey))}</h4>
                   <div className="ko-col-matches">
-                    {round.pairs.map((p, k) => (
+                    {rounds[r].pairs.slice(from, to).map((p, k) => (
                       <div key={k} className={`ko-match ${p.a === job.country || p.b === job.country ? "mine" : ""}`}>
                         {[p.a, p.b].map((c, side) => (
-                          <div key={side} className={round.done && c && p.w === c ? "ko-team won" : "ko-team"}>
-                            {c ? row(c) : <span className="muted">–</span>}
-                            <b>{round.done ? (side === 0 ? p.ga : p.gb) : ""}</b>
+                          <div key={side} className={rounds[r].done && c && p.w === c ? "ko-team won" : "ko-team"} title={c ? name(c) : undefined}>
+                            {c ? <span className="ko-code"><Flag code={c} size={13} /> {c}</span> : <span className="muted">–</span>}
+                            <b>{rounds[r].done ? (side === 0 ? p.ga : p.gb) : ""}</b>
                           </div>
                         ))}
                       </div>
@@ -140,7 +148,7 @@ export function Tournament() {
         <>
           {([["goals", "national.scorers"], ["assists", "national.assistLeague"]] as const).map(([field, title]) => {
             const other = field === "goals" ? "assists" : "goals";
-            const list = Object.values(tr.stats!).filter((s) => s[field] > 0).sort((x, y) => y[field] - x[field] || y[other] - x[other] || x.name.localeCompare(y.name)).slice(0, 10);
+            const list = Object.entries(tr.stats!).map(([id, s]) => ({...s, id})).filter((s) => s[field] > 0).sort((x, y) => y[field] - x[field] || y[other] - x[other] || x.name.localeCompare(y.name)).slice(0, 10);
             return (
               <Card key={field} title={<><Icon name={field === "goals" ? "ball" : "boot"} size={20} /> {iconize(t(title as TKey))}</>}>
                 <table className="table national-table">
@@ -148,7 +156,7 @@ export function Tournament() {
                     {list.map((s, i) => (
                       <tr key={s.name + s.country} className={s.country === job.country ? "mine" : undefined}>
                         <td className="num">{i + 1}</td>
-                        <td><Flag code={s.country} size={15} /> {s.name}</td>
+                        <td><Flag code={s.country} size={15} /> {game.players[s.id] ? <button type="button" className="link" onClick={() => openPlayer(s.id)}>{s.name}</button> : s.name}</td>
                         <td className="num strong">{s[field]}</td>
                       </tr>
                     ))}

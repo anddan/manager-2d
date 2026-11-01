@@ -631,7 +631,7 @@ export interface GameState {
   /** Friends' players looked at with a code and kept to decide on later (by code). */
   friendLooks?: Record<string, FriendSaleEntry>;
   /** Trophies won and not celebrated yet (shown once, then removed). */
-  celebrations?: ({kind: "league" | "cup"; season: number} | {kind: "tournament"; season: number; comp: "wc" | "ec"; place: 1 | 2 | 3; country: string} | {kind: "award"; season: number; awards: {key: "player" | "keeper" | "talent" | "manager"; playerId?: string; name: string}[]})[];
+  celebrations?: ({kind: "league" | "cup"; season: number} | {kind: "tournament"; season: number; comp: "wc" | "ec"; place: 1 | 2 | 3; country: string} | {kind: "award"; season: number; awards: {key: "player" | "keeper" | "talent" | "manager"; playerId?: string; name: string; /** The winner's team, and whether it is ours. */ team?: string; mine?: boolean}[]})[];
   /** Set when the manager is sacked: the game is over. */
   gameOver?: {season: number; week: number; reason: "debt"};
   /** The last few post-match team talks, oldest first: the same words every week wear thin. */

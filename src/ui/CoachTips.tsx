@@ -7,7 +7,7 @@ import {useT, type TKey} from "../i18n";
 import {useGame} from "../store";
 import {Icon, iconize} from "./Icon";
 
-export const COACH_TIPS = 18;
+export const COACH_TIPS = 20;
 
 export function CoachTips() {
   const {t} = useT();

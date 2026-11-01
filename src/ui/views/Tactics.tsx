@@ -411,6 +411,7 @@ export function Tactics() {
             <Hint>
               <p>{iconize(t("tac.benchHint"))}</p>
               <p>{iconize(t(custom ? "tac.customHint" : "tac.dragHint"))}</p>
+              <p>{iconize(t("tac.fitnessHint"))}</p>
             </Hint>
             <ul className="pick-list">
               {(benched.length > 0 || !!drag.ghost) && <li className={`pick-group bench-head ${typeof drag.over === "object" && drag.over !== null && "zone" in drag.over && drag.over.zone === "bench" ? "drop" : ""}`} data-zone="bench"><Icon name="bench" size={18} /> {iconize(t("tac.benchGroup", {n: benched.length, max: BENCH_SIZE}))}</li>}

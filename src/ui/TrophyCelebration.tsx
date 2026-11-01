@@ -43,9 +43,9 @@ export function TrophyCelebration() {
           {next.awards.map((a) => {
             const p = a.playerId ? game.players[a.playerId] : undefined;
             return (
-              <li key={a.key} className="award-winner">
+              <li key={a.key} className={a.mine ? "award-winner mine" : "award-winner"}>
                 {p ? <button type="button" className="award-winner-card" title={t("tac.profile")} aria-label={`${t("tac.profile")}: ${a.name}`} onClick={() => { done(); openPlayer(p.id); }}><PlayerCard game={game} player={p} /></button> : <span className="award-winner-manager"><ManagerAvatar look={game.managerLook ?? defaultManagerLook(game.managerName)} size={72} tie={club.color} /></span>}
-                <span className="award-winner-text"><small>{iconize(t(`award.${a.key}` as TKey))}</small><strong>{a.name}</strong></span>
+                <span className="award-winner-text"><small>{iconize(t(`award.${a.key}` as TKey))}</small>{p ? <button type="button" className="link award-name" onClick={() => { done(); openPlayer(p.id); }}><strong>{a.name}</strong></button> : <strong>{a.name}</strong>}{a.team && a.key !== "manager" && <small className="award-team">{a.team}</small>}</span>
               </li>
             );
           })}

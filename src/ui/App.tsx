@@ -222,7 +222,9 @@ function Nav() {
   const {t} = useT();
   const natGame = useGameState();
   NATIONAL_ON = !!natGame.national;
-  TOURNAMENT_LABEL = tournamentOf(natGame.season) ? `${t(`national.comp.${tournamentOf(natGame.season)}` as never)} ${natGame.season}` : null;
+  // The year's tournament, or the last one played (to look at after it is over).
+  const lastTournament = natGame.national?.tournament;
+  TOURNAMENT_LABEL = lastTournament ? `${t(`national.comp.${lastTournament.comp}` as never)} ${lastTournament.season}` : tournamentOf(natGame.season) ? `${t(`national.comp.${tournamentOf(natGame.season)}` as never)} ${natGame.season}` : null;
   const view = useGame((s) => s.view);
   const setView = useGame((s) => s.setView);
   const badges = useBadges();

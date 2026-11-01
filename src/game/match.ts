@@ -1413,10 +1413,13 @@ export function createMatch(
         }
       }
 
-      // Injuries.
-      if (rng.chance(0.003)) {
+      // Injuries: tired legs (low fitness) get hurt more often, both in how likely it is that someone is and in who.
+      const worn = (id: string) => (state.players[id].fitness >= 70 ? 1 : 1 + ((70 - state.players[id].fitness) / 70) * 2);
+      const onField = [...home.onPitch, ...away.onPitch];
+      const tiredness = onField.length > 0 ? onField.reduce((sum, o) => sum + worn(o.id), 0) / onField.length : 1;
+      if (rng.chance(0.003 * tiredness)) {
         const team = rng.chance(0.5) ? home : away;
-        const picked = team.onPitch.length > 0 ? rng.weighted(team.onPitch, (o) => (hasTrait(state.players[o.id], "fragile") ? 1.5 : 1)) : undefined;
+        const picked = team.onPitch.length > 0 ? rng.weighted(team.onPitch, (o) => (hasTrait(state.players[o.id], "fragile") ? 1.5 : 1) * worn(o.id)) : undefined;
         // Shin guards keep some knocks from becoming injuries.
         const guard = picked && state.players[picked.id].shin;
         const hurt = guard && rng.chance(SHIN_PROTECT[guard.tier]) ? undefined : picked;

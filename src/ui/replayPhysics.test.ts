@@ -253,6 +253,8 @@ describe("replay movement", () => {
           if (!left && !before.flying && s.flying && before.reached === i) {
             left = true;
             const taker = before.bodies[f.playerId!];
+            // (Someone hurt and taken off in that very minute is no longer on the pitch to restart from.)
+            if (!taker) return;
             if (Math.hypot(taker.x - before.ball.x, taker.y - before.ball.y) > 2.5) bad.push(`${f.kind} ${f.minute.toFixed(1)}`);
           }
         }

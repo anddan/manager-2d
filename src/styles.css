@@ -2766,3 +2766,14 @@ button.manager-item:hover:not(:disabled) { background: rgb(127 127 127 / 0.18); 
 /* A country's flag where a club's badge would be. */
 .crest-flag { display: inline-flex; align-items: center; justify-content: center; background: none !important; border: 0 !important; box-shadow: none !important; }
 .crest-flag-btn { background: none; border: 0; padding: 0; cursor: pointer; display: inline-flex; }
+
+.award-winner.mine .award-winner-text strong { color: #facc15; }
+.award-winner-text .award-team { display: block; opacity: 0.8; }
+
+/* The bracket from both sides in to the final: seven narrow columns. */
+.ko-tree.sym { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; overflow: visible; }
+.ko-tree.sym .ko-col { min-width: 0; }
+.ko-tree.sym h4 { margin: 0 0 4px; font-size: 0.58rem; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ko-tree.sym .ko-team { padding: 3px 4px; gap: 2px; font-size: 0.7rem; }
+.ko-tree.sym .ko-code { display: inline-flex; align-items: center; gap: 2px; min-width: 0; }
+.ko-tree.sym .ko-col.final .ko-match { border-left-color: #facc15; }
