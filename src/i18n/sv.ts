@@ -520,7 +520,7 @@ export const sv = {
 
   // Tactics
   "tac.auto": "Välj bästa elvan",
-  "tac.clearAll": "Rensa alla",
+  "tac.clearAll": "Rensa",
   "tac.defensive": "Defensiv",
   "tac.balanced": "Balanserad",
   "tac.attacking": "Offensiv",

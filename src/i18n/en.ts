@@ -508,7 +508,7 @@ export const en: Record<keyof typeof sv, string> = {
 
   "tac.auto": "Pick the best XI",
 
-  "tac.clearAll": "Clear all",
+  "tac.clearAll": "Clear",
   "tac.defensive": "Defensive",
   "tac.balanced": "Balanced",
   "tac.attacking": "Attacking",

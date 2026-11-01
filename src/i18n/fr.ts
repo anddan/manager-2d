@@ -507,7 +507,7 @@ export const fr: Record<keyof typeof sv, string> = {
   "happy.shirt": "Numéro de maillot",
 
   "tac.auto": "Choisir le meilleur onze",
-  "tac.clearAll": "Tout vider",
+  "tac.clearAll": "Vider",
   "tac.defensive": "Défensive",
   "tac.balanced": "Équilibrée",
   "tac.attacking": "Offensive",

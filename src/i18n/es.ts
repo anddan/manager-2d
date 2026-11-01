@@ -508,7 +508,7 @@ export const es: Record<keyof typeof sv, string> = {
 
   "tac.auto": "Elegir el mejor once",
 
-  "tac.clearAll": "Vaciar todo",
+  "tac.clearAll": "Vaciar",
   "tac.defensive": "Defensiva",
   "tac.balanced": "Equilibrada",
   "tac.attacking": "Ofensiva",
