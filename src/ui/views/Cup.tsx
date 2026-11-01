@@ -12,6 +12,7 @@ import {useGame, useGameState} from "../../store";
 import {Card, Empty, Hint} from "../common";
 import {FlagIcon} from "../Flag";
 import {FixtureRow} from "./Fixtures";
+import {TeamLink, TeamOvr} from "../LineupSheet";
 
 /** Who goes into each quarter-final before it's known: [group, place] for home and away. */
 const QUARTER_SEEDS: [[number, number], [number, number]][] = [
@@ -62,16 +63,21 @@ function Groups() {
   // Just our group to start with (if we are in it); the box shows all four.
   const ours = cup.groups.findIndex((ids) => ids.includes(game.userClubId));
   const [onlyOurs, setOnlyOurs] = useState(true);
+  // Less to begin with, as in the league table: just the points; "Show more" opens out played, won, drawn, lost and goal difference.
+  const [more, setMore] = useState(false);
   return (
     <Card
       title={<><Icon name="trophy" size={20} /> {iconize(t("cup.groups"))}</>}
       className="span-2"
       actions={
-        ours >= 0 ? (
-          <label className="toggle">
-            <input type="checkbox" checked={onlyOurs} onChange={(e) => setOnlyOurs(e.target.checked)} /> {iconize(t("cup.onlyOurs"))}
-          </label>
-        ) : undefined
+        <>
+          {ours >= 0 && (
+            <label className="toggle">
+              <input type="checkbox" checked={onlyOurs} onChange={(e) => setOnlyOurs(e.target.checked)} /> {iconize(t("cup.onlyOurs"))}
+            </label>
+          )}
+          <button type="button" className="btn small" aria-expanded={more} onClick={() => setMore(!more)}>{iconize(t(more ? "tbl.showLess" : "tbl.showMore"))}</button>
+        </>
       }
     >
       <Hint>{iconize(t("cup.groupHint"))}</Hint>
@@ -88,8 +94,8 @@ function Groups() {
                 <thead>
                   <tr>
                     <th>#</th><th>{iconize(t("col.name"))}</th>
-                    <th className="num">{iconize(t("cup.colP"))}</th><th className="num">{iconize(t("cup.colW"))}</th><th className="num">{iconize(t("cup.colD"))}</th><th className="num">{iconize(t("cup.colL"))}</th>
-                    <th className="num">{iconize(t("cup.colGD"))}</th><th className="num">{iconize(t("cup.colPts"))}</th>
+                    {more && <><th className="num">{iconize(t("cup.colP"))}</th><th className="num">{iconize(t("cup.colW"))}</th><th className="num">{iconize(t("cup.colD"))}</th><th className="num">{iconize(t("cup.colL"))}</th>
+                    <th className="num">{iconize(t("cup.colGD"))}</th></>}<th className="num">{iconize(t("cup.colPts"))}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -101,10 +107,10 @@ function Groups() {
                       <tr key={r.clubId} className={`${r.clubId === game.userClubId ? "me" : ""} ${i < 2 ? "through" : ""}`}>
                         <td>{i + 1}</td>
                         <td className="cup-club">
-                          {club.country ? <FlagIcon code={club.country} size={13} /> : null} <span className="crest tiny" style={{background: club.color}} /> {club.name}
+                          {club.country ? <FlagIcon code={club.country} size={13} /> : null} <span className="crest tiny" style={{background: club.color}} /> <TeamLink clubId={club.id} />{more && <> <TeamOvr clubId={club.id} /></>}
                         </td>
-                        <td className="num">{r.played}</td><td className="num">{r.won}</td><td className="num">{r.drawn}</td><td className="num">{r.lost}</td>
-                        <td className="num">{gd > 0 ? `+${gd}` : gd}</td><td className="num strong">{r.points}</td>
+                        {more && <><td className="num">{r.played}</td><td className="num">{r.won}</td><td className="num">{r.drawn}</td><td className="num">{r.lost}</td>
+                        <td className="num">{gd > 0 ? `+${gd}` : gd}</td></>}<td className="num strong">{r.points}</td>
                       </tr>
                     );
                   })}
@@ -178,7 +184,8 @@ function TeamLine({id, goals, pens, winner}: {id: string; goals?: number; pens?:
   return (
     <div className={`bracket-team ${winner ? "won" : ""} ${id === game.userClubId ? "me" : ""}`}>
       <span className="crest tiny" style={{background: club.color}} />
-      <span className="bracket-name">{club.name}</span>
+      <span className="bracket-name"><TeamLink clubId={id} /></span>
+      <TeamOvr clubId={id} />
       {goals !== undefined && <span className="bracket-score">{goals}{pens !== undefined && <small> ({pens})</small>}</span>}
     </div>
   );

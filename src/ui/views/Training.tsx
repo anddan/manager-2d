@@ -31,6 +31,8 @@ export function Training() {
   const openPlayer = useGame((s) => s.openPlayer);
   // Picking several players to give the same individual training at once (as in the squad).
   const [selecting, setSelecting] = useState(false);
+  // Less to begin with (on a phone): who, rating, fitness and the week's change; "Show more" adds age, the biggest changes and the focus.
+  const [more, setMore] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
   const [choosing, setChoosing] = useState(false);
   const toggle = (id: string) => setPicked((l) => (l.includes(id) ? l.filter((x) => x !== id) : [...l, id]));
@@ -140,9 +142,12 @@ export function Training() {
         title={t("train.lastWeek")}
         className="span-2"
         actions={
+          <>
+          <button type="button" className="btn small" aria-expanded={more} onClick={() => setMore(!more)}>{iconize(t(more ? "tbl.showLess" : "tbl.showMore"))}</button>
           <button className={selecting ? "btn small primary" : "btn small"} aria-pressed={selecting} onClick={() => { setSelecting(!selecting); setPicked([]); }}>
             <Icon name="check" size={16} /> {iconize(t(selecting ? "squad.selectDone" : "squad.select"))}
           </button>
+          </>
         }
       >
         {selecting && (
@@ -170,8 +175,8 @@ export function Training() {
             <thead>
               <tr>
                 {selecting && <th aria-label={t("squad.select")} />}
-                {th("pos", t("col.pos"), false)}{th("name", t("col.name"), false)}{th("age", t("col.age"), false)}{th("ovr", t("col.ovr"), true, t("col.ovrHint"))}
-                {th("fitness", t("col.fitness"))}{th("change", t("train.change"))}<th>{iconize(t("train.biggest"))}</th>{th("focus", t("pl.individualFocus"), false)}
+                {th("pos", t("col.pos"), false)}{th("name", t("col.name"), false)}{more && th("age", t("col.age"), false)}{th("ovr", t("col.ovr"), true, t("col.ovrHint"))}
+                {th("fitness", t("col.fitness"))}{th("change", t("train.change"))}{more && <th>{iconize(t("train.biggest"))}</th>}{more && th("focus", t("pl.individualFocus"), false)}
               </tr>
             </thead>
             <tbody>
@@ -182,18 +187,18 @@ export function Training() {
                     {selecting && <td><input type="checkbox" className="bench-check" checked={picked.includes(p.id)} onChange={() => toggle(p.id)} onClick={(e) => e.stopPropagation()} aria-label={listName(p)} /></td>}
                     <td><PosBadge pos={p.position} /></td>
                     <td><button className="link" onClick={() => openPlayer(p.id)}>{listName(p)}</button>{p.injuryWeeks > 0 && <> {iconize("🩹")}</>}</td>
-                    <td>{p.age}</td>
+                    {more && <td>{p.age}</td>}
                     <td className="num strong">{overall(p)}</td>
                     <td><Bar value={p.fitness} small /></td>
                     <td><Delta value={totalChange(p)} digits={2} /></td>
-                    <td className="small">
+                    {more && <td className="small">
                       {changes.slice(0, 2).map((c) => (
                         <span key={c.a} className="change-tag">{iconize(t(`attr.${c.a}`))} <Delta value={c.d} digits={2} /></span>
                       ))}
-                    </td>
-                    <td>
+                    </td>}
+                    {more && <td>
                       <FocusPicker player={p} compact />
-                    </td>
+                    </td>}
                   </tr>
                 );
               })}

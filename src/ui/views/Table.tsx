@@ -1,3 +1,4 @@
+import {useState} from "react";
 import {listName} from "../../game/helpers";
 import {iconize} from "../Icon";
 import {standings} from "../../game/league";
@@ -5,6 +6,7 @@ import type {GameState, Player} from "../../game/types";
 import {useT, type TKey} from "../../i18n";
 import {useGame, useGameState} from "../../store";
 import {Card} from "../common";
+import {TeamLink, TeamOvr} from "../LineupSheet";
 
 /** The season's leaders in the league's clubs, best first (ties: fewer games). */
 function leaders(game: GameState, value: (p: Player) => number): Player[] {
@@ -48,24 +50,26 @@ function Leaders({title, players, value, show}: {title: TKey; players: Player[];
 }
 
 export function Table() {
+  // Less on a phone to begin with: just the points and the last two matches (no played / won / drawn / lost / goals, no rating chips); "Show more" opens it all out.
+  const [more, setMore] = useState(false);
   const {t, tx} = useT();
   const game = useGameState();
   const rows = standings(game);
 
   return (
     <div className="grid">
-      <Card title={`${game.leagueName} ${game.season}`} className="span-2">
+      <Card title={`${game.leagueName} ${game.season}`} className="span-2" actions={<button type="button" className="btn small" aria-expanded={more} onClick={() => setMore(!more)}>{iconize(t(more ? "tbl.showLess" : "tbl.showMore"))}</button>}>
         <div className="table-wrap">
           <table className="table league">
             <thead>
               <tr>
                 <th>#</th><th>{iconize(t("tbl.club"))}</th>
-                <th title={t("tbl.playedLong")}>{iconize(t("tbl.played"))}</th>
-                <th title={t("tbl.wonLong")}>{iconize(t("tbl.won"))}</th>
-                <th title={t("tbl.drawnLong")}>{iconize(t("tbl.drawn"))}</th>
-                <th title={t("tbl.lostLong")}>{iconize(t("tbl.lost"))}</th>
-                <th>{iconize(t("tbl.goals"))}</th>
-                <th title={t("tbl.gdLong")}>{iconize(t("tbl.gd"))}</th>
+                {more && <th title={t("tbl.playedLong")}>{iconize(t("tbl.played"))}</th>}
+                {more && <th title={t("tbl.wonLong")}>{iconize(t("tbl.won"))}</th>}
+                {more && <th title={t("tbl.drawnLong")}>{iconize(t("tbl.drawn"))}</th>}
+                {more && <th title={t("tbl.lostLong")}>{iconize(t("tbl.lost"))}</th>}
+                {more && <th>{iconize(t("tbl.goals"))}</th>}
+                {more && <th title={t("tbl.gdLong")}>{iconize(t("tbl.gd"))}</th>}
                 <th>{iconize(t("tbl.points"))}</th>
                 <th>{iconize(t("tbl.form"))}</th>
               </tr>
@@ -74,15 +78,15 @@ export function Table() {
               {rows.map((r, i) => (
                 <tr key={r.club.id} className={r.club.id === game.userClubId ? "me" : ""}>
                   <td className="num">{i + 1}</td>
-                  <td className="name-cell"><span className="crest tiny" style={{background: r.club.color}} /> {r.club.name}</td>
-                  <td className="num">{r.played}</td>
-                  <td className="num">{r.won}</td>
-                  <td className="num">{r.drawn}</td>
-                  <td className="num">{r.lost}</td>
-                  <td className="num">{r.goalsFor}:{r.goalsAgainst}</td>
-                  <td className="num">{r.goalsFor - r.goalsAgainst > 0 ? "+" : ""}{r.goalsFor - r.goalsAgainst}</td>
+                  <td className="name-cell"><span className="crest tiny" style={{background: r.club.color}} /> <TeamLink clubId={r.club.id} />{more && <> <TeamOvr clubId={r.club.id} /></>}</td>
+                  {more && <td className="num">{r.played}</td>}
+                  {more && <td className="num">{r.won}</td>}
+                  {more && <td className="num">{r.drawn}</td>}
+                  {more && <td className="num">{r.lost}</td>}
+                  {more && <td className="num">{r.goalsFor}:{r.goalsAgainst}</td>}
+                  {more && <td className="num">{r.goalsFor - r.goalsAgainst > 0 ? "+" : ""}{r.goalsFor - r.goalsAgainst}</td>}
                   <td className="num strong">{r.points}</td>
-                  <td><div className="form-row">{r.form.map((f, j) => <span key={j} className={`form-dot form-${f}`}>{iconize(tx(`form.${f}`))}</span>)}</div></td>
+                  <td><div className="form-row">{(more ? r.form : r.form.slice(-2)).map((f, j) => <span key={j} className={`form-dot form-${f}`}>{iconize(tx(`form.${f}`))}</span>)}</div></td>
                 </tr>
               ))}
             </tbody>

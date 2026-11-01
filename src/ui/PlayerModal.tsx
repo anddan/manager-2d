@@ -400,13 +400,13 @@ function LookEditor({player: p}: {player: Player}) {
 
 /** Sell now to the club that pays most, for less than waiting for bids would bring. Asks first. */
 /** Sell at once to the best offer, asked once more. `onSold`: what to do after (e.g. close a pack). */
-export function QuickSale({player: p, onSold}: {player: Player; onSold?: () => void}) {
+export function QuickSale({player: p, onSold, confirmNow}: {player: Player; onSold?: () => void; /** Already past the first button (after a pack the choice to sell was just made): straight to the price to confirm. */ confirmNow?: boolean}) {
   const {t, money} = useT();
   const game = useGameState();
   const act = useGame((s) => s.act);
   const notify = useGame((s) => s.notify);
   const openPlayer = useGame((s) => s.openPlayer);
-  const [sure, setSure] = useState(false);
+  const [sure, setSure] = useState(!!confirmNow);
   if (p.clubId !== game.userClubId || p.loan) return null;
   const offer = quickSaleOffer(game, p.id);
   if (!offer) return <p className="muted small">{iconize(t("pl.noBuyer"))}</p>;

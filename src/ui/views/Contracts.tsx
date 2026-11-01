@@ -1,3 +1,4 @@
+import {useState} from "react";
 import {startNegotiation} from "../../game/contracts";
 import {Icon, iconize} from "../Icon";
 import {listName, shortName, userClub} from "../../game/helpers";
@@ -29,6 +30,8 @@ export function Contracts() {
   const openPlayer = useGame((s) => s.openPlayer);
   const setNegotiation = useGame((s) => s.setNegotiation);
   const notify = useGame((s) => s.notify);
+  // Less to begin with (on a phone): who, wage and when it ends; "Show more" opens out age, rating, market wage, role and mood.
+  const [more, setMore] = useState(false);
   const club = userClub(game);
   const bill = wageBill(game, club.id);
   // Soonest-expiring first to start with, best first among them; any column sorts.
@@ -53,13 +56,13 @@ export function Contracts() {
         <p>{iconize(t("con.billOfBudget", {bill, budget: club.wageBudget}))}</p>
         <Hint>{iconize(t("con.hint"))}</Hint>
       </Card>
-      <Card title={t("nav.contracts")} className="span-2">
+      <Card title={t("nav.contracts")} className="span-2" actions={<button type="button" className="btn small" aria-expanded={more} onClick={() => setMore(!more)}>{iconize(t(more ? "tbl.showLess" : "tbl.showMore"))}</button>}>
         <div className="table-wrap">
           <table className="table">
             <thead>
               <tr>
-                {th("pos", t("col.pos"), false)}{th("name", t("col.name"), false)}{th("age", t("col.age"), false)}{th("ovr", t("col.ovr"), true, t("col.ovrHint"))}
-                {th("wage", t("col.wage"))}{th("market", t("con.market"))}{th("contract", t("col.contract"), false)}{th("role", t("col.role"), false)}{th("happiness", t("col.happiness"))}<th />
+                {th("pos", t("col.pos"), false)}{th("name", t("col.name"), false)}{more && th("age", t("col.age"), false)}{more && th("ovr", t("col.ovr"), true, t("col.ovrHint"))}
+                {th("wage", t("col.wage"))}{more && th("market", t("con.market"))}{th("contract", t("col.contract"), false)}{more && th("role", t("col.role"), false)}{more && th("happiness", t("col.happiness"))}<th />
               </tr>
             </thead>
             <tbody>
@@ -69,13 +72,13 @@ export function Contracts() {
                   <tr key={p.id} className={expiring ? "warn-row" : ""}>
                     <td><PosBadge pos={p.position} /></td>
                     <td><button className="link" onClick={() => openPlayer(p.id)}>{listName(p)}</button></td>
-                    <td>{p.age}</td>
-                    <td className="num strong">{overall(p)}</td>
+                    {more && <td>{p.age}</td>}
+                    {more && <td className="num strong">{overall(p)}</td>}
                     <td className="num">{money(p.contract.wage)}</td>
-                    <td className="num muted">{money(expectedWage(p))}</td>
+                    {more && <td className="num muted">{money(expectedWage(p))}</td>}
                     <td className="num">{p.contract.expiresSeason}{expiring && " ⚠️"}</td>
-                    <td>{iconize(t(`role.${p.contract.role}`))}</td>
-                    <td><Face value={p.happiness} /></td>
+                    {more && <td>{iconize(t(`role.${p.contract.role}`))}</td>}
+                    {more && <td><Face value={p.happiness} /></td>}
                     <td><button className="btn small" onClick={() => negotiate(p.id)}><Icon name="pen" size={18} /> {iconize(t("con.negotiate"))}</button></td>
                   </tr>
                 );

@@ -199,6 +199,16 @@ const REAL_LEVEL: Record<string, number> = {
   CH: 64, DK: 64, MX: 63, US: 63, KR: 62, NO: 63, AT: 62, RS: 61, PL: 61, TR: 61, SE: 62, NG: 60, CI: 60, GH: 58, CM: 57, FI: 55, IS: 54,
 };
 
+/** A country's team to look at: its best eleven and bench (4-4-2) with their average rating, or just a level when it has no real team. */
+export function countryTeam(state: GameState, code: string): {squad: {lineup: string[]; bench: string[]} | null; ovr: number} {
+  if (nationalPool(state, code).length >= NATION_MIN) {
+    const squad = nationalSquad(state, code, "4-4-2");
+    const rated = squad.lineup.map((id, i) => (state.players[id] ? effectiveRating(state.players[id], FORMATIONS["4-4-2"][i].pos) : 0)).filter((v) => v > 0);
+    return {squad, ovr: rated.length ? Math.round(rated.reduce((s, v) => s + v, 0) / rated.length) : 0};
+  }
+  return {squad: null, ovr: Math.round(strengths(state).get(code) ?? 0)};
+}
+
 /** How strong every country is: mostly its real-life level, with the players it has in this game making up the rest. */
 function strengths(state: GameState): Map<string, number> {
   const real = new Map(nations(state).map((n) => [n.code, n.strength]));

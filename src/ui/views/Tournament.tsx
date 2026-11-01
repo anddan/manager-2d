@@ -7,6 +7,7 @@ import type {TKey} from "../../i18n";
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
 import {Card, Empty, Flag} from "../common";
+import {CountrySheet} from "../CountrySheet";
 
 const ROUNDS = ["national.round.r16", "national.round.qf", "national.round.sf", "national.round.final"] as const;
 
@@ -22,6 +23,8 @@ export function Tournament() {
   const year = tr?.season ?? game.season;
   const comingUp = tournamentOf(game.season) !== null && year !== game.season;
   const [tree, setTree] = useState(false);
+  // A country tapped: its team and rating.
+  const [sheet, setSheet] = useState<string | null>(null);
   // Only the manager's own group (off to begin with), like the cup.
   const [onlyMine, setOnlyMine] = useState(true);
   type Pair = {a: string; b: string; ga: number; gb: number; w: string};
@@ -33,7 +36,7 @@ export function Tournament() {
     return {done: false, known: !!coming, pairs};
   });
   const name = (c: string) => t(`nat.${c}` as TKey);
-  const row = (c: string) => <span className={c === job.country ? "strong" : undefined}><Flag code={c} size={15} /> {name(c)}</span>;
+  const row = (c: string) => <button type="button" className={c === job.country ? "link strong" : "link"} title={t("tac.seeTeam")} onClick={() => setSheet(c)}><Flag code={c} size={15} /> {name(c)}</button>;
   return (
     <div className="grid">
       <Card title={<><Icon name="trophy" size={20} /> {iconize(t(`national.comp.${comp}` as TKey))} {year}</>}>
@@ -88,7 +91,7 @@ export function Tournament() {
                       <div key={k} className={`ko-match ${p.a === job.country || p.b === job.country ? "mine" : ""}`}>
                         {[p.a, p.b].map((c, side) => (
                           <div key={side} className={rounds[r].done && c && p.w === c ? "ko-team won" : "ko-team"} title={c ? name(c) : undefined}>
-                            {c ? <span className="ko-code"><Flag code={c} size={13} /> {c}</span> : <span className="muted">–</span>}
+                            {c ? <button type="button" className="link ko-code" onClick={() => setSheet(c)}><Flag code={c} size={13} /> {c}</button> : <span className="muted">–</span>}
                             <b>{rounds[r].done ? (side === 0 ? p.ga : p.gb) : ""}</b>
                           </div>
                         ))}
@@ -167,6 +170,7 @@ export function Tournament() {
           })}
         </>
       )}
+      {sheet && <CountrySheet code={sheet} onClose={() => setSheet(null)} />}
     </div>
   );
 }

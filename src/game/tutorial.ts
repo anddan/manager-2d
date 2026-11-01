@@ -1,6 +1,8 @@
 // The guide for new players: which step they're on, and a first match picked
 // to show off the game (a penalty to take, and a win).
+import {equipGear} from "./gear";
 import {simulateMatch} from "./match";
+import {overall} from "./ratings";
 import {Rng} from "./rng";
 import type {Fixture, GameState, Side} from "./types";
 
@@ -24,6 +26,8 @@ export type TutorialStep = (typeof TUTORIAL_STEPS)[number];
 export interface Tutorial {
   /** The guide's present, a free pair of boots, has been put in the kit bag (only once). */
   kit?: boolean;
+  /** Who the boots were put on (the best outfield player of the first eleven), to point out on the pitch. */
+  kitPlayer?: string;
   /** Index into TUTORIAL_STEPS; past the end means done. */
   step: number;
   /** The first match has been picked (only once). */
@@ -43,12 +47,19 @@ export function upgradeTutorial(state: GameState): void {
   t.v = TUTORIAL_VERSION;
 }
 
-/** The guide's present: a free pair of basic boots in the kit bag, once. */
+/** The guide's present: a free pair of basic boots, once, put straight on the best outfield player of the eleven (else left in the kit bag). */
 export function giveGuideBoots(state: GameState): void {
   const t = state.tutorial;
   if (!t || t.kit) return;
   t.kit = true;
-  (state.gearBag ??= []).push({kind: "speed", tier: "common"});
+  const bag = (state.gearBag ??= []);
+  bag.push({kind: "speed", tier: "common"});
+  const club = state.clubs[state.userClubId];
+  const starter = club.lineup
+    .map((id) => state.players[id])
+    .filter((p) => p && p.position !== "GK" && !p.gear)
+    .sort((a, b) => overall(b) - overall(a))[0];
+  if (starter && equipGear(state, starter.id, bag.length - 1) === null) t.kitPlayer = starter.id;
 }
 
 /** Moves the guide on from a step (only if it's on that step). */

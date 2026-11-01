@@ -44,6 +44,8 @@ function Search() {
   const [pos, setPos] = useState<Position | "">("");
   const [maxAge, setMaxAge] = useState(35);
   const [maxPrice, setMaxPrice] = useState(0);
+  // Less to begin with (on a phone): position, name, rating and price; "Show more" adds age, club and contract.
+  const [more, setMore] = useState(false);
   const [minOvr, setMinOvr] = useState(0);
   const [source, setSource] = useState<"all" | "free" | "listed">("all");
   // Best first to start with; any column sorts the whole search, then the first 80 show.
@@ -106,12 +108,13 @@ function Search() {
         </label>
       </div>
       <Hint>{iconize(t("tr.searchHint", {budget: userClub(game).transferBudget}))}</Hint>
+      <div className="table-more"><button type="button" className="btn small" aria-expanded={more} onClick={() => setMore(!more)}>{iconize(t(more ? "tbl.showLess" : "tbl.showMore"))}</button></div>
       <div className="table-wrap">
         <table className="table">
           <thead>
             <tr>
-              {th("pos", t("col.pos"), false)}{th("name", t("col.name"), false)}{th("age", t("col.age"), false)}{th("ovr", t("col.ovr"), true, t("col.ovrHint"))}
-              {th("club", t("tbl.club"), false)}{th("price", t("tr.asking"), false)}{th("contract", t("col.contract"), false)}
+              {th("pos", t("col.pos"), false)}{th("name", t("col.name"), false)}{more && th("age", t("col.age"), false)}{th("ovr", t("col.ovr"), true, t("col.ovrHint"))}
+              {more && th("club", t("tbl.club"), false)}{th("price", t("tr.asking"), false)}{more && th("contract", t("col.contract"), false)}
             </tr>
           </thead>
           <tbody>
@@ -119,11 +122,11 @@ function Search() {
               <tr key={p.id} className="clickable" onClick={() => openPlayer(p.id)}>
                 <td><PosBadge pos={p.position} /></td>
                 <td className="name-cell"><Flag code={p.nationality} /> {listName(p)} <StatusIcons player={p} /></td>
-                <td>{p.age}</td>
+                {more && <td>{p.age}</td>}
                 <td className="num"><Ovr game={game} player={p} /></td>
-                <td>{p.clubId ? game.clubs[p.clubId].short : t("tr.free")}</td>
+                {more && <td>{p.clubId ? game.clubs[p.clubId].short : t("tr.free")}</td>}
                 <td className="num">{p.clubId ? money(price) : "–"}</td>
-                <td className="num">{p.clubId ? p.contract.expiresSeason : "–"}</td>
+                {more && <td className="num">{p.clubId ? p.contract.expiresSeason : "–"}</td>}
               </tr>
             ))}
           </tbody>

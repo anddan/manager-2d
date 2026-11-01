@@ -278,7 +278,9 @@ function TeamRolesCard() {
           const auto = options.find((p) => club.lineup.includes(p.id));
           const holder = chosen ?? auto;
           const isOpen = open === role;
-          const shown = all ? options : options.slice(0, 6);
+          // Whoever holds it now is already shown above: the list is who else could take it.
+          const others = options.filter((p) => p.id !== holder?.id);
+          const shown = all ? others : others.slice(0, 6);
           return (
             <div key={role} className={`role-tile ${isOpen ? "open" : ""}`}>
               <div className="role-head">
@@ -313,9 +315,9 @@ function TeamRolesCard() {
                       </button>
                     </li>
                   ))}
-                  {!all && options.length > shown.length && (
+                  {!all && others.length > shown.length && (
                     <li>
-                      <button className="link small" onClick={() => setAll(true)}>{iconize(t("roles.showAll", {n: options.length}))}</button>
+                      <button className="link small" onClick={() => setAll(true)}>{iconize(t("roles.showAll", {n: others.length}))}</button>
                     </li>
                   )}
                 </ul>

@@ -37,7 +37,7 @@ export function PackReveal({playerId, pack, title, onClose}: {playerId: string; 
           <>
             <h3 className="pack-got">{iconize(t("pack.got", {name: fullName(player)}))}</h3>
             {selling ? (
-              <QuickSale player={player} onSold={onClose} />
+              <QuickSale player={player} onSold={onClose} confirmNow />
             ) : (
               <div className="btn-row pack-actions">
                 <button className="btn" onClick={() => { onClose(); openPlayer(player.id); }}><Icon name="user" size={18} /> {iconize(t("pack.profile"))}</button>

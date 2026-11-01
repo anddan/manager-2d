@@ -1,3 +1,4 @@
+import {TeamLink} from "../LineupSheet";
 import {Flag} from "../common";
 import {upcomingNational} from "../../game/national";
 import type {TKey} from "../../i18n";
@@ -119,12 +120,12 @@ export function FixtureRow({f}: {f: Fixture}) {
   const flag = (c: typeof home) => (c.country ? <FlagIcon code={c.country} size={14} /> : null);
   return (
     <div className={`fixture ${mine ? "mine" : ""}`}>
-      <span className="fx-team home">{flag(home)} {home.name} <span className="crest tiny" style={{background: home.color}} /></span>
+      <span className="fx-team home">{flag(home)} <TeamLink clubId={home.id} /> <span className="crest tiny" style={{background: home.color}} /></span>
       <span className={`fx-score ${result ? `form-${result}` : ""}`}>
         {f.played ? `${f.homeGoals} – ${f.awayGoals}` : "–"}
         {cup?.penalties && <small className="fx-pens">{iconize(t("fx.penalties", {h: cup.penalties[0], a: cup.penalties[1]}))}</small>}
       </span>
-      <span className="fx-team away"><span className="crest tiny" style={{background: away.color}} /> {away.name} {flag(away)}</span>
+      <span className="fx-team away"><span className="crest tiny" style={{background: away.color}} /> <TeamLink clubId={away.id} /> {flag(away)}</span>
       {report && <button className="btn small" onClick={() => watchMatch(f.id)}><Icon name="play" size={14} /></button>}
     </div>
   );

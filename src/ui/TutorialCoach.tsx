@@ -6,7 +6,7 @@ import {useEffect, useLayoutEffect, useState, type ReactNode} from "react";
 import {TUTORIAL_STEPS, giveGuideBoots, tutorialNext, tutorialSkip, type TutorialStep} from "../game/tutorial";
 import {ENERGY_COST_FORZA} from "../game/constants";
 import {FORZA} from "../game/match";
-import {fixtureWeek, nextUserFixture} from "../game/helpers";
+import {fixtureWeek, nextUserFixture, shortName} from "../game/helpers";
 import type {GameState} from "../game/types";
 import {useT, type TKey} from "../i18n";
 import {useGame} from "../store";
@@ -28,8 +28,9 @@ const STEPS: Record<TutorialStep, StepSpec> = {
   welcome: {next: true},
   tactics: {target: "nav:tactics"},
   bestXI: {target: '[data-tour="best-xi"]', showWhen: '[data-tour="best-xi"]', onClick: true},
-  // A present: a free pair of boots, put in the kit room (pointed out in the menu).
-  gift: {target: "nav:storage", next: true},
+  // A present: a free pair of boots, put on a player.
+  // The boots are already on a player of the eleven: their boot beside the shirt on the board lights up.
+  gift: {target: ".pitch-board .slot-gear:not(.slot-shin)", showWhen: ".pitch-board", next: true},
   // Waits for any dialog to be closed.
   play: {target: ".continue", showWhen: "body:not(:has(.modal-backdrop))"},
   match: {target: ".speed-group", showWhen: ".match-controls", next: true},
@@ -160,7 +161,7 @@ export function TutorialCoach() {
         <strong>{iconize(t("tour.coach"))}</strong>
         <span className="tour-count">{stepIndex + 1}/{TUTORIAL_STEPS.length}</span>
       </div>
-      <p>{withIcons(t(stepText(game, step, view), {name: game.managerName, pct: Math.round((FORZA.boost - 1) * 100), minutes: FORZA.minutes, energy: ENERGY_COST_FORZA, ...weekParams(game)}))}</p>
+      <p>{withIcons(t(stepText(game, step, view), {name: game.managerName, player: game.tutorial?.kitPlayer && game.players[game.tutorial.kitPlayer] ? shortName(game.players[game.tutorial.kitPlayer]) : "", pct: Math.round((FORZA.boost - 1) * 100), minutes: FORZA.minutes, energy: ENERGY_COST_FORZA, ...weekParams(game)}))}</p>
       <div className="tour-actions">
         <button className="btn small" onClick={() => act((g) => tutorialSkip(g))}>{iconize(t("tour.skip"))}</button>
         {spec.next && (

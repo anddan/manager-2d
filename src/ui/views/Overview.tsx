@@ -10,6 +10,8 @@ import {DailyTasks} from "../DailyTasks";
 import {useGame, useGameState} from "../../store";
 import {Card, Empty, Face, Flag, PlayerLink} from "../common";
 import {dueNationalMatch} from "../../game/national";
+import {leagueById} from "../../game/leagues";
+import type {ReactNode} from "react";
 import type {TKey} from "../../i18n";
 
 export function Overview() {
@@ -21,6 +23,11 @@ export function Overview() {
   const next = nextUserFixture(game);
   // A national match this week is the next match (it is played with the usual play button).
   const natDue = game.national ? dueNationalMatch(game) : null;
+  // What kind of match it is, in the title: tap to go to the league, the cup, the national team or the tournament.
+  const leagueFlag = leagueById(game.leagueId).flag;
+  const nextKind: {label: ReactNode; view: "table" | "cup" | "national" | "tournament"} | null = natDue
+    ? natDue.what === "friendly" ? {label: <><Flag code={game.national!.country} size={16} /> {t("nav.national")}</>, view: "national"} : {label: t(`national.comp.${natDue.what.split(".")[0]}` as TKey), view: "tournament"}
+    : next ? (isCupFixture(next) ? {label: t("nav.cup"), view: "cup"} : {label: <><Flag code={leagueFlag} size={16} /> {game.leagueName}</>, view: "table"}) : null;
   const position = leaguePosition(game, club.id);
   const squad = clubPlayers(game, club.id);
   const injured = squad.filter((p) => p.injuryWeeks > 0 || p.suspension > 0);
@@ -34,7 +41,7 @@ export function Overview() {
     <div className="grid">
       <BoardWarningBanner />
       <DailyTasks />
-      <Card title={t("ov.nextMatch")}>
+      <Card title={<>{iconize(t("ov.nextMatch"))}{nextKind && <> · <button type="button" className="link" onClick={() => setView(nextKind.view)}>{nextKind.label}</button></>}</>}>
         {natDue && game.national ? (
           <div className="ov-next">
             <div className="ov-next-what"><Icon name="ball" size={20} /> {iconize(t(`national.what.${natDue.what}` as TKey))}</div>

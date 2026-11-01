@@ -176,6 +176,22 @@ export function ClubSheet({clubId, onClose}: {clubId: string; onClose: () => voi
   );
 }
 
+/** A club's name; for another club it is a button showing their line-up and players (and their rating). */
+export function TeamLink({clubId}: {clubId: string}) {
+  const {t} = useT();
+  const game = useGameState();
+  const [open, setOpen] = useState(false);
+  const c = game.clubs[clubId];
+  if (!c) return null;
+  if (clubId === game.userClubId) return <>{c.name}</>;
+  return (
+    <>
+      <button type="button" className="link team-link" title={t("tac.seeTeam")} onClick={() => setOpen(true)}>{c.name}</button>
+      {open && <ClubSheet clubId={clubId} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
 /** A club's team strength; for another club it's a button showing their tactics and players. */
 export function TeamOvr({clubId}: {clubId: string}) {
   const {t} = useT();
