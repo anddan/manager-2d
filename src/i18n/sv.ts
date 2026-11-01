@@ -667,6 +667,7 @@ export const sv = {
   "so.orderTitle": "Turordning för straffarna",
   "so.orderHint": "Den som står först slår först. De fem första tar de första fem straffarna, resten är reserver om det går till sudden death. Siffran är avslut.",
   "so.start": "Starta straffläggningen",
+  "so.takeLabel": "Straffläggning",
   "so.up": "Flytta upp",
   "so.down": "Flytta ner",
   "so.won": "Ni vann straffläggningen med {h}–{a}! 🎉",

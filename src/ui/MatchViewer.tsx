@@ -1115,15 +1115,23 @@ function shootoutTakers(players: Player[], designated?: string): Player[] {
  * penalties in the match. Five each, then sudden death; it stops as soon as
  * it's decided.
  */
-function Shootout({report, seed, userSide, textOnly, onDone}: {report: MatchReport; seed: number; userSide: Side; textOnly?: boolean; onDone: (score: [number, number]) => void}) {
+function Shootout({report, seed, userSide, textOnly: viewIsText, onDone}: {report: MatchReport; seed: number; userSide: Side; textOnly?: boolean; onDone: (score: [number, number]) => void}) {
   const {t} = useT();
+  // Following the match as text or zones the assistant takes the kicks, but for the shootout the manager can choose to take them himself.
+  const [takeThem, setTakeThem] = useState(false);
+  const textOnly = viewIsText && !takeThem;
   const game = useGameState();
   const [home, away] = matchClubs(game.clubs[report.homeId], game.clubs[report.awayId]);
   const end = matchLength(report);
   const onPitch = (side: Side) => [...onPitchAt(report, side, end).values()].map((id) => game.players[id]).filter(Boolean);
   const defaults = {home: shootoutTakers(onPitch("home"), home.roles?.penalties), away: shootoutTakers(onPitch("away"), away.roles?.penalties)};
   // Before the first kick the manager sets the order of his takers (the computer picks the other side's).
-  const [order, setOrder] = useState<string[] | null>(null);
+  const [order, setOrderState] = useState<string[] | null>(null);
+  const orderRef = useRef<string[] | null>(null);
+  const setOrder = (ids: string[] | null) => {
+    orderRef.current = ids;
+    setOrderState(ids);
+  };
   const [ready, setReady] = useState(false);
   const mineTakers = order ? order.map((id) => game.players[id]).filter(Boolean) : defaults[userSide];
   const takers = {...defaults, [userSide]: mineTakers};
@@ -1133,6 +1141,36 @@ function Shootout({report, seed, userSide, textOnly, onDone}: {report: MatchRepo
     if (j < 0 || j >= ids.length) return;
     [ids[i], ids[j]] = [ids[j], ids[i]];
     setOrder(ids);
+  };
+  // Drag a taker up or down the list: the row follows the finger and the others make room.
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const dragging = useRef<number | null>(null);
+  const startOrderDrag = (e: ReactPointerEvent, from: number) => {
+    e.preventDefault();
+    dragging.current = from;
+    setDragIndex(from);
+    const onMove = (m: PointerEvent) => {
+      const at = dragging.current;
+      const el = document.elementFromPoint(m.clientX, m.clientY)?.closest<HTMLElement>("[data-so]");
+      if (at === null || !el) return;
+      const to = Number(el.dataset.so);
+      if (to === at) return;
+      const ids = (orderRef.current ?? defaults[userSide].map((p) => p.id)).slice();
+      const [moved] = ids.splice(at, 1);
+      ids.splice(to, 0, moved);
+      orderRef.current = ids;
+      setOrder(ids);
+      dragging.current = to;
+      setDragIndex(to);
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      dragging.current = null;
+      setDragIndex(null);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
   };
   const keepers = {home: onPitch("home").find((p) => p.position === "GK"), away: onPitch("away").find((p) => p.position === "GK")};
   // Scored or not, kick by kick (home, away, home, ...).
@@ -1188,16 +1226,28 @@ function Shootout({report, seed, userSide, textOnly, onDone}: {report: MatchRepo
           <strong><Icon name="ball" size={18} /> {iconize(t("so.orderTitle"))}</strong>
           <span className="shootout-score">{home.short} – {away.short}</span>
         </div>
+        {viewIsText && (
+          <div className="manager-item manager-toggle">
+            <span><Icon name="target" size={18} /> {iconize(t("so.takeLabel"))}</span>
+            <span className="speed-group" role="group" aria-label={t("so.takeLabel")}>
+              {([true, false] as const).map((self) => (
+                <button key={String(self)} type="button" className={takeThem === self ? "chip active" : "chip"} onClick={() => setTakeThem(self)}>{self ? t("match.self") : t("match.auto")}</button>
+              ))}
+            </span>
+          </div>
+        )}
         <p className="muted small">{iconize(t("so.orderHint"))}</p>
         <ol className="shootout-order">
           {mineTakers.map((p, i) => (
-            <li key={p.id} className={i < 5 ? "first-five" : undefined}>
+            <li key={p.id} data-so={i} className={`${i < 5 ? "first-five" : ""} ${dragIndex === i ? "dragging" : ""}`}>
+              <span className="so-grip" aria-hidden onPointerDown={(e) => startOrderDrag(e, i)}>⠿</span>
               <span className="so-num">{i + 1}</span>
               <PosBadge pos={p.position} />
               <span className="so-name">{shortName(p)}</span>
               <span className="num strong">{Math.round(p.attrs.finishing)}</span>
-              <button type="button" className="icon-btn" aria-label={t("so.up")} disabled={i === 0} onClick={() => move(i, -1)}>▲</button>
-              <button type="button" className="icon-btn" aria-label={t("so.down")} disabled={i === mineTakers.length - 1} onClick={() => move(i, 1)}>▼</button>
+              {/* The first has no arrow up and the last none down. */}
+              {i > 0 ? <button type="button" className="icon-btn" aria-label={t("so.up")} onClick={() => move(i, -1)}>▲</button> : <span className="so-gap" />}
+              {i < mineTakers.length - 1 ? <button type="button" className="icon-btn" aria-label={t("so.down")} onClick={() => move(i, 1)}>▼</button> : <span className="so-gap" />}
             </li>
           ))}
         </ol>
@@ -2837,7 +2887,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
             const goalNow = freeze?.kind === "goal" && freeze.side === side && !replay ? freeze : undefined;
             const zonePlayers = withRed.flatMap(({id, index}) => {
               const p = live?.player(id) ?? game.players[id];
-              return p ? [{id, index, name: shortName(p), keeper: slots?.[index]?.pos === "GK", rating: report.ratings?.[id], fitness: p.fitness, gear: p.gear, shin: p.shin, sentOff: redIds.includes(id), hasBall: holderId === id && !redIds.includes(id), shirt: p.shirt, motm: motmId === id, subbedOn: !!side && !report.lineups[side].includes(id), captain: id === captainId, goalGlow: goalNow?.scorerId === id ? "scorer" as const : goalNow?.assistId === id ? "assist" as const : undefined, ...marks[id]}] : [];
+              return p ? [{id, index, name: shortName(p), keeper: slots?.[index]?.pos === "GK", rating: report.ratings?.[id], fitness: p.fitness, gear: p.gear, shin: p.shin, sentOff: redIds.includes(id), hasBall: holderId === id && !redIds.includes(id), shirt: game.nationalMatch ? undefined : p.shirt, motm: motmId === id, subbedOn: !!side && !report.lineups[side].includes(id), captain: id === captainId, goalGlow: goalNow?.scorerId === id ? "scorer" as const : goalNow?.assistId === id ? "assist" as const : undefined, ...marks[id]}] : [];
             });
             return (
               <ZonePanel

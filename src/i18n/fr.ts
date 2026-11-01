@@ -652,6 +652,7 @@ export const fr: Record<keyof typeof sv, string> = {
   "so.orderTitle": "Ordre des tirs au but",
   "so.orderHint": "Le premier de la liste tire en premier. Les cinq premiers prennent les cinq premiers tirs, les autres attendent en cas de mort subite. Le chiffre est la finition.",
   "so.start": "Lancer la séance",
+  "so.takeLabel": "Tirs au but",
   "so.up": "Monter",
   "so.down": "Descendre",
   "so.won": "Vous avez gagné aux tirs au but {h}–{a} ! 🎉",

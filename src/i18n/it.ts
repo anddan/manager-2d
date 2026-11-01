@@ -652,6 +652,7 @@ export const it: Record<keyof typeof sv, string> = {
   "so.orderTitle": "Ordine dei rigori",
   "so.orderHint": "Il primo della lista tira per primo. I primi cinque tirano i primi cinque rigori, gli altri aspettano in caso di oltranza. Il numero è la finalizzazione.",
   "so.start": "Inizia i rigori",
+  "so.takeLabel": "Calci di rigore",
   "so.up": "Su",
   "so.down": "Giù",
   "so.won": "Avete vinto ai rigori {h}–{a}! 🎉",

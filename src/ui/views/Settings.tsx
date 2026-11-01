@@ -125,7 +125,10 @@ export function Settings() {
         <Hint>{iconize(t("sound.hint"))}</Hint>
       </Card>
       <Card title={<><Icon name="user" size={20} /> {iconize(t("settings.avatars"))}</>}>
-        <Choice label={t("settings.avatars")} value={avatarStyle} onPick={(v) => { setAvatarStyle(v); writeAvatarStyle(v); }} options={[["toon", t("settings.avatarToon")], ["classic", t("settings.avatarClassic")]]} />
+        <dl className="kv setting-rows">
+          <dt><Icon name="user" size={18} /> {iconize(t("settings.avatars"))}</dt>
+          <dd><Choice label={t("settings.avatars")} value={avatarStyle} onPick={(v) => { setAvatarStyle(v); writeAvatarStyle(v); }} options={[["toon", t("settings.avatarToon")], ["classic", t("settings.avatarClassic")]]} /></dd>
+        </dl>
       </Card>
       <Card title={<><Icon name="mail" size={20} /> {iconize(t("settings.decisions"))}</>}>
         <label className="toggle">

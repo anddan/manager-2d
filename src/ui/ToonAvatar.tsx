@@ -356,6 +356,16 @@ function ToonFace({look, mood}: {look: Look; mood: Mood}) {
   );
 }
 
+/** Just the head (hair, face, ears), for the full figures in the set-piece scenes and the trophy podium. */
+export function ToonHead({look, mood = 70}: {look: Look; mood?: number}) {
+  return (
+    <>
+      <HairBack style={look.style} hair={look.hair} />
+      <ToonFace look={look} mood={moodOf(mood)} />
+    </>
+  );
+}
+
 /** A player's portrait in the kit: the head, a short neck, a V-neck shirt with a badge, hands on the hips. */
 export function ToonKitAvatar({look, keeper = false, shirt, trim, size = 96, mood = 70}: {look: Look; keeper?: boolean; shirt: string; trim: string; size?: number; mood?: number}) {
   const kit = keeper ? "#16a34a" : shirt;

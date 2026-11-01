@@ -5,6 +5,7 @@ import {useId} from "react";
 import type {Collar, ShirtPattern, Sleeves} from "../game/types";
 import type {Look} from "./Avatar";
 import {Face} from "./Avatar";
+import {ToonHead, readAvatarStyle} from "./ToonAvatar";
 import {shade} from "./Jersey";
 
 export type Pose = "ready" | "up" | "wall" | "run" | "kick";
@@ -130,9 +131,15 @@ export function Figure({look, kit, trim, shorts = "#111827", socks, facing = "fr
       {facing === "front" && armPath(-1)}
       {facing === "front" && armPath(1)}
       {facing === "front" ? (
-        <g transform="translate(0 -26) scale(0.14) translate(-50 -45)">
-          <Face look={look} mood={mood} />
-        </g>
+        readAvatarStyle() === "toon" ? (
+          <g transform="translate(0 -26) scale(0.13) translate(-50 -40)">
+            <ToonHead look={look} mood={mood} />
+          </g>
+        ) : (
+          <g transform="translate(0 -26) scale(0.14) translate(-50 -45)">
+            <Face look={look} mood={mood} />
+          </g>
+        )
       ) : (
         <g>
           <circle cx={-2.9} cy={-25.6} r={0.7} fill={look.skin} />

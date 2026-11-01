@@ -663,6 +663,7 @@ export const en: Record<keyof typeof sv, string> = {
   "so.orderTitle": "Penalty order",
   "so.orderHint": "The first in the list shoots first. The first five take the first five kicks, the rest wait in case it goes to sudden death. The number is finishing.",
   "so.start": "Start the shootout",
+  "so.takeLabel": "Penalty shootout",
   "so.up": "Move up",
   "so.down": "Move down",
   "so.won": "You won the shoot-out {h}–{a}! 🎉",

@@ -663,6 +663,7 @@ export const es: Record<keyof typeof sv, string> = {
   "so.orderTitle": "Orden de los penaltis",
   "so.orderHint": "El primero de la lista tira primero. Los cinco primeros lanzan los cinco primeros penaltis; el resto espera por si hay muerte súbita. El número es la definición.",
   "so.start": "Empezar la tanda",
+  "so.takeLabel": "Tanda de penaltis",
   "so.up": "Subir",
   "so.down": "Bajar",
   "so.won": "¡Ganasteis la tanda {h}–{a}! 🎉",
