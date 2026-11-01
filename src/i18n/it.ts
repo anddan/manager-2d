@@ -364,7 +364,7 @@ export const it: Record<keyof typeof sv, string> = {
   "col.happiness": "Umore",
   "col.value": "Valore",
   "col.wage": "Stipendio",
-  "col.contract": "Contratto fino al",
+  "col.contract": "Contratto",
   "col.role": "Ruolo in rosa",
 
   "status.injured": "Infortunato ({weeks} sett.)",

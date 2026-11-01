@@ -2779,3 +2779,6 @@ button.manager-item:hover:not(:disabled) { background: rgb(127 127 127 / 0.18); 
 .ko-tree.sym .ko-col.final .ko-match { border-left-color: #facc15; }
 
 .table-more { display: flex; justify-content: flex-end; margin: 4px 0; }
+
+/* No gap to the right of the position column (squad, training, contracts, transfers): the name sits right beside it. */
+.table th.col-pos, .table td:has(> .pos) { padding-right: 0; }

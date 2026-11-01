@@ -39,7 +39,7 @@ export function Contracts() {
   const base = clubPlayers(game, club.id).sort((a, b) => a.contract.expiresSeason - b.contract.expiresSeason || overall(b) - overall(a));
   const players = sortRows(base, (p) => contractValue(p, sort.key), sort.desc);
   const th = (key: ContractSort, label: string, descFirst = true, title?: string) => (
-    <SortTh label={label} title={title} active={sort.key === key} desc={sort.desc} onClick={() => sort.onSort(key, descFirst)} />
+    <SortTh label={label} title={title} className={key === "pos" ? "col-pos" : undefined} active={sort.key === key} desc={sort.desc} onClick={() => sort.onSort(key, descFirst)} />
   );
 
   const negotiate = (id: string) => {

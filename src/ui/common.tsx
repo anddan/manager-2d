@@ -221,9 +221,9 @@ export function sortRows<T>(rows: T[], value: (row: T) => number | string, desc:
 }
 
 /** A header cell that sorts by its column, with ▲ / ▼ on the one in use. */
-export function SortTh({label, active, desc, onClick, title}: {label: ReactNode; active: boolean; desc: boolean; onClick: () => void; title?: string}) {
+export function SortTh({label, active, desc, onClick, title, className}: {label: ReactNode; active: boolean; desc: boolean; onClick: () => void; title?: string; className?: string}) {
   return (
-    <th title={title}>
+    <th title={title} className={className}>
       <button className="th-btn" onClick={onClick}>
         {label}{active ? (desc ? " ▼" : " ▲") : ""}
       </button>

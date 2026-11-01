@@ -73,7 +73,7 @@ function Search() {
     sort.desc
   ).slice(0, 80);
   const th = (key: SearchSort, label: string, descFirst = true, title?: string) => (
-    <SortTh label={label} title={title} active={sort.key === key} desc={sort.desc} onClick={() => sort.onSort(key, descFirst)} />
+    <SortTh label={label} title={title} className={key === "pos" ? "col-pos" : undefined} active={sort.key === key} desc={sort.desc} onClick={() => sort.onSort(key, descFirst)} />
   );
 
   return (

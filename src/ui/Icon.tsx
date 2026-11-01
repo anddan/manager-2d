@@ -7,7 +7,7 @@ export type IconName =
   | "swap" | "pen" | "wallet" | "boot" | "diamond" | "diamondLine" | "settings" | "play" | "ball" | "shield" | "info" | "close"
   | "warn" | "fire" | "video" | "gift" | "shin" | "glove" | "dice" | "user" | "text" | "palette" | "megaphone" | "skip" | "coffee" | "stop" | "target" | "star" | "sparkle" | "chart" | "chat" | "handshake" | "trend" | "tag" | "shirt" | "undo" | "check" | "bolt" | "bank" | "sound" | "compass" | "download" | "upload" | "cart" | "hammer" | "run" | "bench" | "moon" | "search" | "inbox" | "eye" | "coins" | "medical" | "plane" | "clip" | "lock" | "flag" | "updown" | "plus" | "male" | "female" | "mixed" | "chevron" | "thumbUp" | "thumbDown" | "debrief" | "hotdog" | "cup" | "scarf"
   | "faceSmile" | "faceGrin" | "faceNeutral" | "faceWorried" | "faceSad" | "faceAngry" | "faceGrimace" | "faceYawn" | "broom"
-  | "globe" | "party" | "cardYellow" | "cardRed" | "wall" | "plaster" | "sprout" | "trendDown" | "heartBroken" | "sun" | "goal" | "bag" | "chair";
+  | "globe" | "captain" | "freekick" | "party" | "cardYellow" | "cardRed" | "wall" | "plaster" | "sprout" | "trendDown" | "heartBroken" | "sun" | "goal" | "bag" | "chair";
 
 const PATHS: Record<IconName, ReactNode> = {
   home: <><path d="M3 11 12 4l9 7" /><path d="M5 10v10h14V10" /><path d="M10 20v-6h4v6" /></>,
@@ -147,6 +147,10 @@ const PATHS: Record<IconName, ReactNode> = {
   faceSad: <><circle cx="12" cy="12" r="9" /><circle cx="9" cy="10" r="0.9" fill="currentColor" /><circle cx="15" cy="10" r="0.9" fill="currentColor" /><path d="M8 17c1.2-2 2.5-2.8 4-2.8s2.8.8 4 2.8" /></>,
   faceAngry: <><circle cx="12" cy="12" r="9" /><circle cx="9" cy="10" r="0.9" fill="currentColor" /><circle cx="15" cy="10" r="0.9" fill="currentColor" /><path d="M7.4 7.6l3.6 1.8M16.6 7.6L13 9.4" /><path d="M9 16.2c1-1 2-1.5 3-1.5s2 .5 3 1.5" /></>,
   faceGrimace: <><circle cx="12" cy="12" r="9" /><circle cx="9" cy="10" r="0.9" fill="currentColor" /><circle cx="15" cy="10" r="0.9" fill="currentColor" /><rect x="7.5" y="13.4" width="9" height="3.6" rx="1.4" /><path d="M10.5 13.4v3.6M13.5 13.4v3.6" /></>,
+  // The captain's armband: a band round the arm with a C.
+  captain: <><rect x="3" y="7" width="18" height="10" rx="2" /><path d="M14.500 10.200a3 3 0 1 0 0 3.600" /></>,
+  // A free kick: the ball curling over a wall.
+  freekick: <><circle cx="18" cy="6.500" r="2.500" /><path d="M3 20c1-7 6-12 12-12" strokeDasharray="2 2.500" /><path d="M5 21v-5M9 21v-5M13 21v-5" /></>,
   globe: <><circle cx="12" cy="12" r="9" /><path d="M3 12h18" /><path d="M12 3c-3.200 2.600-3.200 15.400 0 18M12 3c3.200 2.600 3.200 15.400 0 18" /></>,
   faceYawn: <><circle cx="12" cy="12" r="9" /><path d="M7.5 10h3M13.5 10h3" /><ellipse cx="12" cy="16" rx="2.3" ry="2.8" /></>,
 };

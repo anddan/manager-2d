@@ -1,5 +1,5 @@
 import {useState} from "react";
-import {Icon, iconize} from "../Icon";
+import {Icon, iconize, type IconName} from "../Icon";
 import {fullName, listName, shortName, userClub} from "../../game/helpers";
 import {clubPlayers, overall} from "../../game/ratings";
 import {takerSkill} from "../../game/setpieces";
@@ -103,7 +103,7 @@ export function Squad() {
             <tr>
               {selecting && <th aria-label={t("squad.select")} />}
               {COLUMNS.filter((c) => more || LESS.includes(c.key)).map((c) => (
-                <th key={c.key} title={c.key === "ovr" ? t("col.ovrHint") : undefined}>
+                <th key={c.key} className={c.key === "pos" ? "col-pos" : undefined} title={c.key === "ovr" ? t("col.ovrHint") : undefined}>
                   <button className="th-btn" onClick={() => onSort(c.key)}>
                     {iconize(t(c.label))}{sort === c.key ? (desc ? " ▼" : " ▲") : ""}
                   </button>
@@ -200,7 +200,7 @@ function SellMany({ids, onClose, onSell}: {ids: string[]; onClose: () => void; o
 
 const ROLES_OPEN_KEY = "manager2d.rolesOpen";
 
-const ROLE_ICONS: Record<TeamRole, string> = {captain: "©️", penalties: "🎯", freekicks: "🌀", corners: "🚩"};
+const ROLE_ICONS: Record<TeamRole, IconName> = {captain: "captain", penalties: "target", freekicks: "freekick", corners: "flag"};
 
 /** How good a player is at a role, for sorting and showing next to the name. */
 function roleSkill(p: Player, role: TeamRole): number {
@@ -265,7 +265,7 @@ function TeamRolesCard() {
             const h = holderOf(role);
             return (
               <span key={role} className="roles-summary-item" title={t(`roles.${role}`)}>
-                <span aria-hidden>{ROLE_ICONS[role]}</span> {h ? listName(h) : "–"}
+                <span aria-hidden><Icon name={ROLE_ICONS[role]} size={16} /></span> {h ? listName(h) : "–"}
               </span>
             );
           })}
@@ -292,7 +292,7 @@ function TeamRolesCard() {
           return (
             <div key={role} className={`role-tile ${isOpen ? "open" : ""}`}>
               <div className="role-head">
-                <span className="role-icon" aria-hidden>{ROLE_ICONS[role]}</span>
+                <span className="role-icon" aria-hidden><Icon name={ROLE_ICONS[role]} size={22} /></span>
                 <span className="role-label">{iconize(t(`roles.${role}`))}</span>
                 <button className="btn small" aria-expanded={isOpen} onClick={() => { setOpen(isOpen ? null : role); setAll(false); }}>
                   {isOpen ? t("roles.close") : t("roles.change")} {isOpen ? "▲" : "▼"}

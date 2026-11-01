@@ -370,7 +370,7 @@ export const sv = {
   "col.happiness": "Nöjdhet",
   "col.value": "Värde",
   "col.wage": "Lön",
-  "col.contract": "Kontrakt t.o.m.",
+  "col.contract": "Kontrakt",
   "col.role": "Roll",
 
   // Status
