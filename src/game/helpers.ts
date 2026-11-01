@@ -55,7 +55,7 @@ export function cupFixturesInStage(state: GameState, stage: number): CupFixture[
 
 /** A league or Champions Cup fixture by id. */
 export function findFixture(state: GameState, id: string): Fixture | undefined {
-  return state.fixtures.find((f) => f.id === id) ?? state.cup?.fixtures.find((f) => f.id === id);
+  return state.fixtures.find((f) => f.id === id) ?? state.cup?.fixtures.find((f) => f.id === id) ?? (state.nationalMatch?.fixture.id === id ? state.nationalMatch.fixture : undefined);
 }
 
 /** The user's next unplayed fixture, league or cup. */

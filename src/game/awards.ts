@@ -78,7 +78,7 @@ export function announceAwards(state: GameState, awards: SeasonAwards): void {
       manager: awards.managerClub ? (managerMine ? `${state.managerName} (${state.clubs[awards.managerClub].short})` : state.clubs[awards.managerClub].name) : "–",
       managerMine: managerMine ? 1 : 0,
     },
-    highlight: ours.length > 0,
+    action: {type: "ack"},
   });
   if (ours.length > 0) state.celebrations = [...(state.celebrations ?? []), {kind: "award", season: state.season, awards: ours}];
 }

@@ -2,7 +2,7 @@
 // the formation and mood the manager chooses. A few friendlies a year, and the Euros / World Cup in the
 // last weeks of the season in their years.
 import {Icon, iconize} from "../Icon";
-import {nationalKit, nationalSquad, nextNationalWeek, tournamentOf} from "../../game/national";
+import {dueNationalMatch, nationalKit, nationalSquad, nextNationalWeek, startNationalMatch, tournamentOf} from "../../game/national";
 import {FORMATION_IDS, MENTALITIES, type FormationId, type Mentality} from "../../game/types";
 import type {TKey} from "../../i18n";
 import {useT} from "../../i18n";
@@ -21,6 +21,7 @@ export function National() {
   const kit = nationalKit(job.country);
   const squad = nationalSquad(game, job.country, job.formation);
   const next = nextNationalWeek(game);
+  const due = dueNationalMatch(game);
   const tournament = tournamentOf(game.season);
   const sheet = {name: t(`nat.${job.country}` as TKey), color: kit.color, color2: kit.color2, formation: job.formation, mentality: job.mentality, lineup: squad.lineup, bench: squad.bench};
   return (
@@ -30,6 +31,16 @@ export function National() {
         actions={<button className="btn small" onClick={() => act((g) => { g.national = undefined; })}>{iconize(t("national.leave"))}</button>}
       >
         <Hint>{iconize(t("national.hint"))}</Hint>
+        {/* The match to play this week: the same as any other (tactics here, then kick-off). */}
+        {due && (
+          <div className="national-due">
+            <span className="strong">
+              <Flag code={job.country} size={18} /> {t(`nat.${job.country}` as TKey)} – <Flag code={due.opponent} size={18} /> {t(`nat.${due.opponent}` as TKey)}
+            </span>
+            <span className="muted small">{iconize(t(`national.what.${due.what}` as TKey))}</span>
+            <button className="btn primary" onClick={() => act((g, rng) => startNationalMatch(g, rng))}>{iconize(t("national.play"))} ▶</button>
+          </div>
+        )}
         <div className="tac-pickers">
           <label className="field">
             <span>{iconize(t("tac.formation"))}</span>

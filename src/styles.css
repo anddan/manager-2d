@@ -257,7 +257,7 @@ input[type="number"], input:not([type]), input[type="text"], select {
 /* Modal */
 .modal-backdrop {
   /* Dialogs open at the top and grow downwards, rather than re-centring as they fill. */
-  position: fixed; inset: 0; background: rgb(0 0 0 / 0.55); display: grid; place-items: start center; z-index: 50; padding: 16px;
+  position: fixed; inset: 0; background: rgb(0 0 0 / 0.55); display: grid; place-items: start center; z-index: 65; padding: 16px;
   overflow-y: auto;
 }
 .modal {
@@ -1590,7 +1590,8 @@ button.manager-item:hover:not(:disabled) { background: rgb(127 127 127 / 0.1); }
 }
 /* One scroll at a time: while a dialog is open the page behind it stays put, and on phones
    only the dialog's body scrolls (not the backdrop, and never sideways). */
-html:has(.modal-backdrop), body:has(.modal-backdrop), html:has(.match-dialog-backdrop), body:has(.match-dialog-backdrop) { overflow: hidden; }
+/* (A dialog holds the page by fixing the body, see scrollKeep.ts.) */
+html { scrollbar-gutter: stable; }
 .modal-body { overflow-x: hidden; }
 @media (max-width: 599px) { .modal-backdrop { overflow: hidden; } }
 /* Maximised, the match owns the screen: the dialog's title bar is hidden and nothing behind the
@@ -2624,7 +2625,7 @@ button.manager-item:hover:not(:disabled) { background: rgb(127 127 127 / 0.18); 
 .motm-backdrop { z-index: 70; }
 @keyframes motm-in { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: scale(1); } }
 @keyframes motm-star { 0% { transform: scale(0) rotate(-200deg); } 60% { transform: scale(1.5) rotate(15deg); } 100% { transform: scale(1) rotate(0); } }
-.tt-motm { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; padding: 6px 10px; border-radius: 10px; font-weight: 800; background: rgb(250 204 21 / 0.14); border: 1px solid rgb(250 204 21 / 0.5); }
+.tt-motm { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; font-weight: 700; }
 .tt-motm-star { color: #facc15; display: inline-flex; animation: motm-twinkle 1.4s ease-in-out 3; }
 @keyframes motm-twinkle { 0%, 100% { transform: scale(1); filter: none; } 50% { transform: scale(1.35) rotate(18deg); filter: drop-shadow(0 0 6px #facc15); } }
 .zone-motm { color: #facc15; display: inline-flex; margin-right: 2px; vertical-align: -1px; filter: drop-shadow(0 0 3px rgb(250 204 21 / 0.9)); }
@@ -2639,9 +2640,6 @@ button.manager-item:hover:not(:disabled) { background: rgb(127 127 127 / 0.18); 
 .motm-confetti .confetti { position: absolute; inset: 0; }
 
 /* The season's awards: a mail that can't be missed when one of ours won. */
-.inbox li.highlight { border: 2px solid #facc15; border-radius: 12px; margin: 6px 0; background: linear-gradient(90deg, rgb(250 204 21 / 0.18), transparent); box-shadow: 0 0 18px rgb(250 204 21 / 0.45); animation: award-glow 1.6s ease-in-out infinite alternate; }
-.inbox li.highlight .inbox-text { color: #fde047; font-weight: 800; }
-@keyframes award-glow { from { box-shadow: 0 0 8px rgb(250 204 21 / 0.3); } to { box-shadow: 0 0 24px rgb(250 204 21 / 0.75); } }
 .awards-list { list-style: none; margin: 0; padding: 0 4px 10px 32px; display: grid; gap: 4px; border: 0; }
 .awards-list .award { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 4px 8px; border: 0; border-radius: 8px; background: rgb(127 127 127 / 0.1); }
 .awards-list .award.mine { background: rgb(250 204 21 / 0.2); box-shadow: inset 0 0 0 1px #facc15; font-weight: 800; }
@@ -2654,7 +2652,6 @@ button.manager-item:hover:not(:disabled) { background: rgb(127 127 127 / 0.18); 
 .award-winner-text { display: grid; }
 .award-winner-text small { color: #fde047; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 800; }
 .award-winner-text strong { font-size: 1.15rem; }
-@media (prefers-reduced-motion: reduce) { .inbox li.highlight { animation: none; } }
 
 .national-results { display: grid; gap: 8px; }
 .national-results li { display: grid; gap: 2px; padding: 6px 8px; border-radius: 10px; background: rgb(127 127 127 / 0.1); }
@@ -2667,3 +2664,41 @@ button.manager-item:hover:not(:disabled) { background: rgb(127 127 127 / 0.18); 
 }
 
 .national-table tr.mine td { background: rgb(250 204 21 / 0.14); font-weight: 800; }
+
+.award-cards { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 4px 10px 32px; }
+.award-card { zoom: 0.6; border: 0; background: none; padding: 0; cursor: pointer; border-radius: 14px; }
+.award-card:hover { filter: brightness(1.1); }
+.award-winner-card { zoom: 0.5; border: 0; background: none; padding: 0; cursor: pointer; flex: none; }
+.decisions { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.decisions > li { padding: 8px 0; border-top: 1px solid var(--border); }
+.decisions > li:first-child { border-top: 0; }
+.decisions p { margin: 0 0 6px; }
+
+/* The manager's button stands out in blue; set pieces are greyed out when the match is followed as text or zones (the assistant takes them). */
+.btn.ctl.manager-btn { background: linear-gradient(180deg, #2f9bff, #1e6fe0); color: #fff; border-color: #5cb8ff; box-shadow: 0 0 0 1px rgb(92 184 255 / 0.4), 0 2px 10px rgb(30 139 255 / 0.45); }
+.btn.ctl.manager-btn.open { border-color: #fff; }
+.manager-toggle.greyed { opacity: 0.4; filter: grayscale(1); pointer-events: none; }
+/* The team talk's buttons as pills, like the tabs at the top of the pages: dark with a light outline, the chosen one blue. */
+.match-dialog .tt-options { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.match-dialog .tt-option, .match-dialog .tt-player .btn, .match-dialog .dialog-actions .btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 16px; border-radius: 999px; cursor: pointer; font: inherit;
+  font-weight: 700; font-size: 0.85rem; color: #fff; background: rgb(255 255 255 / 0.03); border: 1.5px solid rgb(255 255 255 / 0.22); text-align: center;
+}
+.match-dialog .tt-option .icon { color: #fff; width: 18px; height: 18px; }
+.match-dialog .tt-option strong { font-weight: 700; }
+.match-dialog .tt-option.active, .match-dialog .tt-player .btn.primary, .match-dialog .dialog-actions .btn.primary {
+  background: var(--accent); border-color: var(--accent); box-shadow: 0 4px 14px rgb(30 155 255 / 0.4); color: #fff;
+}
+.match-dialog .tt-option:disabled, .match-dialog .dialog-actions .btn:disabled { opacity: 0.5; box-shadow: none; }
+
+/* The penalty shootout's order of takers: the first five go first, the rest are on stand-by. */
+.shootout-order { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 4px; }
+.shootout-order li { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border-radius: 10px; background: rgb(127 127 127 / 0.12); }
+.shootout-order li.first-five { background: rgb(30 139 255 / 0.18); }
+.shootout-order .so-num { width: 1.4em; font-weight: 800; text-align: center; }
+.shootout-order .so-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.award-winner-manager { flex: none; width: 72px; height: 72px; border-radius: 50%; overflow: hidden; background: var(--surface-2); box-shadow: 0 0 0 3px #facc15; }
+.award-winner-manager .avatar { display: block; }
+
+.national-due { display: grid; gap: 6px; justify-items: start; padding: 10px 12px; margin: 8px 0; border-radius: 12px; background: rgb(30 139 255 / 0.14); border: 1px solid rgb(30 139 255 / 0.4); }

@@ -4,7 +4,7 @@ import {newGame} from "./generate";
 import {leagueClubs} from "./helpers";
 
 describe("season awards", () => {
-  it("gives the awards by the season's ratings, and lights up a win for one of ours", () => {
+  it("gives the awards by the season's ratings, asks to be read, and celebrates a win for one of ours", () => {
     const g = newGame("Awards", 3, 41);
     const mine = Object.values(g.players).filter((p) => p.clubId === g.userClubId);
     const star = mine.find((p) => p.position !== "GK")!;
@@ -19,7 +19,7 @@ describe("season awards", () => {
     announceAwards(g, awards);
     const mail = g.inbox[0];
     expect(mail.key).toBe("msg.awards");
-    expect(mail.highlight).toBe(true);
+    expect(mail.action).toEqual({type: "ack"});
     expect(g.celebrations?.some((c) => c.kind === "award")).toBe(true);
   });
 });

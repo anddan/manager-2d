@@ -40,6 +40,9 @@ import {Training} from "./views/Training";
 import {Transfers} from "./views/Transfers";
 import {Storage} from "./views/Storage";
 import {National} from "./views/National";
+import {dueNationalMatch, startNationalMatch} from "../game/national";
+import {DecisionsDialog} from "./DecisionsDialog";
+import {pendingDecisions, readForceDecisions} from "./decisions";
 import {CodeSalesPage, FriendSalesWatcher} from "./FriendSale";
 import {useFriendCupBadge} from "./friendCupBadge";
 import {Pals} from "./views/Pals";
@@ -341,6 +344,8 @@ function PlayButton() {
   const next = nextUserFixture(game);
   const isMatchWeek = !!next && fixtureWeek(next) === game.week;
   const [gaps, setGaps] = useState(0);
+  // Questions in the mail that must be answered first (a setting).
+  const [decisions, setDecisions] = useState(false);
   const button = useRef<HTMLButtonElement>(null);
   const play = () => {
     const result = act((g, rng) => {
@@ -356,7 +361,22 @@ function PlayButton() {
     // Into a match: its energy goes, shown flying off the button.
     if (isMatchWeek) energySpent(button.current, ENERGY_COST_MATCH);
   };
+  // The national team's match this week (played first, like any other: its tactics, then the kick-off).
+  const nationalDue = dueNationalMatch(game);
   const advance = () => {
+    if (readForceDecisions() && pendingDecisions(game).length > 0) {
+      setDecisions(true);
+      return;
+    }
+    if (nationalDue) {
+      if (view !== "national") {
+        setView("national");
+        window.scrollTo({top: 0});
+        return;
+      }
+      act((g, rng) => startNationalMatch(g, rng));
+      return;
+    }
     // Before a match: first a look at the team in Tactics; the next press kicks off.
     if (isMatchWeek && view !== "tactics") {
       setView("tactics");
@@ -382,13 +402,14 @@ function PlayButton() {
     play();
   };
   // A match week: first to the team in Tactics (blue play); there, ready to kick off (green ball).
-  const kickOff = isMatchWeek && view === "tactics";
-  const label = kickOff ? t("top.playMatch") : isMatchWeek ? t("top.toTactics") : t("top.nextWeek");
+  const kickOff = nationalDue ? view === "national" : isMatchWeek && view === "tactics";
+  const label = nationalDue ? t(view === "national" ? "top.playNational" : "top.toNational") : kickOff ? t("top.playMatch") : isMatchWeek ? t("top.toTactics") : t("top.nextWeek");
   // Who can play in the line-up as it stands, and whether that's too few to start.
   const fielded = clubSlots(club).length - gaps;
   const tooFew = gaps > 0 && fielded < MIN_PLAYERS;
   return (
     <div className="nav-play">
+      {decisions && <DecisionsDialog onClose={() => setDecisions(false)} />}
       {gaps > 0 && (
         <Modal compact title={<><Icon name="warn" size={20} /> {iconize(t("top.gapsTitle"))}</>} onClose={() => setGaps(0)}>
           {/* Gaps are filled before kick-off; fewer than the minimum who can play is said plainly. */}

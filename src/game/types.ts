@@ -406,7 +406,8 @@ export type MessageAction =
   | {type: "transferRequest"; playerId: string}
   | {type: "contract"; playerId: string}
   | {type: "match"; fixtureId: string}
-  | {type: "nationalOffer"; country: string};
+  | {type: "nationalOffer"; country: string}
+  | {type: "ack"};
 
 /** One match of the national team. `what`: "friendly", or "wc.qf" … "ec.final". */
 export interface NationalResult {
@@ -575,6 +576,20 @@ export interface GameState {
   history: SeasonHistory[];
   /** The country the manager coaches besides the club, if any. */
   national?: NationalJob;
+  /**
+   * A national team match being played live. While it lasts the two countries are clubs of their own, `userClubId`
+   * is the manager's country, and the match is played like any other; when it ends everything is put back.
+   */
+  nationalMatch?: {
+    /** The manager's real club, to go back to. */
+    realClubId: string;
+    fixture: CupFixture;
+    what: string;
+    opponent: string;
+    knockout: boolean;
+    /** Players made up for a country without a team of its own (removed when the match is over). */
+    tempPlayers: string[];
+  };
   nextId: number;
   /** Set between starting a match week and finishing it. Missing in old saves. */
   liveMatch?: LiveMatchState | null;

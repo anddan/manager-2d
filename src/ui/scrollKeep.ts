@@ -1,22 +1,36 @@
-// Puts the page back where it was when a dialog closes. While a dialog is open the page behind is held
-// still (overflow hidden), and the browser may then drop its scroll position: the page would land at the
-// top, or somewhere else, when the dialog is closed. The position is followed while no dialog is open
-// and set again when the last one has gone.
+// While a dialog is open the page behind is held still: the body is fixed in place at the scroll position
+// it had (so nothing jumps, and no scrollbar comes or goes), and set free again when the last dialog closes.
 import {useEffect} from "react";
 
-let y = typeof window === "undefined" ? 0 : window.scrollY;
-const dialogOpen = () => typeof document !== "undefined" && !!document.querySelector(".modal-backdrop, .match-dialog-backdrop");
-if (typeof window !== "undefined") {
-  window.addEventListener("scroll", () => { if (!dialogOpen()) y = window.scrollY; }, {passive: true});
+let locks = 0;
+let lockedAt = 0;
+
+function lock(): void {
+  if (typeof document === "undefined" || locks++ > 0) return;
+  lockedAt = window.scrollY;
+  const b = document.body.style;
+  b.position = "fixed";
+  b.top = `-${lockedAt}px`;
+  b.left = "0";
+  b.right = "0";
+  b.width = "100%";
 }
 
-/** In every dialog: when it closes (and it was the last), the page goes back to where it was. */
+function unlock(): void {
+  if (typeof document === "undefined" || locks === 0 || --locks > 0) return;
+  const b = document.body.style;
+  b.position = "";
+  b.top = "";
+  b.left = "";
+  b.right = "";
+  b.width = "";
+  window.scrollTo(0, lockedAt);
+}
+
+/** In every dialog: the page behind stays where it is while it is open, and is where it was when it closes. */
 export function useKeepScroll(): void {
   useEffect(() => {
-    return () => {
-      requestAnimationFrame(() => {
-        if (!dialogOpen() && Math.abs(window.scrollY - y) > 1) window.scrollTo(0, y);
-      });
-    };
+    lock();
+    return unlock;
   }, []);
 }

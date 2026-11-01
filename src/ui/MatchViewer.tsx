@@ -34,6 +34,7 @@ import {addMessage, findFixture, fullName, isCupFixture, isKnockout, listName, p
 import {shootoutOver} from "../game/cup";
 import {WIN_VIDEO_DIAMONDS, taskProgress, videoAfterWin} from "../game/daily";
 import {Rng} from "../game/rng";
+import {finishNationalMatch} from "../game/national";
 import {matchVerdict, PLAYER_TALKS, TEAM_TALKS, talkFit, teamTalk, type PlayerTalk, type TeamTalk} from "../game/morale";
 import {boardAt, clockLabel, matchLength} from "../game/clock";
 import {FORMATIONS, type Slot, ENERGY_COST_FORZA} from "../game/constants";
@@ -1120,7 +1121,19 @@ function Shootout({report, seed, userSide, textOnly, onDone}: {report: MatchRepo
   const [home, away] = matchClubs(game.clubs[report.homeId], game.clubs[report.awayId]);
   const end = matchLength(report);
   const onPitch = (side: Side) => [...onPitchAt(report, side, end).values()].map((id) => game.players[id]).filter(Boolean);
-  const takers = {home: shootoutTakers(onPitch("home"), home.roles?.penalties), away: shootoutTakers(onPitch("away"), away.roles?.penalties)};
+  const defaults = {home: shootoutTakers(onPitch("home"), home.roles?.penalties), away: shootoutTakers(onPitch("away"), away.roles?.penalties)};
+  // Before the first kick the manager sets the order of his takers (the computer picks the other side's).
+  const [order, setOrder] = useState<string[] | null>(null);
+  const [ready, setReady] = useState(false);
+  const mineTakers = order ? order.map((id) => game.players[id]).filter(Boolean) : defaults[userSide];
+  const takers = {...defaults, [userSide]: mineTakers};
+  const move = (i: number, by: -1 | 1) => {
+    const ids = (order ?? defaults[userSide].map((p) => p.id)).slice();
+    const j = i + by;
+    if (j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    setOrder(ids);
+  };
   const keepers = {home: onPitch("home").find((p) => p.position === "GK"), away: onPitch("away").find((p) => p.position === "GK")};
   // Scored or not, kick by kick (home, away, home, ...).
   const [kicks, setKicks] = useState<boolean[]>([]);
@@ -1138,7 +1151,7 @@ function Shootout({report, seed, userSide, textOnly, onDone}: {report: MatchRepo
   // Commentary only: every kick is taken by the game, one line at a time.
   const [lines, setLines] = useState<string[]>([]);
   useEffect(() => {
-    if (!textOnly || over || !taker) return;
+    if (!textOnly || !ready || over || !taker) return;
     const id = setTimeout(() => {
       const res = resolveSetPiece(new Rng(seed + 7919 * (k + 1)), sp, null, taker, keeper);
       const params = {player: shortName(taker), team: (side === "home" ? home : away).short, keeper: keeper ? shortName(keeper) : ""};
@@ -1146,7 +1159,7 @@ function Shootout({report, seed, userSide, textOnly, onDone}: {report: MatchRepo
       setKicks((list) => [...list, res.result === "goal"]);
     }, 1600);
     return () => clearTimeout(id);
-  }, [textOnly, over, k]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [textOnly, ready, over, k]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Decided: show the final score a moment, then back to the pitch.
   useEffect(() => {
@@ -1166,6 +1179,34 @@ function Shootout({report, seed, userSide, textOnly, onDone}: {report: MatchRepo
       </div>
     );
   };
+
+  if (!ready) {
+    // The order the takers go in: the first five take the first five kicks.
+    return (
+      <div className="shootout">
+        <div className="shootout-head">
+          <strong><Icon name="ball" size={18} /> {iconize(t("so.orderTitle"))}</strong>
+          <span className="shootout-score">{home.short} – {away.short}</span>
+        </div>
+        <p className="muted small">{iconize(t("so.orderHint"))}</p>
+        <ol className="shootout-order">
+          {mineTakers.map((p, i) => (
+            <li key={p.id} className={i < 5 ? "first-five" : undefined}>
+              <span className="so-num">{i + 1}</span>
+              <PosBadge pos={p.position} />
+              <span className="so-name">{shortName(p)}</span>
+              <span className="num strong">{Math.round(p.attrs.finishing)}</span>
+              <button type="button" className="icon-btn" aria-label={t("so.up")} disabled={i === 0} onClick={() => move(i, -1)}>▲</button>
+              <button type="button" className="icon-btn" aria-label={t("so.down")} disabled={i === mineTakers.length - 1} onClick={() => move(i, 1)}>▼</button>
+            </li>
+          ))}
+        </ol>
+        <div className="btn-row">
+          <button className="btn primary push-right" onClick={() => setReady(true)}>{iconize(t("so.start"))} ▶</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="shootout">
@@ -1519,6 +1560,14 @@ export function LiveMatchViewer() {
   // The team talk comes after the match is counted (it changes their mood, not the result).
   const finish = (words?: Words) => {
     live.playOut();
+    // A national team match: counted into the country's results, no team talk.
+    if (game.nationalMatch) {
+      act((g, rng) => {
+        if (g.liveMatch) g.liveMatch.commands = live.allCommands();
+        finishNationalMatch(g, rng);
+      });
+      return;
+    }
     const said = act((g, rng) => {
       // Includes substitutions the assistant made for injuries while skipping.
       if (g.liveMatch) g.liveMatch.commands = live.allCommands();
@@ -1568,6 +1617,7 @@ function TeamTalkDialog({report, motmId, onDone}: {report: MatchReport; motmId?:
   // One of ours was the player of the match: confetti in the club's colours and a chime when the talk opens.
   const motmOurs = !!motmId && game.players[motmId]?.clubId === game.userClubId;
   const motmClub = game.clubs[game.userClubId];
+  const openPlayer = useGame((s) => s.openPlayer);
   useEffect(() => {
     if (motmOurs && effectsOn()) chime();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1576,7 +1626,7 @@ function TeamTalkDialog({report, motmId, onDone}: {report: MatchReport; motmId?:
       {/* One of ours was the player of the match: said first, with a little sparkle. */}
       {motmOurs && effectsOn() && createPortal(<div className="motm-confetti"><Confetti colors={[motmClub.color, motmClub.color2, "#facc15"]} /></div>, document.body)}
       {motmOurs && motmId && (
-        <p className="tt-motm"><span className="tt-motm-star"><Icon name="star" size={18} /></span> {iconize(t("motm.line", {name: fullName(game.players[motmId]), rating: (report.ratings[motmId] ?? 0).toFixed(1)}))}</p>
+        <p className="tt-motm"><span className="tt-motm-star"><Icon name="star" size={18} /></span> {iconize(t("motm.title"))}: <button type="button" className="link" onClick={() => openPlayer(motmId)}>{fullName(game.players[motmId])}</button> ({(report.ratings[motmId] ?? 0).toFixed(1)})</p>
       )}
       {/* The verdict, and what each talk does behind the (i) (no text on the choices). */}
       <div className="tt-verdict-row">
@@ -2994,7 +3044,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
               {wonIt && game.daily?.winVideoFixture !== report.fixtureId && (
                 <button className="btn push-right" onClick={() => setWatchingAd(true)}><Icon name="video" size={18} /> {iconize(t("video.win", {n: WIN_VIDEO_DIAMONDS}))}</button>
               )}
-              <button className={wonIt && game.daily?.winVideoFixture !== report.fixtureId ? "btn primary" : "btn primary push-right"} onClick={() => setTalking(true)}>{iconize(t("match.finish"))} ▶</button>
+              <button className={wonIt && game.daily?.winVideoFixture !== report.fixtureId ? "btn primary" : "btn primary push-right"} onClick={() => (game.nationalMatch ? onFinish?.() : setTalking(true))}>{iconize(t("match.finish"))} ▶</button>
             </>
           )
         ) : (
@@ -3016,6 +3066,11 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
                         </button>
                       ))}
                     </span>
+                    {/* Once a match: the manager fires up the whole team. */}
+                    <button className="manager-item forza-btn" role="menuitem" disabled={forzaUsed} onClick={forza}>
+                      <span>{forzaIcon} {iconize(t("match.forza"))}</span>
+                      <span className="muted small">{iconize(forzaNote)}</span>
+                    </button>
                     <button className="manager-item" role="menuitem" onClick={() => { setMenuOpen(false); openOrders("subs"); }}>
                       <span><Icon name="swap" size={18} /> {iconize(t("match.subs"))}</span>
                       <Icon name="chevron" size={16} />
@@ -3024,12 +3079,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
                       <span><Icon name="megaphone" size={18} /> {iconize(t("match.giveOrders"))}</span>
                       <Icon name="chevron" size={16} />
                     </button>
-                    {/* Once a match: the manager fires up the whole team. */}
-                    <button className="manager-item forza-btn" role="menuitem" disabled={forzaUsed} onClick={forza}>
-                      <span>{forzaIcon} {iconize(t("match.forza"))}</span>
-                      <span className="muted small">{iconize(forzaNote)}</span>
-                    </button>
-                    <div className="manager-item manager-toggle" data-tour="setpieces">
+                    <div className={textOnly ? "manager-item manager-toggle greyed" : "manager-item manager-toggle"} data-tour="setpieces" aria-disabled={textOnly}>
                       <span><Icon name="target" size={18} /> {iconize(t("match.setPieces"))}</span>
                       <span className="speed-group" role="group" aria-label={t("match.setPieces")}>
                         {([true, false] as const).map((self) => (

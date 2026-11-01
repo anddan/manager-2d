@@ -5,15 +5,16 @@ import {useMemo} from "react";
 import {useT} from "../i18n";
 import type {TKey} from "../i18n";
 import {useGame, useGameState} from "../store";
-import {lookFor} from "./Avatar";
+import {ManagerAvatar, defaultManagerLook, lookFor} from "./Avatar";
 import {Figure} from "./Figure";
 import {Confetti} from "./MatchViewer";
-import {Avatar} from "./Avatar";
+import {PlayerCard} from "./PlayerCard";
 
 export function TrophyCelebration() {
   const {t} = useT();
   const game = useGameState();
   const act = useGame((s) => s.act);
+  const openPlayer = useGame((s) => s.openPlayer);
   const next = game.celebrations?.[0];
   const club = game.clubs[game.userClubId];
   // The eleven, captain in the middle.
@@ -39,7 +40,7 @@ export function TrophyCelebration() {
             const p = a.playerId ? game.players[a.playerId] : undefined;
             return (
               <li key={a.key} className="award-winner">
-                {p ? <Avatar player={p} shirt={club.color} trim={club.color2} size={64} mood={10} /> : <span className="award-winner-icon"><Icon name="star" size={36} /></span>}
+                {p ? <button type="button" className="award-winner-card" title={t("tac.profile")} aria-label={`${t("tac.profile")}: ${a.name}`} onClick={() => { done(); openPlayer(p.id); }}><PlayerCard game={game} player={p} /></button> : <span className="award-winner-manager"><ManagerAvatar look={game.managerLook ?? defaultManagerLook(game.managerName)} size={72} tie={club.color} /></span>}
                 <span className="award-winner-text"><small>{iconize(t(`award.${a.key}` as TKey))}</small><strong>{a.name}</strong></span>
               </li>
             );

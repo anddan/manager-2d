@@ -10,6 +10,7 @@ import type {TKey} from "../../i18n";
 import {useGame, useGameState} from "../../store";
 import {Card, Empty, Tabs} from "../common";
 import {BidCard} from "./Transfers";
+import {PlayerCard} from "../PlayerCard";
 
 const KIND_ICONS: Record<MessageKind, IconName> = {news: "list", player: "user", transfer: "swap", finance: "coins", match: "ball"};
 
@@ -17,9 +18,11 @@ export function Inbox() {
   const {t} = useT();
   const game = useGameState();
   const act = useGame((s) => s.act);
-  const [filter, setFilter] = useState<MessageKind | "all" | "awards">("all");
+  const [filter, setFilter] = useState<MessageKind | "all" | "awards" | "national">("all");
   const [open, setOpen] = useState<string | null>(null);
-  const messages = game.inbox.filter((m) => filter === "all" || (filter === "awards" ? m.key === "msg.awards" : m.kind === filter));
+  const messages = game.inbox.filter((m) => filter === "all" || (filter === "awards" ? m.key === "msg.awards" : filter === "national" ? m.key.startsWith("msg.national") : m.kind === filter));
+  // The national team has its own group once there is a mail about it.
+  const hasNational = game.inbox.some((m) => m.key.startsWith("msg.national"));
 
   const toggle = (m: Message) => {
     setOpen(open === m.id ? null : m.id);
@@ -41,13 +44,14 @@ export function Inbox() {
           {id: "match", label: <><Icon name={KIND_ICONS.match} size={18} /> {iconize(t("inbox.match"))}</>},
           {id: "news", label: <><Icon name={KIND_ICONS.news} size={18} /> {iconize(t("inbox.news"))}</>},
           {id: "finance", label: <><Icon name={KIND_ICONS.finance} size={18} /> {iconize(t("inbox.finance"))}</>},
+          ...(hasNational ? [{id: "national" as const, label: <><Icon name="flag" size={18} /> {iconize(t("inbox.national"))}</>}] : []),
           {id: "awards", label: <><Icon name="trophy" size={18} /> {iconize(t("inbox.awards"))}</>},
         ]}
       />
       {messages.length === 0 ? <Empty>{iconize(t("inbox.empty"))}</Empty> : (
         <ul className="inbox">
           {messages.map((m) => (
-            <li key={m.id} className={`${m.read ? "" : "unread"} ${open === m.id ? "open" : ""} ${m.highlight ? "highlight" : ""}`}>
+            <li key={m.id} className={`${m.read ? "" : "unread"} ${open === m.id ? "open" : ""} `}>
               <button className="inbox-row" onClick={() => toggle(m)} aria-expanded={open === m.id}>
                 <span aria-hidden className="inbox-kind"><Icon name={KIND_ICONS[m.kind]} size={20} /></span>
                 <span className="inbox-text"><MessageText message={m} /></span>
@@ -64,9 +68,10 @@ export function Inbox() {
 }
 
 /** The season's awards, always shown under the mail; the ones one of ours won are lit up in gold. */
-function AwardsList({message: m}: {message: Message}) {
+export function AwardsList({message: m}: {message: Message}) {
   const {t} = useT();
   const game = useGameState();
+  const act = useGame((s) => s.act);
   const openPlayer = useGame((s) => s.openPlayer);
   const p = m.params;
   const rows: {key: string; icon: IconName; name: string; id: string; mine: boolean}[] = [
@@ -75,7 +80,9 @@ function AwardsList({message: m}: {message: Message}) {
     {key: "talent", icon: "sprout", name: String(p.talent), id: String(p.talentId), mine: p.talentMine === 1},
     {key: "manager", icon: "star", name: String(p.manager), id: "", mine: p.managerMine === 1},
   ];
+  const winners = rows.filter((r) => r.id && game.players[r.id]);
   return (
+    <>
     <ul className="awards-list">
       {rows.map((r) => (
         <li key={r.key} className={r.mine ? "award mine" : "award"}>
@@ -86,15 +93,31 @@ function AwardsList({message: m}: {message: Message}) {
         </li>
       ))}
     </ul>
+    {/* The winners' cards: tap one for the profile. */}
+    {winners.length > 0 && (
+      <div className="award-cards">
+        {winners.map((r) => (
+          <button key={r.key} type="button" className="award-card" title={t("tac.profile")} aria-label={`${t("tac.profile")}: ${r.name}`} onClick={() => openPlayer(r.id)}>
+            <PlayerCard game={game} player={game.players[r.id]} />
+          </button>
+        ))}
+      </div>
+    )}
+    {!m.resolved && (
+      <div className="inbox-action">
+        <button className="btn small" onClick={() => act((g) => { const msg = g.inbox.find((x) => x.id === m.id); if (msg) msg.resolved = true; })}>{iconize(t("award.ok"))}</button>
+      </div>
+    )}
+    </>
   );
 }
 
-function MessageText({message}: {message: Message}) {
+export function MessageText({message}: {message: Message}) {
   const {tx} = useT();
   return <>{iconize(tx(message.key, message.params))}</>;
 }
 
-function MessageAction({message: m}: {message: Message}) {
+export function MessageAction({message: m}: {message: Message}) {
   const {t} = useT();
   const game = useGameState();
   const act = useGame((s) => s.act);
@@ -140,6 +163,8 @@ function MessageAction({message: m}: {message: Message}) {
       return game.players[a.playerId] ? (
         <div className="inbox-action"><button className="btn" onClick={() => openPlayer(a.playerId)}><Icon name="user" size={18} /> {iconize(t("inbox.openPlayer"))}</button></div>
       ) : null;
+    case "ack":
+      return null;
     case "nationalOffer":
       return game.national ? null : (
         <div className="inbox-action btn-row">

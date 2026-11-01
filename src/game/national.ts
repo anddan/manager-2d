@@ -8,8 +8,10 @@ import {NATIONALITIES} from "./names";
 import {addMessage} from "./helpers";
 import {isAvailable, pickBestLineup} from "./lineup";
 import {effectiveRating, overall} from "./ratings";
-import type {Rng} from "./rng";
-import type {FormationId, GameState, NationalJob, NationalResult, Player} from "./types";
+import {Rng} from "./rng";
+import {createPlayer} from "./generate";
+import {simulateMatch} from "./match";
+import type {Club, CupFixture, FormationId, GameState, NationalJob, NationalResult, Player, Position} from "./types";
 
 /** A country needs this many players in the game to have a team. */
 const NATION_MIN = 14;
@@ -87,7 +89,7 @@ export function offerNational(state: GameState, rng: Rng): void {
   const top = nations(state).slice(0, 10);
   if (top.length === 0) return;
   const country = rng.pick(top).code;
-  addMessage(state, {kind: "news", key: "msg.nationalOffer", params: {country: `nat.${country}`}, action: {type: "nationalOffer", country}, highlight: true});
+  addMessage(state, {kind: "news", key: "msg.nationalOffer", params: {country: `nat.${country}`}, action: {type: "nationalOffer", country}});
 }
 
 /** Becomes national coach. */
@@ -145,16 +147,17 @@ export function nationalWeek(state: GameState, rng: Rng): void {
   const step = TOURNAMENT_WEEKS.indexOf(state.week);
   const friendly = FRIENDLY_WEEKS.includes(state.week);
   if (friendly) {
+    // Played live already: nothing more to do.
+    if (recorded(job, state)) return;
     const strength = strengths(state);
-    const opponent = rng.pick([...strength.keys()].filter((c) => c !== job.country && (strength.get(c) ?? 0) >= 55));
-    userMatch(state, rng, job, opponent, "friendly", false, strength);
+    userMatch(state, rng, job, friendlyOpponent(state, job, strength), "friendly", false, strength);
     return;
   }
   if (!tournament || step < 0) return;
   const strength = strengths(state);
   if (step === 0 || !job.tournament || job.tournament.season !== state.season) {
     if (step !== 0) return;
-    const groups = drawGroups(state, rng, job.country);
+    const groups = drawGroups(state, new Rng(state.season * 7919 + 13), job.country);
     const table: Record<string, {pl: number; gf: number; ga: number; pts: number}> = {};
     for (const code of groups.flat()) table[code] = {pl: 0, gf: 0, ga: 0, pts: 0};
     job.tournament = {comp: tournament, season: state.season, alive: true, groups, table, bracket: []};
@@ -172,7 +175,7 @@ export function nationalWeek(state: GameState, rng: Rng): void {
         let gb: number;
         if (t.alive && (a === job.country || b === job.country)) {
           const other = a === job.country ? b : a;
-          const r = userMatch(state, rng, job, other, `${t.comp}.g`, false, strength);
+          const r = recorded(job, state) ?? userMatch(state, rng, job, other, `${t.comp}.g`, false, strength);
           [ga, gb] = a === job.country ? r : [r[1], r[0]];
         } else {
           const r = simulate(rng, strength.get(a)!, strength.get(b)!, false);
@@ -209,7 +212,7 @@ export function nationalWeek(state: GameState, rng: Rng): void {
     let aWins: boolean;
     if (t.alive && (a === job.country || b === job.country)) {
       const other = a === job.country ? b : a;
-      const won = userMatch(state, rng, job, other, `${t.comp}.${name}`, true, strength);
+      const won = recorded(job, state) ?? userMatch(state, rng, job, other, `${t.comp}.${name}`, true, strength);
       const ours = won[0] > won[1] || (won[0] === won[1] && won[2]);
       aWins = a === job.country ? ours : !ours;
       if (!ours) {
@@ -269,6 +272,154 @@ function userMatch(state: GameState, rng: Rng, job: NationalJob, opponent: strin
     params: {what: `national.what.${what}`, country: `nat.${job.country}`, opponent: `nat.${opponent}`, score: `${us}–${them}${pens ? ` (${pens[0]}–${pens[1]})` : ""}`},
   });
   return [us, them, won];
+}
+
+/** English names for the countries' teams while they play a match. */
+const COUNTRY_NAMES: Record<string, string> = {
+  SE: "Sweden", NO: "Norway", DK: "Denmark", FI: "Finland", ES: "Spain", BR: "Brazil", AR: "Argentina", DE: "Germany", NL: "Netherlands", GB: "England",
+  FR: "France", US: "USA", IT: "Italy", NG: "Nigeria", PT: "Portugal", BE: "Belgium", HR: "Croatia", PL: "Poland", CH: "Switzerland", AT: "Austria",
+  IS: "Iceland", RS: "Serbia", TR: "Turkey", UY: "Uruguay", CO: "Colombia", MX: "Mexico", JP: "Japan", KR: "South Korea", MA: "Morocco", SN: "Senegal",
+  GH: "Ghana", CI: "Ivory Coast", CM: "Cameroon",
+};
+
+/** Who the friendly is against (the same every time it is asked for this week). */
+function friendlyOpponent(state: GameState, job: NationalJob, strength: Map<string, number>): string {
+  return new Rng(state.season * 131 + state.week).pick([...strength.keys()].filter((c) => c !== job.country && (strength.get(c) ?? 0) >= 55));
+}
+
+/** What this week's match was, if it has been played live already (goals for us, against, and whether we won). */
+function recorded(job: NationalJob, state: GameState): [number, number, boolean] | undefined {
+  const r = job.results[0];
+  if (!r || r.season !== state.season || r.week !== state.week) return undefined;
+  return [r.goals[0], r.goals[1], r.goals[0] > r.goals[1] || (r.goals[0] === r.goals[1] && !!r.pens && r.pens[0] > r.pens[1])];
+}
+
+/** The international match to play this week (not played yet), and against whom. */
+export function dueNationalMatch(state: GameState): {what: string; opponent: string; knockout: boolean} | null {
+  const job = state.national;
+  if (!job || state.nationalMatch || state.liveMatch || recorded(job, state)) return null;
+  const strength = strengths(state);
+  if (FRIENDLY_WEEKS.includes(state.week)) return {what: "friendly", opponent: friendlyOpponent(state, job, strength), knockout: false};
+  const tournament = tournamentOf(state.season);
+  const step = TOURNAMENT_WEEKS.indexOf(state.week);
+  if (!tournament || step < 0) return null;
+  const t = job.tournament && job.tournament.season === state.season ? job.tournament : undefined;
+  if (t && (!t.alive || t.champion)) return null;
+  if (step <= 2) {
+    const groups = t?.groups ?? drawGroups(state, new Rng(state.season * 7919 + 13), job.country);
+    const group = groups.find((g) => g.includes(job.country));
+    if (!group) return null;
+    const me = group.indexOf(job.country);
+    const pair = MATCHDAYS[step].find(([i, j]) => i === me || j === me);
+    if (!pair) return null;
+    return {what: `${tournament}.g`, opponent: group[pair[0] === me ? pair[1] : pair[0]], knockout: false};
+  }
+  const i = t?.bracket.indexOf(job.country) ?? -1;
+  if (!t || i < 0) return null;
+  return {what: `${tournament}.${KNOCKOUT_NAMES[step - 3]}`, opponent: t.bracket[i % 2 === 0 ? i + 1 : i - 1], knockout: true};
+}
+
+/** A country as a club for the length of a match (the user's club as the base for everything a club needs). */
+function natClub(base: Club, code: string, formation: FormationId, mentality: Club["mentality"], lineup: string[], bench: string[]): Club {
+  const kit = nationalKit(code);
+  return {
+    ...structuredClone(base),
+    id: `nat:${code}`,
+    name: COUNTRY_NAMES[code] ?? code,
+    short: code,
+    color: kit.color,
+    color2: kit.color2,
+    color3: undefined,
+    away: undefined,
+    pattern: undefined,
+    collar: undefined,
+    sleeves: undefined,
+    formation,
+    mentality,
+    lineup,
+    bench,
+    roles: undefined,
+    customSlots: undefined,
+    officialName: undefined,
+    stadium: undefined,
+    installments: [],
+    loan: undefined,
+    guest: true,
+    country: code,
+  };
+}
+
+/**
+ * Sets up this week's national match to be played live, like any other: the two countries become clubs for the
+ * match, the manager's country is "the user's club" while it lasts, and a live match is started. An error key, or null.
+ */
+export function startNationalMatch(state: GameState, rng: Rng): string | null {
+  const job = state.national;
+  const due = dueNationalMatch(state);
+  if (!job || !due) return "national.nothing";
+  const strength = strengths(state);
+  const base = state.clubs[state.userClubId];
+  const ours = nationalSquad(state, job.country, job.formation);
+  // The other country: its own players if it has a team, otherwise a squad made up for the match.
+  const tempPlayers: string[] = [];
+  let theirs: {lineup: string[]; bench: string[]};
+  if (nationalPool(state, due.opponent).length >= NATION_MIN) {
+    theirs = nationalSquad(state, due.opponent, "4-4-2");
+  } else {
+    const level = strength.get(due.opponent) ?? 55;
+    const names = NATIONALITIES[due.opponent];
+    const positions: Position[] = ["GK", "CB", "CB", "FB", "FB", "W", "CM", "CM", "W", "ST", "ST", "GK", "CB", "CM", "W", "ST"];
+    const made = positions.map((position) => {
+      const p = createPlayer(state, rng, {position, level: Math.round(level + rng.range(-3, 3)), age: rng.int(22, 32), clubId: null, season: state.season});
+      p.nationality = due.opponent;
+      if (names) {
+        p.firstName = rng.pick(names.first);
+        p.lastName = rng.pick(names.last);
+      }
+      tempPlayers.push(p.id);
+      return p;
+    });
+    theirs = pickBestLineup(state, {id: `nat:${due.opponent}`} as never, FORMATIONS["4-4-2"], made);
+  }
+  const mine = natClub(base, job.country, job.formation, job.mentality, ours.lineup, ours.bench);
+  const other = natClub(base, due.opponent, "4-4-2", "balanced", theirs.lineup, theirs.bench);
+  state.clubs[mine.id] = mine;
+  state.clubs[other.id] = other;
+  const fixture: CupFixture = {id: `nat-${state.season}-${state.week}`, round: 0, homeId: mine.id, awayId: other.id, played: false, homeGoals: 0, awayGoals: 0, stage: due.knockout ? 3 : 0};
+  state.nationalMatch = {realClubId: state.userClubId, fixture, what: due.what, opponent: due.opponent, knockout: due.knockout, tempPlayers};
+  state.userClubId = mine.id;
+  state.liveMatch = {fixtureId: fixture.id, seed: rng.int(1, 2 ** 31 - 1), inputs: {}, commands: []};
+  return null;
+}
+
+/** The live national match is over: counted, written into the country's results, and everything put back as it was. */
+export function finishNationalMatch(state: GameState, rng: Rng): void {
+  void rng;
+  const nm = state.nationalMatch;
+  const live = state.liveMatch;
+  const job = state.national;
+  if (!nm || !live) return;
+  const f = nm.fixture;
+  const report = simulateMatch(state, new Rng(live.seed), f, true, live.inputs, live.commands ?? [], "home");
+  const us = report.homeGoals;
+  const them = report.awayGoals;
+  const pens = f.penalties && us === them ? ([f.penalties[0], f.penalties[1]] as [number, number]) : undefined;
+  const scorers = report.events.filter((e) => e.type === "goal" && e.side === "home" && e.playerId).map((e) => e.playerId!);
+  // Put everything back.
+  state.userClubId = nm.realClubId;
+  for (const id of [`nat:${job?.country ?? ""}`, `nat:${nm.opponent}`]) delete state.clubs[id];
+  for (const id of nm.tempPlayers) delete state.players[id];
+  state.nationalMatch = undefined;
+  state.liveMatch = null;
+  if (!job) return;
+  const result: NationalResult = {season: state.season, week: state.week, opponent: nm.opponent, what: nm.what, goals: [us, them], ...(pens ? {pens} : {}), scorers};
+  job.results.unshift(result);
+  if (job.results.length > 30) job.results.length = 30;
+  addMessage(state, {
+    kind: "match",
+    key: "msg.nationalMatch",
+    params: {what: `national.what.${nm.what}`, country: `nat.${job.country}`, opponent: `nat.${nm.opponent}`, score: `${us}–${them}${pens ? ` (${pens[0]}–${pens[1]})` : ""}`},
+  });
 }
 
 /** The week (of this season) of the next international match, if there is one left. */

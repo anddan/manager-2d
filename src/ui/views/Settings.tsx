@@ -9,6 +9,8 @@ import {Card, Hint} from "../common";
 import {isMuted, onMutedChange, setMuted} from "../sound";
 import {BUILD_ID, checkForUpdate} from "../updates";
 import {MATCH_VIEWS, readMatchView, writeMatchView, type MatchView} from "../matchView";
+import {readForceDecisions, writeForceDecisions} from "../decisions";
+import {readAvatarStyle, writeAvatarStyle, type AvatarStyle} from "../ToonAvatar";
 
 const LANG_NAMES: Record<Lang, string> = {sv: "Svenska", en: "English", es: "Español", it: "Italiano", fr: "Français"};
 
@@ -56,6 +58,8 @@ export function Settings() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [tipsOpen, setTipsOpen] = useState(false);
   const [soundOff, setSoundOff] = useState(isMuted());
+  const [forced, setForced] = useState(readForceDecisions());
+  const [avatarStyle, setAvatarStyle] = useState<AvatarStyle>(readAvatarStyle());
   // How a match is played: the way to watch it, how fast, who takes set pieces and changes, the view, buzz and effects.
   const [matchView, setMatchViewState] = useState<MatchView>(() => readMatchView());
   const noPitch = matchView !== "pitch";
@@ -119,6 +123,15 @@ export function Settings() {
           <input type="checkbox" className="bench-check" checked={!soundOff} onChange={(e) => setMuted(!e.target.checked)} /> {iconize(t("sound.label"))}
         </label>
         <Hint>{iconize(t("sound.hint"))}</Hint>
+      </Card>
+      <Card title={<><Icon name="user" size={20} /> {iconize(t("settings.avatars"))}</>}>
+        <Choice label={t("settings.avatars")} value={avatarStyle} onPick={(v) => { setAvatarStyle(v); writeAvatarStyle(v); }} options={[["toon", t("settings.avatarToon")], ["classic", t("settings.avatarClassic")]]} />
+      </Card>
+      <Card title={<><Icon name="mail" size={20} /> {iconize(t("settings.decisions"))}</>}>
+        <label className="toggle">
+          <input type="checkbox" className="bench-check" checked={forced} onChange={(e) => { setForced(e.target.checked); writeForceDecisions(e.target.checked); }} /> {iconize(t("settings.decisionsLabel"))}
+        </label>
+        <Hint>{iconize(t("settings.decisionsHint"))}</Hint>
       </Card>
       <Card title={<><Icon name="ball" size={20} /> {iconize(t("settings.match"))}</>}>
         <dl className="kv setting-rows">

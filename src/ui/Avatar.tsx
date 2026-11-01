@@ -3,9 +3,12 @@
 // the club colours. The manager's look is picked when starting a new game.
 // The face follows the mood: a big grin when happy, a frown when unhappy and
 // angry brows when they're furious.
+import {ToonKitAvatar, ToonManagerAvatar, readAvatarStyle} from "./ToonAvatar";
 import {LEGEND_ID, THEO_ID} from "../game/legend";
 import {Rng} from "../game/rng";
-import type {ManagerLook, Player} from "../game/types";
+import {recentPointsPerGame} from "../game/league";
+import {useGame} from "../store";
+import type {GameState, ManagerLook, Player} from "../game/types";
 
 export const SKIN = ["#f6d5bd", "#ebbd9c", "#d49c74", "#b37a52", "#8a5638", "#5d3923"];
 const SKIN_WEIGHTS: Record<string, number[]> = {
@@ -29,7 +32,7 @@ const MALE_STYLES = ["short", "buzz", "afro", "sidepart", "mohawk", "bald", "lon
 const FEMALE_STYLES = ["long", "ponytail", "bun", "bob", "braids", "curly", "afro", "pixie"] as const;
 // The newer styles (a top knot, a quiff, a neat side sweep, coils, half up, a fade, dreads) are picked in the look editors only,
 // so everyone's generated look stays as it was.
-export const HAIR_STYLES = [...MALE_STYLES, "ponytail", "bun", "bob", "braids", "pixie", "topknot", "quiff", "swept", "coils", "halfup", "fade", "dreads"] as const;
+export const HAIR_STYLES = [...MALE_STYLES, "ponytail", "bun", "bob", "braids", "pixie", "topknot", "quiff", "swept", "coils", "halfup", "fade", "dreads", "jamal", "cristiano", "messi", "haaland"] as const;
 export type HairStyle = (typeof HAIR_STYLES)[number];
 export const FACE_SHAPES = ["oval", "round", "jaw", "pointed", "cleft"] as const;
 export type FaceShape = (typeof FACE_SHAPES)[number];
@@ -167,7 +170,11 @@ export function managerFace(m: ManagerLook): Look {
   };
 }
 
-function HairBack({look}: {look: Look}) {
+/** The classic avatar has no drawing of the newest styles: it uses the nearest older one. */
+const CLASSIC_STYLE: Record<string, HairStyle> = {jamal: "curly", cristiano: "quiff", messi: "sidepart", haaland: "halfup"};
+
+function HairBack({look: given}: {look: Look}) {
+  const look = {...given, style: CLASSIC_STYLE[given.style] ?? given.style};
   if (look.style === "afro") {
     return (
       <g fill={look.hair}>
@@ -226,7 +233,8 @@ function HairBack({look}: {look: Look}) {
   return null;
 }
 
-function HairFront({look}: {look: Look}) {
+function HairFront({look: given}: {look: Look}) {
+  const look = {...given, style: CLASSIC_STYLE[given.style] ?? given.style};
   const f = look.hair;
   switch (look.style) {
     case "short":
@@ -605,6 +613,7 @@ export function Avatar({player, shirt, trim, size = 96, mood}: {player: Player; 
 
 /** A player's face and shoulders in the kit, for any look (the look editor draws with it too). */
 export function KitAvatar({look, keeper = false, shirt, trim, size = 96, mood = 70}: {look: Look; keeper?: boolean; shirt: string; trim: string; size?: number; mood?: number}) {
+  if (readAvatarStyle() === "toon") return <ToonKitAvatar look={look} keeper={keeper} shirt={shirt} trim={trim} size={size} mood={mood} />;
   const kit = keeper ? "#16a34a" : shirt;
   const kitTrim = keeper ? "#facc15" : trim;
   return (
@@ -628,8 +637,34 @@ export function lookFromEditor(p: Player, m: ManagerLook): Look {
 }
 
 /** The manager in a suit and tie. */
-export function ManagerAvatar({look, size = 96, mood = 70, tie = "#dc2626"}: {look: ManagerLook; size?: number; mood?: number; tie?: string}) {
+/**
+ * How the manager feels: from the club's recent results (a win streak lifts them, a losing run drags them down) and the
+ * board's warnings. 0..100, like a player's happiness.
+ */
+export function managerMood(game: GameState): number {
+  return Math.max(5, Math.min(100, Math.round(58 + managerMoodFactors(game).reduce((n, f) => n + f.value, 0))));
+}
+
+/** What lifts or drags the manager's mood, as in a player's profile (the results, the players' mood and the board's warnings). */
+export function managerMoodFactors(game: GameState): {key: "results" | "squad" | "board"; value: number}[] {
+  const ppg = recentPointsPerGame(game, game.userClubId);
+  const out: {key: "results" | "squad" | "board"; value: number}[] = [{key: "results", value: Math.round((ppg - 1.4) * 27)}];
+  // The players' mood: the squad's average happiness and morale (low is minus, high is plus).
+  const squad = Object.values(game.players).filter((p) => p.clubId === game.userClubId);
+  if (squad.length > 0) {
+    const avg = squad.reduce((n, p) => n + (p.happiness + p.morale) / 2, 0) / squad.length;
+    out.push({key: "squad", value: Math.round((avg - 62) * 0.5)});
+  }
+  const warnings = game.board?.warnings ?? 0;
+  if (warnings > 0) out.push({key: "board", value: -14 * warnings});
+  return out.filter((f) => f.value !== 0);
+}
+
+export function ManagerAvatar({look, size = 96, mood: given, tie = "#dc2626"}: {look: ManagerLook; size?: number; /** Missing: how the manager feels about the results. */ mood?: number; tie?: string}) {
+  const game = useGame((st) => st.game);
+  const mood = given ?? (game ? managerMood(game) : 70);
   const face = managerFace(look);
+  if (readAvatarStyle() === "toon") return <ToonManagerAvatar look={face} suit={look.suit} tie={tie} size={size} mood={mood} />;
   return (
     <svg viewBox="0 0 100 100" width={size} height={size} className="avatar" aria-hidden>
       <path d="M12 100 Q14 80 34 76 L66 76 Q86 80 88 100Z" fill={look.suit} />

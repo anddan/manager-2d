@@ -40,3 +40,37 @@ describe("national team", () => {
     expect(played.filter((r) => r.what.endsWith(".g"))).toHaveLength(3);
   });
 });
+
+describe("a national match played live", () => {
+  it("is set up like a club match, and everything is put back afterwards", async () => {
+    const {LiveMatch} = await import("./live");
+    const {dueNationalMatch, startNationalMatch, finishNationalMatch} = await import("./national");
+    const g = newGame("Live", 3, 61);
+    const rng = new Rng(9);
+    const field = nations(g);
+    acceptNational(g, field[0].code);
+    const realClub = g.userClubId;
+    const players = Object.keys(g.players).length;
+    const clubs = Object.keys(g.clubs).length;
+    g.season = 4;
+    g.week = FRIENDLY_WEEKS[0];
+    expect(dueNationalMatch(g)).not.toBeNull();
+    expect(startNationalMatch(g, rng)).toBeNull();
+    expect(g.userClubId).toBe(`nat:${field[0].code}`);
+    expect(g.liveMatch).toBeTruthy();
+    const live = new LiveMatch(g);
+    live.playOut();
+    g.liveMatch!.commands = live.allCommands();
+    finishNationalMatch(g, rng);
+    expect(g.userClubId).toBe(realClub);
+    expect(g.liveMatch).toBeNull();
+    expect(g.nationalMatch).toBeUndefined();
+    expect(Object.keys(g.clubs)).toHaveLength(clubs);
+    expect(Object.keys(g.players)).toHaveLength(players);
+    expect(g.national!.results).toHaveLength(1);
+    // Played already: nothing more due this week, and the week's processing doesn't play it again.
+    expect(dueNationalMatch(g)).toBeNull();
+    nationalWeek(g, rng);
+    expect(g.national!.results).toHaveLength(1);
+  });
+});

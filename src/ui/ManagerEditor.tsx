@@ -74,14 +74,14 @@ export function ManagerEditor({look, onChange, draw = inSuit, noSuit = false}: {
         <Faces options={FACE_SHAPES} value={look.shape ?? "oval"} label={t("look.shape")} preview={(shape) => ({...look, shape})} onPick={(shape) => set({shape})} draw={draw} name={(o) => t(`shape.${o}` as TKey)} />
         <Swatches colors={HAIR} value={look.hair} label={t("look.hairColor")} onPick={(hair) => set({hair})} />
         <Swatches colors={EYES} value={look.eyes ?? EYES[0]} label={t("look.eyes")} onPick={(eyes) => set({eyes})} />
-        <Faces options={BEARDS} value={look.beard} label={t("look.beard")} preview={(beard) => ({...look, beard})} onPick={(beard) => set({beard})} draw={draw} name={(o) => t(`beard.${o}` as TKey)} />
+        <Faces options={BEARDS} value={look.beard} label={t("look.beard")} preview={(beard) => ({...look, beard})} onPick={(beard) => set(beard !== "none" ? {beard, lashes: false} : {beard})} draw={draw} name={(o) => t(`beard.${o}` as TKey)} />
         {!noSuit && <Swatches colors={SUITS} value={look.suit} label={t("look.suit")} onPick={(suit) => set({suit})} />}
         <div className="btn-row">
           <label className="toggle">
             <input type="checkbox" checked={look.glasses} onChange={(e) => set({glasses: e.target.checked})} /> {iconize(t("look.glasses"))}
           </label>
           <label className="toggle">
-            <input type="checkbox" checked={!!look.lashes} onChange={(e) => set({lashes: e.target.checked})} /> {iconize(t("look.lashes"))}
+            <input type="checkbox" checked={!!look.lashes} onChange={(e) => set(e.target.checked ? {lashes: true, beard: "none"} : {lashes: false})} /> {iconize(t("look.lashes"))}
           </label>
           <label className="toggle">
             <input type="checkbox" checked={!!look.highlights} onChange={(e) => set({highlights: e.target.checked})} /> {iconize(t("look.highlights"))}

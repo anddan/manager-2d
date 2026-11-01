@@ -7,7 +7,7 @@ import {CUP_ROUNDS} from "../game/cup";
 import {leaguePosition} from "../game/league";
 import {useT} from "../i18n";
 import {useGame, useGameState} from "../store";
-import {ManagerAvatar, defaultManagerLook} from "./Avatar";
+import {ManagerAvatar, defaultManagerLook, managerMoodFactors} from "./Avatar";
 import {ManagerEditor} from "./ManagerEditor";
 import {Modal} from "./common";
 import {awayKit, homeKit} from "../game/kit";
@@ -96,6 +96,16 @@ export function ManagerProfile({onClose, kit: startKit}: {onClose: () => void; k
           <p className="muted">{club.officialName ? `${club.name} (${official})` : club.name}</p>
         </div>
       </div>
+      {/* Why the manager looks as they do: what lifts or drags the mood, like the chips in a player's profile. */}
+      {managerMoodFactors(game).length > 0 && (
+        <ul className="factors">
+          {managerMoodFactors(game).map((f) => (
+            <li key={f.key} className={f.value >= 0 ? "pos-factor" : "neg-factor"}>
+              {f.value > 0 ? "+" : ""}{f.value} {iconize(t(`mgr.mood.${f.key}`))}
+            </li>
+          ))}
+        </ul>
+      )}
 
       <h4><Icon name="pen" size={18} /> {iconize(t("mgr.managerName"))}</h4>
       <input className="input mgr-input" value={managerName} maxLength={30} placeholder={game.managerName} onChange={(e) => setManagerName(e.target.value)} />
