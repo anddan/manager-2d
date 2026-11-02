@@ -5,6 +5,37 @@ import {Icon} from "./Icon";
 
 const INK = "#14080a";
 
+/** Car colours: the three body stops (light to dark), the wing and mirror, the seams and the stripe. */
+const CAR: Record<string, {a: string; b: string; c: string; wing: string; seam: string; stripe: string}> = {
+  red: {a: "#ff3a2e", b: "#d80a0a", c: "#6e0505", wing: "#c70909", seam: "#4a0505", stripe: "#ff5a4a"},
+  blue: {a: "#5fb4ff", b: "#0a5fd8", c: "#052a6e", wing: "#0a4fb8", seam: "#031a45", stripe: "#8cc8ff"},
+  yellow: {a: "#ffe45c", b: "#f2b705", c: "#8a6500", wing: "#d99f00", seam: "#5a4000", stripe: "#fff0a0"},
+  white: {a: "#ffffff", b: "#e3e8ee", c: "#97a1ad", wing: "#c5ccd5", seam: "#6b7480", stripe: "#ffffff"},
+  black: {a: "#6a707a", b: "#2a2d33", c: "#0b0c0e", wing: "#1c1e22", seam: "#000000", stripe: "#8a909b"},
+};
+/** Motorcycle paint, light to dark. */
+const BIKE: Record<string, [string, string, string]> = {
+  green: ["#c8ff4d", "#58d10e", "#1f7a05"],
+  red: ["#ff7a6b", "#e01818", "#7a0606"],
+  blue: ["#6fc3ff", "#1b6fe0", "#0a2f7a"],
+  orange: ["#ffd27a", "#ff8a0a", "#9a4400"],
+  black: ["#6a707a", "#2a2d33", "#0c0d0f"],
+};
+/** Watches: the case, the bracelet, the dial, the bezel, and the colour of the hands and the lines. */
+const WATCH: Record<string, {case: [string, string, string]; band: [string, string, string, string]; dial: [string, string, string]; bezel: [string, string]; hand: string; line: string}> = {
+  gold: {case: ["#fff0a6", "#e9b21c", "#9c6a06"], band: ["#b98206", "#ffe38a", "#e2a914", "#9c6a06"], dial: ["#5f8cff", "#1d4fd6", "#0c2a86"], bezel: ["#3b6df0", "#0a2275"], hand: "#f1d46a", line: "#7a5200"},
+  silver: {case: ["#ffffff", "#c4ccd6", "#6f7884"], band: ["#7d8590", "#ffffff", "#b9c1cb", "#6f7884"], dial: ["#4a4f57", "#1c1f24", "#08090b"], bezel: ["#3a3f47", "#0b0c0e"], hand: "#e8edf3", line: "#4b525c"},
+  green: {case: ["#fff0a6", "#e9b21c", "#9c6a06"], band: ["#b98206", "#ffe38a", "#e2a914", "#9c6a06"], dial: ["#5fd08a", "#0f8a45", "#05431f"], bezel: ["#1f9a55", "#05391b"], hand: "#f1d46a", line: "#7a5200"},
+  rose: {case: ["#ffe3d6", "#e8a58a", "#9c5a40"], band: ["#b57a60", "#ffd9c8", "#e0a088", "#9c5a40"], dial: ["#6b4a3e", "#3a2620", "#1a0f0c"], bezel: ["#8a5a48", "#2d1a14"], hand: "#ffd9c8", line: "#6b3a28"},
+};
+/** TV and gaming gear: black or white. */
+const GEAR: Record<string, {body: [string, string, string]; tv: string; stand: string; foot: string; band: string}> = {
+  black: {body: ["#4a5160", "#262a33", "#101217"], tv: "#101217", stand: "#2b2f38", foot: "#3a4150", band: "#3a4150"},
+  white: {body: ["#ffffff", "#e4e8ee", "#aab2be"], tv: "#eef1f5", stand: "#cfd5de", foot: "#b9c0cb", band: "#d5dae2"},
+  red: {body: ["#ff6b5e", "#d81414", "#7a0808"], tv: "#3a0b0b", stand: "#5a1212", foot: "#7a1c1c", band: "#c01818"},
+  blue: {body: ["#6fc3ff", "#1b6fe0", "#0a2f7a"], tv: "#0a1a3a", stand: "#143a7a", foot: "#1b4a9a", band: "#1b6fe0"},
+};
+
 function Frame({width, children}: {width: number; children: ReactNode}) {
   return (
     <svg viewBox="0 0 210 120" width={width} height={(width * 120) / 210} shapeRendering="geometricPrecision" style={{display: "block"}} aria-hidden>
@@ -14,16 +45,17 @@ function Frame({width, children}: {width: number; children: ReactNode}) {
 }
 
 /** A present as a picture: drawn for the watch, the motorcycle and the sports car, an icon for the money. */
-export function GiftPicture({id, width = 80}: {id: string; width?: number}) {
-  if (id === "sportsCar") return <SportsCarArt width={width} />;
-  if (id === "motorcycle") return <MotorcycleArt width={width} />;
-  if (id === "watch") return <WatchArt width={width * 1.05} />;
-  if (id === "gaming") return <GamingArt width={width} />;
+export function GiftPicture({id, variant, width = 80}: {id: string; variant?: string; width?: number}) {
+  if (id === "sportsCar") return <SportsCarArt width={width} variant={variant} />;
+  if (id === "motorcycle") return <MotorcycleArt width={width} variant={variant} />;
+  if (id === "watch") return <WatchArt width={width * 1.05} variant={variant} />;
+  if (id === "gaming") return <GamingArt width={width} variant={variant} />;
   return <Icon name="coins" size={Math.round(width * 0.5)} />;
 }
 
 /** Gaming gear: a TV with a game on it, a speaker on each side, a controller and headphones in front. */
-export function GamingArt({width = 96}: {width?: number}) {
+export function GamingArt({width = 96, variant}: {width?: number; variant?: string}) {
+  const g = GEAR[variant ?? "black"] ?? GEAR.black;
   const id = useId();
   const body = `${id}-body`;
   const screen = `${id}-screen`;
@@ -41,9 +73,9 @@ export function GamingArt({width = 96}: {width?: number}) {
     <Frame width={width}>
       <defs>
         <linearGradient id={body} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#4a5160" />
-          <stop offset="0.5" stopColor="#262a33" />
-          <stop offset="1" stopColor="#101217" />
+          <stop offset="0" stopColor={g.body[0]} />
+          <stop offset="0.5" stopColor={g.body[1]} />
+          <stop offset="1" stopColor={g.body[2]} />
         </linearGradient>
         <linearGradient id={screen} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#3b1f8f" />
@@ -60,9 +92,9 @@ export function GamingArt({width = 96}: {width?: number}) {
       {speaker(12)}
       {speaker(174)}
       {/* The TV: a thin black frame, a game on the screen and a stand. */}
-      <path d="M94 78 L98 90 H112 L116 78Z" fill="#2b2f38" stroke={INK} strokeWidth={1.92} strokeLinejoin="round" />
-      <rect x={82} y={89} width={46} height={5} rx={2.500} fill="#3a4150" stroke={INK} strokeWidth={1.92} />
-      <rect x={42} y={12} width={126} height={68} rx={4.500} fill="#101217" stroke={INK} strokeWidth={2.88} />
+      <path d="M94 78 L98 90 H112 L116 78Z" fill={g.stand} stroke={INK} strokeWidth={1.92} strokeLinejoin="round" />
+      <rect x={82} y={89} width={46} height={5} rx={2.500} fill={g.foot} stroke={INK} strokeWidth={1.92} />
+      <rect x={42} y={12} width={126} height={68} rx={4.500} fill={g.tv} stroke={INK} strokeWidth={2.88} />
       <rect x={46} y={16} width={118} height={60} rx={2.500} fill={`url(#${screen})`} />
       <circle cx={136} cy={32} r={9} fill="#ffe7a1" opacity={0.9} />
       <path d="M46 58 L66 47 L86 56 L110 41 L134 54 L164 45 V76 H46Z" fill="#1b1148" opacity={0.85} />
@@ -88,7 +120,7 @@ export function GamingArt({width = 96}: {width?: number}) {
       </g>
       {/* The headphones in front, to the left: a band and two ear cups with a blue ring. */}
       <path d="M38 106 C36 78 68 78 66 106" stroke={INK} strokeWidth={8} strokeLinecap="round" fill="none" />
-      <path d="M38 106 C36 78 68 78 66 106" stroke="#3a4150" strokeWidth={5} strokeLinecap="round" fill="none" />
+      <path d="M38 106 C36 78 68 78 66 106" stroke={g.band} strokeWidth={5} strokeLinecap="round" fill="none" />
       <path d="M44 94 C48 84 60 84 62 94" stroke="#8fa0b8" strokeWidth={2.56} strokeLinecap="round" fill="none" opacity={0.7} />
       <rect x={31} y={95} width={12} height={20} rx={5.500} fill={`url(#${body})`} stroke={INK} strokeWidth={2.40} />
       <rect x={61} y={95} width={12} height={20} rx={5.500} fill={`url(#${body})`} stroke={INK} strokeWidth={2.40} />
@@ -124,7 +156,8 @@ function SportWheel({cx, cy, r, rim, caliper = "#f5c400"}: {cx: number; cy: numb
 }
 
 /** A red supercar in side view: low, long bonnet, cab-forward glass, side intake, split-spoke wheels. */
-export function SportsCarArt({width = 96}: {width?: number}) {
+export function SportsCarArt({width = 96, variant}: {width?: number; variant?: string}) {
+  const c = CAR[variant ?? "red"] ?? CAR.red;
   const id = useId();
   const body = `${id}-body`;
   const glass = `${id}-glass`;
@@ -134,9 +167,9 @@ export function SportsCarArt({width = 96}: {width?: number}) {
     <Frame width={width}>
       <defs>
         <linearGradient id={body} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#ff3a2e" />
-          <stop offset="0.45" stopColor="#d80a0a" />
-          <stop offset="1" stopColor="#6e0505" />
+          <stop offset="0" stopColor={c.a} />
+          <stop offset="0.45" stopColor={c.b} />
+          <stop offset="1" stopColor={c.c} />
         </linearGradient>
         <linearGradient id={glass} x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stopColor="#bcd7ee" />
@@ -159,8 +192,8 @@ export function SportsCarArt({width = 96}: {width?: number}) {
       {/* A big rear wing on two posts, with end plates. */}
       <path d="M30 62 L32 46 M46 58 L48 46" stroke="#1b1b1f" strokeWidth={3.400} strokeLinecap="round" />
       <path d="M6 41 L62 34 L64 40 L9 47Z" fill="#17171b" stroke={INK} strokeWidth={2.08} strokeLinejoin="round" />
-      <path d="M8 41 L62 34" stroke="#ff5a4a" strokeWidth={2.24} strokeLinecap="round" />
-      <path d="M5 33 L20 31 L23 50 L8 52Z" fill="#c70909" stroke={INK} strokeWidth={2.08} strokeLinejoin="round" />
+      <path d="M8 41 L62 34" stroke={c.stripe} strokeWidth={2.24} strokeLinecap="round" />
+      <path d="M5 33 L20 31 L23 50 L8 52Z" fill={c.wing} stroke={INK} strokeWidth={2.08} strokeLinejoin="round" />
       {/* A front splitter and a side skirt. */}
       <path d="M182 90 L209 86 L209 91 L186 94Z" fill="#141416" stroke={INK} strokeWidth={1.60} strokeLinejoin="round" />
       <path d="M72 91 L150 91" stroke="#141416" strokeWidth={3} strokeLinecap="round" />
@@ -169,16 +202,16 @@ export function SportsCarArt({width = 96}: {width?: number}) {
       <path d="M112 42 L109 57" stroke={INK} strokeWidth={2.24} />
       <path d="M91 52 C97 47 105 45 111 44" stroke="#fff" strokeWidth={2.88} strokeLinecap="round" fill="none" opacity={0.7} />
       {/* The shoulder line, the door and the shine along the body. */}
-      <path d="M26 72 C70 64 128 62 196 70" stroke="#ff8b7a" strokeWidth={2.56} fill="none" opacity={0.7} strokeLinecap="round" />
-      <path d="M97 58 C95 70 95 80 97 90" stroke="#4a0505" strokeWidth={2.08} fill="none" />
-      <rect x={101} y={65} width={10} height={2.600} rx={1.300} fill="#3b0707" />
+      <path d="M26 72 C70 64 128 62 196 70" stroke={c.stripe} strokeWidth={2.56} fill="none" opacity={0.7} strokeLinecap="round" />
+      <path d="M97 58 C95 70 95 80 97 90" stroke={c.seam} strokeWidth={2.08} fill="none" />
+      <rect x={101} y={65} width={10} height={2.600} rx={1.300} fill={c.seam} />
       <path d="M40 70 C80 63 130 62 180 68 L180 72 C130 67 80 68 40 75Z" fill={`url(#${gloss})`} />
       {/* The side intake with its fins. */}
       <path d="M70 70 L96 66 L100 82 L74 84Z" fill="#1d0808" stroke={INK} strokeWidth={1.60} />
-      <path d="M78 72 L97 69 M79 77 L98 74 M80 82 L99 79" stroke="#5b1a1a" strokeWidth={1.92} />
+      <path d="M78 72 L97 69 M79 77 L98 74 M80 82 L99 79" stroke={c.seam} strokeWidth={1.92} />
       {/* The bonnet: shine and vents. */}
       <path d="M140 47 C156 53 172 58 190 62" stroke="#fff" strokeWidth={2.600} opacity={0.55} fill="none" strokeLinecap="round" />
-      <path d="M160 58 L170 60 M163 62 L173 64" stroke="#7a0707" strokeWidth={2.24} strokeLinecap="round" />
+      <path d="M160 58 L170 60 M163 62 L173 64" stroke={c.seam} strokeWidth={2.24} strokeLinecap="round" />
       {/* The nose: lights, a black lip and a small badge. */}
       <path d="M185 63 C193 63 201 66 205 71 L191 72Z" fill="#eaf4ff" stroke={INK} strokeWidth={1.92} strokeLinejoin="round" />
       <path d="M186 82 L206 79 L206 86 L190 89Z" fill="#141416" stroke={INK} strokeWidth={1.60} />
@@ -187,7 +220,7 @@ export function SportsCarArt({width = 96}: {width?: number}) {
       <path d="M17 70 L29 66 L28 76 L18 77Z" fill="#ff2b2b" stroke={INK} strokeWidth={1.60} strokeLinejoin="round" />
       <path d="M17 90 L40 90 L38 94 L19 94Z" fill="#141416" />
       {/* A wing mirror. */}
-      <path d="M141 50 L150 48 L151 53 L143 54Z" fill="#b00808" stroke={INK} strokeWidth={1.60} strokeLinejoin="round" />
+      <path d="M141 50 L150 48 L151 53 L143 54Z" fill={c.wing} stroke={INK} strokeWidth={1.60} strokeLinejoin="round" />
       {/* The wheel arches and the wheels. */}
       <path d="M32 92 A21 21 0 0 1 74 92Z" fill="#150404" />
       <path d="M139 92 A21 21 0 0 1 181 92Z" fill="#150404" />
@@ -198,7 +231,8 @@ export function SportsCarArt({width = 96}: {width?: number}) {
 }
 
 /** A gold diver's watch with a blue dial and bezel, a date window and an Oyster-type gold bracelet. */
-export function WatchArt({width = 96}: {width?: number}) {
+export function WatchArt({width = 96, variant}: {width?: number; variant?: string}) {
+  const w = WATCH[variant ?? "gold"] ?? WATCH.gold;
   const id = useId();
   const gold = `${id}-gold`;
   const goldV = `${id}-goldv`;
@@ -206,31 +240,31 @@ export function WatchArt({width = 96}: {width?: number}) {
   const bezel = `${id}-bezel`;
   const links = (y0: number, y1: number, top: boolean) => {
     const rows: ReactNode[] = [];
-    for (let y = y0; y < y1; y += 8) rows.push(<path key={y} d={`M${top ? 85 : 84} ${y} H${top ? 125 : 126}`} stroke="#7a5200" strokeWidth={1.60} opacity={0.7} />);
+    for (let y = y0; y < y1; y += 8) rows.push(<path key={y} d={`M${top ? 85 : 84} ${y} H${top ? 125 : 126}`} stroke={w.line} strokeWidth={1.60} opacity={0.7} />);
     return rows;
   };
   return (
     <Frame width={width}>
       <defs>
         <linearGradient id={gold} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#fff0a6" />
-          <stop offset="0.45" stopColor="#e9b21c" />
-          <stop offset="1" stopColor="#9c6a06" />
+          <stop offset="0" stopColor={w.case[0]} />
+          <stop offset="0.45" stopColor={w.case[1]} />
+          <stop offset="1" stopColor={w.case[2]} />
         </linearGradient>
         <linearGradient id={goldV} x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor="#b98206" />
-          <stop offset="0.35" stopColor="#ffe38a" />
-          <stop offset="0.7" stopColor="#e2a914" />
-          <stop offset="1" stopColor="#9c6a06" />
+          <stop offset="0" stopColor={w.band[0]} />
+          <stop offset="0.35" stopColor={w.band[1]} />
+          <stop offset="0.7" stopColor={w.band[2]} />
+          <stop offset="1" stopColor={w.band[3]} />
         </linearGradient>
         <radialGradient id={dial} cx="0.35" cy="0.3" r="0.95">
-          <stop offset="0" stopColor="#5f8cff" />
-          <stop offset="0.6" stopColor="#1d4fd6" />
-          <stop offset="1" stopColor="#0c2a86" />
+          <stop offset="0" stopColor={w.dial[0]} />
+          <stop offset="0.6" stopColor={w.dial[1]} />
+          <stop offset="1" stopColor={w.dial[2]} />
         </radialGradient>
         <linearGradient id={bezel} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#3b6df0" />
-          <stop offset="1" stopColor="#0a2275" />
+          <stop offset="0" stopColor={w.bezel[0]} />
+          <stop offset="1" stopColor={w.bezel[1]} />
         </linearGradient>
       </defs>
       <ellipse cx={105} cy={115} rx={46} ry={4} fill="#000" opacity={0.28} />
@@ -239,10 +273,10 @@ export function WatchArt({width = 96}: {width?: number}) {
       <path d="M85 88 H125 L128 118 H82Z" fill={`url(#${goldV})`} stroke={INK} strokeWidth={2.24} strokeLinejoin="round" />
       {links(8, 34, true)}
       {links(94, 118, false)}
-      <path d="M96 3 V34 M114 3 V34 M96 88 V118 M114 88 V118" stroke="#7a5200" strokeWidth={1.60} opacity={0.75} />
+      <path d="M96 3 V34 M114 3 V34 M96 88 V118 M114 88 V118" stroke={w.line} strokeWidth={1.60} opacity={0.75} />
       {/* The crown with its guards. */}
       <rect x={147} y={52} width={13} height={16} rx={3} fill={`url(#${gold})`} stroke={INK} strokeWidth={2.24} />
-      <path d="M149 55 H158 M149 60 H158 M149 65 H158" stroke="#7a5200" strokeWidth={1.60} />
+      <path d="M149 55 H158 M149 60 H158 M149 65 H158" stroke={w.line} strokeWidth={1.60} />
       {/* The case, the blue bezel with its markers and the dial. */}
       <circle cx={105} cy={60} r={46} fill={`url(#${gold})`} stroke={INK} strokeWidth={2.56} />
       <circle cx={105} cy={60} r={39} fill={`url(#${bezel})`} stroke={INK} strokeWidth={1.92} />
@@ -261,17 +295,18 @@ export function WatchArt({width = 96}: {width?: number}) {
       <rect x={118} y={55.500} width={9} height={9} rx={1} fill="#fff" stroke={INK} strokeWidth={1.44} />
       <text x={122.500} y={62.500} textAnchor="middle" fontSize={6.500} fontWeight={700} fill="#111" fontFamily="sans-serif">17</text>
       {/* The hands. */}
-      <path d="M105 60 L105 36" stroke="#f1d46a" strokeWidth={3} strokeLinecap="round" />
-      <path d="M105 60 L121 70" stroke="#f1d46a" strokeWidth={3.600} strokeLinecap="round" />
+      <path d="M105 60 L105 36" stroke={w.hand} strokeWidth={3} strokeLinecap="round" />
+      <path d="M105 60 L121 70" stroke={w.hand} strokeWidth={3.600} strokeLinecap="round" />
       <path d="M105 60 L92 50" stroke="#fff" strokeWidth={1.92} strokeLinecap="round" />
-      <circle cx={105} cy={60} r={3.600} fill="#f1d46a" stroke={INK} strokeWidth={1.60} />
+      <circle cx={105} cy={60} r={3.600} fill={w.hand} stroke={INK} strokeWidth={1.60} />
       <path d="M78 46 A31 31 0 0 1 97 32" stroke="#fff" strokeWidth={3} strokeLinecap="round" fill="none" opacity={0.55} />
     </Frame>
   );
 }
 
 /** A green sport bike: full fairing and windscreen, black seat, a silver muffler on this side, drilled brake discs. */
-export function MotorcycleArt({width = 96}: {width?: number}) {
+export function MotorcycleArt({width = 96, variant}: {width?: number; variant?: string}) {
+  const paint = BIKE[variant ?? "green"] ?? BIKE.green;
   const id = useId();
   const green = `${id}-green`;
   const rim = `${id}-rim`;
@@ -294,9 +329,9 @@ export function MotorcycleArt({width = 96}: {width?: number}) {
     <Frame width={width}>
       <defs>
         <linearGradient id={green} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#c8ff4d" />
-          <stop offset="0.5" stopColor="#58d10e" />
-          <stop offset="1" stopColor="#1f7a05" />
+          <stop offset="0" stopColor={paint[0]} />
+          <stop offset="0.5" stopColor={paint[1]} />
+          <stop offset="1" stopColor={paint[2]} />
         </linearGradient>
         <radialGradient id={rim} cx="0.35" cy="0.3" r="0.9">
           <stop offset="0" stopColor="#ffffff" />

@@ -110,8 +110,22 @@ export const GIFTS = [
 ] as const;
 export type GiftId = (typeof GIFTS)[number]["id"];
 
+/** The colours a present comes in (the first is the usual one). Money has none. */
+export const GIFT_VARIANTS: Record<string, readonly string[]> = {
+  gaming: ["black", "white", "red", "blue"],
+  watch: ["gold", "silver", "green", "rose"],
+  motorcycle: ["green", "red", "blue", "orange", "black"],
+  sportsCar: ["red", "blue", "yellow", "white", "black"],
+};
+
+/** A kept present ("sportsCar:blue", or just the id) as its kind and colour. */
+export function parseGift(kept: string): {id: string; variant: string | undefined} {
+  const [id, variant] = kept.split(":");
+  return {id, variant: variant ?? GIFT_VARIANTS[id]?.[0]};
+}
+
 /** Gives a player a bonus or a present, paid by the club. An i18n key for how it went (a talk, so once a week for each player). */
-export function giveGift(state: GameState, playerId: string, giftId: GiftId): string {
+export function giveGift(state: GameState, playerId: string, giftId: GiftId, variant?: string): string {
   const p = state.players[playerId];
   const gift = GIFTS.find((g) => g.id === giftId);
   const club = state.clubs[state.userClubId];
@@ -126,7 +140,9 @@ export function giveGift(state: GameState, playerId: string, giftId: GiftId): st
   p.form = clamp(p.form + gift.form, 0, 100);
   p.relation = clamp(p.relation + gift.relation, 0, 100);
   // The present is kept, to be seen round their card (the last few).
-  p.gifts = [...(p.gifts ?? []), gift.id].slice(-8);
+  const colours = GIFT_VARIANTS[gift.id];
+  const colour = colours ? (variant && colours.includes(variant) ? variant : colours[0]) : null;
+  p.gifts = [...(p.gifts ?? []), colour ? `${gift.id}:${colour}` : gift.id].slice(-99);
   if (p.wantsToLeave && p.happiness >= 35) p.wantsToLeave = false;
   return "talk.bonus.paid";
 }

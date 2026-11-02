@@ -2646,7 +2646,7 @@ button.manager-item:hover:not(:disabled) { background: rgb(127 127 127 / 0.18); 
 .award-label { opacity: 0.75; min-width: 8.5em; }
 .award-yours { color: #facc15; margin-left: auto; }
 .award-overlay .award-winners { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; width: min(100%, 360px); }
-.award-winner { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 14px; background: rgb(250 204 21 / 0.14); border: 1px solid #facc15; text-align: left; animation: pop-in 0.5s ease-out both; }
+.award-winner { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 14px; background: rgb(250 204 21 / 0.14); text-align: left; animation: pop-in 0.5s ease-out both; }
 .award-winner .avatar { border-radius: 50%; background: var(--surface-2); flex: none; }
 .award-winner-icon { color: #facc15; display: grid; place-items: center; width: 64px; height: 64px; flex: none; }
 .award-winner-text { display: grid; }
@@ -2698,7 +2698,7 @@ button.manager-item:hover:not(:disabled) { background: rgb(127 127 127 / 0.18); 
 .shootout-order .so-num { width: 1.4em; font-weight: 800; text-align: center; }
 .shootout-order .so-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.award-winner-manager { flex: none; width: 72px; height: 72px; border-radius: 50%; overflow: hidden; background: var(--surface-2); box-shadow: 0 0 0 3px #facc15; }
+.award-winner-manager { flex: none; width: 72px; height: 72px; border-radius: 50%; overflow: hidden; background: var(--surface-2); }
 .award-winner-manager .avatar { display: block; }
 
 .national-due { display: grid; gap: 6px; justify-items: start; padding: 10px 12px; margin: 8px 0; border-radius: 12px; background: rgb(30 139 255 / 0.14); border: 1px solid rgb(30 139 255 / 0.4); }
@@ -2837,10 +2837,10 @@ button.manager-item:hover:not(:disabled) { background: rgb(127 127 127 / 0.18); 
 /* The presents round a player's card: two on each side. */
 .card-gifts { position: relative; display: inline-block; }
 .card-gift { position: absolute; display: block; pointer-events: none; }
-.card-gift.pos-0 { left: -74px; top: 0; }
-.card-gift.pos-1 { right: -74px; top: 0; }
-.card-gift.pos-2 { left: -76px; bottom: 2%; }
-.card-gift.pos-3 { right: -74px; bottom: 0; }
+.card-gift.pos-0 { left: -62px; top: 0; }
+.card-gift.pos-1 { right: -62px; top: 0; }
+.card-gift.pos-2 { left: -64px; bottom: 2%; }
+.card-gift.pos-3 { right: -62px; bottom: 0; }
 
 /* The picture column is as wide for every present, so the names line up. */
 .gift-icon { width: 80px; min-width: 80px; justify-content: center; }
@@ -2877,3 +2877,22 @@ button.ov-next-what { font: inherit; font-family: var(--display); font-weight: 8
 /* The kick-off button: an even glow all the way round, like a circle (no offset downwards). */
 .play-circle { box-shadow: 0 0 0 1px rgb(30 155 255 / 0.5), 0 0 18px 4px rgb(30 155 255 / 0.5); }
 .play-circle.match { box-shadow: 0 0 0 2px rgb(34 197 94 / 0.85), 0 0 18px 4px rgb(34 197 94 / 0.5); }
+
+/* How many of a present the player has got (from two): a blue number on its corner. */
+.gift-count { position: absolute; top: 0; right: 4px; min-width: 24px; height: 24px; padding: 0 6px; border-radius: 999px; display: grid; place-items: center; background: var(--accent); color: #fff; font-weight: 800; font-size: 0.85rem; border: 2px solid #0a1830; box-shadow: 0 2px 6px rgb(0 0 0 / 0.5); }
+
+/* More colours of the same present stand a little behind each other (the first in front). */
+.card-gift { transform: translate(calc(var(--i, 0) * var(--dx, 0px)), calc(var(--i, 0) * var(--dy, 0px))); }
+.card-gift.pos-0 { --dx: 0px; --dy: 26px; }
+.card-gift.pos-1 { --dx: 0px; --dy: 26px; }
+.card-gift.pos-2 { --dx: 0px; --dy: -17px; }
+.card-gift.pos-3 { --dx: 0px; --dy: -17px; }
+/* The colour of a present: round arrow buttons (a ring with a chevron) left and right under its picture in the list. */
+.gift-item { position: relative; }
+.gift.has-colours { padding-bottom: 44px; }
+.gift-arrows { position: absolute; left: 6px; bottom: 6px; width: 80px; display: flex; justify-content: space-between; gap: 6px; padding: 0 2px; }
+.gift-arrows button { width: 32px; height: 32px; display: grid; place-items: center; padding: 0; border-radius: 50%; cursor: pointer; color: #fff; background: rgb(255 255 255 / 0.04); border: 1.5px solid rgb(255 255 255 / 0.5); }
+.gift-arrows button:hover { border-color: var(--accent); color: var(--accent); }
+.gift-arrows button:active { transform: scale(0.92); }
+.gift-arrows button:first-child svg { transform: rotate(90deg); }
+.gift-arrows button:last-child svg { transform: rotate(-90deg); }

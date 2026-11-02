@@ -13,7 +13,7 @@ import {GiftPicture} from "./GiftArt";
 
 /** The presents that are things (not money): each has its own place round the card. */
 const CARD_GIFTS = ["watch", "gaming", "motorcycle", "sportsCar"];
-import {GIFTS, giveGift, happinessFactors, answerTransferRequest, talkToPlayer, TALKS, type GiftId} from "../game/morale";
+import {GIFTS, GIFT_VARIANTS, giveGift, parseGift, happinessFactors, answerTransferRequest, talkToPlayer, TALKS, type GiftId} from "../game/morale";
 import {
   askingPrice,
   completeLoan,
@@ -96,9 +96,20 @@ export function PlayerModal({playerId, preview}: {playerId: string; preview?: {o
         {/* The presents they have been given, round the card. */}
         <div className="card-gifts">
           <PlayerCard game={game} player={p} />
-          {CARD_GIFTS.filter((id) => (p.gifts ?? []).includes(id)).map((id) => (
-            <span key={id} className={`card-gift pos-${CARD_GIFTS.indexOf(id)}`} title={t(`gift.${id}` as TKey)}><GiftPicture id={id} width={108} /></span>
-          ))}
+          {/* Each kind has its own place; more colours of the same kind stand a little behind each other, with a number for how many of that colour. */}
+          {CARD_GIFTS.flatMap((id) => {
+            const owned = new Map<string, number>();
+            for (const kept of p.gifts ?? []) {
+              const g = parseGift(kept);
+              if (g.id === id) owned.set(g.variant ?? "", (owned.get(g.variant ?? "") ?? 0) + 1);
+            }
+            return [...owned].map(([variant, n], i) => (
+              <span key={`${id}:${variant}`} className={`card-gift pos-${CARD_GIFTS.indexOf(id)}`} style={{"--i": i, zIndex: CARD_GIFTS.indexOf(id) < 2 ? 10 + i : 10 - i} as React.CSSProperties} title={`${t(`gift.${id}` as TKey)}${variant ? ` · ${t(`gift.v.${variant}` as TKey)}` : ""}`}>
+                <GiftPicture id={id} variant={variant || undefined} width={92} />
+                {n > 1 && <span className="gift-count">{n}</span>}
+              </span>
+            ));
+          })}
         </div>
         <div className="player-head">
           <dl className="pm-facts">
@@ -339,19 +350,26 @@ function OwnActions({player: p}: {player: Player}) {
   // The dialog for a bonus or a present.
   const [giving, setGiving] = useState(false);
   // After a present: what went up (from, to), shown with the bars rising.
-  const [gained, setGained] = useState<{id: GiftId; stats: {key: "morale" | "sharpness" | "form" | "happiness" | "relation"; from: number; to: number}[]} | null>(null);
+  const [gained, setGained] = useState<{id: GiftId; variant?: string; stats: {key: "morale" | "sharpness" | "form" | "happiness" | "relation"; from: number; to: number}[]} | null>(null);
   // The present being looked at: its effect shows on the bars at the top.
   const [looking, setLooking] = useState<GiftId | null>(null);
   // The present picked (a click picks it, the buy button gives it: two clicks, so no one is bought by mistake).
   const [picked, setPicked] = useState<GiftId | null>(null);
+  // The colour chosen for each present (the usual one until changed).
+  const [colours, setColours] = useState<Record<string, string>>({});
+  const colourOf = (id: string) => colours[id] ?? GIFT_VARIANTS[id]?.[0];
+  const stepColour = (id: string, d: number) => {
+    const all = GIFT_VARIANTS[id];
+    if (all) setColours({...colours, [id]: all[(all.indexOf(colourOf(id)) + d + all.length) % all.length]});
+  };
   const {money} = useT();
   const give = (id: GiftId) => {
     const before = {morale: p.morale, sharpness: p.sharpness, form: p.form, happiness: p.happiness, relation: p.relation};
-    const key = act((g) => giveGift(g, p.id, id));
+    const key = act((g) => giveGift(g, p.id, id, colourOf(id)));
     if (key !== "talk.bonus.paid") return notify(key, {name: shortName(p), gift: t(`gift.${id}`)}, "error");
     const gift = GIFTS.find((x) => x.id === id)!;
     const up = (k: keyof typeof before) => ({key: k, from: before[k], to: Math.min(100, before[k] + gift[k])});
-    setGained({id, stats: [up("morale"), up("sharpness"), ...(gift.form > 0 ? [up("form")] : []), up("happiness"), up("relation")]});
+    setGained({id, variant: colourOf(id), stats: [up("morale"), up("sharpness"), ...(gift.form > 0 ? [up("form")] : []), up("happiness"), up("relation")]});
     notify(key, {name: shortName(p), gift: t(`gift.${id}`)}, "good");
   };
   const closeGifts = () => {
@@ -394,7 +412,7 @@ function OwnActions({player: p}: {player: Player}) {
         <Modal title={<><Icon name="coins" size={20} /> {iconize(t("talk.bonus.title", {name: shortName(p)}))}</>} onClose={closeGifts}>
           {gained ? (
             <div className="gift-result">
-              <div className="gift-result-art"><GiftPicture id={gained.id} width={110} /></div>
+              <div className="gift-result-art"><GiftPicture id={gained.id} variant={gained.variant} width={110} /></div>
               <ul className="gift-gains">
                 {gained.stats.map((st, i) => (
                   <GainRow key={st.key} label={t(STAT_LABELS[st.key])} from={st.from} to={st.to} delay={i * 220} />
@@ -430,9 +448,9 @@ function OwnActions({player: p}: {player: Player}) {
           </ul>
           <ul className="gift-list" onMouseLeave={() => setLooking(null)}>
             {GIFTS.map((g) => (
-              <li key={g.id}>
-                <button className={picked === g.id ? "gift picked" : "gift"} aria-pressed={picked === g.id} disabled={game.clubs[game.userClubId].cash < g.cost} onClick={() => setPicked(picked === g.id ? null : g.id)} onMouseEnter={() => setLooking(g.id)} onFocus={() => setLooking(g.id)} onBlur={() => setLooking(null)}>
-                  <span className="gift-icon"><GiftPicture id={g.id} width={74} /></span>
+              <li key={g.id} className="gift-item">
+                <button className={`${picked === g.id ? "gift picked" : "gift"}${GIFT_VARIANTS[g.id] ? " has-colours" : ""}`} aria-pressed={picked === g.id} disabled={game.clubs[game.userClubId].cash < g.cost} onClick={() => setPicked(picked === g.id ? null : g.id)} onMouseEnter={() => setLooking(g.id)} onFocus={() => setLooking(g.id)} onBlur={() => setLooking(null)}>
+                  <span className="gift-icon"><GiftPicture id={g.id} variant={colourOf(g.id)} width={74} /></span>
                   <span className="gift-name">
                     <strong>{iconize(t(`gift.${g.id}`))}</strong>
                     {/* What it changes: morale, match sharpness, satisfaction and the bond with the manager. */}
@@ -440,6 +458,13 @@ function OwnActions({player: p}: {player: Player}) {
                   </span>
                   <span className="gift-price">{money(g.cost)}</span>
                 </button>
+                {/* The colour: the little arrows under the picture go through them. */}
+                {GIFT_VARIANTS[g.id] && (
+                  <span className="gift-arrows" title={t(`gift.v.${colourOf(g.id)}` as TKey)}>
+                    <button type="button" aria-label={t("gift.prevColour")} onClick={() => stepColour(g.id, -1)}><Icon name="chevron" size={18} /></button>
+                    <button type="button" aria-label={t("gift.nextColour")} onClick={() => stepColour(g.id, 1)}><Icon name="chevron" size={18} /></button>
+                  </span>
+                )}
               </li>
             ))}
           </ul>
