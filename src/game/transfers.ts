@@ -21,7 +21,8 @@ import {POSITIONS, type Club, type GameState, type IncomingBid, type Player, typ
 /** The scouting reports not looked at yet (players not in our own club). */
 export function unseenScouted(state: GameState): string[] {
   const seen = new Set(state.scoutedSeen ?? []);
-  return Object.keys(state.scouted).filter((id) => !seen.has(id) && state.players[id] && state.players[id].clubId !== state.userClubId);
+  const hidden = new Set(state.scoutHidden ?? []);
+  return Object.keys(state.scouted).filter((id) => !seen.has(id) && !hidden.has(id) && state.players[id] && state.players[id].clubId !== state.userClubId);
 }
 
 export function isKnown(state: GameState, p: Player): boolean {

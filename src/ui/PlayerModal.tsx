@@ -97,7 +97,7 @@ export function PlayerModal({playerId, preview}: {playerId: string; preview?: {o
         <div className="card-gifts">
           <PlayerCard game={game} player={p} />
           {CARD_GIFTS.filter((id) => (p.gifts ?? []).includes(id)).map((id) => (
-            <span key={id} className={`card-gift pos-${CARD_GIFTS.indexOf(id)}`} title={t(`gift.${id}` as TKey)}><GiftPicture id={id} width={58} /></span>
+            <span key={id} className={`card-gift pos-${CARD_GIFTS.indexOf(id)}`} title={t(`gift.${id}` as TKey)}><GiftPicture id={id} width={108} /></span>
           ))}
         </div>
         <div className="player-head">
@@ -310,6 +310,8 @@ function ContractInfo({player: p}: {player: Player}) {
   );
 }
 
+const STAT_LABELS = {morale: "pl.morale", sharpness: "pl.sharpness", form: "col.form", happiness: "col.happiness", relation: "pl.relation"} as const;
+
 /** One stat that went up after a present: the bar rises from where it was, with a +N floating up beside it. */
 function GainRow({label, from, to, delay}: {label: string; from: number; to: number; delay: number}) {
   const [now, setNow] = useState(from);
@@ -337,20 +339,26 @@ function OwnActions({player: p}: {player: Player}) {
   // The dialog for a bonus or a present.
   const [giving, setGiving] = useState(false);
   // After a present: what went up (from, to), shown with the bars rising.
-  const [gained, setGained] = useState<{id: GiftId; stats: {key: "morale" | "sharpness" | "happiness" | "relation"; from: number; to: number}[]} | null>(null);
+  const [gained, setGained] = useState<{id: GiftId; stats: {key: "morale" | "sharpness" | "form" | "happiness" | "relation"; from: number; to: number}[]} | null>(null);
+  // The present being looked at: its effect shows on the bars at the top.
+  const [looking, setLooking] = useState<GiftId | null>(null);
+  // The present picked (a click picks it, the buy button gives it: two clicks, so no one is bought by mistake).
+  const [picked, setPicked] = useState<GiftId | null>(null);
   const {money} = useT();
   const give = (id: GiftId) => {
-    const before = {morale: p.morale, sharpness: p.sharpness, happiness: p.happiness, relation: p.relation};
+    const before = {morale: p.morale, sharpness: p.sharpness, form: p.form, happiness: p.happiness, relation: p.relation};
     const key = act((g) => giveGift(g, p.id, id));
     if (key !== "talk.bonus.paid") return notify(key, {name: shortName(p), gift: t(`gift.${id}`)}, "error");
     const gift = GIFTS.find((x) => x.id === id)!;
     const up = (k: keyof typeof before) => ({key: k, from: before[k], to: Math.min(100, before[k] + gift[k])});
-    setGained({id, stats: [up("morale"), up("sharpness"), up("happiness"), up("relation")]});
+    setGained({id, stats: [up("morale"), up("sharpness"), ...(gift.form > 0 ? [up("form")] : []), up("happiness"), up("relation")]});
     notify(key, {name: shortName(p), gift: t(`gift.${id}`)}, "good");
   };
   const closeGifts = () => {
     setGiving(false);
     setGained(null);
+    setPicked(null);
+    setLooking(null);
   };
 
   const talk = (kind: (typeof TALKS)[number]) => {
@@ -389,7 +397,7 @@ function OwnActions({player: p}: {player: Player}) {
               <div className="gift-result-art"><GiftPicture id={gained.id} width={110} /></div>
               <ul className="gift-gains">
                 {gained.stats.map((st, i) => (
-                  <GainRow key={st.key} label={t(st.key === "morale" ? "pl.morale" : st.key === "sharpness" ? "pl.sharpness" : st.key === "happiness" ? "col.happiness" : "pl.relation")} from={st.from} to={st.to} delay={i * 220} />
+                  <GainRow key={st.key} label={t(STAT_LABELS[st.key])} from={st.from} to={st.to} delay={i * 220} />
                 ))}
               </ul>
               <div className="btn-row dialog-actions">
@@ -398,22 +406,48 @@ function OwnActions({player: p}: {player: Player}) {
             </div>
           ) : (
           <>
-          <p className="muted small">{iconize(t("talk.bonus.hint"))}</p>
-          <ul className="gift-list">
+          <div className="gift-hint-row">
+            <span className="muted small">{iconize(t("talk.bonus.pick"))}</span>
+            <Hint inline>{iconize(t("talk.bonus.hint"))}</Hint>
+          </div>
+          {/* How they are now, and what the present you are looking at would add. */}
+          <ul className="gift-preview">
+            {(["morale", "sharpness", "form", "happiness", "relation"] as const).map((k) => {
+              const shown = picked ?? looking;
+              const add = shown ? GIFTS.find((g) => g.id === shown)![k] : 0;
+              const now = p[k];
+              return (
+                <li key={k} className="pv-row">
+                  <span className="pv-label">{t(STAT_LABELS[k])}</span>
+                  <span className="pv-bar">
+                    <span className="pv-now" style={{width: `${now}%`}} />
+                    {add > 0 && <span className="pv-add" style={{left: `${now}%`, width: `${Math.min(add, 100 - now)}%`}} />}
+                  </span>
+                  <span className="pv-num">{Math.round(now)}{add > 0 && <strong className="pos-num"> +{Math.min(add, Math.round(100 - now))}</strong>}</span>
+                </li>
+              );
+            })}
+          </ul>
+          <ul className="gift-list" onMouseLeave={() => setLooking(null)}>
             {GIFTS.map((g) => (
               <li key={g.id}>
-                <button className="gift" disabled={game.clubs[game.userClubId].cash < g.cost} onClick={() => give(g.id)}>
+                <button className={picked === g.id ? "gift picked" : "gift"} aria-pressed={picked === g.id} disabled={game.clubs[game.userClubId].cash < g.cost} onClick={() => setPicked(picked === g.id ? null : g.id)} onMouseEnter={() => setLooking(g.id)} onFocus={() => setLooking(g.id)} onBlur={() => setLooking(null)}>
                   <span className="gift-icon"><GiftPicture id={g.id} width={74} /></span>
                   <span className="gift-name">
                     <strong>{iconize(t(`gift.${g.id}`))}</strong>
                     {/* What it changes: morale, match sharpness, satisfaction and the bond with the manager. */}
-                    <small className="muted gift-effects"><span>{t("pl.morale")} +{g.morale}</span><span>{t("pl.sharpness")} +{g.sharpness}</span><span>{t("col.happiness")} +{g.happiness}</span><span>{t("pl.relation")} +{g.relation}</span></small>
+                    <small className="muted gift-effects"><span>{t("pl.morale")} +{g.morale}</span><span>{t("pl.sharpness")} +{g.sharpness}</span>{g.form > 0 && <span>{t("col.form")} +{g.form}</span>}<span>{t("col.happiness")} +{g.happiness}</span><span>{t("pl.relation")} +{g.relation}</span></small>
                   </span>
                   <span className="gift-price">{money(g.cost)}</span>
                 </button>
               </li>
             ))}
           </ul>
+          <div className="btn-row dialog-actions">
+            <button className="btn primary" disabled={!picked} onClick={() => picked && give(picked)}>
+              <Icon name="coins" size={18} /> {picked ? iconize(t("talk.bonus.buy", {gift: t(`gift.${picked}` as TKey), price: GIFTS.find((g) => g.id === picked)!.cost})) : iconize(t("talk.bonus.pick"))}
+            </button>
+          </div>
           </>
           )}
         </Modal>

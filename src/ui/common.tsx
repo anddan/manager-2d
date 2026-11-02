@@ -32,16 +32,16 @@ export function Card({title, actions, children, className = ""}: {title?: ReactN
  * from wherever it's written in the card): tapped, it opens in a small dialog. Keeps pages short.
  * A card without a heading has it at its top right.
  */
-export function Hint({children}: {children: ReactNode}) {
+export function Hint({children, inline}: {children: ReactNode; /** In the flow of the text (in a dialog), not in a card's heading or its corner. */ inline?: boolean}) {
   const {t} = useT();
   const [open, setOpen] = useState(false);
   const anchor = useRef<HTMLSpanElement>(null);
   const [head, setHead] = useState<Element | null>(null);
   useEffect(() => {
-    setHead(anchor.current?.closest(".card")?.querySelector(":scope > .card-head") ?? null);
+    setHead(inline ? null : anchor.current?.closest(".card")?.querySelector(":scope > .card-head") ?? null);
   }, []);
   const button = (
-    <button className={head ? "hint-btn in-head" : "hint-btn"} onClick={() => setOpen(true)} aria-label={t("common.howItWorks")} title={t("common.howItWorks")}>
+    <button className={head ? "hint-btn in-head" : inline ? "hint-btn inline" : "hint-btn"} onClick={() => setOpen(true)} aria-label={t("common.howItWorks")} title={t("common.howItWorks")}>
       <Icon name="info" size={20} />
     </button>
   );

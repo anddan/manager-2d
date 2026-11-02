@@ -521,6 +521,7 @@ function NextMatch() {
   const game = useGameState();
   const next = nextUserFixture(game);
   const [sheet, setSheet] = useState<string | null>(null);
+  const setView = useGame((s) => s.setView);
   if (!next || fixtureWeek(next) !== game.week) return null;
   const home = game.clubs[next.homeId];
   const away = game.clubs[next.awayId];
@@ -533,7 +534,10 @@ function NextMatch() {
   return (
     <div className="next-match span-2" role="status">
       <span className="next-match-what">
+        {/* What it is: tap to go to the league table or the cup. */}
+        <button type="button" className="link" onClick={() => setView(isCupFixture(next) ? "cup" : "table")}>
         {isCupFixture(next) ? <><Icon name="trophy" size={18} /> {iconize(t("cup.name"))} · {iconize(t(CUP_STAGES[next.stage]))}</> : <><Icon name="ball" size={18} /> {iconize(t("ov.round", {round: next.round}))}</>}
+        </button>
         {/* Home or away, on the same line. */}
         <span className="next-match-where"> · {next.homeId === game.userClubId ? t("tac.home") : t("tac.away")}</span>
       </span>

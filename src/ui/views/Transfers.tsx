@@ -212,12 +212,14 @@ function Scouting() {
   const {t, money} = useT();
   const game = useGameState();
   const openPlayer = useGame((s) => s.openPlayer);
+  const act = useGame((s) => s.act);
   // The reports as a table: newest first to start with, any column sorts; a player we have bought is no longer in it.
   const sort = useSort<ReportSort>("week", true);
   const [more, setMore] = useState(false);
+  const hidden = new Set(game.scoutHidden ?? []);
   const scouted = Object.entries(game.scouted)
     .map(([id, week]) => ({p: game.players[id], week}))
-    .filter(({p}) => p && p.clubId !== game.userClubId && p.loan?.parentClubId !== game.userClubId);
+    .filter(({p}) => p && !hidden.has(p.id) && p.clubId !== game.userClubId && p.loan?.parentClubId !== game.userClubId);
   const reports = sortRows(
     scouted,
     ({p, week}): number | string => {
@@ -255,7 +257,10 @@ function Scouting() {
       )}
       <div className="table-head-row">
         <h3>{iconize(t("tr.reports"))}</h3>
-        <button type="button" className="btn small" aria-expanded={more} onClick={() => setMore(!more)}>{iconize(t(more ? "tbl.showLess" : "tbl.showMore"))}</button>
+        <span className="btn-row">
+          {scouted.length > 0 && <button type="button" className="btn small" title={t("tr.clearReportsHint")} onClick={() => act((g) => { g.scoutHidden = Object.keys(g.scouted); })}>{t("tr.clearReports")}</button>}
+          <button type="button" className="btn small" aria-expanded={more} onClick={() => setMore(!more)}>{iconize(t(more ? "tbl.showLess" : "tbl.showMore"))}</button>
+        </span>
       </div>
       {scouted.length === 0 ? <Empty>{iconize(t("tr.noReports"))}</Empty> : (
         <div className="table-wrap">

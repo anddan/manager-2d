@@ -579,6 +579,8 @@ export interface GameState {
   scouted: Record<string, number>;
   /** The scouting reports that have been looked at (a player's profile opened); the rest are new. Missing in older saves: all of them count as seen. */
   scoutedSeen?: string[];
+  /** Reports cleared from the list (the player stays scouted: his numbers are still known). */
+  scoutHidden?: string[];
   scoutQueue: string[];
   /** The wage budget warning last mailed (yellow from 75 % of the budget, red above it); missing when the wages are under 75 %. */
   wageAlert?: "yellow" | "red";

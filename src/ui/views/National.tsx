@@ -25,6 +25,7 @@ export function National() {
   const game = useGameState();
   const act = useGame((s) => s.act);
   const openPlayer = useGame((s) => s.openPlayer);
+  const setView = useGame((s) => s.setView);
   const job = game.national;
   // The place being picked for, and whether leaving is being confirmed (before the early return: hooks keep their order).
   const [slotPick, setSlotPick] = useState<number | null>(null);
@@ -119,7 +120,10 @@ export function National() {
       {/* The match to play this week, on top like on the tactics page: it is started with the play button in the middle of the bar. */}
       {due && (
         <div className="next-match span-2" role="status">
-          <span className="next-match-what"><Icon name="ball" size={18} /> {iconize(t(`national.what.${due.what}` as TKey))}</span>
+          <span className="next-match-what">
+            {/* Tournament matches: tap to go to the tournament. */}
+            {due.what === "friendly" ? <><Icon name="ball" size={18} /> {iconize(t(`national.what.${due.what}` as TKey))}</> : <button type="button" className="link" onClick={() => setView("tournament")}><Icon name="ball" size={18} /> {iconize(t(`national.what.${due.what}` as TKey))}</button>}
+          </span>
           <span className="next-match-teams">
             <span className="next-match-opp"><Flag code={job.country} size={18} /> <strong>{t(`nat.${job.country}` as TKey)}</strong></span> <span className="muted">–</span> <span className="next-match-opp"><strong>{t(`nat.${due.opponent}` as TKey)}</strong> <Flag code={due.opponent} size={18} /></span>
           </span>

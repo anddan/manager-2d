@@ -2836,11 +2836,11 @@ button.manager-item:hover:not(:disabled) { background: rgb(127 127 127 / 0.18); 
 
 /* The presents round a player's card: two on each side. */
 .card-gifts { position: relative; display: inline-block; }
-.card-gift { position: absolute; display: grid; place-items: center; filter: drop-shadow(0 3px 4px rgb(0 0 0 / 0.45)); pointer-events: none; }
-.card-gift.pos-0 { left: -40px; top: 5%; transform: rotate(-8deg); }
-.card-gift.pos-1 { right: -40px; top: 5%; transform: rotate(7deg); }
-.card-gift.pos-2 { left: -42px; bottom: 7%; transform: rotate(6deg); }
-.card-gift.pos-3 { right: -40px; bottom: 5%; transform: rotate(-6deg); }
+.card-gift { position: absolute; display: block; pointer-events: none; }
+.card-gift.pos-0 { left: -74px; top: 0; }
+.card-gift.pos-1 { right: -74px; top: 0; }
+.card-gift.pos-2 { left: -76px; bottom: 2%; }
+.card-gift.pos-3 { right: -74px; bottom: 0; }
 
 /* The picture column is as wide for every present, so the names line up. */
 .gift-icon { width: 80px; min-width: 80px; justify-content: center; }
@@ -2858,3 +2858,22 @@ button.manager-item:hover:not(:disabled) { background: rgb(127 127 127 / 0.18); 
 @keyframes gain-rise { 0% { opacity: 0; transform: translateY(10px) scale(0.6); } 30% { opacity: 1; transform: translateY(-4px) scale(1.3); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes gift-pop { 0% { transform: scale(0.4) rotate(-6deg); opacity: 0; } 70% { transform: scale(1.12) rotate(2deg); opacity: 1; } 100% { transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { .gain-fill { transition: none; } .gain-plus, .gift-result-art { animation: none; opacity: 1; } }
+
+/* The bars at the top of the present dialog: now, and what the present you point at would add. */
+.gift-preview { list-style: none; margin: 8px 0 12px; padding: 0; display: grid; gap: 6px; }
+.pv-row { display: grid; grid-template-columns: 7.5em 1fr 4.2em; align-items: center; gap: 8px; font-size: 0.85rem; }
+.pv-label { font-weight: 700; }
+.pv-bar { position: relative; height: 12px; border-radius: 999px; background: rgb(255 255 255 / 0.12); overflow: hidden; }
+.pv-now { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px 0 0 999px; background: linear-gradient(90deg, #3b82f6, #60a5fa); }
+.pv-add { position: absolute; top: 0; bottom: 0; background: repeating-linear-gradient(45deg, #22c55e 0 5px, #86efac 5px 10px); box-shadow: 0 0 8px rgb(74 222 128 / 0.8); transition: width 0.25s ease; }
+.pv-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.gift.picked { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); background: rgb(59 130 246 / 0.18); }
+
+.gift-hint-row { display: flex; align-items: center; gap: 6px; }
+.hint-btn.inline { position: static; width: 28px; height: 28px; }
+
+button.ov-next-what { font: inherit; font-family: var(--display); font-weight: 800; font-size: 1.1rem; text-transform: uppercase; justify-self: start; display: inline-flex; align-items: center; gap: 6px; }
+
+/* The kick-off button: an even glow all the way round, like a circle (no offset downwards). */
+.play-circle { box-shadow: 0 0 0 1px rgb(30 155 255 / 0.5), 0 0 18px 4px rgb(30 155 255 / 0.5); }
+.play-circle.match { box-shadow: 0 0 0 2px rgb(34 197 94 / 0.85), 0 0 18px 4px rgb(34 197 94 / 0.5); }

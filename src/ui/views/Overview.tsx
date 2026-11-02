@@ -44,7 +44,7 @@ export function Overview() {
       <Card title={<>{iconize(t("ov.nextMatch"))}{nextKind && <> · <button type="button" className="link" onClick={() => setView(nextKind.view)}>{nextKind.label}</button></>}</>}>
         {natDue && game.national ? (
           <div className="ov-next">
-            <div className="ov-next-what"><Icon name="ball" size={20} /> {iconize(t(`national.what.${natDue.what}` as TKey))}</div>
+            <button type="button" className="ov-next-what link" onClick={() => nextKind && setView(nextKind.view)}><Icon name="ball" size={20} /> {iconize(t(`national.what.${natDue.what}` as TKey))}</button>
             <div className="team"><Flag code={game.national.country} size={44} /><span>{t(`nat.${game.national.country}` as TKey)}</span></div>
             <span className="vs">–</span>
             <div className="team"><Flag code={natDue.opponent} size={44} /><span>{t(`nat.${natDue.opponent}` as TKey)}</span></div>
@@ -53,7 +53,7 @@ export function Overview() {
         ) : next ? (
           <div className="ov-next">
             {/* What it is first, a little bigger: the cup round or the league round. */}
-            <div className="ov-next-what">{isCupFixture(next) ? <><Icon name="trophy" size={20} /> {iconize(t("cup.name"))} · {iconize(t(CUP_STAGES[next.stage]))}</> : t("ov.round", {round: next.round})}</div>
+            <button type="button" className="ov-next-what link" onClick={() => nextKind && setView(nextKind.view)}>{isCupFixture(next) ? <><Icon name="trophy" size={20} /> {iconize(t("cup.name"))} · {iconize(t(CUP_STAGES[next.stage]))}</> : t("ov.round", {round: next.round})}</button>
             <Team id={next.homeId} />
             <span className="vs">–</span>
             <Team id={next.awayId} />

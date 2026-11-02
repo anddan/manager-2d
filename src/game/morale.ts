@@ -102,11 +102,11 @@ export type Talk = (typeof TALKS)[number];
 /** Result key for the UI, e.g. "talk.praise.good". */
 /** What can be given to a player to cheer them up: money or a present. The dearer, the more it lifts morale, match sharpness, satisfaction and the bond with the manager. */
 export const GIFTS = [
-  {id: "cash", icon: "coins", cost: 10_000, morale: 5, sharpness: 4, happiness: 6, relation: 3},
-  {id: "gaming", icon: "gamepad", cost: 50_000, morale: 11, sharpness: 10, happiness: 14, relation: 7},
-  {id: "watch", icon: "watch", cost: 150_000, morale: 13, sharpness: 12, happiness: 17, relation: 9},
-  {id: "motorcycle", icon: "motorcycle", cost: 400_000, morale: 18, sharpness: 17, happiness: 24, relation: 13},
-  {id: "sportsCar", icon: "sportsCar", cost: 1_500_000, morale: 45, sharpness: 42, happiness: 60, relation: 36},
+  {id: "cash", icon: "coins", cost: 10_000, morale: 5, sharpness: 4, form: 0, happiness: 6, relation: 3},
+  {id: "gaming", icon: "gamepad", cost: 50_000, morale: 11, sharpness: 12, form: 4, happiness: 14, relation: 7},
+  {id: "watch", icon: "watch", cost: 150_000, morale: 13, sharpness: 18, form: 8, happiness: 17, relation: 9},
+  {id: "motorcycle", icon: "motorcycle", cost: 400_000, morale: 18, sharpness: 26, form: 15, happiness: 24, relation: 13},
+  {id: "sportsCar", icon: "sportsCar", cost: 1_500_000, morale: 45, sharpness: 55, form: 30, happiness: 60, relation: 36},
 ] as const;
 export type GiftId = (typeof GIFTS)[number]["id"];
 
@@ -123,6 +123,7 @@ export function giveGift(state: GameState, playerId: string, giftId: GiftId): st
   p.happiness = clamp(p.happiness + gift.happiness, 0, 100);
   p.morale = clamp(p.morale + gift.morale, 0, 100);
   p.sharpness = clamp(p.sharpness + gift.sharpness, 0, 100);
+  p.form = clamp(p.form + gift.form, 0, 100);
   p.relation = clamp(p.relation + gift.relation, 0, 100);
   // The present is kept, to be seen round their card (the last few).
   p.gifts = [...(p.gifts ?? []), gift.id].slice(-8);
