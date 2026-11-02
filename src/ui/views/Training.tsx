@@ -10,7 +10,7 @@ import {useState} from "react";
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
 import {FocusModal, FocusPicker} from "../FocusPicker";
-import {Bar, Card, Delta, PosBadge, SortTh, sortRows, useSort, Hint} from "../common";
+import {Bar, Card, Delta, PosBadge, SortTh, sortRows, useSort, Hint, StatusIcons} from "../common";
 
 type TrainingSort = "pos" | "name" | "age" | "ovr" | "fitness" | "change" | "focus";
 
@@ -186,7 +186,7 @@ export function Training() {
                   <tr key={p.id} className={picked.includes(p.id) ? "picked-row" : undefined} onClick={selecting ? () => toggle(p.id) : undefined}>
                     {selecting && <td><input type="checkbox" className="bench-check" checked={picked.includes(p.id)} onChange={() => toggle(p.id)} onClick={(e) => e.stopPropagation()} aria-label={listName(p)} /></td>}
                     <td><PosBadge pos={p.position} /></td>
-                    <td><button className="link" onClick={() => openPlayer(p.id)}>{listName(p)}</button>{p.injuryWeeks > 0 && <> {iconize("🩹")}</>}</td>
+                    <td><button className="link" onClick={() => openPlayer(p.id)}>{listName(p)}</button> <StatusIcons player={p} /></td>
                     {more && <td>{p.age}</td>}
                     <td className="num strong">{overall(p)}</td>
                     <td><Bar value={p.fitness} small /></td>

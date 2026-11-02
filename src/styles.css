@@ -2896,3 +2896,5 @@ button.ov-next-what { font: inherit; font-family: var(--display); font-weight: 8
 .gift-arrows button:active { transform: scale(0.92); }
 .gift-arrows button:first-child svg { transform: rotate(90deg); }
 .gift-arrows button:last-child svg { transform: rotate(-90deg); }
+
+.focus-mini { display: inline-flex; vertical-align: middle; color: var(--accent); }

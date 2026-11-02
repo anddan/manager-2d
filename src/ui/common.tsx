@@ -12,6 +12,7 @@ import type {GameState, Player, Position} from "../game/types";
 import {useT} from "../i18n";
 import {useGame} from "../store";
 import {FlagIcon} from "./Flag";
+import {FOCUS_ICONS} from "./FocusPicker";
 
 export function Card({title, actions, children, className = ""}: {title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string}) {
   return (
@@ -160,6 +161,8 @@ export function StatusIcons({player}: {player: Player}) {
       {player.loanListed && <span title={t("status.loanListed")}>🔁</span>}
       {player.wantsToLeave && <span title={t("status.wantsOut")}>✈️</span>}
       {player.loan && <span title={t("status.onLoan")}>📎</span>}
+      {/* The extra training they have been given: its icon. */}
+      {player.individualFocus && <span className="focus-mini" title={`${t("pl.individualFocus")}: ${player.individualFocus === "rest" ? t("train.rest") : t(`attr.${player.individualFocus}`)}`}><Icon name={FOCUS_ICONS[player.individualFocus]} size={16} /></span>}
       {/* The boot (or glove) itself, small: its colour says the kind, its trim the tier. */}
       {wornGear(player).map(({slot, item}) => (
         <span key={slot} className="gear-mini" title={`${t(`gear.kind.${item.kind}`)} · ${t(`gear.tier.${item.tier}`)}`}>
