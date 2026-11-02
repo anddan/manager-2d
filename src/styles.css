@@ -2898,3 +2898,25 @@ button.ov-next-what { font: inherit; font-family: var(--display); font-weight: 8
 .gift-arrows button:last-child svg { transform: rotate(-90deg); }
 
 .focus-mini { display: inline-flex; vertical-align: middle; color: var(--accent); }
+
+/* The buildings under the arena: dim until built, a yellow outline when picked or under construction. */
+.stadium-facility { cursor: pointer; }
+.stadium-facility-box { fill: #334155; stroke: rgb(255 255 255 / 0.25); stroke-width: 0.6; }
+.stadium-facility.built .stadium-facility-box { fill: #1e3a5f; stroke: rgb(125 196 255 / 0.7); }
+.stadium-facility.picked .stadium-facility-box, .stadium-facility:hover .stadium-facility-box { stroke: #fde047; stroke-width: 1.4; }
+.stadium-facility.building .stadium-facility-box { stroke: #fde047; stroke-dasharray: 2 1.5; }
+.stadium-pip { fill: rgb(255 255 255 / 0.25); }
+.stadium-pip.on { fill: #4ade80; }
+.stadium-facility, .stadium-hammer { color: #fff; }
+.stadium-hammer { color: #fde047; }
+.stadium-extra { color: #fff; }
+.stadium-extra.picked svg { filter: drop-shadow(0 0 2px #fde047); }
+.stadium-square.built .stadium-facility-box { fill: #1e3a5f; stroke: rgb(125 196 255 / 0.7); }
+.stadium-extra.picked .stadium-facility-box, .stadium-extra:hover .stadium-facility-box { stroke: #fde047; stroke-width: 1.4; }
+
+/* The little buildings: dim and grey until built; a frame that lights up when picked or being built. */
+.stadium-art.unbuilt { opacity: 0.45; filter: grayscale(0.85); }
+.stadium-facility-frame { fill: none; stroke: rgb(255 255 255 / 0.3); stroke-width: 0.6; }
+.stadium-facility.built .stadium-facility-frame { stroke: rgb(125 196 255 / 0.8); }
+.stadium-facility.picked .stadium-facility-frame, .stadium-facility:hover .stadium-facility-frame { stroke: #fde047; stroke-width: 1.6; }
+.stadium-facility.building .stadium-facility-frame { stroke: #fde047; stroke-dasharray: 2 1.5; }

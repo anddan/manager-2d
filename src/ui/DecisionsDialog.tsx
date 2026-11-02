@@ -1,7 +1,7 @@
 // "Answer first": the questions waiting in the mail, each with its buttons; the dialog closes by itself when
 // the last one is answered (then the game can go on).
 import {useEffect} from "react";
-import {iconize} from "./Icon";
+import {Icon, iconize} from "./Icon";
 import {useT} from "../i18n";
 import {useGameState} from "../store";
 import {Modal} from "./common";
@@ -16,7 +16,7 @@ export function DecisionsDialog({onClose}: {onClose: () => void}) {
     if (pending.length === 0) onClose();
   }, [pending.length, onClose]);
   return (
-    <Modal title={<></>} onClose={onClose}>
+    <Modal compact title={<><Icon name="mail" size={20} /> {iconize(t("decisions.waiting"))}</>} onClose={onClose}>
       <p className="muted small">{iconize(t("decisions.hint"))}</p>
       <ul className="decisions">
         {pending.map((m) => (

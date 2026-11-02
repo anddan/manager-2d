@@ -231,8 +231,19 @@ function useBadges(): Partial<Record<View, number>> {
 const BLUE_BADGES: View[] = ["storage", "codes", "transfers"];
 /** How soon the first contract runs out: this season (red), next season (yellow), or no hurry (set as the menu is drawn). */
 let CONTRACT_TONE: "red" | "yellow" | null = null;
-const isBlue = (v: View) => BLUE_BADGES.includes(v) || (v === "contracts" && CONTRACT_TONE === "yellow");
-const badgeClass = (v: View) => (v === "contracts" && CONTRACT_TONE === "yellow" ? "badge warn" : BLUE_BADGES.includes(v) ? "badge blue" : "badge");
+type BadgeTone = "red" | "warn" | "blue";
+/** A page's colour: red is to be done, yellow a contract running out next season, blue a reminder. */
+const toneOf = (v: View): BadgeTone => (v === "contracts" && CONTRACT_TONE === "yellow" ? "warn" : BLUE_BADGES.includes(v) ? "blue" : "red");
+const TONE_CLASS: Record<BadgeTone, string> = {red: "badge", warn: "badge warn", blue: "badge blue"};
+const badgeClass = (v: View) => TONE_CLASS[toneOf(v)];
+/** A menu's number: the worst colour among its pages (red, then yellow, then blue), with how many of that colour. */
+function worstBadge(pages: View[], badges: Partial<Record<View, number>>): {tone: BadgeTone; n: number} | null {
+  for (const tone of ["red", "warn", "blue"] as const) {
+    const n = pages.filter((p) => toneOf(p) === tone).reduce((k, p) => k + (badges[p] ?? 0), 0);
+    if (n > 0) return {tone, n};
+  }
+  return null;
+}
 
 /**
  * The bar at the bottom: two groups, the round play button, two groups. Tapping a group
@@ -252,8 +263,6 @@ function Nav() {
   const [open, setOpen] = useState<string | null>(null);
   const group = NAV_GROUPS.find((g) => g.id === open);
   const current = groupOf(view);
-  // A group's number: what's waiting (red) first, else the reminders (blue).
-  const count = (g: (typeof NAV_GROUPS)[number], blue: boolean) => groupPages(g).filter((v) => isBlue(v) === blue).reduce((n, v) => n + (badges[v] ?? 0), 0);
   const groupButton = (g: (typeof NAV_GROUPS)[number]) => (
     <button
       key={g.id}
@@ -264,7 +273,10 @@ function Nav() {
     >
       <Icon name={g.icon} />
       <span className="nav-label">{iconize(t(`nav.group.${g.id}`))}</span>
-      {count(g, false) > 0 ? <span className="badge">{count(g, false)}</span> : count(g, true) > 0 && <span className="badge blue">{count(g, true)}</span>}
+      {(() => {
+        const w = worstBadge(groupPages(g), badges);
+        return w && <span className={TONE_CLASS[w.tone]}>{w.n}</span>;
+      })()}
     </button>
   );
   return (
@@ -334,10 +346,10 @@ function GroupTabs() {
             <Icon name={ICONS[v]} size={18} />
             <span>{navLabel(v, t)}</span>
             {/* The tab counts its sub-pages too (red: to do, blue: reminders). */}
-            {[false, true].map((blue) => {
-              const n = pagesOf(v).filter((p) => isBlue(p) === blue).reduce((k, p) => k + (badges[p] ?? 0), 0);
-              return n > 0 ? <span key={String(blue)} className={blue ? "badge blue" : "badge"}>{n}</span> : null;
-            })}
+            {(() => {
+              const w = worstBadge(pagesOf(v), badges);
+              return w && <span className={TONE_CLASS[w.tone]}>{w.n}</span>;
+            })()}
           </button>
         ))}
         {group.views.includes("settings") && (

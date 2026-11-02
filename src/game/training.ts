@@ -2,7 +2,7 @@
 // intensity, facilities, form and morale. Older players decline.
 import {NATURAL_GAIN_SHARE, TRAINING_BASE_GAIN, TRAINING_INJURY_CHANCE} from "./constants";
 import {leagueClubs} from "./helpers";
-import {GYM_BOOST, TRAINING_BOOST} from "./stadium";
+import {ACADEMY_AGE, ACADEMY_BOOST, GYM_BOOST, REHAB_REST, TRAINING_BOOST} from "./stadium";
 import {injure} from "./injuries";
 import {hasTrait} from "./traits";
 import {overall} from "./ratings";
@@ -86,7 +86,9 @@ export function trainPlayer(rng: Rng, club: Club, p: Player, given: TrainOptions
   // The training ground helps everything grow; the gym the physical side on top (the user's club builds them in the stadium).
   const ground = 1 + TRAINING_BOOST * (club.stadium?.training ?? 0);
   const gym = 1 + GYM_BOOST * (club.stadium?.gym ?? 0);
-  const base = TRAINING_BASE_GAIN * ageFactor(p.age) * late * room * quality * intensity.gain * mood * minutes * session * ground;
+  // The academy: the young ones develop faster still.
+  const academy = p.age <= ACADEMY_AGE ? 1 + ACADEMY_BOOST * (club.stadium?.academy ?? 0) : 1;
+  const base = TRAINING_BASE_GAIN * ageFactor(p.age) * late * room * quality * intensity.gain * mood * minutes * session * ground * academy;
 
   for (const attr of ATTRIBUTES) {
     let delta = 0;
@@ -104,9 +106,11 @@ export function trainPlayer(rng: Rng, club: Club, p: Player, given: TrainOptions
     }
   }
 
-  p.fitness = clamp(p.fitness + intensity.fitness * session - (opts.extraSession ? 6 : 0), 0, 100);
+  // The rehab centre: rest works better.
+  const rest = 1 + REHAB_REST * (club.stadium?.rehab ?? 0);
+  p.fitness = clamp(p.fitness + intensity.fitness * session * rest - (opts.extraSession ? 6 : 0), 0, 100);
   if (opts.focus === "recovery") {
-    p.fitness = clamp(p.fitness + 12, 0, 100);
+    p.fitness = clamp(p.fitness + 12 * rest, 0, 100);
     p.morale = clamp(p.morale + 2, 0, 100);
   }
   if (opts.focus === "conditioning") p.fitness = clamp(p.fitness - 3, 0, 100);

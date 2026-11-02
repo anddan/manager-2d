@@ -6,7 +6,7 @@ import type {Club, Fixture, GameState} from "./types";
 
 export const STANDS = ["north", "south", "west", "east"] as const;
 export type Stand = (typeof STANDS)[number];
-export type StadiumPart = Stand | "kiosks" | "shop" | "training" | "gym" | "rehab";
+export type StadiumPart = Stand | "kiosks" | "shop" | "training" | "gym" | "rehab" | "academy";
 
 /** Seats each level of a stand adds: the long sides hold more than the ends. */
 export const STAND_SEATS: Record<Stand, number> = {north: 3000, south: 3000, west: 2000, east: 2000};
@@ -29,6 +29,13 @@ export const GYM_BOOST = 0.08;
 export const REHAB_MAX = 5;
 const REHAB_COST = [350_000, 700_000, 1_200_000, 1_900_000, 2_800_000];
 export const REHAB_CHANCE = 0.12;
+/** The rehab centre also helps rest: each level makes the fitness the squad wins back (in training and in recovery) 10 % bigger. */
+export const REHAB_REST = 0.1;
+/** The academy: for each level, players aged 21 and under develop 10 % faster. */
+export const ACADEMY_MAX = 5;
+const ACADEMY_COST = [300_000, 600_000, 1_000_000, 1_600_000, 2_400_000];
+export const ACADEMY_BOOST = 0.1;
+export const ACADEMY_AGE = 21;
 /**
  * What the kiosks and the club shop sell, each at a price the manager sets (a fair one to start).
  * The dearer it is, the fewer buy: around one and a half times fair brings in the most (about 12 % more than
@@ -77,7 +84,7 @@ export function setItemPrice(state: GameState, item: SaleItem, price: number): v
 }
 
 /** How long each kind of project takes, in weeks. */
-export const BUILD_WEEKS = {stand: 3, kiosks: 1, shop: 2, training: 2, gym: 2, rehab: 2};
+export const BUILD_WEEKS = {stand: 3, kiosks: 1, shop: 2, training: 2, gym: 2, rehab: 2, academy: 2};
 
 export interface StadiumState {
   stands: Record<Stand, number>;
@@ -87,6 +94,7 @@ export interface StadiumState {
   training?: number;
   gym?: number;
   rehab?: number;
+  academy?: number;
   /** The capacity before any building. */
   base: number;
   /** The kiosks' and the shop's prices (missing: a fair one). */
@@ -118,7 +126,7 @@ export function partLevel(st: StadiumState, part: StadiumPart): number {
 }
 
 export function partMax(part: StadiumPart): number {
-  return isStand(part) ? STAND_MAX : part === "kiosks" ? KIOSK_MAX : part === "shop" ? SHOP_MAX : part === "training" ? TRAINING_MAX : part === "gym" ? GYM_MAX : REHAB_MAX;
+  return isStand(part) ? STAND_MAX : part === "kiosks" ? KIOSK_MAX : part === "shop" ? SHOP_MAX : part === "training" ? TRAINING_MAX : part === "gym" ? GYM_MAX : part === "rehab" ? REHAB_MAX : ACADEMY_MAX;
 }
 
 /** What the next level of a part costs (undefined at the top). */
@@ -126,7 +134,7 @@ export function upgradeCost(st: StadiumState, part: StadiumPart): number | undef
   const level = partLevel(st, part);
   if (level >= partMax(part)) return undefined;
   if (isStand(part)) return STAND_SEATS[part] * SEAT_COST * (1 + level * 0.5);
-  return (part === "kiosks" ? KIOSK_COST : part === "shop" ? SHOP_COST : part === "training" ? TRAINING_COST : part === "gym" ? GYM_COST : REHAB_COST)[level];
+  return (part === "kiosks" ? KIOSK_COST : part === "shop" ? SHOP_COST : part === "training" ? TRAINING_COST : part === "gym" ? GYM_COST : part === "rehab" ? REHAB_COST : ACADEMY_COST)[level];
 }
 
 export function buildWeeks(part: StadiumPart): number {
@@ -164,7 +172,7 @@ export function weeklyStadium(state: GameState, played: Fixture[]): void {
     else st[part] = (st[part] ?? 0) + 1;
     st.project = undefined;
     club.capacity = stadiumCapacity(st);
-    if (part === "training" || part === "gym" || part === "rehab") addMessage(state, {kind: "news", key: "msg.facilityBuilt", params: {part: `stadium.part.${part}`}});
+    if (part === "training" || part === "gym" || part === "rehab" || part === "academy") addMessage(state, {kind: "news", key: "msg.facilityBuilt", params: {part: `stadium.part.${part}`}});
     else addMessage(state, {kind: "news", key: "msg.stadiumBuilt", params: {part: `stadium.part.${part}`, capacity: club.capacity}});
   }
   const home = played.find((f) => f.homeId === club.id && f.played);

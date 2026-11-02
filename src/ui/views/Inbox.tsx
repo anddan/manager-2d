@@ -8,7 +8,7 @@ import type {Message, MessageKind} from "../../game/types";
 import {useT} from "../../i18n";
 import type {TKey} from "../../i18n";
 import {useGame, useGameState} from "../../store";
-import {Card, Empty, Tabs} from "../common";
+import {Card, Empty, Flag, Tabs} from "../common";
 import {BidCard} from "./Transfers";
 import {PlayerCard} from "../PlayerCard";
 
@@ -112,8 +112,16 @@ export function AwardsList({message: m}: {message: Message}) {
 }
 
 export function MessageText({message}: {message: Message}) {
-  const {tx} = useT();
-  return <>{iconize(tx(message.key, message.params))}</>;
+  const {t, tx} = useT();
+  const text = tx(message.key, message.params);
+  // A country's offer: its flag right before its name.
+  if (message.action?.type === "nationalOffer") {
+    const code = message.action.country;
+    const name = t(`nat.${code}` as TKey);
+    const at = text.indexOf(name);
+    if (at >= 0) return <>{iconize(text.slice(0, at))}<Flag code={code} size={18} /> {name}{iconize(text.slice(at + name.length))}</>;
+  }
+  return <>{iconize(text)}</>;
 }
 
 export function MessageAction({message: m}: {message: Message}) {
