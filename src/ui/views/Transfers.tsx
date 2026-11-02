@@ -1,12 +1,12 @@
 import {moneyBurst, pressedElement} from "../effects";
-import {useState} from "react";
+import {useState, type ReactNode} from "react";
 import {Icon, iconize} from "../Icon";
 import {fullName, listName, shortName, userClub} from "../../game/helpers";
-import {askingPrice, estimatedOverall, respondToBid} from "../../game/transfers";
-import {POSITIONS, type Position} from "../../game/types";
+import {askingPrice, estimatedOverall, respondToBid, unseenScouted} from "../../game/transfers";
+import {POSITIONS, type Player, type Position} from "../../game/types";
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
-import {Card, Empty, Flag, NumberInput, Ovr, PosBadge, SortTh, StatusIcons, Tabs, sortRows, useSort, Hint} from "../common";
+import {Card, CrestOf, Empty, Flag, NumberInput, Ovr, PosBadge, SortTh, StatusIcons, Tabs, sortRows, useSort, Hint} from "../common";
 
 type SearchSort = "pos" | "name" | "age" | "ovr" | "club" | "price" | "contract";
 
@@ -17,6 +17,8 @@ export function Transfers() {
   const game = useGameState();
   const [tab, setTab] = useState<Tab>("search");
   const bids = game.incomingBids.length;
+  const listedCount = Object.values(game.players).filter((p) => p.clubId === game.userClubId && (p.transferListed || p.loanListed)).length;
+  const scoutedCount = unseenScouted(game).length;
   return (
     <Card title={t("nav.transfers")}>
       <Tabs
@@ -25,8 +27,8 @@ export function Transfers() {
         options={[
           {id: "search", label: <><Icon name="search" size={18} /> {iconize(t("tr.search"))}</>},
           {id: "bids", label: <><Icon name="inbox" size={18} /> {iconize(t("tr.bids"))}{bids ? ` (${bids})` : ""}</>},
-          {id: "listed", label: <><Icon name="tag" size={18} /> {iconize(t("tr.listed"))}</>},
-          {id: "scouting", label: <><Icon name="eye" size={18} /> {iconize(t("tr.scouting"))}</>},
+          {id: "listed", label: <><Icon name="tag" size={18} /> {iconize(t("tr.listed"))}{listedCount ? ` (${listedCount})` : ""}</>},
+          {id: "scouting", label: <><Icon name="eye" size={18} /> {iconize(t("tr.scouting"))}{scoutedCount ? ` (${scoutedCount})` : ""}</>},
         ]}
       />
       {tab === "search" && <Search />}
@@ -110,10 +112,10 @@ function Search() {
       <Hint>{iconize(t("tr.searchHint", {budget: userClub(game).transferBudget}))}</Hint>
       <div className="table-more"><button type="button" className="btn small" aria-expanded={more} onClick={() => setMore(!more)}>{iconize(t(more ? "tbl.showLess" : "tbl.showMore"))}</button></div>
       <div className="table-wrap">
-        <table className="table">
+        <table className="table flush">
           <thead>
             <tr>
-              {th("pos", t("col.pos"), false)}{th("name", t("col.name"), false)}{more && th("age", t("col.age"), false)}{th("ovr", t("col.ovr"), true, t("col.ovrHint"))}
+              {th("pos", t("col.pos"), false)}{th("name", t("col.name"), false)}{more && th("age", t("col.age"), false)}{th("ovr", t(more ? "col.ovr" : "col.ovrShort"), true, t("col.ovrHint"))}
               {more && th("club", t("tbl.club"), false)}{th("price", t("tr.asking"), false)}{more && th("contract", t("col.contract"), false)}
             </tr>
           </thead>
@@ -204,32 +206,82 @@ function Listed() {
   );
 }
 
+type ReportSort = "week" | "pos" | "name" | "age" | "ovr" | "club" | "price" | "contract";
+
 function Scouting() {
-  const {t} = useT();
+  const {t, money} = useT();
   const game = useGameState();
   const openPlayer = useGame((s) => s.openPlayer);
+  // The reports as a table: newest first to start with, any column sorts; a player we have bought is no longer in it.
+  const sort = useSort<ReportSort>("week", true);
+  const [more, setMore] = useState(false);
   const scouted = Object.entries(game.scouted)
     .map(([id, week]) => ({p: game.players[id], week}))
-    .filter(({p}) => p && p.clubId !== game.userClubId)
-    .sort((a, b) => b.week - a.week);
+    .filter(({p}) => p && p.clubId !== game.userClubId && p.loan?.parentClubId !== game.userClubId);
+  const reports = sortRows(
+    scouted,
+    ({p, week}): number | string => {
+      switch (sort.key) {
+        case "week": return week;
+        case "pos": return POSITIONS.indexOf(p.position);
+        case "name": return listName(p);
+        case "age": return p.age;
+        case "ovr": return estimatedOverall(game, p).high;
+        case "club": return p.clubId ? game.clubs[p.clubId].short : "";
+        case "price": return p.clubId ? askingPrice(game, p) : 0;
+        case "contract": return p.clubId ? p.contract.expiresSeason : 0;
+      }
+    },
+    sort.desc
+  );
+  const th = (key: ReportSort, label: ReactNode, descFirst = true, title?: string) => (
+    <SortTh label={label} title={title} className={key === "pos" ? "col-pos" : undefined} active={sort.key === key} desc={sort.desc} onClick={() => sort.onSort(key, descFirst)} />
+  );
+  // A player in the lists: position, the name (tap for the profile), rating and club; a blue dot while a report is new.
+  const row = (p: Player, fresh: boolean) => (
+    <li key={p.id}>
+      {fresh && <span className="new-dot" title={t("tr.newReport")} />}
+      <PosBadge pos={p.position} /> <button className="link" onClick={() => openPlayer(p.id)}>{fullName(p)}</button>{" "}
+      <span className="muted">{iconize(t("col.ovr"))} <Ovr game={game} player={p} /> · {p.clubId && game.clubs[p.clubId] ? <><CrestOf club={game.clubs[p.clubId]} className="crest tiny" /> {game.clubs[p.clubId].short}</> : t("tr.free")}</span>
+    </li>
+  );
   return (
     <>
       <h3>{iconize(t("tr.inProgress"))}</h3>
       {game.scoutQueue.length === 0 ? <Empty>{iconize(t("tr.noScouting"))}</Empty> : (
         <ul className="plain-list">
-          {game.scoutQueue.map((id) => game.players[id] && <li key={id}>🔭 {fullName(game.players[id])}</li>)}
+          {game.scoutQueue.map((id) => game.players[id] && row(game.players[id], false))}
         </ul>
       )}
-      <h3>{iconize(t("tr.reports"))}</h3>
+      <div className="table-head-row">
+        <h3>{iconize(t("tr.reports"))}</h3>
+        <button type="button" className="btn small" aria-expanded={more} onClick={() => setMore(!more)}>{iconize(t(more ? "tbl.showLess" : "tbl.showMore"))}</button>
+      </div>
       {scouted.length === 0 ? <Empty>{iconize(t("tr.noReports"))}</Empty> : (
-        <ul className="plain-list">
-          {scouted.map(({p}) => (
-            <li key={p.id}>
-              <PosBadge pos={p.position} /> <button className="link" onClick={() => openPlayer(p.id)}>{fullName(p)}</button>{" "}
-              <span className="muted">{iconize(t("col.ovr"))} <Ovr game={game} player={p} /> · {p.clubId ? game.clubs[p.clubId].short : t("tr.free")}</span>
-            </li>
-          ))}
-        </ul>
+        <div className="table-wrap">
+          <table className="table flush">
+            <thead>
+              <tr>
+                {th("week", <span className="new-dot" />, true, t("tr.newReport"))}{th("pos", t("col.pos"), false)}{th("name", t("col.name"), false)}{more && th("age", t("col.age"), false)}{th("ovr", t(more ? "col.ovr" : "col.ovrShort"), true, t("col.ovrHint"))}
+                {th("club", t("tbl.club"), false)}{more && th("price", t("tr.asking"), false)}{more && th("contract", t("col.contract"), false)}
+              </tr>
+            </thead>
+            <tbody>
+              {reports.map(({p}) => (
+                <tr key={p.id} className="clickable" onClick={() => openPlayer(p.id)}>
+                  <td>{!game.scoutedSeen?.includes(p.id) && <span className="new-dot" title={t("tr.newReport")} />}</td>
+                  <td><PosBadge pos={p.position} /></td>
+                  <td className="name-cell"><Flag code={p.nationality} /> {listName(p)} <StatusIcons player={p} /></td>
+                  {more && <td>{p.age}</td>}
+                  <td className="num"><Ovr game={game} player={p} /></td>
+                  <td>{p.clubId && game.clubs[p.clubId] ? <><CrestOf club={game.clubs[p.clubId]} className="crest tiny" /> {game.clubs[p.clubId].short}</> : t("tr.free")}</td>
+                  {more && <td className="num">{p.clubId ? money(askingPrice(game, p)) : "–"}</td>}
+                  {more && <td className="num">{p.clubId ? p.contract.expiresSeason : "–"}</td>}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </>
   );

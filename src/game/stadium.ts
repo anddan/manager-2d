@@ -31,7 +31,8 @@ const REHAB_COST = [350_000, 700_000, 1_200_000, 1_900_000, 2_800_000];
 export const REHAB_CHANCE = 0.12;
 /**
  * What the kiosks and the club shop sell, each at a price the manager sets (a fair one to start).
- * The dearer it is, the fewer buy: just above fair brings in the most, far above it next to nothing.
+ * The dearer it is, the fewer buy: around one and a half times fair brings in the most (about 12 % more than
+ * the fair price, which is where it starts), far above it next to nothing.
  */
 export const SALE_ITEMS = ["hotdog", "drink", "scarf", "shirt"] as const;
 export type SaleItem = (typeof SALE_ITEMS)[number];
@@ -46,9 +47,9 @@ export function itemPrice(st: StadiumState, item: SaleItem): number {
   return st.prices?.[item] ?? ITEM_FAIR[item];
 }
 
-/** How many buy at a price, against how many would at a fair one (1 at fair, 0 at 2.7 times it). */
+/** How many buy at a price, against how many would at a fair one (1 at fair, 0 at three times it). */
 export function priceDemand(item: SaleItem, price: number): number {
-  return Math.max(0, Math.min(1.6, 1.6 - (0.6 * price) / ITEM_FAIR[item]));
+  return Math.max(0, Math.min(1.5, 1.5 - (0.5 * price) / ITEM_FAIR[item]));
 }
 
 /** What one item brings in: at the kiosks per home match (from the crowd), at the shop per week. */

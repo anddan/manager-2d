@@ -17,6 +17,7 @@ import {
 import {fullName} from "../../game/helpers";
 import {LEGENDS, LEGEND_PRICE_DIAMONDS, buyLegend, buySecretLegend, legendOwned, legendPlayer, type Legend} from "../../game/legend";
 import {chime} from "../sound";
+import {logPurchase} from "../adminLog";
 import {exchangeDiamonds, grantMoneyPack, grantPack, mockPaymentProvider, recordPurchase, refillEnergy, regenerateEnergy, type MoneyPackId, type PackId} from "../../game/monetization";
 import {DIAMOND_PACK, PLAYER_PACKS, PLAYER_PACK_IDS, openDiamondPack, openPack, pickFromPack, type PlayerPackId} from "../../game/packs";
 import {useT} from "../../i18n";
@@ -73,6 +74,7 @@ export function Shop() {
       recordPurchase(g, {diamonds: got}, priceEur);
       return got;
     });
+    logPurchase("diamonds", packId, priceEur, n);
     notify("toast.purchased", {n}, "good");
   };
 
@@ -143,6 +145,7 @@ export function Shop() {
       recordPurchase(g, {money: got}, priceEur);
       return got;
     });
+    logPurchase("money", packId, priceEur, amount);
     notify("toast.moneyPurchased", {money: amount}, "good");
   };
 

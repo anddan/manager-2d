@@ -126,6 +126,8 @@ export interface Player {
   happiness: number;
   /** Relationship with the manager 0..100. */
   relation: number;
+  /** The presents the manager has given them (newest last): shown round their card. */
+  gifts?: string[];
   /** Hidden trait 0..100: how well they take criticism and hard training. */
   professionalism: number;
   clubId: string | null;
@@ -485,6 +487,8 @@ export const FINANCE_CATEGORIES = [
   "matchday",
   "sponsor",
   "prize",
+  "motm",
+  "fines",
   "sales",
   "loan",
   "premium",
@@ -573,7 +577,13 @@ export interface GameState {
   fixtures: Fixture[];
   /** Player id -> absWeek they were scouted. */
   scouted: Record<string, number>;
+  /** The scouting reports that have been looked at (a player's profile opened); the rest are new. Missing in older saves: all of them count as seen. */
+  scoutedSeen?: string[];
   scoutQueue: string[];
+  /** The wage budget warning last mailed (yellow from 75 % of the budget, red above it); missing when the wages are under 75 %. */
+  wageAlert?: "yellow" | "red";
+  /** A week with more spent than earned has been mailed (until a week is back under). */
+  econAlert?: boolean;
   inbox: Message[];
   promises: PlayingTimePromise[];
   incomingBids: IncomingBid[];

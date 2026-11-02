@@ -183,7 +183,7 @@ export function TeamLink({clubId}: {clubId: string}) {
   const [open, setOpen] = useState(false);
   const c = game.clubs[clubId];
   if (!c) return null;
-  if (clubId === game.userClubId) return <>{c.name}</>;
+  if (clubId === game.userClubId) return <span className="team-link">{c.name}</span>;
   return (
     <>
       <button type="button" className="link team-link" title={t("tac.seeTeam")} onClick={() => setOpen(true)}>{c.name}</button>

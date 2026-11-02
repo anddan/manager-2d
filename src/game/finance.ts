@@ -99,10 +99,13 @@ export function autoPrice(state: GameState, club: Club, fixture?: Fixture): numb
   return best;
 }
 
-/** The price for a match: the club's own, or on auto the best one moved by the manager's percent. */
+/** The auto price plays safe: a little under the best one, so the ground fills for sure. Finding the exact best price by hand brings in more. */
+export const AUTO_SAFETY = 0.94;
+
+/** The price for a match: the club's own, or on auto the safe price (a little under the best) moved by the manager's percent. */
 export function matchPrice(state: GameState, club: Club, fixture?: Fixture): number {
   if (!club.ticketAuto) return club.ticketPrice;
-  const adjusted = autoPrice(state, club, fixture) * (1 + (club.ticketAdjust ?? 0) / 100);
+  const adjusted = autoPrice(state, club, fixture) * AUTO_SAFETY * (1 + (club.ticketAdjust ?? 0) / 100);
   return clamp(Math.round(adjusted), TICKET_PRICE.min, TICKET_PRICE.max);
 }
 
@@ -144,9 +147,52 @@ export function weeklyFinances(state: GameState, played: Fixture[]): void {
 
   weeklyLoan(state);
   const user = state.clubs[state.userClubId];
+  wageBudgetAlert(state, user.wageBudget);
   closeReport(state);
+  economyAlert(state);
   boardPatience(state, user.cash);
   if (user.cash < -2_000_000) user.transferBudget = Math.min(user.transferBudget, 0);
+}
+
+/** The weeks the economy is judged over: the takings come mostly at home matches, every other week, so one week alone says little. */
+export const ECONOMY_WEEKS = 4;
+
+/** How much of the income the spending took over the last few weeks (in percent), with the sums; null before there is a report. */
+export function recentSpend(state: GameState): {used: number; spent: number; income: number; net: number} | null {
+  const weeks = state.finance.weeks.slice(0, ECONOMY_WEEKS);
+  if (weeks.length === 0) return null;
+  let income = 0;
+  let expenses = 0;
+  for (const w of weeks) {
+    const sums = sumLines(w.lines);
+    income += sums.income;
+    expenses += sums.expenses;
+  }
+  const spent = -expenses;
+  const used = income > 0 ? (spent / income) * 100 : spent > 0 ? 101 : 0;
+  return {used, spent, income, net: income + expenses};
+}
+
+/** A mail when the last weeks' spending goes over the income (red): once, until it is back under. */
+function economyAlert(state: GameState): void {
+  const week = recentSpend(state);
+  const red = !!week && week.used > 100;
+  if (red && !state.econAlert) addMessage(state, {kind: "finance", key: "msg.econRed", params: {spent: week.spent, income: week.income}, highlight: true});
+  state.econAlert = red || undefined;
+}
+
+/** A mail when the wages take 75 % of the wage budget (yellow) and again when they pass it (red); once for each, until they are back under 75 %. */
+function wageBudgetAlert(state: GameState, budget: number): void {
+  const bill = wageBill(state, state.userClubId);
+  const used = (bill / Math.max(1, budget)) * 100;
+  const level = used > 100 ? "red" : used >= 75 ? "yellow" : undefined;
+  const rank = {yellow: 1, red: 2};
+  const last = state.wageAlert;
+  // (Not in the very first weeks of a new game: the starting wages sit close under the budget, nothing has happened yet.)
+  if (level && state.absWeek > 2 && rank[level] > (last ? rank[last] : 0)) {
+    addMessage(state, {kind: "finance", key: level === "red" ? "msg.wageRed" : "msg.wageYellow", params: {used: Math.round(used), bill, budget}, highlight: level === "red"});
+  }
+  state.wageAlert = level;
 }
 
 /** Weeks in a row in the red before the board gives a warning. */

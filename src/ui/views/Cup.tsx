@@ -90,7 +90,7 @@ function Groups() {
           return (
             <section key={g} className={`cup-group ${mine ? "mine" : ""}`}>
               <h3>{iconize(t("cup.groupName", {group: GROUP_NAMES[g]}))}</h3>
-              <table className="table compact">
+              <table className="table compact flush">
                 <thead>
                   <tr>
                     <th>#</th><th>{iconize(t("col.name"))}</th>
@@ -107,7 +107,7 @@ function Groups() {
                       <tr key={r.clubId} className={`${r.clubId === game.userClubId ? "me" : ""} ${i < 2 ? "through" : ""}`}>
                         <td>{i + 1}</td>
                         <td className="cup-club">
-                          {club.country ? <FlagIcon code={club.country} size={13} /> : null} <span className="crest tiny" style={{background: club.color}} /> <TeamLink clubId={club.id} />{more && <> <TeamOvr clubId={club.id} /></>}
+                          {club.country ? <FlagIcon code={club.country} size={13} /> : null} <span className="crest tiny" style={{background: club.color, color: club.color2}} /> <TeamLink clubId={club.id} />{more && <> <TeamOvr clubId={club.id} /></>}
                         </td>
                         {more && <><td className="num">{r.played}</td><td className="num">{r.won}</td><td className="num">{r.drawn}</td><td className="num">{r.lost}</td>
                         <td className="num">{gd > 0 ? `+${gd}` : gd}</td></>}<td className="num strong">{r.points}</td>
@@ -183,7 +183,7 @@ function TeamLine({id, goals, pens, winner}: {id: string; goals?: number; pens?:
   if (!club) return null;
   return (
     <div className={`bracket-team ${winner ? "won" : ""} ${id === game.userClubId ? "me" : ""}`}>
-      <span className="crest tiny" style={{background: club.color}} />
+      <span className="crest tiny" style={{background: club.color, color: club.color2}} />
       <span className="bracket-name"><TeamLink clubId={id} /></span>
       <TeamOvr clubId={id} />
       {goals !== undefined && <span className="bracket-score">{goals}{pens !== undefined && <small> ({pens})</small>}</span>}

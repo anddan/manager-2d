@@ -117,5 +117,23 @@ service cloud.firestore {
         allow delete: if deserted(cupAt(code));
       }
     }
+
+    // Error reports and real-money purchases (see src/ui/adminLog.ts). The game can only add them, size-bounded;
+    // nobody can read, change or delete them from the game: the admin reads them in the Firebase console.
+    match /errorLogs/{id} {
+      allow create: if request.resource.data.device is string
+        && request.resource.data.message is string
+        && request.resource.data.message.size() <= 500
+        && request.resource.data.get('stack', '').size() <= 2000
+        && request.resource.data.size() <= 20;
+      allow read, update, delete: if false;
+    }
+    match /purchases/{id} {
+      allow create: if request.resource.data.device is string
+        && request.resource.data.what in ['diamonds', 'money']
+        && request.resource.data.eur is number
+        && request.resource.data.size() <= 20;
+      allow read, update, delete: if false;
+    }
   }
 }

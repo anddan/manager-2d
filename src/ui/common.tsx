@@ -90,8 +90,8 @@ export function Modal({title, onClose, children, wide, compact, backdropCloses =
 }
 
 /** A 0..100 meter; colours go red -> amber -> green. */
-export function Bar({value, label, small}: {value: number; label?: string; small?: boolean}) {
-  const tone = value < 35 ? "bad" : value < 60 ? "mid" : "good";
+export function Bar({value, label, small, color}: {value: number; label?: string; small?: boolean; /** Its own colour instead of the usual one by how full it is. */ color?: "good" | "mid" | "bad"}) {
+  const tone = color ?? (value < 35 ? "bad" : value < 60 ? "mid" : "good");
   return (
     <div className={`bar ${small ? "bar-small" : ""}`} title={label ? `${label}: ${Math.round(value)}` : String(Math.round(value))}>
       <div className={`bar-fill ${tone}`} style={{width: `${Math.max(2, Math.min(100, value))}%`}} />
@@ -113,7 +113,8 @@ export function PosBadge({pos}: {pos: Position}) {
 /** A club's badge: its colours and letters, or the flag when it is a country (a national match). */
 export function CrestOf({club, className = "crest"}: {club: {id: string; short: string; color: string; color2: string}; className?: string}) {
   if (club.id.startsWith("nat:")) return <span className={`${className} crest-flag`} aria-hidden><Flag code={club.short} size={className.includes("big") ? 44 : className.includes("tiny") ? 16 : 26} /></span>;
-  return <span className={className} style={{background: club.color, color: club.color2}}>{club.short}</span>;
+  // The tiny badge is just the colours (no room for the letters).
+  return <span className={className} style={{background: club.color, color: club.color2}}>{className.includes("tiny") ? null : club.short}</span>;
 }
 
 export function Flag({code, named, size}: {code: string; named?: boolean; size?: number}) {

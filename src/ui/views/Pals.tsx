@@ -182,7 +182,7 @@ function PalTeam({id, onClose}: {id: string; onClose: () => void}) {
     }
   };
   return (
-    <Modal title={p ? <><span className="crest tiny" style={{background: p.club.color}} /> {p.club.name}</> : iconize(t("pals.list"))} onClose={onClose}>
+    <Modal title={p ? <><span className="crest tiny" style={{background: p.club.color, color: p.club.color2}} /> {p.club.name}</> : iconize(t("pals.list"))} onClose={onClose}>
       {p === undefined && <Empty>{iconize(t("friends.loading"))}</Empty>}
       {(p === null || (p && !team)) && <Empty>{iconize(t("friends.noTeam"))}</Empty>}
       {p && club && team && (

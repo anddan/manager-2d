@@ -7,7 +7,7 @@ export type IconName =
   | "swap" | "pen" | "wallet" | "boot" | "diamond" | "diamondLine" | "settings" | "play" | "ball" | "shield" | "info" | "close"
   | "warn" | "fire" | "video" | "gift" | "shin" | "glove" | "dice" | "user" | "text" | "palette" | "megaphone" | "skip" | "coffee" | "stop" | "target" | "star" | "sparkle" | "chart" | "chat" | "handshake" | "trend" | "tag" | "shirt" | "undo" | "check" | "bolt" | "bank" | "sound" | "compass" | "download" | "upload" | "cart" | "hammer" | "run" | "bench" | "moon" | "search" | "inbox" | "eye" | "coins" | "medical" | "plane" | "clip" | "lock" | "flag" | "updown" | "plus" | "male" | "female" | "mixed" | "chevron" | "thumbUp" | "thumbDown" | "debrief" | "hotdog" | "cup" | "scarf"
   | "faceSmile" | "faceGrin" | "faceNeutral" | "faceWorried" | "faceSad" | "faceAngry" | "faceGrimace" | "faceYawn" | "broom"
-  | "globe" | "captain" | "freekick" | "party" | "cardYellow" | "cardRed" | "wall" | "plaster" | "sprout" | "trendDown" | "heartBroken" | "sun" | "goal" | "bag" | "chair";
+  | "globe" | "gamepad" | "motorcycle" | "sportsCar" | "watch" | "captain" | "freekick" | "party" | "cardYellow" | "cardRed" | "wall" | "plaster" | "sprout" | "trendDown" | "heartBroken" | "sun" | "goal" | "bag" | "chair";
 
 const PATHS: Record<IconName, ReactNode> = {
   home: <><path d="M3 11 12 4l9 7" /><path d="M5 10v10h14V10" /><path d="M10 20v-6h4v6" /></>,
@@ -151,6 +151,10 @@ const PATHS: Record<IconName, ReactNode> = {
   captain: <><rect x="3" y="7" width="18" height="10" rx="2" /><path d="M14.500 10.200a3 3 0 1 0 0 3.600" /></>,
   // A free kick: the ball curling over a wall.
   freekick: <><circle cx="18" cy="6.500" r="2.500" /><path d="M3 20c1-7 6-12 12-12" strokeDasharray="2 2.500" /><path d="M5 21v-5M9 21v-5M13 21v-5" /></>,
+  gamepad: <><path d="M6.500 7h11c2.500 0 4 2 4.500 5l.8 4c.3 1.800-1 3-2.500 3-1.200 0-2-.6-2.700-1.700L16 15H8l-1.600 2.300C5.700 18.400 4.900 19 3.700 19c-1.500 0-2.800-1.200-2.500-3l.8-4c.5-3 2-5 4.500-5Z" /><path d="M8 9.500v3M6.500 11h3M15.500 10h.01M17.500 12h.01" /></>,
+  motorcycle: <><circle cx="5.500" cy="16" r="3" /><circle cx="18.500" cy="16" r="3" /><path d="M5.500 16 9 10.500h5.500l4 5.500M9 10.500 7.800 7.500H5.500M14.500 10.500l1.300-3H18M10 13.500h4" /></>,
+  sportsCar: <><path d="M2 16v-2.200c0-1 .8-1.800 2-2.100l4.500-1.200c1.700-1.300 3.500-1.900 5.500-1.900 1.600 0 3 .5 4.200 1.500l2.800.9c1.100.4 1.500 1 1.500 2.300V16h-2M5.500 16h9M19 9h2.500M20.500 9v3" /><circle cx="7" cy="16.500" r="1.700" /><circle cx="17" cy="16.500" r="1.700" /></>,
+  watch: <><circle cx="12" cy="12" r="5.500" /><path d="M12 9.500V12l1.800 1.200M9 6.500 9.700 3h4.600l.7 3.500M9 17.500 9.700 21h4.600l.7-3.500" /></>,
   globe: <><circle cx="12" cy="12" r="9" /><path d="M3 12h18" /><path d="M12 3c-3.200 2.600-3.200 15.400 0 18M12 3c3.200 2.600 3.200 15.400 0 18" /></>,
   faceYawn: <><circle cx="12" cy="12" r="9" /><path d="M7.5 10h3M13.5 10h3" /><ellipse cx="12" cy="16" rx="2.3" ry="2.8" /></>,
 };

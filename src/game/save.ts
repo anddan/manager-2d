@@ -51,6 +51,8 @@ export function parseSave(raw: string): GameState | null {
  * otherwise from next season.
  */
 function migrate(state: GameState): void {
+  // The reports already there in an older save count as read.
+  if (!state.scoutedSeen) state.scoutedSeen = Object.keys(state.scouted ?? {});
   upgradeTutorial(state);
   if (state.cup && !state.cup.groups) {
     const cupIds = new Set(state.cup.fixtures.map((f) => f.id));

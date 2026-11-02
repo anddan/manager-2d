@@ -34,6 +34,8 @@ export function Contracts() {
   const [more, setMore] = useState(false);
   const club = userClub(game);
   const bill = wageBill(game, club.id);
+  // How much of the budget the wages use, in percent: green under 75, yellow up to 100, red above.
+  const used = (bill / Math.max(1, club.wageBudget)) * 100;
   // Soonest-expiring first to start with, best first among them; any column sorts.
   const sort = useSort<ContractSort>("contract");
   const base = clubPlayers(game, club.id).sort((a, b) => a.contract.expiresSeason - b.contract.expiresSeason || overall(b) - overall(a));
@@ -51,14 +53,22 @@ export function Contracts() {
   return (
     <div className="grid">
       <Card title={t("con.wageBudget")}>
-        {/* The bar shows headroom: full means plenty left, empty means at or over budget. */}
-        <Bar value={Math.max(0, 100 - (bill / Math.max(1, club.wageBudget)) * 100) * 5} label={t("con.headroom")} />
+        {/* The bar shows how much of the budget the wages use: half full is half used (green under 75 %, yellow up to 100 %, red above). */}
+        <Bar value={used} color={used < 75 ? "good" : used <= 100 ? "mid" : "bad"} label={t("con.used")} />
         <p>{iconize(t("con.billOfBudget", {bill, budget: club.wageBudget}))}</p>
-        <Hint>{iconize(t("con.hint"))}</Hint>
+        <Hint>
+          <p>{iconize(t("con.hint"))}</p>
+          {/* The colours of the bar, shown rather than told. */}
+          <p className="budget-legend">
+            <span><i className="legend-dot good" /> 0–75 %</span>
+            <span><i className="legend-dot mid" /> 75–100 %</span>
+            <span><i className="legend-dot bad" /> 100 %+</span>
+          </p>
+        </Hint>
       </Card>
       <Card title={t("nav.contracts")} className="span-2" actions={<button type="button" className="btn small" aria-expanded={more} onClick={() => setMore(!more)}>{iconize(t(more ? "tbl.showLess" : "tbl.showMore"))}</button>}>
         <div className="table-wrap">
-          <table className="table">
+          <table className="table flush">
             <thead>
               <tr>
                 {th("pos", t("col.pos"), false)}{th("name", t("col.name"), false)}{more && th("age", t("col.age"), false)}{more && th("ovr", t("col.ovr"), true, t("col.ovrHint"))}
@@ -79,7 +89,7 @@ export function Contracts() {
                     <td className="num">{p.contract.expiresSeason}{expiring && " ⚠️"}</td>
                     {more && <td>{iconize(t(`role.${p.contract.role}`))}</td>}
                     {more && <td><Face value={p.happiness} /></td>}
-                    <td><button className="btn small" onClick={() => negotiate(p.id)}><Icon name="pen" size={18} /> {iconize(t("con.negotiate"))}</button></td>
+                    <td><button className="btn small" title={t("con.negotiate")} aria-label={t("con.negotiate")} onClick={() => negotiate(p.id)}><Icon name="pen" size={18} />{more && <> {iconize(t("con.negotiate"))}</>}</button></td>
                   </tr>
                 );
               })}

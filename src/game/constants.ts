@@ -48,7 +48,17 @@ export const SALE_TO_BUDGET_SHARE = 0.7;
 export const BID_EXPIRY_WEEKS = 2;
 
 // Monetization: energy for matches and extra training, diamonds as premium currency.
-export const ENERGY_MAX = 10;
+export const ENERGY_MAX = 20;
+/** A small bonus to the club when one of its players is the man of the match (counts in the economy): more the bigger the match. */
+export const MOTM_BONUS = {league: 10_000, group: 15_000, quarter: 20_000, semi: 25_000, final: 30_000};
+/** What a card costs the club in fines. */
+export const CARD_FINE = {yellow: 5_000, red: 20_000};
+/** The cup stages: 0-2 the group matches, then the quarter-finals, the semi-finals and the final. */
+export function motmBonusFor(fixture: object | undefined): number {
+  const stage = fixture && "stage" in fixture ? (fixture as {stage: number}).stage : undefined;
+  if (stage === undefined) return MOTM_BONUS.league;
+  return stage <= 2 ? MOTM_BONUS.group : stage === 3 ? MOTM_BONUS.quarter : stage === 4 ? MOTM_BONUS.semi : MOTM_BONUS.final;
+}
 /** One ⚡ back every 9 min 59 s. */
 export const ENERGY_REGEN_MS = 10 * 60 * 1000;
 export const ENERGY_COST_MATCH = 1;

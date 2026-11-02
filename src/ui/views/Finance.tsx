@@ -1,4 +1,4 @@
-import {TICKET_ADJUST, TICKET_PRICE, crowdFor, fairPrice, operatingCost, sumLines} from "../../game/finance";
+import {TICKET_ADJUST, TICKET_PRICE, crowdFor, fairPrice, operatingCost, recentSpend, sumLines, ECONOMY_WEEKS} from "../../game/finance";
 import {Icon, iconize} from "../Icon";
 import {BoardWarningBanner} from "../BoardWarning";
 import {fixtureWeek, userClub, difficulty} from "../../game/helpers";
@@ -6,9 +6,9 @@ import {wageBill} from "../../game/ratings";
 import {FINANCE_CATEGORIES, type FinanceLines} from "../../game/types";
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
-import {Card, Empty, Modal, NumberInput, Hint} from "../common";
+import {Bar, Card, Empty, Modal, NumberInput, Hint} from "../common";
 import {loanLeft, loanOffers, repayLoan, takeLoan} from "../../game/loans";
-import {useState} from "react";
+import {Fragment, useState, type ReactNode} from "react";
 
 export function Finance() {
   const {t, money} = useT();
@@ -17,6 +17,8 @@ export function Finance() {
   const helped = difficulty(game) !== "hard";
   const club = userClub(game);
   const last = game.finance.weeks[0];
+  // The economy at a glance covers the last few weeks (the takings come every other week, at home matches).
+  const recent = recentSpend(game);
   const bill = wageBill(game, club.id);
   const act = useGame((s) => s.act);
   const setPrice = (price: number) =>
@@ -47,6 +49,12 @@ export function Finance() {
       <BoardWarningBanner />
       <Card title={t("fin.overview")}>
         <Hint>
+          <p>{iconize(t("fin.spendHint"))}</p>
+          <p className="budget-legend">
+            <span><i className="legend-dot good" /> 0–75 %</span>
+            <span><i className="legend-dot mid" /> 75–100 %</span>
+            <span><i className="legend-dot bad" /> 100 %+</span>
+          </p>
           <p>{iconize(t("fin.wageHint.what"))}</p>
           <p>{iconize(t("fin.wageHint.over"))}</p>
           <h4>{iconize(t("fin.wageHint.howTitle"))}</h4>
@@ -54,6 +62,20 @@ export function Finance() {
             {(["sell", "loan", "expire", "negotiate", "buy"] as const).map((k) => <li key={k}>{iconize(t(`fin.wageHint.${k}`))}</li>)}
           </ul>
         </Hint>
+        {/* Last week at a glance, like the wage budget: how much of the income the spending took (green under 75 %, yellow up to 100 %, red above). */}
+        {recent && (() => {
+          const sums = {income: recent.income, net: recent.net};
+          const spent = recent.spent;
+          const used = recent.used;
+          return (
+            <div className="econ-glance">
+              {used > 100 && <p className="callout error"><Icon name="warn" size={18} /> {iconize(t("fin.redWarning"))}</p>}
+              <Bar value={used} color={used < 75 ? "good" : used <= 100 ? "mid" : "bad"} label={t("fin.spendUsed")} />
+              <p>{iconize(t("fin.spendOfIncome", {spent, income: sums.income}))}</p>
+              <p className={sums.net >= 0 ? "pos-num strong" : "neg strong"}>{iconize(t("fin.netWeek", {net: sums.net}))}</p>
+            </div>
+          );
+        })()}
         <dl className="kv">
           <dt>{iconize(t("fin.cash"))}</dt><dd className={club.cash < 0 ? "neg" : ""}>{money(club.cash)}</dd>
           <dt>{iconize(t("fin.transferBudget"))}</dt><dd>{money(club.transferBudget)}</dd>
@@ -110,13 +132,14 @@ export function Finance() {
         </dl>
       </Card>
 
-      <Card title={last ? t("fin.lastWeek", {week: last.week}) : t("fin.lastWeekEmpty")}>
+      {/* The reports fold up to just their total (the net). */}
+      <Folding title={last ? t("fin.lastWeek", {week: last.week}) : t("fin.lastWeekEmpty")} net={last ? sumLines(last.lines).net : undefined}>
         {last ? <Lines lines={last.lines} /> : <Empty>{iconize(t("fin.noReport"))}</Empty>}
-      </Card>
+      </Folding>
 
-      <Card title={t("fin.season", {season: game.season})}>
+      <Folding title={t("fin.season", {season: game.season})} net={sumLines(game.finance.season).net}>
         <Lines lines={game.finance.season} />
-      </Card>
+      </Folding>
 
       <Loans />
 
@@ -130,29 +153,54 @@ export function Finance() {
         </Card>
       )}
 
-      <Card title={t("fin.history")} className="span-2">
+      <Folding title={t("fin.history")} net={recent?.net} className="span-2">
         <div className="table-wrap">
           <table className="table">
             <thead>
               <tr><th>{iconize(t("fin.week"))}</th><th>{iconize(t("fin.income"))}</th><th>{iconize(t("fin.expenses"))}</th><th>{iconize(t("fin.net"))}</th></tr>
             </thead>
             <tbody>
-              {game.finance.weeks.map((w) => {
+              {game.finance.weeks.map((w, i) => {
                 const s = sumLines(w.lines);
                 return (
-                  <tr key={`${w.season}-${w.week}`}>
+                  <Fragment key={`${w.season}-${w.week}`}>
+                  {/* The last four weeks are the month the economy is judged on. */}
+                  {i === 0 && recent && <tr className="month-head"><td colSpan={4}>{iconize(t("fin.lastMonth"))} <span className={recent.net >= 0 ? "pos-num" : "neg"}>{money(recent.net)}</span></td></tr>}
+                  <tr className={i < ECONOMY_WEEKS ? "month-row" : undefined}>
                     <td>{w.season}:{w.week}</td>
                     <td className="num pos-num">{money(s.income)}</td>
                     <td className="num neg">{money(s.expenses)}</td>
                     <td className={s.net >= 0 ? "num pos-num strong" : "num neg strong"}>{money(s.net)}</td>
                   </tr>
+                  </Fragment>
                 );
               })}
             </tbody>
           </table>
         </div>
-      </Card>
+      </Folding>
     </div>
+  );
+}
+
+/** A card that can be folded up: closed, it shows only its total (the net); the button opens it out. */
+function Folding({title, net, children, className}: {title: ReactNode; net?: number; children: ReactNode; className?: string}) {
+  const {t, money} = useT();
+  const [open, setOpen] = useState(false);
+  return (
+    <Card
+      title={title}
+      className={className}
+      actions={<button type="button" className="btn small" aria-expanded={open} aria-label={t(open ? "tbl.showLess" : "tbl.showMore")} onClick={() => setOpen(!open)}>{open ? "▲" : "▼"}</button>}
+    >
+      {open ? (
+        children
+      ) : net === undefined ? null : (
+        <p className="fold-total">
+          {iconize(t("fin.net"))}: <strong className={net >= 0 ? "pos-num" : "neg"}>{money(net)}</strong>
+        </p>
+      )}
+    </Card>
   );
 }
 

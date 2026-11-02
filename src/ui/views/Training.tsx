@@ -171,11 +171,11 @@ export function Training() {
           />
         )}
         <div className="table-wrap">
-          <table className="table">
+          <table className="table flush">
             <thead>
               <tr>
                 {selecting && <th aria-label={t("squad.select")} />}
-                {th("pos", t("col.pos"), false)}{th("name", t("col.name"), false)}{more && th("age", t("col.age"), false)}{th("ovr", t("col.ovr"), true, t("col.ovrHint"))}
+                {th("pos", t("col.pos"), false)}{th("name", t("col.name"), false)}{more && th("age", t("col.age"), false)}{th("ovr", t(more ? "col.ovr" : "col.ovrShort"), true, t("col.ovrHint"))}
                 {th("fitness", t("col.fitness"))}{th("change", t("train.change"))}{more && <th>{iconize(t("train.biggest"))}</th>}{more && th("focus", t("pl.individualFocus"), false)}
               </tr>
             </thead>

@@ -34,7 +34,7 @@ function Leaders({title, players, value, show}: {title: TKey; players: Player[];
                 <tr key={p.id} className={p.clubId === game.userClubId ? "me" : ""}>
                   <td className="num">{i + 1}</td>
                   <td className="name-cell">
-                    <span className="crest tiny" style={{background: club.color}} title={club.name} />
+                    <span className="crest tiny" style={{background: club.color, color: club.color2}} title={club.name} />
                     <button className="link" onClick={() => openPlayer(p.id)}>{listName(p)}</button>
                   </td>
                   <td className="muted small">{club.short}</td>
@@ -60,7 +60,7 @@ export function Table() {
     <div className="grid">
       <Card title={`${game.leagueName} ${game.season}`} className="span-2" actions={<button type="button" className="btn small" aria-expanded={more} onClick={() => setMore(!more)}>{iconize(t(more ? "tbl.showLess" : "tbl.showMore"))}</button>}>
         <div className="table-wrap">
-          <table className="table league">
+          <table className="table league flush">
             <thead>
               <tr>
                 <th>#</th><th>{iconize(t("tbl.club"))}</th>
@@ -78,7 +78,7 @@ export function Table() {
               {rows.map((r, i) => (
                 <tr key={r.club.id} className={r.club.id === game.userClubId ? "me" : ""}>
                   <td className="num">{i + 1}</td>
-                  <td className="name-cell"><span className="crest tiny" style={{background: r.club.color}} /> <TeamLink clubId={r.club.id} />{more && <> <TeamOvr clubId={r.club.id} /></>}</td>
+                  <td className="name-cell"><span className="crest tiny" style={{background: r.club.color, color: r.club.color2}} /> <TeamLink clubId={r.club.id} />{more && <> <TeamOvr clubId={r.club.id} /></>}</td>
                   {more && <td className="num">{r.played}</td>}
                   {more && <td className="num">{r.won}</td>}
                   {more && <td className="num">{r.drawn}</td>}

@@ -5,11 +5,15 @@ import {wornGear} from "../game/gear";
 import {nationalSlots, setNationalSlot, shownSquad} from "../game/national";
 // Others: scouting, bids, loans and free-agent offers.
 import {Icon, iconize} from "./Icon";
-import {useRef, useState, type ReactNode} from "react";
+import {useEffect, useRef, useState, type ReactNode} from "react";
 import {profileName, shortName} from "../game/helpers";
 import {DIAMONDS_SCOUT_COST, SCOUT_COST, clubSlots} from "../game/constants";
 import {startNegotiation} from "../game/contracts";
-import {happinessFactors, answerTransferRequest, talkToPlayer, TALKS} from "../game/morale";
+import {GiftPicture} from "./GiftArt";
+
+/** The presents that are things (not money): each has its own place round the card. */
+const CARD_GIFTS = ["watch", "gaming", "motorcycle", "sportsCar"];
+import {GIFTS, giveGift, happinessFactors, answerTransferRequest, talkToPlayer, TALKS, type GiftId} from "../game/morale";
 import {
   askingPrice,
   completeLoan,
@@ -22,7 +26,7 @@ import {
   type BidResult,
 } from "../game/transfers";
 import {ATTRIBUTES, type ManagerLook, type Player, type Position} from "../game/types";
-import {useT} from "../i18n";
+import {useT, type TKey} from "../i18n";
 import {useGame, useGameState} from "../store";
 import {Bar, Delta, Face, Flag, FormArrow, Modal, NumberInput, Ovr, PosBadge, StatusIcons, Hint} from "./common";
 import {PlayerCard} from "./PlayerCard";
@@ -47,6 +51,10 @@ export function PlayerModal({playerId, preview}: {playerId: string; preview?: {o
   const fromNational = useGame((s) => s.profileNational);
   const act = useGame((s) => s.act);
   const p = game.players[playerId];
+  // A scouting report is read once the profile is opened.
+  useEffect(() => {
+    if (!preview && game.scouted[playerId] !== undefined && !game.scoutedSeen?.includes(playerId)) act((g) => { (g.scoutedSeen ??= []).push(playerId); });
+  }, [playerId, preview, game.scouted, game.scoutedSeen, act]);
   if (!p) return null;
   const own = !preview && (p.clubId === game.userClubId || p.loan?.parentClubId === game.userClubId);
   const known = !!preview || isKnown(game, p);
@@ -85,7 +93,13 @@ export function PlayerModal({playerId, preview}: {playerId: string; preview?: {o
       }
     >
       <div className="player-top">
-        <PlayerCard game={game} player={p} />
+        {/* The presents they have been given, round the card. */}
+        <div className="card-gifts">
+          <PlayerCard game={game} player={p} />
+          {CARD_GIFTS.filter((id) => (p.gifts ?? []).includes(id)).map((id) => (
+            <span key={id} className={`card-gift pos-${CARD_GIFTS.indexOf(id)}`} title={t(`gift.${id}` as TKey)}><GiftPicture id={id} width={58} /></span>
+          ))}
+        </div>
         <div className="player-head">
           <dl className="pm-facts">
             <div className="pm-fact"><dt>{iconize(t("pl.position"))}</dt><dd><PosBadge pos={p.position} />{playsAs && own && <> <span className="muted">→</span> <PosBadge pos={playsAs} /> <Effect factor={familiarity(p, playsAs)} /></>}</dd></div>
@@ -296,6 +310,22 @@ function ContractInfo({player: p}: {player: Player}) {
   );
 }
 
+/** One stat that went up after a present: the bar rises from where it was, with a +N floating up beside it. */
+function GainRow({label, from, to, delay}: {label: string; from: number; to: number; delay: number}) {
+  const [now, setNow] = useState(from);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setNow(to), 250 + delay);
+    return () => window.clearTimeout(timer);
+  }, [to, delay]);
+  return (
+    <li className="gain-row">
+      <span className="gain-label">{label}</span>
+      <span className="gain-bar"><span className="gain-fill" style={{width: `${now}%`}} /></span>
+      <strong className="gain-plus" style={{animationDelay: `${250 + delay}ms`}}>+{Math.round(to - from)}</strong>
+    </li>
+  );
+}
+
 function OwnActions({player: p}: {player: Player}) {
   const {t, tx} = useT();
   const game = useGameState();
@@ -304,6 +334,24 @@ function OwnActions({player: p}: {player: Player}) {
   const setNegotiation = useGame((s) => s.setNegotiation);
   if (p.loan && p.clubId !== game.userClubId) return <p className="muted">{iconize(t("pl.awayOnLoan"))}</p>;
   const talkedThisWeek = game.absWeek - p.lastTalkWeek < 1;
+  // The dialog for a bonus or a present.
+  const [giving, setGiving] = useState(false);
+  // After a present: what went up (from, to), shown with the bars rising.
+  const [gained, setGained] = useState<{id: GiftId; stats: {key: "morale" | "sharpness" | "happiness" | "relation"; from: number; to: number}[]} | null>(null);
+  const {money} = useT();
+  const give = (id: GiftId) => {
+    const before = {morale: p.morale, sharpness: p.sharpness, happiness: p.happiness, relation: p.relation};
+    const key = act((g) => giveGift(g, p.id, id));
+    if (key !== "talk.bonus.paid") return notify(key, {name: shortName(p), gift: t(`gift.${id}`)}, "error");
+    const gift = GIFTS.find((x) => x.id === id)!;
+    const up = (k: keyof typeof before) => ({key: k, from: before[k], to: Math.min(100, before[k] + gift[k])});
+    setGained({id, stats: [up("morale"), up("sharpness"), up("happiness"), up("relation")]});
+    notify(key, {name: shortName(p), gift: t(`gift.${id}`)}, "good");
+  };
+  const closeGifts = () => {
+    setGiving(false);
+    setGained(null);
+  };
 
   const talk = (kind: (typeof TALKS)[number]) => {
     const key = act((g, rng) => talkToPlayer(g, rng, p.id, kind));
@@ -330,9 +378,46 @@ function OwnActions({player: p}: {player: Player}) {
         {TALKS.map((k) => (
           <button key={k} className="btn" disabled={talkedThisWeek} onClick={() => talk(k)}>{iconize(t(`talk.${k}`))}</button>
         ))}
+        <button className="btn" disabled={talkedThisWeek} onClick={() => setGiving(true)}><Icon name="coins" size={18} /> {iconize(t("talk.bonus"))}</button>
         <button className="btn" onClick={negotiate}><Icon name="pen" size={18} /> {iconize(t("pl.discussContract"))}</button>
       </div>
       {talkedThisWeek && <p className="muted small">{iconize(tx("talk.tooSoon"))}</p>}
+      {giving && (
+        <Modal title={<><Icon name="coins" size={20} /> {iconize(t("talk.bonus.title", {name: shortName(p)}))}</>} onClose={closeGifts}>
+          {gained ? (
+            <div className="gift-result">
+              <div className="gift-result-art"><GiftPicture id={gained.id} width={110} /></div>
+              <ul className="gift-gains">
+                {gained.stats.map((st, i) => (
+                  <GainRow key={st.key} label={t(st.key === "morale" ? "pl.morale" : st.key === "sharpness" ? "pl.sharpness" : st.key === "happiness" ? "col.happiness" : "pl.relation")} from={st.from} to={st.to} delay={i * 220} />
+                ))}
+              </ul>
+              <div className="btn-row dialog-actions">
+                <button className="btn primary" onClick={closeGifts}>{iconize(t("pack.great"))}</button>
+              </div>
+            </div>
+          ) : (
+          <>
+          <p className="muted small">{iconize(t("talk.bonus.hint"))}</p>
+          <ul className="gift-list">
+            {GIFTS.map((g) => (
+              <li key={g.id}>
+                <button className="gift" disabled={game.clubs[game.userClubId].cash < g.cost} onClick={() => give(g.id)}>
+                  <span className="gift-icon"><GiftPicture id={g.id} width={74} /></span>
+                  <span className="gift-name">
+                    <strong>{iconize(t(`gift.${g.id}`))}</strong>
+                    {/* What it changes: morale, match sharpness, satisfaction and the bond with the manager. */}
+                    <small className="muted gift-effects"><span>{t("pl.morale")} +{g.morale}</span><span>{t("pl.sharpness")} +{g.sharpness}</span><span>{t("col.happiness")} +{g.happiness}</span><span>{t("pl.relation")} +{g.relation}</span></small>
+                  </span>
+                  <span className="gift-price">{money(g.cost)}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          </>
+          )}
+        </Modal>
+      )}
       {game.promises.filter((pr) => pr.playerId === p.id).map((pr) => (
         <p key={pr.id} className="muted small"><Icon name="handshake" size={18} /> {iconize(t("pl.promiseStatus", {starts: pr.starts, required: pr.requiredStarts, left: pr.matchesLeft}))}</p>
       ))}

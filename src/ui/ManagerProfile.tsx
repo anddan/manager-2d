@@ -212,16 +212,21 @@ export function ManagerProfile({onClose, kit: startKit}: {onClose: () => void; k
         <div className="mgr-swatch-rows">
           <ColorRow label={t("mgr.color1")} value={color} onPick={setColor} />
           <ColorRow label={t("mgr.color2")} value={color2} onPick={setColor2} />
-          <ColorRow label={t("mgr.color3")} value={color3 ?? color2} onPick={setColor3} />
-          {color3 && <button type="button" className="btn small" onClick={() => setColor3(undefined)}>{iconize(t("mgr.color3Reset"))}</button>}
-        {/* The shirt: plain or patterned, in the two colours above. */}
-        <h4><Icon name="shirt" size={18} /> {iconize(t("mgr.shirt"))}</h4>
-        <div className="shirt-preview"><Jersey color={color} trim={color2} pattern={pattern} trim3={color3} collar={collar} sleeves={sleeves} size={96} /></div>
-        <Stepper label={t("mgr.shirt")} onStep={(by) => setPattern(SHIRT_PATTERNS[stepTo(SHIRT_PATTERNS.length, SHIRT_PATTERNS.indexOf(pattern), by)])} />
-        <Stepper label={t("mgr.collar")} onStep={(by) => setCollar(COLLARS[stepTo(COLLARS.length, COLLARS.indexOf(collar), by)])} />
-        <Stepper label={t("mgr.sleeves")} onStep={(by) => setSleeves(SLEEVES[stepTo(SLEEVES.length, SLEEVES.indexOf(sleeves), by)])} />
         </div>
       </div>
+        {/* The shirt: plain or patterned, in the two colours above. */}
+        <h4><Icon name="shirt" size={18} /> {iconize(t("mgr.shirt"))}</h4>
+        {/* The shirt on the left, and what can be changed on it on the right (like the badge above). */}
+        <div className="mgr-colors mgr-shirt-row">
+          <div className="shirt-preview"><Jersey color={color} trim={color2} pattern={pattern} trim3={color3} collar={collar} sleeves={sleeves} size={96} /></div>
+          <div className="mgr-swatch-rows mgr-shirt-parts">
+          <Stepper label={t("mgr.shirt")} onStep={(by) => setPattern(SHIRT_PATTERNS[stepTo(SHIRT_PATTERNS.length, SHIRT_PATTERNS.indexOf(pattern), by)])} />
+          <Stepper label={t("mgr.collar")} onStep={(by) => setCollar(COLLARS[stepTo(COLLARS.length, COLLARS.indexOf(collar), by)])} />
+          <Stepper label={t("mgr.sleeves")} onStep={(by) => setSleeves(SLEEVES[stepTo(SLEEVES.length, SLEEVES.indexOf(sleeves), by)])} />
+            <ColorRow label={t("mgr.color3")} value={color3 ?? color2} onPick={setColor3} />
+            {color3 && <button type="button" className="btn small" onClick={() => setColor3(undefined)}>{iconize(t("mgr.color3Reset"))}</button>}
+          </div>
+        </div>
       </section>
 
       {/* Always in view at the bottom of the dialog, however far it's scrolled. */}

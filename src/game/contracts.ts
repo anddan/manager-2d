@@ -63,12 +63,13 @@ export function startNegotiation(
     // A big step down only tempts players who want out.
     if (state.clubs[p.clubId].reputation - club.reputation > 30) return {refused: "neg.refuse.smallClub"};
   }
-  let wage = expectedWage(p) * (1 + interest(p) * 0.25) * (0.92 + p.form / 600);
+  // Players ask a little less than what they are worth on paper, so a contract is not a fight every time.
+  let wage = expectedWage(p) * DEMAND_EASE * (1 + interest(p) * 0.25) * (0.92 + p.form / 600);
   if (kind === "renewal") {
     if (p.happiness < 50) wage *= 1 + (50 - p.happiness) / 100;
     if (p.happiness > 75) wage *= 0.95;
     // Never ask for less than they earn now.
-    wage = Math.max(wage, p.contract.wage * 1.03);
+    wage = Math.max(wage, p.contract.wage);
   } else {
     const from = p.clubId ? state.clubs[p.clubId] : undefined;
     // Stepping down to a smaller club costs extra.
@@ -77,7 +78,8 @@ export function startNegotiation(
     if (kind === "freeAgent") wage *= 1.05;
   }
   const role = deservedRole(state, {...p, clubId}, club);
-  const years = p.age < 24 ? 4 : p.age < 29 ? 3 : p.age < 32 ? 2 : 1;
+  // At least two years until they are well on in years (a one-year contract is up before it has started).
+  const years = p.age < 24 ? 4 : p.age < 29 ? 3 : p.age < 36 ? 2 : 1;
   const demand: ContractOffer = {
     wage: round50(wage),
     years,
@@ -120,6 +122,9 @@ export function offerShortfalls(demand: ContractOffer, offer: ContractOffer): (k
   return bad;
 }
 
+/** How much of the expected wage players ask for (a little under, to make contracts easier). */
+const DEMAND_EASE = 0.88;
+
 export function evaluateOffer(state: GameState, neg: Negotiation, offer: ContractOffer): NegotiationResult {
   const p = state.players[neg.playerId];
   const score = offerScore(neg.demand, offer);
@@ -132,10 +137,10 @@ export function evaluateOffer(state: GameState, neg: Negotiation, offer: Contrac
     return {status: "rejected", reason: neg.round >= 4 ? "neg.reject.patience" : "neg.reject.insulting"};
   }
   // The agent gives a little ground on the wage each round.
-  const giveWage = neg.demand.wage - (neg.demand.wage - offer.wage) * 0.3;
+  const giveWage = neg.demand.wage - (neg.demand.wage - offer.wage) * 0.4;
   neg.demand = {
     ...neg.demand,
-    wage: round50(Math.max(giveWage, neg.demand.wage * 0.94)),
+    wage: round50(Math.max(giveWage, neg.demand.wage * 0.92)),
     signingBonus: round50(neg.demand.signingBonus * 0.95),
   };
   return {status: "counter", demand: neg.demand};

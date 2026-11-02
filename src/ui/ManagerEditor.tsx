@@ -74,7 +74,7 @@ export function ManagerEditor({look, onChange, draw = inSuit, noSuit = false}: {
   return (
     <div className="manager-editor">
       <div className="manager-preview">
-        {draw(look, 112)}
+        {draw(look, 150)}
         <button type="button" className="btn small" onClick={random}><Icon name="dice" size={18} /> {iconize(t("look.random"))}</button>
       </div>
       <div className="look-controls">

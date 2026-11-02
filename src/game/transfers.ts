@@ -18,6 +18,12 @@ import {Rng, clamp} from "./rng";
 import {POSITIONS, type Club, type GameState, type IncomingBid, type Player, type Position} from "./types";
 
 /** The user knows their own players and the ones they've scouted. */
+/** The scouting reports not looked at yet (players not in our own club). */
+export function unseenScouted(state: GameState): string[] {
+  const seen = new Set(state.scoutedSeen ?? []);
+  return Object.keys(state.scouted).filter((id) => !seen.has(id) && state.players[id] && state.players[id].clubId !== state.userClubId);
+}
+
 export function isKnown(state: GameState, p: Player): boolean {
   // The country the manager coaches: their players are known too, whatever club they play for.
   return p.clubId === state.userClubId || state.scouted[p.id] !== undefined || (!!state.national && p.nationality === state.national.country);

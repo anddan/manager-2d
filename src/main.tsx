@@ -2,6 +2,9 @@ import {StrictMode} from "react";
 import {createRoot} from "react-dom/client";
 import {App} from "./ui/App";
 import {ErrorBoundary} from "./ui/ErrorBoundary";
+import {startAdminLog} from "./ui/adminLog";
+
+startAdminLog();
 import "./styles.css";
 
 createRoot(document.getElementById("root")!).render(

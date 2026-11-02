@@ -4,7 +4,7 @@
 //   finishWeek: the user's match counts -> training -> moods -> market -> money -> season end
 // advanceWeek does both at once, with the computer deciding every set piece.
 import {unequipGear} from "./gear";
-import {CUP_WEEKS, DIAMONDS_SEASON, ENERGY_COST_MATCH, FORMATIONS, SEASON_WEEKS} from "./constants";
+import {CUP_WEEKS, DIAMONDS_SEASON, ENERGY_COST_MATCH, CARD_FINE, FORMATIONS, SEASON_WEEKS, motmBonusFor} from "./constants";
 import {payPrizeMoney, seasonBoardReview, setSeasonBudgets, weeklyFinances} from "./finance";
 import {assignRoles, createFreeAgents, createPlayer} from "./generate";
 import {finishCupStage, setupCup, userCupResult} from "./cup";
@@ -13,13 +13,13 @@ import {nationalWeek, offerNational} from "./national";
 import {weeklyStadium} from "./stadium";
 import {taskProgress} from "./daily";
 import {tutorialMatchSeed} from "./tutorial";
-import {addMessage, cupFixturesInStage, currentCupStage, currentRound, findFixture, fixturesInRound, fullName, leagueClubs, playerName} from "./helpers";
+import {addMessage, book, cupFixturesInStage, currentCupStage, currentRound, findFixture, fixturesInRound, fullName, leagueClubs, playerName} from "./helpers";
 import {makeFixtures, standings} from "./league";
 import {pickBestLineup, repairLineup} from "./lineup";
 import {applyMatch, simulateMatch} from "./match";
 import {spendEnergy} from "./monetization";
 import {updatePromises, weeklyMorale} from "./morale";
-import {clubStrength, marketValue, overall} from "./ratings";
+import {clubStrength, marketValue, overall, playerOfTheMatch} from "./ratings";
 import {Rng, clamp} from "./rng";
 import {REHAB_CHANCE} from "./stadium";
 import {weeklyTraining} from "./training";
@@ -113,6 +113,13 @@ export function finishWeek(state: GameState, rng: Rng): MatchReport | undefined 
     state.reports.unshift(report);
     if (state.reports.length > 6) state.reports.length = 6;
     updatePromises(state, user.lineup);
+    // A man of the match from our side brings in a small bonus (in this week's economy).
+    const motm = playerOfTheMatch(report.ratings);
+    if (motm && state.players[motm]?.clubId === user.id) book(state, user.id, "motm", motmBonusFor(f));
+    // Cards cost the club money (fines).
+    for (const e of report.events) {
+      if ((e.type === "yellow" || e.type === "red") && e.playerId && state.players[e.playerId]?.clubId === user.id) book(state, user.id, "fines", -CARD_FINE[e.type]);
+    }
     const opponent = state.clubs[f.homeId === user.id ? f.awayId : f.homeId];
     addMessage(state, {
       kind: "match",

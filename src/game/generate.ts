@@ -297,6 +297,7 @@ export function newGame(
     players: {},
     fixtures: [],
     scouted: {},
+    scoutedSeen: [],
     scoutQueue: [],
     inbox: [],
     promises: [],

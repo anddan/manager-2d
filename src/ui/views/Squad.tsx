@@ -98,14 +98,14 @@ export function Squad() {
         </div>
       )}
       <div className="table-wrap">
-        <table className="table">
+        <table className="table flush">
           <thead>
             <tr>
               {selecting && <th aria-label={t("squad.select")} />}
               {COLUMNS.filter((c) => more || LESS.includes(c.key)).map((c) => (
                 <th key={c.key} className={c.key === "pos" ? "col-pos" : undefined} title={c.key === "ovr" ? t("col.ovrHint") : undefined}>
                   <button className="th-btn" onClick={() => onSort(c.key)}>
-                    {iconize(t(c.label))}{sort === c.key ? (desc ? " ▼" : " ▲") : ""}
+                    {iconize(t(c.key === "ovr" && !more ? "col.ovrShort" : c.label))}{sort === c.key ? (desc ? " ▼" : " ▲") : ""}
                   </button>
                 </th>
               ))}
@@ -119,7 +119,7 @@ export function Squad() {
                 {selecting && <td><input type="checkbox" className="bench-check" checked={picked.includes(p.id)} onChange={() => toggle(p.id)} onClick={(e) => e.stopPropagation()} aria-label={listName(p)} /></td>}
                 <td><PosBadge pos={p.position} /></td>
                 <td className="name-cell">
-                  <Avatar player={p} shirt={club.color} trim={club.color2} size={28} mood={p.happiness} />
+                  {more && <Avatar player={p} shirt={club.color} trim={club.color2} size={28} mood={p.happiness} />}
                   <Flag code={p.nationality} /> {listName(p)} <StatusIcons player={p} />
                 </td>
                 {more && <td>{p.age}</td>}

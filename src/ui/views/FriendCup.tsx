@@ -220,7 +220,7 @@ function CupRoom({code, onLeave}: {code: string; onLeave: () => void}) {
   const name = (id: string) => cup.members[id]?.club.name ?? "?";
   const crest = (id: string) => {
     const c = cup.members[id]?.club;
-    return c ? <span className="crest tiny" style={{background: c.color}} /> : null;
+    return c ? <span className="crest tiny" style={{background: c.color, color: c.color2}} /> : null;
   };
   const snap = snapshotTeam(game);
   const teams = cup.order?.length ?? 0;
@@ -461,7 +461,7 @@ function TeamView({code, member, sentAt, onClose}: {code: string; member: string
   const club = team?.club;
   const players = new Map(team?.players.map((p) => [p.id, p]) ?? []);
   return (
-    <Modal title={club ? <><span className="crest tiny" style={{background: club.color}} /> {club.name}</> : iconize(t("friends.lineup"))} onClose={onClose}>
+    <Modal title={club ? <><span className="crest tiny" style={{background: club.color, color: club.color2}} /> {club.name}</> : iconize(t("friends.lineup"))} onClose={onClose}>
       {team === undefined && <Empty>{iconize(t("friends.loading"))}</Empty>}
       {team === null && <Empty>{iconize(t("friends.noTeam"))}</Empty>}
       {club && team && (

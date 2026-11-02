@@ -1,6 +1,6 @@
 // Happiness (long-term) and what unhappy players do about it, plus the
 // manager's talks and the promises they create.
-import {addMessage, newId, playerName} from "./helpers";
+import {addMessage, book, newId, playerName} from "./helpers";
 import {recentPointsPerGame} from "./league";
 import {deservedRole, expectedWage, overall, teamOvr} from "./ratings";
 import {Rng, clamp} from "./rng";
@@ -100,9 +100,40 @@ export const TALKS = ["praise", "criticize", "promisePlayingTime"] as const;
 export type Talk = (typeof TALKS)[number];
 
 /** Result key for the UI, e.g. "talk.praise.good". */
+/** What can be given to a player to cheer them up: money or a present. The dearer, the more it lifts morale, match sharpness, satisfaction and the bond with the manager. */
+export const GIFTS = [
+  {id: "cash", icon: "coins", cost: 10_000, morale: 5, sharpness: 4, happiness: 6, relation: 3},
+  {id: "gaming", icon: "gamepad", cost: 50_000, morale: 11, sharpness: 10, happiness: 14, relation: 7},
+  {id: "watch", icon: "watch", cost: 150_000, morale: 13, sharpness: 12, happiness: 17, relation: 9},
+  {id: "motorcycle", icon: "motorcycle", cost: 400_000, morale: 18, sharpness: 17, happiness: 24, relation: 13},
+  {id: "sportsCar", icon: "sportsCar", cost: 1_500_000, morale: 45, sharpness: 42, happiness: 60, relation: 36},
+] as const;
+export type GiftId = (typeof GIFTS)[number]["id"];
+
+/** Gives a player a bonus or a present, paid by the club. An i18n key for how it went (a talk, so once a week for each player). */
+export function giveGift(state: GameState, playerId: string, giftId: GiftId): string {
+  const p = state.players[playerId];
+  const gift = GIFTS.find((g) => g.id === giftId);
+  const club = state.clubs[state.userClubId];
+  if (!p || !gift || p.clubId !== club.id) return "talk.bonus.no";
+  if (state.absWeek - p.lastTalkWeek < 1) return "talk.tooSoon";
+  if (club.cash < gift.cost) return "talk.bonus.noMoney";
+  p.lastTalkWeek = state.absWeek;
+  book(state, club.id, "bonuses", -gift.cost);
+  p.happiness = clamp(p.happiness + gift.happiness, 0, 100);
+  p.morale = clamp(p.morale + gift.morale, 0, 100);
+  p.sharpness = clamp(p.sharpness + gift.sharpness, 0, 100);
+  p.relation = clamp(p.relation + gift.relation, 0, 100);
+  // The present is kept, to be seen round their card (the last few).
+  p.gifts = [...(p.gifts ?? []), gift.id].slice(-8);
+  if (p.wantsToLeave && p.happiness >= 35) p.wantsToLeave = false;
+  return "talk.bonus.paid";
+}
+
 export function talkToPlayer(state: GameState, rng: Rng, playerId: string, talk: Talk): string {
   const p = state.players[playerId];
   if (state.absWeek - p.lastTalkWeek < 1) return "talk.tooSoon";
+
   p.lastTalkWeek = state.absWeek;
   const goodForm = p.form >= 55;
   const poorForm = p.form < 45;

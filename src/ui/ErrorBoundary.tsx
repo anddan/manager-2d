@@ -1,5 +1,6 @@
 // If something in the app fails to draw, a message and a way back instead of a blank page. The save is not touched.
 import {Component, type ErrorInfo, type ReactNode} from "react";
+import {logError} from "./adminLog";
 
 export class ErrorBoundary extends Component<{children: ReactNode}, {failed: boolean}> {
   state = {failed: false};
@@ -10,6 +11,7 @@ export class ErrorBoundary extends Component<{children: ReactNode}, {failed: boo
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error(error, info.componentStack);
+    logError("render", error, (info.componentStack ?? "").slice(0, 400));
   }
 
   render() {

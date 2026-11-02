@@ -1,15 +1,19 @@
 import {useEffect, useState, useRef} from "react";
-import {ENERGY_COST_MATCH} from "../game/constants";
+import {ENERGY_COST_MATCH, SEASON_WEEKS} from "../game/constants";
 import {energySpent} from "./effects";
 import {Icon, type IconName, iconize} from "./Icon";
 import {clubSlots, ENERGY_MAX, MIN_PLAYERS} from "../game/constants";
 import {fixtureWeek, nextUserFixture, userClub} from "../game/helpers";
 import {lineupProblems, pickBestLineup} from "../game/lineup";
 import {CrestOf, Modal} from "./common";
+import {unseenScouted} from "../game/transfers";
+import {recentSpend} from "../game/finance";
 import {dailyToCollect, ensureDaily} from "../game/daily";
 import {claimDailyBonus, msToNextEnergy, regenerateEnergy} from "../game/monetization";
 import {finishWeek, startWeek} from "../game/week";
 import {useT, type TKey} from "../i18n";
+import {clubPlayers} from "../game/ratings";
+import type {GameState} from "../game/types";
 import {useGame, useGameState, type View} from "../store";
 import {ManagerAvatar, defaultManagerLook} from "./Avatar";
 import {ContractModal} from "./ContractModal";
@@ -190,17 +194,30 @@ function Game() {
 }
 
 /** Unread mail and daily rewards to collect, shown as a number on a page (and its group). */
+/** Our players whose contract ends this season (the ones with the warning triangle on the contracts page): yellow, and red in the last weeks of the season when it is about to happen. */
+function expiringContracts(game: GameState): {tone: "red" | "yellow" | null; n: number} {
+  const now = clubPlayers(game, game.userClubId).filter((p) => p.contract.expiresSeason <= game.season).length;
+  if (now === 0) return {tone: null, n: 0};
+  return {tone: game.week > SEASON_WEEKS - 10 ? "red" : "yellow", n: now};
+}
+
 function useBadges(): Partial<Record<View, number>> {
   const game = useGameState();
   const friends = useFriendCupBadge();
   const pals = palsTodo(usePals());
   return {
     inbox: game.inbox.filter((m) => !m.read).length,
+    // Contracts running out: this season (red) or next (yellow).
+    contracts: expiringContracts(game).n,
+    // The last weeks spent more than came in: a red circle (see the economy page).
+    finance: (recentSpend(game)?.used ?? 0) > 100 ? 1 : 0,
     overview: dailyToCollect(game.daily),
     // Kit bought but not put on anyone yet.
     storage: game.gearBag?.length ?? 0,
-    // Bids on our players, waiting for an answer.
-    transfers: game.incomingBids.length,
+    // Bids on our players, and the ones listed for sale and scouted (a blue reminder, like the tabs).
+    transfers: game.incomingBids.length
+      + Object.values(game.players).filter((p) => p.clubId === game.userClubId && (p.transferListed || p.loanListed)).length
+      + unseenScouted(game).length,
     // Players up for sale to a friend with a code, waiting to be bought.
     codes: Object.keys(game.friendSales ?? {}).length,
     // Things to do in the friends' cup: offers to answer, matches to see, prizes, rounds to play.
@@ -212,7 +229,10 @@ function useBadges(): Partial<Record<View, number>> {
 
 /** Pages whose number is a reminder rather than something waiting (shown in blue, not red). */
 const BLUE_BADGES: View[] = ["storage", "codes", "transfers"];
-const badgeClass = (v: View) => (BLUE_BADGES.includes(v) ? "badge blue" : "badge");
+/** How soon the first contract runs out: this season (red), next season (yellow), or no hurry (set as the menu is drawn). */
+let CONTRACT_TONE: "red" | "yellow" | null = null;
+const isBlue = (v: View) => BLUE_BADGES.includes(v) || (v === "contracts" && CONTRACT_TONE === "yellow");
+const badgeClass = (v: View) => (v === "contracts" && CONTRACT_TONE === "yellow" ? "badge warn" : BLUE_BADGES.includes(v) ? "badge blue" : "badge");
 
 /**
  * The bar at the bottom: two groups, the round play button, two groups. Tapping a group
@@ -222,6 +242,7 @@ function Nav() {
   const {t} = useT();
   const natGame = useGameState();
   NATIONAL_ON = !!natGame.national;
+  CONTRACT_TONE = expiringContracts(natGame).tone;
   // The year's tournament, or the last one played (to look at after it is over).
   const lastTournament = natGame.national?.tournament;
   TOURNAMENT_LABEL = lastTournament ? `${t(`national.comp.${lastTournament.comp}` as never)} ${lastTournament.season}` : tournamentOf(natGame.season) ? `${t(`national.comp.${tournamentOf(natGame.season)}` as never)} ${natGame.season}` : null;
@@ -232,7 +253,7 @@ function Nav() {
   const group = NAV_GROUPS.find((g) => g.id === open);
   const current = groupOf(view);
   // A group's number: what's waiting (red) first, else the reminders (blue).
-  const count = (g: (typeof NAV_GROUPS)[number], blue: boolean) => groupPages(g).filter((v) => BLUE_BADGES.includes(v) === blue).reduce((n, v) => n + (badges[v] ?? 0), 0);
+  const count = (g: (typeof NAV_GROUPS)[number], blue: boolean) => groupPages(g).filter((v) => isBlue(v) === blue).reduce((n, v) => n + (badges[v] ?? 0), 0);
   const groupButton = (g: (typeof NAV_GROUPS)[number]) => (
     <button
       key={g.id}
@@ -314,7 +335,7 @@ function GroupTabs() {
             <span>{navLabel(v, t)}</span>
             {/* The tab counts its sub-pages too (red: to do, blue: reminders). */}
             {[false, true].map((blue) => {
-              const n = pagesOf(v).filter((p) => BLUE_BADGES.includes(p) === blue).reduce((k, p) => k + (badges[p] ?? 0), 0);
+              const n = pagesOf(v).filter((p) => isBlue(p) === blue).reduce((k, p) => k + (badges[p] ?? 0), 0);
               return n > 0 ? <span key={String(blue)} className={blue ? "badge blue" : "badge"}>{n}</span> : null;
             })}
           </button>

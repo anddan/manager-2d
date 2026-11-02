@@ -1,6 +1,6 @@
 // The crowd: the ticket price, how big the match is, and how the team is doing.
 import {describe, expect, it} from "vitest";
-import {autoPrice, crowdFor, fairPrice, matchAppeal, matchPrice} from "./finance";
+import {AUTO_SAFETY, autoPrice, crowdFor, fairPrice, matchAppeal, matchPrice} from "./finance";
 import {newGame} from "./generate";
 import type {CupFixture} from "./types";
 
@@ -58,10 +58,12 @@ describe("crowd and ticket price", () => {
     const best = autoPrice(game, auto, fixture);
     const income = (price: number) => crowdFor(game, auto, fixture, price).fans * price;
     for (let price = 5; price <= 150; price++) expect(income(best)).toBeGreaterThanOrEqual(income(price) * 0.99);
-    expect(matchPrice(game, auto, fixture)).toBe(best);
+    // Auto plays safe, a little under the best price; the best one by hand brings in more.
+    expect(matchPrice(game, auto, fixture)).toBe(Math.round(best * AUTO_SAFETY));
+    expect(income(best)).toBeGreaterThan(income(matchPrice(game, auto, fixture)));
     auto.ticketAdjust = 20;
-    expect(matchPrice(game, auto, fixture)).toBe(Math.round(best * 1.2));
-    expect(crowdFor(game, auto, fixture).price).toBe(Math.round(best * 1.2));
+    expect(matchPrice(game, auto, fixture)).toBe(Math.round(best * AUTO_SAFETY * 1.2));
+    expect(crowdFor(game, auto, fixture).price).toBe(Math.round(best * AUTO_SAFETY * 1.2));
     // A cup final costs more than a league game.
     expect(autoPrice(game, auto, {...fixture, id: "final", stage: 3} as never)).toBeGreaterThan(best);
     // Manual: the club's own price, whatever the match.

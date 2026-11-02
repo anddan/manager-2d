@@ -37,7 +37,7 @@ import {Rng} from "../game/rng";
 import {finishNationalMatch} from "../game/national";
 import {matchVerdict, PLAYER_TALKS, TEAM_TALKS, talkFit, teamTalk, type PlayerTalk, type TeamTalk} from "../game/morale";
 import {boardAt, clockLabel, matchLength} from "../game/clock";
-import {FORMATIONS, type Slot, ENERGY_COST_FORZA} from "../game/constants";
+import {FORMATIONS, type Slot, ENERGY_COST_FORZA, motmBonusFor} from "../game/constants";
 import {LiveMatch} from "../game/live";
 import {distance, fromSide, kickoffSpot, progressFor, teamSpot, type Point} from "../game/pitch";
 import {effectiveRating, overall, pickCaptain, playerOfTheMatch} from "../game/ratings";
@@ -783,6 +783,24 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
           // On the ball: go to it if it isn't at their feet yet.
           target = {x: ball.x, y: ball.y};
           sprint = distance(body, ball) > 3;
+          // At their feet with nothing recorded for a while: carry on up the pitch, round whoever is close,
+          // instead of standing still in the middle of the defenders until the next touch. (Not the keeper.)
+          if (pos !== "GK" && distance(body, ball) <= 1.5) {
+            const up = progressFor(side, body.x) < 88 ? (side === "home" ? 1 : -1) * 6 : 0;
+            let tx = body.x + up;
+            let ty = body.y + (50 - body.y) * 0.05;
+            for (const o of opponents) {
+              const ob = bodies[o];
+              const d = ob ? distance(ob, body) : Infinity;
+              if (ob && d < 7 && d > 0.01) {
+                const near = (7 - d) / 7;
+                tx += ((body.x - ob.x) / d) * near * 6;
+                ty += ((body.y - ob.y) / d) * near * 8;
+              }
+            }
+            target = {x: tx, y: ty};
+            sprint = false;
+          }
         } else if (id === presser) {
           // A loose ball (in flight, or lying there waiting for who gets it next):
           // close it down but stop a step short, so nobody stands on a free ball and leaves it.
@@ -1654,7 +1672,7 @@ interface ScreenProps {
  * what was expected, so the right words can be picked.
  */
 function TeamTalkDialog({report, motmId, onDone}: {report: MatchReport; motmId?: string; onDone: (words?: Words) => void}) {
-  const {t, tx} = useT();
+  const {t, tx, money} = useT();
   const game = useGameState();
   const [talk, setTalk] = useState<TeamTalk | null>(null);
   const [single, setSingle] = useState<{playerId: string; talk: PlayerTalk} | null>(null);
@@ -1678,7 +1696,7 @@ function TeamTalkDialog({report, motmId, onDone}: {report: MatchReport; motmId?:
       {/* One of ours was the player of the match: said first, with a little sparkle. */}
       {celebrate && effectsOn() && createPortal(<div className="motm-confetti"><Confetti colors={[motmClub.color, motmClub.color2, "#facc15"]} /></div>, document.body)}
       {motmOurs && motmId && (
-        <p className="tt-motm"><span className="tt-motm-star"><Icon name="star" size={18} /></span> {iconize(t("motm.title"))}: <button type="button" className="link" onClick={() => openPlayer(motmId)}>{fullName(game.players[motmId])}</button> ({(report.ratings[motmId] ?? 0).toFixed(1)})</p>
+        <p className="tt-motm"><span className="tt-motm-star"><Icon name="star" size={18} /></span> {iconize(t("motm.title"))} <span className="pos-num">+{money(motmBonusFor(findFixture(game, report.fixtureId)))}</span>: <button type="button" className="link" onClick={() => openPlayer(motmId)}>{fullName(game.players[motmId])}</button> ({(report.ratings[motmId] ?? 0).toFixed(1)})</p>
       )}
       {/* The verdict, and what each talk does behind the (i) (no text on the choices). */}
       <div className="tt-verdict-row">

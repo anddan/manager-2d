@@ -58,8 +58,9 @@ export function Fixtures() {
 
   const day = (d: Matchday) => (
     <div key={d.week} className={d === next ? "round current" : "round"}>
+      <div className="round-week">{iconize(t("cup.week", {week: d.week}))}</div>
       <h3>
-        {d.title} <small className="muted">· {iconize(t("cup.week", {week: d.week}))}</small>
+        {d.title}
         {d === next && <span className="next-tag">{d.week === game.week ? t("fx.thisWeek") : t("fx.next")}</span>}
       </h3>
       {d.toBeDrawn && d.fixtures.length === 0 && <p className="muted small">{iconize(t("fx.toBeDrawn"))}</p>}
@@ -120,12 +121,12 @@ export function FixtureRow({f}: {f: Fixture}) {
   const flag = (c: typeof home) => (c.country ? <FlagIcon code={c.country} size={14} /> : null);
   return (
     <div className={`fixture ${mine ? "mine" : ""}`}>
-      <span className="fx-team home">{flag(home)} <TeamLink clubId={home.id} /> <span className="crest tiny" style={{background: home.color}} /></span>
+      <span className="fx-team home">{flag(home)} <TeamLink clubId={home.id} /> <span className="crest tiny" style={{background: home.color, color: home.color2}} /></span>
       <span className={`fx-score ${result ? `form-${result}` : ""}`}>
         {f.played ? `${f.homeGoals} – ${f.awayGoals}` : "–"}
         {cup?.penalties && <small className="fx-pens">{iconize(t("fx.penalties", {h: cup.penalties[0], a: cup.penalties[1]}))}</small>}
       </span>
-      <span className="fx-team away"><span className="crest tiny" style={{background: away.color}} /> <TeamLink clubId={away.id} /> {flag(away)}</span>
+      <span className="fx-team away"><span className="crest tiny" style={{background: away.color, color: away.color2}} /> <TeamLink clubId={away.id} /> {flag(away)}</span>
       {report && <button className="btn small" onClick={() => watchMatch(f.id)}><Icon name="play" size={14} /></button>}
     </div>
   );
