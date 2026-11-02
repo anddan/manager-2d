@@ -5,6 +5,7 @@ import {PRIZE_MONEY} from "./constants";
 import {addMessage, book, isCupFixture, leagueClubs} from "./helpers";
 import {leaguePosition, recentPointsPerGame} from "./league";
 import {wageBill} from "./ratings";
+import {kioskTakings, shopTakings} from "./stadium";
 import {clamp} from "./rng";
 import type {Club, FinanceLines, Fixture, GameState} from "./types";
 
@@ -147,6 +148,8 @@ export function weeklyFinances(state: GameState, played: Fixture[]): void {
 
   weeklyLoan(state);
   const user = state.clubs[state.userClubId];
+  // New stands, kiosks and a shop lift the wage budget at once, not only next season.
+  user.wageBudget = Math.max(user.wageBudget, wageBudgetTarget(state, user));
   wageBudgetAlert(state, user.wageBudget);
   closeReport(state);
   economyAlert(state);
@@ -265,12 +268,19 @@ export function payPrizeMoney(state: GameState, order: string[]): void {
   order.forEach((clubId, i) => book(state, clubId, "prize", PRIZE_MONEY[i] ?? PRIZE_MONEY[PRIZE_MONEY.length - 1]));
 }
 
+/** Wages the club can carry: 62 % of a typical week's income (a home match every other week), gate and stadium takings included. */
+export function wageBudgetTarget(state: GameState, club: Club): number {
+  const st = club.stadium;
+  const stadium = st ? kioskTakings(st, crowdFor(state, club).fans) / 2 + shopTakings(st) : 0;
+  const income = club.sponsorWeekly + ticketIncome(state, club) / 2 + stadium;
+  return Math.round((income * 0.62) / 1_000) * 1_000;
+}
+
 /** New season budgets: part of the cash for transfers, wages from expected income. */
 export function setSeasonBudgets(state: GameState): void {
   for (const club of leagueClubs(state)) {
     club.transferBudget = Math.max(0, Math.round((club.cash * 0.4) / 50_000) * 50_000);
-    const income = club.sponsorWeekly + ticketIncome(state, club) / 2;
-    const target = Math.round((income * 0.62) / 1_000) * 1_000;
+    const target = wageBudgetTarget(state, club);
     // Never below the current bill by much, or the board would force a fire sale.
     club.wageBudget = Math.max(target, Math.round((wageBill(state, club.id) * 0.98) / 1_000) * 1_000);
   }
