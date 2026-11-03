@@ -2920,3 +2920,11 @@ button.ov-next-what { font: inherit; font-family: var(--display); font-weight: 8
 .stadium-facility.built .stadium-facility-frame { stroke: rgb(125 196 255 / 0.8); }
 .stadium-facility.picked .stadium-facility-frame, .stadium-facility:hover .stadium-facility-frame { stroke: #fde047; stroke-width: 1.6; }
 .stadium-facility.building .stadium-facility-frame { stroke: #fde047; stroke-dasharray: 2 1.5; }
+
+/* Squad rows with a fixed place for the kit, so the rows line up whoever wears what. */
+.pick-gear { display: inline-flex; align-items: center; justify-content: flex-end; gap: 2px; width: 44px; }
+.pick.pick-fixed, .bench-row .pick.pick-fixed, .rest-row .pick.pick-fixed { grid-template-columns: auto auto 1fr 44px auto auto 60px; }
+.pick-list button.pick:has(.pick-gear) { grid-template-columns: auto 1fr 44px auto auto 60px; }
+.rest-toggle { display: flex; align-items: center; gap: 6px; width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; text-align: left; }
+.rest-chevron { margin-left: auto; display: inline-flex; transform: rotate(90deg); transition: transform 0.15s; }
+.rest-chevron.open { transform: rotate(-90deg); }

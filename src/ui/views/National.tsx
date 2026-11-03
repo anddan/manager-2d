@@ -35,6 +35,8 @@ export function National() {
   const narrow = useNarrow();
   // The picker shows only who is not starting already, unless told otherwise (like on the tactics page).
   const [onlyFit, setOnlyFit] = useState(true);
+  // The ones not picked are many: shown only when asked for.
+  const [showResting, setShowResting] = useState(false);
   if (!job) return <Card title={t("nav.national")}><Empty>{iconize(t("national.none"))}</Empty></Card>;
   const kit = nationalKit(job.country);
   // The eleven shown: the ones picked (empty places stay empty until the match, when the best fill them), else the best.
@@ -55,12 +57,11 @@ export function National() {
   // A player in the lists beside the pitch: tap the name for the profile.
   const row = (p: Player, cls: string) => (
     <li key={p.id} className={cls}>
-      <div className="pick">
+      <div className="pick pick-fixed">
         <span className="drag-handle"><Jersey color={kit.color} trim={kit.color2} pattern={kit.pattern} keeper={p.position === "GK"} size={26} /></span>
         <PosBadge pos={p.position} />
         <button className="link pick-name" onClick={() => openPlayer(p.id)}><Flag code={p.nationality} size={15} /> {listName(p)} <StatusIcons player={p} /></button>
-        {p.gear && <GearPicture item={p.gear} size={18} />}
-        {p.shin && <GearPicture item={p.shin} size={14} />}
+        <span className="pick-gear">{p.gear && <GearPicture item={p.gear} size={18} />}{p.shin && <GearPicture item={p.shin} size={14} />}</span>
         <FormArrow form={p.form} />
         <span className="num">{Math.round(effectiveRating(p, p.position))}</span>
         <Bar value={p.fitness} small />
@@ -81,10 +82,8 @@ export function National() {
         <li className="pick-row pick-current">
           <button className="pick" onClick={() => profile(inSlot.id, slotPick ?? undefined)} title={t("tac.profile")} aria-label={`${t("tac.profile")}: ${listName(inSlot)}`}>
             <PosBadge pos={inSlot.position} />
-            <span className="pick-name"><Flag code={inSlot.nationality} size={15} /> {listName(inSlot)} <StatusIcons player={inSlot} /></span>
-            {inSlot.gear && <GearPicture item={inSlot.gear} size={18} />}
-            {inSlot.shin && <GearPicture item={inSlot.shin} size={14} />}
-            <span className="muted small"><Icon name="user" size={16} /></span>
+            <span className="pick-name"><Flag code={inSlot.nationality} size={15} /> {listName(inSlot)} <StatusIcons player={inSlot} /> <Icon name="user" size={14} /></span>
+            <span className="pick-gear">{inSlot.gear && <GearPicture item={inSlot.gear} size={18} />}{inSlot.shin && <GearPicture item={inSlot.shin} size={14} />}</span>
             <FormArrow form={inSlot.form} />
             <span className={familiarity(inSlot, pickPos) < 1 ? "num warn" : "num strong"}>{Math.round(effectiveRating(inSlot, pickPos))}</span>
             <Bar value={inSlot.fitness} small />
@@ -99,10 +98,8 @@ export function National() {
         <li key={p.id} className="pick-row">
           <button className="pick" disabled={!isAvailable(p)} onClick={() => set(p.id)}>
             <PosBadge pos={p.position} />
-            <span className="pick-name"><Flag code={p.nationality} size={15} /> {listName(p)} <StatusIcons player={p} /></span>
-            {p.gear && <GearPicture item={p.gear} size={18} />}
-            {p.shin && <GearPicture item={p.shin} size={14} />}
-            <span className="muted small">{taken.has(p.id) ? t("tac.starting") : squad.bench.includes(p.id) ? t("tac.onBench") : ""}</span>
+            <span className="pick-name"><Flag code={p.nationality} size={15} /> {listName(p)} <StatusIcons player={p} /> <span className="muted small">{taken.has(p.id) ? t("tac.starting") : squad.bench.includes(p.id) ? t("tac.onBench") : ""}</span></span>
+            <span className="pick-gear">{p.gear && <GearPicture item={p.gear} size={18} />}{p.shin && <GearPicture item={p.shin} size={14} />}</span>
             <FormArrow form={p.form} />
             <span className={familiarity(p, pickPos) < 1 ? "num warn" : "num strong"}>{Math.round(effectiveRating(p, pickPos))}</span>
             <Bar value={p.fitness} small />
@@ -118,17 +115,25 @@ export function National() {
   return (
     <div className="grid">
       {/* The match to play this week, on top like on the tactics page: it is started with the play button in the middle of the bar. */}
-      {due && (
-        <div className="next-match span-2" role="status">
-          <span className="next-match-what">
-            {/* Tournament matches: tap to go to the tournament. */}
-            {due.what === "friendly" ? <><Icon name="ball" size={18} /> {iconize(t(`national.what.${due.what}` as TKey))}</> : <button type="button" className="link" onClick={() => setView("tournament")}><Icon name="ball" size={18} /> {iconize(t(`national.what.${due.what}` as TKey))}</button>}
-          </span>
-          <span className="next-match-teams">
-            <span className="next-match-opp"><Flag code={job.country} size={18} /> <strong>{t(`nat.${job.country}` as TKey)}</strong></span> <span className="muted">–</span> <span className="next-match-opp"><strong>{t(`nat.${due.opponent}` as TKey)}</strong> <Flag code={due.opponent} size={18} /></span>
-          </span>
-        </div>
-      )}
+      {(due || next) && (() => {
+        const what = due ? due.what : next!.what;
+        const weeks = next ? next.week - game.week : 0;
+        return (
+          <div className="next-match span-2" role="status">
+            <span className="next-match-what">
+              {/* Tournament matches: tap to go to the tournament. */}
+              {what === "friendly" ? <><Icon name="ball" size={18} /> {iconize(t(`national.what.${what}` as TKey))}</> : <button type="button" className="link" onClick={() => setView("tournament")}><Icon name="ball" size={18} /> {iconize(t(`national.what.${what}` as TKey))}</button>}
+            </span>
+            {due ? (
+              <span className="next-match-teams">
+                <span className="next-match-opp"><Flag code={job.country} size={18} /> <strong>{t(`nat.${job.country}` as TKey)}</strong></span> <span className="muted">–</span> <span className="next-match-opp"><strong>{t(`nat.${due.opponent}` as TKey)}</strong> <Flag code={due.opponent} size={18} /></span>
+              </span>
+            ) : (
+              <span className="next-match-teams muted">{t(weeks === 1 ? "national.nextWeek" : "national.inWeeks", {n: weeks})}</span>
+            )}
+          </div>
+        );
+      })()}
       <Card
         title={<><Flag code={job.country} size={22} /> {t(`nat.${job.country}` as TKey)} <span className="team-ovr" title={t("tac.teamOvrHint")}>{iconize(t("tac.teamOvr"))} <strong>{ovr}</strong></span></>}
         actions={
@@ -154,9 +159,6 @@ export function National() {
             </select>
           </label>
         </div>
-        <p className="muted small">
-          {next ? iconize(t(next.what === "friendly" ? "national.next" : "national.nextTournament", {week: next.week, comp: `national.comp.${next.what}`})) : null}
-        </p>
         <LineupSheet
           club={sheet}
           hideBench
@@ -190,8 +192,15 @@ export function National() {
           <ul className="pick-list">
             {squad.bench.length > 0 && <li className="pick-group bench-head"><Icon name="bench" size={18} /> {iconize(t("tac.benchGroup", {n: squad.bench.length, max: BENCH_SIZE}))}</li>}
             {squad.bench.map((id) => game.players[id]).filter(Boolean).map((p) => row(p, "bench-row"))}
-            {resting.length > 0 && <li className="pick-group rest-head"><Icon name="moon" size={18} /> {iconize(t("tac.restGroup", {n: resting.length}))}</li>}
-            {resting.map((p) => row(p, "rest-row"))}
+            {resting.length > 0 && (
+              <li className="pick-group rest-head">
+                <button type="button" className="rest-toggle" aria-expanded={showResting} onClick={() => setShowResting(!showResting)}>
+                  <Icon name="moon" size={18} /> {iconize(t("tac.restGroup", {n: resting.length}))}
+                  <span className={showResting ? "rest-chevron open" : "rest-chevron"}><Icon name="chevron" size={16} /></span>
+                </button>
+              </li>
+            )}
+            {showResting && resting.map((p) => row(p, "rest-row"))}
           </ul>
         )}
       </Card>

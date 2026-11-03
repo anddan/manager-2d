@@ -1245,11 +1245,11 @@ function Shootout({report, seed, userSide, textOnly: viewIsText, onDone}: {repor
           <span className="shootout-score">{home.short} – {away.short}</span>
         </div>
         {viewIsText && (
-          <div className="so-mode">
-            <span className="muted small"><Icon name="target" size={16} /> {iconize(t("so.takeLabel"))}</span>
-            <span className="speed-group manager-view" role="radiogroup" aria-label={t("so.takeLabel")}>
+          <div className="so-mode manager-toggle">
+            <span><Icon name="target" size={18} /> {iconize(t("so.takeLabel"))}</span>
+            <span className="speed-group" role="group" aria-label={t("so.takeLabel")}>
               {([true, false] as const).map((self) => (
-                <button key={String(self)} type="button" role="radio" aria-checked={takeThem === self} className={takeThem === self ? "chip active" : "chip"} onClick={() => setTakeThem(self)}>{self ? t("match.self") : t("match.auto")}</button>
+                <button key={String(self)} type="button" className={takeThem === self ? "chip active" : "chip"} onClick={() => setTakeThem(self)}>{self ? t("match.self") : t("match.auto")}</button>
               ))}
             </span>
           </div>
