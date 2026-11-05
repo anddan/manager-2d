@@ -574,8 +574,8 @@ function NextMatch() {
   };
   return (
     <>
-    {/* The whole card goes to the league table or the cup (the opponent and the fold button have their own taps). */}
-    <div className={small ? "next-match match-poster go small span-2" : "next-match match-poster go span-2"} role="status" style={{["--h" as string]: kitHome.color, ["--a" as string]: kitAway.color}} onClick={() => setView(cup ? "cup" : "table")}>
+    {/* Only the pill on top goes to the league table or the cup. */}
+    <div className={small ? "next-match match-poster small span-2" : "next-match match-poster span-2"} role="status" style={{["--h" as string]: kitHome.color, ["--a" as string]: kitAway.color}}>
       <div className="mp-main">
         {/* Folded, the pills on top are gone: just the two teams. */}
         {!small && (
@@ -592,6 +592,7 @@ function NextMatch() {
             />
             {/* The weather and the time (only for show) and home or away take turns. */}
             <Swap
+              className="mp-conds"
               a={
                 <>
                   <span className="mp-chip" title={t(`weather.${cond.weather}` as TKey)}><Icon name={cond.weather} size={14} /> {cond.temp}°</span>

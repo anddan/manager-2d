@@ -759,8 +759,8 @@ function CornerView({sp, taker, attackers = [], defenders = [], keeper, shooters
             return (
               <g key={`l${z}`} className="zone-tag" onClick={() => pick(z)}>
                 <rect x={at.x - 9} y={labelY - 3.2} width={18} height={6.2} rx={1.2} />
-                <text x={at.x} y={labelY - 0.4} className="zone-label">{iconize(t(`sp.zone.${z}`))}</text>
-                <text x={at.x} y={labelY + 2.3} className="zone-player">{(who ? shortName(who) : undefined) ?? "?"}</text>
+                <text x={at.x} y={labelY - 0.4} className="sp-zone-label">{iconize(t(`sp.zone.${z}`))}</text>
+                <text x={at.x} y={labelY + 2.3} className="sp-zone-player">{(who ? shortName(who) : undefined) ?? "?"}</text>
               </g>
             );
           })}

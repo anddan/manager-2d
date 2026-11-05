@@ -786,7 +786,9 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
           sprint = distance(body, ball) > 3;
           // At their feet with nothing recorded for a while: carry on up the pitch, round whoever is close,
           // instead of standing still in the middle of the defenders until the next touch. (Not the keeper.)
-          if (pos !== "GK" && distance(body, ball) <= 1.5) {
+          // (Not the one taking a kick-off, throw-in or goal kick: they stand over the ball until it is played.)
+          const restartHeld = held?.playerId === id && ["kickoff", "goalkick", "throwin", "setpiece"].includes(held.kind ?? "");
+          if (pos !== "GK" && !restartHeld && distance(body, ball) <= 1.5) {
             const up = progressFor(side, body.x) < 88 ? (side === "home" ? 1 : -1) * 6 : 0;
             let tx = body.x + up;
             let ty = body.y + (50 - body.y) * 0.05;

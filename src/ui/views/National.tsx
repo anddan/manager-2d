@@ -175,8 +175,8 @@ export function National() {
         const cond = due || played || next || under ? matchConditions(`nat:${game.season}:${what ?? "x"}`, !played && next ? next.week : game.week, job.country) : undefined;
         return (
           <>
-          {/* The whole card goes to the tournament (the opponent and the fold button have their own taps). */}
-          <div className={`next-match match-poster span-2${small ? " small" : ""}${comp === "wc" || comp === "ec" ? " go" : ""}`} role="status" style={{["--h" as string]: mine.color, ["--a" as string]: theirs?.color ?? "#64748b"}} onClick={comp === "wc" || comp === "ec" ? () => setView("tournament") : undefined}>
+          {/* Only the pill on top goes to the tournament. */}
+          <div className={`next-match match-poster span-2${small ? " small" : ""}`} role="status" style={{["--h" as string]: mine.color, ["--a" as string]: theirs?.color ?? "#64748b"}}>
             {!small && (
               <div className="mp-top">
                 {/* The kind of match (the competition and its round) and "next match" take turns. */}
@@ -191,6 +191,7 @@ export function National() {
                 {/* The weather and the time take turns with how long it is to the match. */}
                 {cond && (
                   <Swap
+                    className="mp-conds"
                     a={
                       <>
                         <span className="mp-chip" title={t(`weather.${cond.weather}` as TKey)}><Icon name={cond.weather} size={14} /> {cond.temp}°</span>
