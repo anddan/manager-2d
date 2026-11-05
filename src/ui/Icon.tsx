@@ -7,7 +7,7 @@ export type IconName =
   | "swap" | "pen" | "wallet" | "boot" | "diamond" | "diamondLine" | "settings" | "play" | "ball" | "shield" | "info" | "close"
   | "warn" | "fire" | "video" | "gift" | "shin" | "glove" | "dice" | "user" | "text" | "palette" | "megaphone" | "skip" | "coffee" | "stop" | "target" | "star" | "sparkle" | "chart" | "chat" | "handshake" | "trend" | "tag" | "shirt" | "undo" | "check" | "bolt" | "bank" | "sound" | "compass" | "download" | "upload" | "cart" | "hammer" | "run" | "bench" | "moon" | "search" | "inbox" | "eye" | "coins" | "medical" | "plane" | "clip" | "lock" | "flag" | "updown" | "plus" | "male" | "female" | "mixed" | "chevron" | "thumbUp" | "thumbDown" | "debrief" | "hotdog" | "cup" | "scarf"
   | "faceSmile" | "faceGrin" | "faceNeutral" | "faceWorried" | "faceSad" | "faceAngry" | "faceGrimace" | "faceYawn" | "broom"
-  | "globe" | "gamepad" | "motorcycle" | "sportsCar" | "watch" | "captain" | "freekick" | "party" | "cardYellow" | "cardRed" | "wall" | "plaster" | "sprout" | "trendDown" | "heartBroken" | "sun" | "goal" | "bag" | "chair";
+  | "globe" | "gamepad" | "motorcycle" | "sportsCar" | "watch" | "captain" | "freekick" | "party" | "cardYellow" | "cardRed" | "wall" | "plaster" | "sprout" | "trendDown" | "heartBroken" | "sun" | "goal" | "bag" | "chair" | "cloud" | "rain" | "snow" | "wind" | "clock";
 
 const PATHS: Record<IconName, ReactNode> = {
   home: <><path d="M3 11 12 4l9 7" /><path d="M5 10v10h14V10" /><path d="M10 20v-6h4v6" /></>,
@@ -138,6 +138,11 @@ const PATHS: Record<IconName, ReactNode> = {
   sun: <><circle cx="12" cy="12" r="4" /><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.600 5.600l1.400 1.400M17 17l1.400 1.400M18.400 5.600L17 7M7 17l-1.400 1.400" /></>,
   goal: <><path d="M3 19V6h18v13" /><path d="M3 12h18M9 6v13M15 6v13" /></>,
   bag: <><path d="M5 8h14l-1 12H6L5 8Z" /><path d="M9 8V6a3 3 0 0 1 6 0v2" /></>,
+  cloud: <path d="M7 18h10.500a4 4 0 0 0 .5-7.900A6 6 0 0 0 6.300 11.400 3.300 3.300 0 0 0 7 18Z" />,
+  rain: <><path d="M7 15h10.500a4 4 0 0 0 .5-7.900A6 6 0 0 0 6.300 8.400 3.300 3.300 0 0 0 7 15Z" /><path d="M8 18l-1 3M12.500 18l-1 3M17 18l-1 3" /></>,
+  snow: <><path d="M7 14h10.500a4 4 0 0 0 .5-7.900A6 6 0 0 0 6.300 7.400 3.300 3.300 0 0 0 7 14Z" /><path d="M8 18v.1M12 20v.1M16 18v.1M10 21v.1M14 21.500v.1" strokeWidth="2.200" /></>,
+  wind: <path d="M3 9h11a3 3 0 1 0-3-3M3 14h15a3 3 0 1 1-3 3M3 19h7" />,
+  clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
   chair: <><path d="M7 4v9h10" /><path d="M7 13v7M17 13v7M7 17h10" /></>,
   // Faces, drawn like the rest: a round head, two dots for eyes and a mouth that says how they feel.
   faceSmile: <><circle cx="12" cy="12" r="9" /><circle cx="9" cy="10" r="0.9" fill="currentColor" /><circle cx="15" cy="10" r="0.9" fill="currentColor" /><path d="M8.5 14.5c1 1.4 2.2 2 3.5 2s2.5-.6 3.5-2" /></>,

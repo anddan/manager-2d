@@ -1,7 +1,7 @@
 // Today's three tasks, their diamonds, and the bonus pack for doing all three.
 import {Icon, iconize, type IconName} from "./Icon";
 import {useState} from "react";
-import {STREAK_PACKS, dayBefore, ENERGY_VIDEOS_PER_DAY, TASKS, claimDailyBonus, claimTask, taskDone, taskProgress, videoForEnergy, type TaskKind} from "../game/daily";
+import {STREAK_PACKS, dayBefore, TASKS, claimDailyBonus, claimTask, taskDone, taskProgress, videoForEnergy, type TaskKind} from "../game/daily";
 import type {PlayerPackId} from "../game/packs";
 import {useT} from "../i18n";
 import {useGame, useGameState} from "../store";
@@ -90,16 +90,19 @@ export function DailyTasks() {
           );
         })}
       </ul>
-      <div className="daily-bonus">
-        <span><Icon name="gift" size={18} /> {daily.bonusClaimed ? t("daily.bonusDone") : t("daily.bonus")}</span>
-        {!daily.bonusClaimed && <button className="btn primary small" disabled={!allClaimed} onClick={bonus}>{iconize(t("daily.bonusClaim"))}</button>}
+      <div className={daily.bonusClaimed ? "daily-bonus done" : allClaimed ? "daily-bonus ready" : "daily-bonus"}>
+        <span className="daily-bonus-gift" aria-hidden><Icon name="gift" size={26} /></span>
+        <span className="daily-bonus-text">{daily.bonusClaimed ? t("daily.bonusDone") : t("daily.bonus")}</span>
+        {!daily.bonusClaimed && <button className="btn primary daily-bonus-btn" disabled={!allClaimed} onClick={bonus}>{iconize(t("daily.bonusClaim"))}</button>}
       </div>
       {/* The streak ladder: what keeping it going can bring, and how far to the next step. */}
       <div className="streak-ladder">
         {[...STREAK_PACKS].reverse().map((s) => (
           <div key={s.pack} className={`streak-step ppack-${s.pack} ${streak >= s.days ? "reached" : ""}`}>
-            <strong>{streak >= s.days ? "✓ " : ""}{iconize(t("daily.streakDays", {n: s.days}))}</strong>
-            <span>{iconize(t("daily.streakChance", {pct: Math.round(s.chance * 100), pack: t(`pack.${s.pack}`)}))}</span>
+            <span className="streak-fire"><Icon name={streak >= s.days ? "check" : "fire"} size={18} /></span>
+            <strong>{iconize(t("daily.streakDays", {n: s.days}))}</strong>
+            <span className="streak-chance">{iconize(t("daily.streakChance", {pct: Math.round(s.chance * 100), pack: t(`pack.${s.pack}`)}))}</span>
+            <span className="streak-meter"><span style={{width: `${Math.min(100, (streak / s.days) * 100)}%`}} /></span>
           </div>
         ))}
       </div>
@@ -111,7 +114,6 @@ export function DailyTasks() {
           <p className="streak-next"><Icon name="fire" size={18} /> {iconize(t("daily.streakMax"))}</p>
         );
       })()}
-      <p className="muted small">{iconize(t("daily.videos", {n: ENERGY_VIDEOS_PER_DAY - daily.energyVideos}))}</p>
       {watching && <VideoAd onReward={watched} onClose={() => setWatching(false)} />}
       {bonusPlayer && <PackReveal playerId={bonusPlayer.id} pack={bonusPlayer.pack} onClose={() => setBonusPlayer(null)} />}
     </Card>

@@ -69,6 +69,8 @@ export function Settings() {
   const [zoom, setZoom] = usePref<"1" | "0">("manager2d.zoomedIn", "1");
   const [haptics, setHaptics] = usePref<"on" | "off">("manager2d.haptics", "on");
   const [effects, setEffects] = usePref<"on" | "off">("manager2d.effects", "on");
+  const [intro, setIntro] = usePref<"on" | "off">("manager2d.matchIntro", "on");
+  const [zoneMove, setZoneMove] = usePref<"on" | "off">("manager2d.zoneMove", "on");
   // The running version: when it was built, in local time.
   const [checking, setChecking] = useState(false);
   const builtAt = (() => {
@@ -160,6 +162,15 @@ export function Settings() {
           <dd><Choice label={t("settings.haptics")} value={haptics} onPick={setHaptics} options={[["on", t("settings.on")], ["off", t("settings.off")]]} /></dd>
           <dt><Icon name="coins" size={18} /> {iconize(t("settings.effects"))}</dt>
           <dd><Choice label={t("settings.effects")} value={effects} onPick={setEffects} options={[["on", t("settings.on")], ["off", t("settings.off")]]} /></dd>
+          <dt><Icon name="ball" size={18} /> {iconize(t("settings.matchIntro"))}</dt>
+          <dd><Choice label={t("settings.matchIntro")} value={intro} onPick={setIntro} options={[["on", t("settings.on")], ["off", t("settings.off")]]} /></dd>
+          {/* Only for the zones view: hidden with another view chosen. */}
+          {matchView === "zones" && (
+            <>
+              <dt><Icon name="users" size={18} /> {iconize(t("settings.zoneMove"))}</dt>
+              <dd><Choice label={t("settings.zoneMove")} value={zoneMove} onPick={setZoneMove} options={[["on", t("settings.on")], ["off", t("settings.off")]]} /></dd>
+            </>
+          )}
         </dl>
         <Hint>{iconize(t("settings.matchHint"))}</Hint>
       </Card>

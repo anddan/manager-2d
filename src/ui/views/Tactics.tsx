@@ -2,6 +2,7 @@
 // drag a shirt onto another slot and they swap, or a player from the list (by
 // their handle) onto a slot to bring them in.
 import {Icon, iconize} from "../Icon";
+import {Swap} from "../Swap";
 import {useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, useLayoutEffect} from "react";
 import {BENCH_SIZE, clubSlots, roleAt, type Slot} from "../../game/constants";
 import {CUP_STAGES} from "../../game/cup";
@@ -9,10 +10,12 @@ import {fixtureWeek, isCupFixture, listName, nextUserFixture, shortName, userClu
 import {isAvailable, pickBestLineup} from "../../game/lineup";
 import {clubPlayers, effectiveRating, familiarity, pickCaptain, teamOvr} from "../../game/ratings";
 import {ManagerProfile} from "../ManagerProfile";
+import {leagueCountry, matchConditions} from "../../game/conditions";
+import {leaguePosition} from "../../game/league";
 import {FORMATION_IDS, MENTALITIES, type FormationId, type Mentality, type Player} from "../../game/types";
-import {useT} from "../../i18n";
+import {useT, type TKey} from "../../i18n";
 import {useGame, useGameState} from "../../store";
-import {Bar, Card, Flag, FormArrow, Modal, PosBadge, StatusIcons, Hint} from "../common";
+import {Bar, Card, CrestOf, Flag, FormArrow, Modal, PosBadge, StatusIcons, Hint} from "../common";
 import {Avatar} from "../Avatar";
 import {Jersey} from "../Jersey";
 import {kitFor, matchClubs} from "../../game/kit";
@@ -522,30 +525,93 @@ function NextMatch() {
   const next = nextUserFixture(game);
   const [sheet, setSheet] = useState<string | null>(null);
   const setView = useGame((s) => s.setView);
+  // Folded to the least (remembered on this device).
+  const [small, setSmall] = useState(() => {
+    try {
+      return localStorage.getItem("manager2d.matchCardSmall") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const toggleSmall = () =>
+    setSmall((v) => {
+      try {
+        localStorage.setItem("manager2d.matchCardSmall", v ? "0" : "1");
+      } catch {
+        // Only for now.
+      }
+      return !v;
+    });
   if (!next || fixtureWeek(next) !== game.week) return null;
   const home = game.clubs[next.homeId];
   const away = game.clubs[next.awayId];
   if (!home || !away) return null;
-  const crest = (c: typeof home) => <span className="crest" style={{background: c.color, color: c.color2}}>{c.short}</span>;
-  const team = (c: typeof home, crestLast: boolean) => {
-    const inner = crestLast ? <><strong>{c.name}</strong> {crest(c)}</> : <>{crest(c)} <strong>{c.name}</strong></>;
-    return c.id === game.userClubId ? <span className="next-match-opp">{inner}</span> : <button type="button" className="next-match-opp" title={t("tac.seeTeam")} onClick={() => setSheet(c.id)}>{inner}</button>;
+  // Played in the kit colours: the home side's, and the away side's (or another if they clash).
+  const [kitHome, kitAway] = matchClubs(home, away);
+  const cup = isCupFixture(next);
+  const cond = matchConditions(next.id, game.week, leagueCountry(game.leagueId));
+  const side = (c: typeof home, kit: typeof home, cls: "home" | "away") => {
+    const mine = c.id === game.userClubId;
+    const inner = (
+      <>
+        <span className="mp-crest">
+          <CrestOf club={kit} className="crest" />
+          {mine && <span className="mp-star" aria-label={t("intro.you")}><Icon name="star" size={11} /></span>}
+        </span>
+        <span className="mp-text">
+          <strong className="mp-name">{c.name}</strong>
+          {!small && (
+            <span className="mp-meta">
+              <span>{iconize(t("tac.teamOvr"))} <b>{teamOvr(game, c.id)}</b></span>
+              {!cup && <span><Icon name="list" size={12} /> <b>{leaguePosition(game, c.id)}</b></span>}
+            </span>
+          )}
+        </span>
+      </>
+    );
+    // The opponent: tap for their tactics and players.
+    return mine ? <div className={`mp-team ${cls} mine`}>{inner}</div> : <button type="button" className={`mp-team ${cls}`} title={t("tac.seeTeam")} onClick={(e) => { e.stopPropagation(); setSheet(c.id); }}>{inner}</button>;
   };
   return (
-    <div className="next-match span-2" role="status">
-      <span className="next-match-what">
-        {/* What it is: tap to go to the league table or the cup. */}
-        <button type="button" className="link" onClick={() => setView(isCupFixture(next) ? "cup" : "table")}>
-        {isCupFixture(next) ? <><Icon name="trophy" size={18} /> {iconize(t("cup.name"))} · {iconize(t(CUP_STAGES[next.stage]))}</> : <><Icon name="ball" size={18} /> {iconize(t("ov.round", {round: next.round}))}</>}
-        </button>
-        {/* Home or away, on the same line. */}
-        <span className="next-match-where"> · {next.homeId === game.userClubId ? t("tac.home") : t("tac.away")}</span>
-      </span>
-      <span className="next-match-teams">
-        {/* The opponent: tap for their tactics and players. */}
-        {team(home, false)} <span className="muted">–</span> {team(away, true)}
-      </span>
-      {sheet && <ClubSheet clubId={sheet} onClose={() => setSheet(null)} />}
+    <>
+    {/* The whole card goes to the league table or the cup (the opponent and the fold button have their own taps). */}
+    <div className={small ? "next-match match-poster go small span-2" : "next-match match-poster go span-2"} role="status" style={{["--h" as string]: kitHome.color, ["--a" as string]: kitAway.color}} onClick={() => setView(cup ? "cup" : "table")}>
+      <div className="mp-main">
+        {/* Folded, the pills on top are gone: just the two teams. */}
+        {!small && (
+          <div className="mp-top">
+            {/* What it is: tap to go to the league table or the cup. */}
+            {/* The round and "next match" take turns. */}
+            <Swap
+              a={
+                <button type="button" className="mp-what" onClick={() => setView(cup ? "cup" : "table")}>
+                  {cup ? <><Icon name="trophy" size={16} /> {iconize(t("cup.name"))} · {iconize(t(CUP_STAGES[next.stage]))}</> : <><Icon name="ball" size={16} /> {game.leagueName} · {iconize(t("ov.round", {round: next.round}))}</>}
+                </button>
+              }
+              b={<span className="mp-what static"><Icon name="clock" size={16} /> {t("ov.nextMatch")}</span>}
+            />
+            {/* The weather and the time (only for show) and home or away take turns. */}
+            <Swap
+              a={
+                <>
+                  <span className="mp-chip" title={t(`weather.${cond.weather}` as TKey)}><Icon name={cond.weather} size={14} /> {cond.temp}°</span>
+                  <span className="mp-chip" title={t("intro.time")}><Icon name="clock" size={14} /> {cond.time}</span>
+                </>
+              }
+              b={<span className="mp-chip"><Icon name={next.homeId === game.userClubId ? "home" : "flag"} size={14} /> {t(next.homeId === game.userClubId ? "tac.home" : "tac.away")}</span>}
+            />
+          </div>
+        )}
+        <div className="mp-teams">
+          {side(home, kitHome, "home")}
+          <div className="mp-vs"><span>VS</span></div>
+          {side(away, kitAway, "away")}
+        </div>
+      </div>
+      {/* The fold button sits to the right of the whole card. */}
+      <button type="button" className="mp-fold" aria-expanded={!small} aria-label={t(small ? "tbl.showMore" : "tbl.showLess")} onClick={(e) => { e.stopPropagation(); toggleSmall(); }}>{small ? "▼" : "▲"}</button>
     </div>
+    {sheet && <ClubSheet clubId={sheet} onClose={() => setSheet(null)} />}
+    </>
   );
 }

@@ -2,7 +2,7 @@
 // the formation and mood the manager chooses. A few friendlies a year, and the Euros / World Cup in the
 // last weeks of the season in their years.
 import {Icon, iconize} from "../Icon";
-import {clearNationalLineup, dueNationalMatch, moveNationalSlot, nationalKit, nationalPool, nationalSlots, nextNationalWeek, setNationalFormation, setNationalSlot, shownSquad} from "../../game/national";
+import {clearNationalLineup, countryTeam, dueNationalMatch, moveNationalSlot, nationalKit, nationalPool, nationalSlots, nextNationalWeek, setNationalFormation, setNationalSlot, shownSquad} from "../../game/national";
 import {BENCH_SIZE} from "../../game/constants";
 import {Jersey} from "../Jersey";
 import {useNarrow} from "./Tactics";
@@ -19,6 +19,9 @@ import {isAvailable} from "../../game/lineup";
 import {familiarity} from "../../game/ratings";
 import {LineupSheet} from "../LineupSheet";
 import {fullName, listName} from "../../game/helpers";
+import {CountrySheet} from "../CountrySheet";
+import {matchConditions} from "../../game/conditions";
+import {Swap} from "../Swap";
 
 export function National() {
   const {t} = useT();
@@ -37,6 +40,25 @@ export function National() {
   const [onlyFit, setOnlyFit] = useState(true);
   // The ones not picked are many: shown only when asked for.
   const [showResting, setShowResting] = useState(false);
+  // A country looked at (tap the opponent on the next-match card).
+  const [country, setCountry] = useState<string | null>(null);
+  // The next-match card folded to the least (remembered on this device, the same as on the tactics page).
+  const [small, setSmall] = useState(() => {
+    try {
+      return localStorage.getItem("manager2d.matchCardSmall") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const toggleSmall = () =>
+    setSmall((v) => {
+      try {
+        localStorage.setItem("manager2d.matchCardSmall", v ? "0" : "1");
+      } catch {
+        // Only for now.
+      }
+      return !v;
+    });
   if (!job) return <Card title={t("nav.national")}><Empty>{iconize(t("national.none"))}</Empty></Card>;
   const kit = nationalKit(job.country);
   // The eleven shown: the ones picked (empty places stay empty until the match, when the best fill them), else the best.
@@ -115,23 +137,92 @@ export function National() {
   return (
     <div className="grid">
       {/* The match to play this week, on top like on the tactics page: it is started with the play button in the middle of the bar. */}
-      {(due || next) && (() => {
-        const what = due ? due.what : next!.what;
+      {(() => {
+        // A tournament under way for us, the next match not known yet (the knockout draws itself as it goes).
+        const under = job.tournament && job.tournament.season === game.season && job.tournament.alive ? job.tournament : undefined;
+        // Played this week: the card stays with the result on it.
+        const last = job.results[job.results.length - 1];
+        const played = !due && last && last.season === game.season && last.week === game.week ? last : undefined;
+        const what: string | undefined = due ? due.what : played ? played.what : next ? next.what : under?.comp;
+        // "wc.g" is the World Cup's group stage; "friendly" is a friendly.
+        const comp = what?.split(".")[0];
+        const shown = due ?? played;
+        const stageKey = shown && comp !== "friendly" ? shown.what.split(".")[1] : undefined;
+        const year = job.tournament && job.tournament.season === game.season ? job.tournament.season : game.season;
+        const title = comp === "wc" || comp === "ec" ? `${t(`national.comp.${comp}` as TKey)} ${year}` : comp === "friendly" ? t("national.comp.friendly") : t("national.title");
         const weeks = next ? next.week - game.week : 0;
-        return (
-          <div className="next-match span-2" role="status">
-            <span className="next-match-what">
-              {/* Tournament matches: tap to go to the tournament. */}
-              {what === "friendly" ? <><Icon name="ball" size={18} /> {iconize(t(`national.what.${what}` as TKey))}</> : <button type="button" className="link" onClick={() => setView("tournament")}><Icon name="ball" size={18} /> {iconize(t(`national.what.${what}` as TKey))}</button>}
-            </span>
-            {due ? (
-              <span className="next-match-teams">
-                <span className="next-match-opp"><Flag code={job.country} size={18} /> <strong>{t(`nat.${job.country}` as TKey)}</strong></span> <span className="muted">–</span> <span className="next-match-opp"><strong>{t(`nat.${due.opponent}` as TKey)}</strong> <Flag code={due.opponent} size={18} /></span>
+        const stage = stageKey ? t(`national.stage.${stageKey}` as TKey) : under ? t(under.bracket.length > 0 ? "national.knockout" : "national.groupStage") : undefined;
+        const mine = nationalKit(job.country);
+        const oppCode = due?.opponent ?? played?.opponent;
+        const theirs = oppCode ? nationalKit(oppCode) : undefined;
+        const flagSide = (code: string | undefined, cls: "home" | "away", you?: boolean) => {
+          const inner = (
+            <>
+              <span className="mp-crest">
+                <span className="crest big crest-flag">{code ? <Flag code={code} size={36} /> : "?"}</span>
+                {you && <span className="mp-star"><Icon name="star" size={11} /></span>}
               </span>
-            ) : (
-              <span className="next-match-teams muted">{t(weeks === 1 ? "national.nextWeek" : "national.inWeeks", {n: weeks})}</span>
+              <span className="mp-text">
+                <strong className="mp-name">{code ? t(`nat.${code}` as TKey) : t("national.opponentTbd")}</strong>
+                {!small && code && <span className="mp-meta"><span>{iconize(t("tac.teamOvr"))} <b>{you ? ovr : countryTeam(game, code).ovr}</b></span></span>}
+              </span>
+            </>
+          );
+          // The opponent: tap for their eleven.
+          return you || !code ? <div className={`mp-team ${cls}${you ? " mine" : ""}`}>{inner}</div> : <button type="button" className={`mp-team ${cls}`} title={t("tac.seeTeam")} onClick={(e) => { e.stopPropagation(); setCountry(code); }}>{inner}</button>;
+        };
+        // The weather and the time (only for show), as on the tactics page.
+        const cond = due || played || next || under ? matchConditions(`nat:${game.season}:${what ?? "x"}`, !played && next ? next.week : game.week, job.country) : undefined;
+        return (
+          <>
+          {/* The whole card goes to the tournament (the opponent and the fold button have their own taps). */}
+          <div className={`next-match match-poster span-2${small ? " small" : ""}${comp === "wc" || comp === "ec" ? " go" : ""}`} role="status" style={{["--h" as string]: mine.color, ["--a" as string]: theirs?.color ?? "#64748b"}} onClick={comp === "wc" || comp === "ec" ? () => setView("tournament") : undefined}>
+            {!small && (
+              <div className="mp-top">
+                {/* The kind of match (the competition and its round) and "next match" take turns. */}
+                <Swap
+                  a={comp === "wc" || comp === "ec" ? (
+                    <button type="button" className="mp-what" onClick={() => setView("tournament")}><Icon name="trophy" size={16} /> {stage ? `${title} · ${stage}` : title}</button>
+                  ) : (
+                    <span className="mp-what"><Icon name="ball" size={16} /> {stage ? `${title} · ${stage}` : title}</span>
+                  )}
+                  b={<span className="mp-what static"><Icon name="clock" size={16} /> {t(played ? "national.fullTime" : "ov.nextMatch")}</span>}
+                />
+                {/* The weather and the time take turns with how long it is to the match. */}
+                {cond && (
+                  <Swap
+                    a={
+                      <>
+                        <span className="mp-chip" title={t(`weather.${cond.weather}` as TKey)}><Icon name={cond.weather} size={14} /> {cond.temp}°</span>
+                        <span className="mp-chip" title={t("intro.time")}><Icon name="clock" size={14} /> {cond.time}</span>
+                      </>
+                    }
+                    b={<span className="mp-chip"><Icon name="clock" size={14} /> {played ? t("national.fullTime") : !due && next ? t(weeks === 1 ? "national.nextWeek" : "national.inWeeks", {n: weeks}) : t("ov.nextMatch")}</span>}
+                  />
+                )}
+              </div>
             )}
+            <div className="mp-teams">
+              {due || played || next || under ? (
+                <>
+                  {flagSide(job.country, "home", true)}
+                  {played ? (
+                    <div className="mp-vs score">
+                      <span>{played.goals[0]}–{played.goals[1]}{played.pens && <small> ({played.pens[0]}–{played.pens[1]})</small>}</span>
+                    </div>
+                  ) : (
+                    <div className="mp-vs"><span>VS</span></div>
+                  )}
+                  {flagSide(oppCode, "away")}
+                </>
+              ) : (
+                <p className="mp-none muted">{iconize(t("national.noneSoon"))}</p>
+              )}
+            </div>
+            <button type="button" className="mp-fold" aria-expanded={!small} aria-label={t(small ? "tbl.showMore" : "tbl.showLess")} onClick={(e) => { e.stopPropagation(); toggleSmall(); }}>{small ? "▼" : "▲"}</button>
           </div>
+          {country && <CountrySheet code={country} onClose={() => setCountry(null)} />}
+          </>
         );
       })()}
       <Card
@@ -193,11 +284,9 @@ export function National() {
             {squad.bench.length > 0 && <li className="pick-group bench-head"><Icon name="bench" size={18} /> {iconize(t("tac.benchGroup", {n: squad.bench.length, max: BENCH_SIZE}))}</li>}
             {squad.bench.map((id) => game.players[id]).filter(Boolean).map((p) => row(p, "bench-row"))}
             {resting.length > 0 && (
-              <li className="pick-group rest-head">
-                <button type="button" className="rest-toggle" aria-expanded={showResting} onClick={() => setShowResting(!showResting)}>
-                  <Icon name="moon" size={18} /> {iconize(t("tac.restGroup", {n: resting.length}))}
-                  <span className={showResting ? "rest-chevron open" : "rest-chevron"}><Icon name="chevron" size={16} /></span>
-                </button>
+              <li className="pick-group rest-head rest-fold">
+                <span><Icon name="moon" size={18} /> {iconize(t("tac.restGroup", {n: resting.length}))}</span>
+                <button type="button" className="btn small" aria-expanded={showResting} aria-label={t(showResting ? "tbl.showLess" : "tbl.showMore")} onClick={() => setShowResting(!showResting)}>{showResting ? "▲" : "▼"}</button>
               </li>
             )}
             {showResting && resting.map((p) => row(p, "rest-row"))}

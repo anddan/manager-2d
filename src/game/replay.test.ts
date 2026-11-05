@@ -192,6 +192,26 @@ describe("match replay", () => {
     expect(count("cross")).toBeGreaterThan(5);
   });
 
+  it("plays triangles, and has shots from outside the box", () => {
+    let triangles = 0;
+    let longShots = 0;
+    for (const r of reports) {
+      r.frames.forEach((f, i) => {
+        // A pass chain that comes back to the first player: a, b, c, a.
+        const ids = [r.frames[i - 3], r.frames[i - 2], r.frames[i - 1], f].map((x) => (x?.kind === "pass" ? x.playerId : undefined));
+        if (ids[0] && ids[0] === ids[3] && ids[1] && ids[2] && ids[1] !== ids[2] && ids[1] !== ids[0] && ids[2] !== ids[0]) triangles++;
+        // A shot struck from well outside the box: the touch before a goal or a save, 25 to 36 metres out.
+        const prev = r.frames[i - 1];
+        if ((f.kind === "goal" || f.kind === "save" || f.kind === "out") && prev?.kind === "dribble" && f.x !== undefined) {
+          const depth = (x: number) => (f.possession === "home" ? x : 100 - x);
+          if (depth(prev.x) > 60 && depth(prev.x) < 77 && depth(f.x) > 95) longShots++;
+        }
+      });
+    }
+    expect(triangles).toBeGreaterThan(5);
+    expect(longShots).toBeGreaterThan(3);
+  });
+
   it("puts set-piece shots in the same corner as the close-up (the taker's right is their right)", () => {
     let checked = 0;
     for (const r of reports) {

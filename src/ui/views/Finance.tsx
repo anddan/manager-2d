@@ -141,8 +141,6 @@ export function Finance() {
         <Lines lines={game.finance.season} />
       </Folding>
 
-      <Loans />
-
       {club.installments.length > 0 && (
         <Card title={t("fin.installments")}>
           <ul className="plain-list">
@@ -179,6 +177,9 @@ export function Finance() {
           </table>
         </div>
       </Folding>
+
+      {/* The loan folds up like the other cards, last on the page. */}
+      <Loans />
     </div>
   );
 }
@@ -227,7 +228,7 @@ function Loans() {
     if (err) notify(err, undefined, "error");
   };
   return (
-    <Card title={<><Icon name="bank" size={20} /> {iconize(t("loan.title"))}</>}>
+    <Folding title={<><Icon name="bank" size={20} /> {iconize(t("loan.title"))}</>} className="span-2">
       {loan ? (
         <>
           <dl className="kv">
@@ -262,7 +263,7 @@ function Loans() {
           </div>
         </Modal>
       )}
-    </Card>
+    </Folding>
   );
 }
 

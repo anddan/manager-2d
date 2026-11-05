@@ -50,7 +50,7 @@ function Faces<T extends string>({options, value, label, onPick}: {options: read
 const HAIR_SHORT = ["buzz", "fade", "bald", "short", "spiky", "quiff", "cristiano", "swept", "sidepart", "messi", "pixie", "jamal", "mohawk", "topknot"];
 const HAIR_LONG = ["long", "halfup", "haaland", "bob", "ponytail", "bun", "braids", "dreads", "curly", "coils", "afro"];
 /** The heads, the ears and the brows: every one can be combined with every other. */
-const HEADS_ = ["oval", "wide", "dimple", "wideDimple", "narrow", "square"] as const;
+const HEADS_ = ["oval", "wide", "dimple", "wideDimple"] as const;
 const EARS_ = ["normal", "small", "tilted", "long", "big"] as const;
 const BROWS_ = ["normal", "thin", "thick", "soft", "angled", "thinAngled", "high"] as const;
 

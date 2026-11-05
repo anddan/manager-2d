@@ -7,6 +7,7 @@ import {leaguePosition, standings} from "../../game/league";
 import {clubPlayers, teamOvr, wageBill} from "../../game/ratings";
 import {useT} from "../../i18n";
 import {DailyTasks} from "../DailyTasks";
+import {LuckyWheelCard} from "../LuckyWheel";
 import {useGame, useGameState} from "../../store";
 import {Card, Empty, Face, Flag, PlayerLink} from "../common";
 import {dueNationalMatch} from "../../game/national";
@@ -41,6 +42,7 @@ export function Overview() {
     <div className="grid">
       <BoardWarningBanner />
       <DailyTasks />
+      <LuckyWheelCard />
       <Card title={<>{iconize(t("ov.nextMatch"))}{nextKind && <> · <button type="button" className="link" onClick={() => setView(nextKind.view)}>{nextKind.label}</button></>}</>}>
         {natDue && game.national ? (
           <div className="ov-next">

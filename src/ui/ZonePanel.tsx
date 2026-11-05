@@ -16,6 +16,37 @@ import {ManagerAvatar} from "./Avatar";
 import type {ManagerLook} from "../game/types";
 import {boardSpots} from "./views/Tactics";
 
+/** The tops (percent of the board) of the places with the team's lines squeezed: lean > 0 pulls the lines up towards the forwards, lean < 0 down towards the defenders. */
+export function squeezeTops(places: {top: number; keeper: boolean}[], lean: number): number[] {
+  const MIN_GAP = 12;
+  const out = places.map((p) => p.top);
+  const field = places.map((p, i) => ({i, top: p.top})).filter((_, i) => !places[i].keeper).sort((a, b) => a.top - b.top);
+  // The rows (places at about the same height).
+  const rows: {tops: number[]; ids: number[]}[] = [];
+  for (const f of field) {
+    const last = rows[rows.length - 1];
+    if (last && f.top - last.tops[last.tops.length - 1] <= 5) {
+      last.tops.push(f.top);
+      last.ids.push(f.i);
+    } else rows.push({tops: [f.top], ids: [f.i]});
+  }
+  // Dropping back: the keeper steps back towards his line too.
+  if (lean < 0) places.forEach((p, i) => { if (p.keeper) out[i] = Math.min(88, p.top - lean * 7); });
+  if (rows.length < 2 || lean === 0) return out;
+  const mid = rows.map((r) => r.tops.reduce((a, b) => a + b, 0) / r.tops.length);
+  const k = 1 - 0.55 * Math.abs(lean);
+  const to = [...mid];
+  if (lean > 0) {
+    for (let i = 1; i < mid.length; i++) to[i] = Math.min(mid[i], to[i - 1] + Math.max(MIN_GAP, (mid[i] - mid[i - 1]) * k));
+  } else {
+    // The defenders drop back (towards their keeper), and the rows above are pulled down after them.
+    to[mid.length - 1] = mid[mid.length - 1] - lean * 12;
+    for (let i = mid.length - 2; i >= 0; i--) to[i] = Math.max(mid[i], to[i + 1] - Math.max(MIN_GAP, (mid[i + 1] - mid[i]) * k));
+  }
+  rows.forEach((r, ri) => r.ids.forEach((id) => (out[id] = places[id].top + (to[ri] - mid[ri]))));
+  return out;
+}
+
 /** Percent of the match so far that the ball has been in [own third, middle, opponent's third], from `side`'s view. */
 export function zoneShares(frames: Frame[], side: Side, upTo: number): [number, number, number] {
   const time = [0, 0, 0];
@@ -231,7 +262,17 @@ function useSmoothed(target: number[]): number[] {
   return shown;
 }
 
-export function ZonePanel({shares, home, away, mine, slots, players, kit, shout, managerLook, onSubOut, onProfile, forza, instructed}: {
+export function ZonePanel({shares, home, away, mine, slots, players, kit, shout, managerLook, onSubOut, onProfile, forza, instructed, pass, leaving, over, still, hold}: {
+  /** The first minutes of each half: the lines stand in their own places, and only then begin to move with the play. */
+  hold?: boolean;
+  /** The match is over (not just half-time): once they have started to walk off, no one comes back. */
+  over?: boolean;
+  /** The players stand on their places (the setting for it is off). */
+  still?: boolean;
+  /** The match is over: after a moment the players walk off the pitch, one after another. */
+  leaving?: boolean;
+  /** The last pass: who gave it and who got it (a dashed line that fades quickly); `key` changes with every pass. */
+  pass?: {from: string; to: string; key: number};
   shares: [number, number, number];
   home: ClubKit;
   away: ClubKit;
@@ -272,6 +313,28 @@ export function ZonePanel({shares, home, away, mine, slots, players, kit, shout,
     document.addEventListener("pointerdown", away);
     return () => document.removeEventListener("pointerdown", away);
   }, [picked]);
+  // Pressure squeezes the team's lines together: up when the play is in the opponent's end (the defenders come up towards the halfway line, the forwards stay), back when it is in their own (the defenders and the keeper drop back, and the rest of the team follows). The rows keep a gap so no one ends up on top of another. From the whole percentages, so it changes only now and then; the browser does the gliding.
+  const lean = still || hold ? 0 : Math.max(-1, Math.min(1, ((shares[2] - shares[0]) / 100) * 3));
+  const squeezed = squeezeTops(spots.map((sp, i) => ({top: parseFloat(sp.top), keeper: !!players?.find((p) => p.index === i)?.keeper})), lean);
+  const pressed = (p: ZonePlayer) => {
+    const sp = spots[p.index];
+    if (!sp || still) return sp;
+    return {left: sp.left, top: `${squeezed[p.index].toFixed(2)}%`};
+  };
+  // The line between the two on the board (the centre of their shirts).
+  const centre = (id: string) => {
+    const p = players?.find((x) => x.id === id);
+    const sp = p && pressed(p);
+    return sp ? {x: parseFloat(sp.left), y: parseFloat(sp.top) + 5} : null;
+  };
+  const passFrom = pass && centre(pass.from);
+  const passTo = pass && centre(pass.to);
+  // Once they have started to walk off they keep going (the match's end state may flicker): no one comes back.
+  const [walkedOff, setWalkedOff] = useState(false);
+  useEffect(() => {
+    if (leaving && over) setWalkedOff(true);
+  }, [leaving, over]);
+  const gone = leaving || (!!over && walkedOff);
   const pickedPlayer = players?.find((p) => p.id === picked);
   return (
     <figure className="zone-panel">
@@ -280,8 +343,30 @@ export function ZonePanel({shares, home, away, mine, slots, players, kit, shout,
           {/* The three zones as one soft wash: the colour of each at its middle, blending between them. */}
           <div className="zone-wash" style={{background: `linear-gradient(to bottom, ${washStop(bands[0].tone)} 0%, ${washStop(bands[0].tone)} 12%, ${washStop(bands[1].tone)} 50%, ${washStop(bands[2].tone)} 88%, ${washStop(bands[2].tone)} 100%)`}} />
           <div className="pitch-lines" aria-hidden />
+          {passFrom && passTo && (
+            <svg key={pass!.key} className="zone-pass" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
+              {/* A rubber band, cartoon style: it stretches out past the one who got the ball (and thins), settles, then snaps back the same way with a wobble (and thickens for a moment). */}
+              <line x1={passFrom.x} y1={passFrom.y} x2={passFrom.x} y2={passFrom.y}>
+                {(["x2", "y2"] as const).map((k) => {
+                  const f = k === "x2" ? passFrom.x : passFrom.y;
+                  const to = k === "x2" ? passTo.x : passTo.y;
+                  return <animate key={k} attributeName={k} values={`${f};${f + (to - f) * 1.14};${f + (to - f) * 0.97};${to}`} keyTimes="0;0.55;0.8;1" dur="0.22s" fill="freeze" />;
+                })}
+                {(["x1", "y1"] as const).map((k) => {
+                  const f = k === "x1" ? passFrom.x : passFrom.y;
+                  const to = k === "x1" ? passTo.x : passTo.y;
+                  return <animate key={k} attributeName={k} values={`${f};${f - (to - f) * 0.06};${f + (to - f) * 1.05};${f + (to - f) * 0.97};${to}`} keyTimes="0;0.2;0.62;0.82;1" dur="0.4s" begin="0.35s" fill="freeze" />;
+                })}
+                <animate attributeName="stroke-width" values="0.22;0.12;0.22" keyTimes="0;0.5;1" dur="0.22s" fill="freeze" />
+                <animate attributeName="stroke-width" values="0.22;0.42;0.22" keyTimes="0;0.45;1" dur="0.4s" begin="0.35s" fill="freeze" />
+              </line>
+            </svg>
+          )}
           <span className="zone-box top" aria-hidden />
           <span className="zone-box bottom" aria-hidden />
+          {/* The goals: a frame with a net, at each end. */}
+          <span className="zone-goal top" aria-hidden />
+          <span className="zone-goal bottom" aria-hidden />
           {["tl", "tr", "bl", "br"].map((c) => <span key={c} className={`zone-corner ${c}`} aria-hidden />)}
           {bands.map((band, i) => (
           <div key={i} className="zone-label" style={{top: `${i * (100 / 3) + 100 / 6}%`}}>
@@ -293,7 +378,7 @@ export function ZonePanel({shares, home, away, mine, slots, players, kit, shout,
           {kit && players?.map((p) => {
             const glow = instructed === "all" || instructed?.includes(p.id) ? "instructed" : forza ? "forza" : "";
             return (
-              <div key={p.id} data-pid={p.id} className={`slot zone-slot ${picked === p.id ? "picked" : ""} ${glow} ${p.sentOff ? "sent-off" : ""} ${p.goalGlow ? `goal-${p.goalGlow}` : ""}`} style={spots[p.index]} role="button" tabIndex={p.sentOff ? -1 : 0} aria-disabled={p.sentOff} onClick={() => onSubOut && !p.sentOff && setPicked(picked === p.id ? null : p.id)} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSubOut && !p.sentOff && setPicked(picked === p.id ? null : p.id)}>
+              <div key={p.id} data-pid={p.id} className={`slot zone-slot ${gone ? "leaving" : ""} ${p.hasBall ? "holder" : ""} ${picked === p.id ? "picked" : ""} ${glow} ${p.sentOff ? "sent-off" : ""} ${p.goalGlow ? `goal-${p.goalGlow}` : ""}`} style={gone ? {...pressed(p), ["--n" as string]: p.index} : pressed(p)} role="button" tabIndex={p.sentOff ? -1 : 0} aria-disabled={p.sentOff} onClick={() => onSubOut && !p.sentOff && setPicked(picked === p.id ? null : p.id)} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSubOut && !p.sentOff && setPicked(picked === p.id ? null : p.id)}>
                 <Jersey color={kit.color} trim={kit.color2} pattern={kit.pattern} trim3={kit.color3} collar={kit.collar} sleeves={kit.sleeves} keeper={p.keeper} number={p.shirt ?? p.index + 1} captain={p.captain} />
                 {/* Boots or gloves in front of the shirt at its lower right, shin guards on the other side (as in Tactics). */}
                 {p.gear && <span className={p.gear.kind === "gloves" ? "slot-gear gloves" : "slot-gear"} aria-hidden><GearPicture item={p.gear} size={p.gear.kind === "gloves" ? 22 : 24} /></span>}

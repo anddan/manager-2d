@@ -26,6 +26,7 @@ function setStore(partial: Partial<ReturnType<typeof useGame.getState>>) {
 }
 
 describe("UI smoke test", () => {
+
   for (const lang of LANGS) {
     it(`renders every view in ${lang}`, () => {
       for (const view of VIEWS) {

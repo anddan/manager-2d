@@ -36,9 +36,9 @@ const GEAR: Record<string, {body: [string, string, string]; tv: string; stand: s
   blue: {body: ["#6fc3ff", "#1b6fe0", "#0a2f7a"], tv: "#0a1a3a", stand: "#143a7a", foot: "#1b4a9a", band: "#1b6fe0"},
 };
 
-function Frame({width, children}: {width: number; children: ReactNode}) {
+function Frame({width, children, height = 120}: {width: number; children: ReactNode; height?: number}) {
   return (
-    <svg viewBox="0 0 210 120" width={width} height={(width * 120) / 210} shapeRendering="geometricPrecision" style={{display: "block"}} aria-hidden>
+    <svg viewBox={`0 0 210 ${height}`} width={width} height={(width * height) / 210} shapeRendering="geometricPrecision" style={{display: "block"}} aria-hidden>
       {children}
     </svg>
   );
@@ -50,6 +50,7 @@ export function GiftPicture({id, variant, width = 80}: {id: string; variant?: st
   if (id === "motorcycle") return <MotorcycleArt width={width} variant={variant} />;
   if (id === "watch") return <WatchArt width={width * 1.05} variant={variant} />;
   if (id === "gaming") return <GamingArt width={width} variant={variant} />;
+  if (id === "mansion") return <MansionArt width={width} />;
   return <Icon name="coins" size={Math.round(width * 0.5)} />;
 }
 
@@ -388,6 +389,98 @@ export function MotorcycleArt({width = 96, variant}: {width?: number; variant?: 
       <path d="M98 89 L32 72" stroke="#fff" strokeWidth={2} strokeLinecap="round" fill="none" opacity={0.7} />
       <path d="M44 66 L46 77 M52 68 L54 79 M60 70 L62 81" stroke="#59606a" strokeWidth={2.56} strokeLinecap="round" />
       <ellipse cx={26} cy={71.500} rx={2.800} ry={5.500} transform="rotate(-14 26 71.500)" fill="#1a1c20" stroke={INK} strokeWidth={1.60} />
+    </Frame>
+  );
+}
+
+/** A luxury house: pillars, a pediment, two wings with lit windows, a gold door, a lawn and a couple of palms. */
+export function MansionArt({width = 96}: {width?: number}) {
+  const id = useId();
+  const wall = `${id}-wall`;
+  const roof = `${id}-roof`;
+  const glass = `${id}-glass`;
+  const lawn = `${id}-lawn`;
+  const water = `${id}-water`;
+  const win = (x: number, y: number, w = 11, h = 15) => (
+    <g key={`${x}-${y}`}>
+      <rect x={x} y={y} width={w} height={h} rx={1.500} fill={`url(#${glass})`} stroke={INK} strokeWidth={1.800} />
+      <path d={`M${x + w / 2} ${y}v${h}M${x} ${y + h / 2}h${w}`} stroke={INK} strokeWidth={1} opacity={0.55} />
+    </g>
+  );
+  const palm = (x: number) => (
+    <g key={x}>
+      <path d={`M${x} 104 Q${x + 2} 90 ${x} 78`} stroke="#7a4b1c" strokeWidth={3.200} fill="none" strokeLinecap="round" />
+      {[-24, 0, 24, 48, -48].map((a) => <ellipse key={a} cx={x} cy={72} rx={9} ry={3} fill="#2fae4e" stroke={INK} strokeWidth={1.200} transform={`rotate(${a - 90} ${x} 76) translate(0 0)`} />)}
+    </g>
+  );
+  return (
+    <Frame width={width} height={126}>
+      <defs>
+        <linearGradient id={wall} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#fffaf0" />
+          <stop offset="1" stopColor="#e6d8bd" />
+        </linearGradient>
+        <linearGradient id={roof} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#8f4a3a" />
+          <stop offset="1" stopColor="#5a2418" />
+        </linearGradient>
+        <linearGradient id={glass} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#fff2a8" />
+          <stop offset="1" stopColor="#f0a82c" />
+        </linearGradient>
+        <linearGradient id={water} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#9be8ff" />
+          <stop offset="1" stopColor="#1f9be0" />
+        </linearGradient>
+        <linearGradient id={lawn} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#58c75a" />
+          <stop offset="1" stopColor="#2a8a3c" />
+        </linearGradient>
+      </defs>
+      <ellipse cx={105} cy={123} rx={98} ry={3} fill="#000" opacity={0.25} />
+      {/* The lawn runs on under and round the pool. */}
+      <rect x={4} y={98} width={202} height={25} rx={7} fill={`url(#${lawn})`} stroke={INK} strokeWidth={1.800} />
+      {palm(14)}
+      {palm(196)}
+      {/* The wings. */}
+      <rect x={26} y={62} width={50} height={38} fill={`url(#${wall})`} stroke={INK} strokeWidth={2.200} />
+      <rect x={134} y={62} width={50} height={38} fill={`url(#${wall})`} stroke={INK} strokeWidth={2.200} />
+      <path d="M22 62 30 52h42l6 10Z" fill={`url(#${roof})`} stroke={INK} strokeWidth={2.200} strokeLinejoin="round" />
+      <path d="M132 62 138 52h42l8 10Z" fill={`url(#${roof})`} stroke={INK} strokeWidth={2.200} strokeLinejoin="round" />
+      {[34, 54].map((x) => win(x, 70))}
+      {[146, 166].map((x) => win(x, 70))}
+      {/* The middle: pillars under a pediment. */}
+      <rect x={72} y={44} width={66} height={56} fill={`url(#${wall})`} stroke={INK} strokeWidth={2.200} />
+      <path d="M66 44 105 16l39 28Z" fill={`url(#${roof})`} stroke={INK} strokeWidth={2.400} strokeLinejoin="round" />
+      <circle cx={105} cy={33} r={6.500} fill={`url(#${glass})`} stroke={INK} strokeWidth={1.800} />
+      {win(78, 50, 10, 14)}
+      {win(122, 50, 10, 14)}
+      <rect x={96} y={78} width={18} height={22} rx={9} ry={9} fill="#6b3a1a" stroke={INK} strokeWidth={2} />
+      <path d="M105 78v22" stroke={INK} strokeWidth={1.200} opacity={0.6} />
+      <circle cx={109} cy={91} r={1.400} fill="#ffd54a" />
+      {[76, 88, 116, 128].map((x) => (
+        <g key={x}>
+          <rect x={x} y={64} width={6} height={36} fill="#ffffff" stroke={INK} strokeWidth={1.600} />
+          <rect x={x - 1.500} y={62} width={9} height={3.500} fill="#ffffff" stroke={INK} strokeWidth={1.200} />
+        </g>
+      ))}
+      <rect x={90} y={100} width={30} height={4} fill="#f3ead6" stroke={INK} strokeWidth={1.400} />
+      {/* The pool in front, to the right: a white rim, water, ripples and a ladder. */}
+      <rect x={126} y={103} width={64} height={15} rx={7.500} fill="#ffffff" stroke={INK} strokeWidth={1.800} />
+      <rect x={130} y={106} width={56} height={9} rx={4.500} fill={`url(#${water})`} stroke="#1b6aa8" strokeWidth={1.200} />
+      <path d="M137 110q4-3 8 0t8 0t8 0M150 113q4-3 8 0t8 0" fill="none" stroke="#fff" strokeWidth={1.200} strokeLinecap="round" opacity={0.85} />
+      <path d="M180 101v9M184 101v9M180 104h4M180 108h4" stroke="#c9d2dc" strokeWidth={1.400} strokeLinecap="round" />
+      {/* A gold trophy on the lawn in front of the house. */}
+      <g transform="translate(68 87)">
+        <path d="M-8 0h16v5c0 5-3.500 8-8 8s-8-3-8-8Z" fill="#ffd23a" stroke={INK} strokeWidth={1.600} strokeLinejoin="round" />
+        <path d="M-8 2h-4c0 6 2.500 8 6 8M8 2h4c0 6-2.500 8-6 8" fill="none" stroke={INK} strokeWidth={1.500} strokeLinecap="round" />
+        <path d="M-5 3v5" stroke="#fff6b0" strokeWidth={1.600} strokeLinecap="round" />
+        <rect x={-2} y={13} width={4} height={4} fill="#e0a61a" stroke={INK} strokeWidth={1.200} />
+        <rect x={-6} y={17} width={12} height={4} rx={1} fill="#b87a10" stroke={INK} strokeWidth={1.400} />
+      </g>
+      {/* A glint: it is a very dear house. */}
+      <path d="M176 22v10M171 27h10" stroke="#fff6b0" strokeWidth={2.200} strokeLinecap="round" />
+      <path d="M36 20v7M32.500 23.500h7" stroke="#fff6b0" strokeWidth={1.800} strokeLinecap="round" />
     </Frame>
   );
 }

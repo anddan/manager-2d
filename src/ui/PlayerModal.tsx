@@ -12,8 +12,8 @@ import {startNegotiation} from "../game/contracts";
 import {GiftPicture} from "./GiftArt";
 
 /** The presents that are things (not money): each has its own place round the card. */
-const CARD_GIFTS = ["watch", "gaming", "motorcycle", "sportsCar"];
-import {GIFTS, GIFT_VARIANTS, giveGift, parseGift, happinessFactors, answerTransferRequest, talkToPlayer, TALKS, type GiftId} from "../game/morale";
+const CARD_GIFTS = ["watch", "gaming", "motorcycle", "sportsCar", "mansion"];
+import {GIFTS, GIFT_VARIANTS, giveGift, hasMansion, parseGift, happinessFactors, answerTransferRequest, talkToPlayer, TALKS, type GiftId} from "../game/morale";
 import {
   askingPrice,
   completeLoan,
@@ -94,7 +94,7 @@ export function PlayerModal({playerId, preview}: {playerId: string; preview?: {o
     >
       <div className="player-top">
         {/* The presents they have been given, round the card. */}
-        <div className="card-gifts">
+        <div className={hasMansion(p) ? "card-gifts has-mansion" : "card-gifts"}>
           <PlayerCard game={game} player={p} />
           {/* Each kind has its own place; more colours of the same kind stand a little behind each other, with a number for how many of that colour. */}
           {CARD_GIFTS.flatMap((id) => {
@@ -105,7 +105,7 @@ export function PlayerModal({playerId, preview}: {playerId: string; preview?: {o
             }
             return [...owned].map(([variant, n], i) => (
               <span key={`${id}:${variant}`} className={`card-gift pos-${CARD_GIFTS.indexOf(id)}`} style={{"--i": i, zIndex: CARD_GIFTS.indexOf(id) < 2 ? 10 + i : 10 - i} as React.CSSProperties} title={`${t(`gift.${id}` as TKey)}${variant ? ` · ${t(`gift.v.${variant}` as TKey)}` : ""}`}>
-                <GiftPicture id={id} variant={variant || undefined} width={92} />
+                <GiftPicture id={id} variant={variant || undefined} width={id === "mansion" ? 150 : 92} />
                 {n > 1 && <span className="gift-count">{n}</span>}
               </span>
             ));
@@ -449,12 +449,12 @@ function OwnActions({player: p}: {player: Player}) {
           <ul className="gift-list" onMouseLeave={() => setLooking(null)}>
             {GIFTS.map((g) => (
               <li key={g.id} className="gift-item">
-                <button className={`${picked === g.id ? "gift picked" : "gift"}${GIFT_VARIANTS[g.id] ? " has-colours" : ""}`} aria-pressed={picked === g.id} disabled={game.clubs[game.userClubId].cash < g.cost} onClick={() => setPicked(picked === g.id ? null : g.id)} onMouseEnter={() => setLooking(g.id)} onFocus={() => setLooking(g.id)} onBlur={() => setLooking(null)}>
+                <button className={`${picked === g.id ? "gift picked" : "gift"}${GIFT_VARIANTS[g.id] ? " has-colours" : ""}`} aria-pressed={picked === g.id} disabled={game.clubs[game.userClubId].cash < g.cost || (g.id === "mansion" && hasMansion(p))} onClick={() => setPicked(picked === g.id ? null : g.id)} onMouseEnter={() => setLooking(g.id)} onFocus={() => setLooking(g.id)} onBlur={() => setLooking(null)}>
                   <span className="gift-icon"><GiftPicture id={g.id} variant={colourOf(g.id)} width={74} /></span>
                   <span className="gift-name">
                     <strong>{iconize(t(`gift.${g.id}`))}</strong>
                     {/* What it changes: morale, match sharpness, satisfaction and the bond with the manager. */}
-                    <small className="muted gift-effects"><span>{t("pl.morale")} +{g.morale}</span><span>{t("pl.sharpness")} +{g.sharpness}</span>{g.form > 0 && <span>{t("col.form")} +{g.form}</span>}<span>{t("col.happiness")} +{g.happiness}</span><span>{t("pl.relation")} +{g.relation}</span></small>
+                    {g.id === "mansion" ? <small className="muted gift-effects"><span>{hasMansion(p) ? t("gift.mansionOwned") : t("gift.mansionNote")}</span></small> : (<small className="muted gift-effects"><span>{t("pl.morale")} +{g.morale}</span><span>{t("pl.sharpness")} +{g.sharpness}</span>{g.form > 0 && <span>{t("col.form")} +{g.form}</span>}<span>{t("col.happiness")} +{g.happiness}</span><span>{t("pl.relation")} +{g.relation}</span></small>)}
                   </span>
                   <span className="gift-price">{money(g.cost)}</span>
                 </button>

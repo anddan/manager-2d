@@ -31,9 +31,10 @@ import {PlayerCard} from "../PlayerCard";
 import {GearShop} from "../Gear";
 import {energyBurst} from "../effects";
 import {PackArt} from "../PackArt";
+import {SpendingPackages} from "../Spending";
 
 export function Shop() {
-  const {t, lang, money, num} = useT();
+  const {t, lang, money} = useT();
   const game = useGameState();
   const act = useGame((s) => s.act);
   const notify = useGame((s) => s.notify);
@@ -153,11 +154,7 @@ export function Shop() {
 
   return (
     <div className="grid">
-      {/* The balance, big and clear, at the top of the shop. */}
-      <div className="shop-balance span-2">
-        <span className="shop-balance-label">{iconize(t("shop.yourDiamonds"))}</span>
-        <strong><Icon name="diamond" size={22} /> {num(m.diamonds)}</strong>
-      </div>
+      <SpendingPackages />
       <Card title={<><Icon name="bolt" size={20} /> {iconize(t("shop.energy"))}</>}>
         <div className="energy-count"><Icon name="bolt" size={26} /> <strong>{m.energy}/{ENERGY_MAX}</strong></div>
         <Hint>{iconize(t("shop.energyHint", {time: Math.round(ENERGY_REGEN_MS / 60_000), match: ENERGY_COST_MATCH, training: ENERGY_COST_EXTRA_TRAINING}))}</Hint>

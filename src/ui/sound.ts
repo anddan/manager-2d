@@ -318,3 +318,43 @@ export function rallyFanfare(): void {
     at += len + 0.02;
   }
 }
+
+/** A peg flicking the wheel's pointer: one short click. */
+export function wheelTick(): void {
+  const a = audio();
+  if (!a || muted) return;
+  const t0 = a.ctx.currentTime;
+  const osc = a.ctx.createOscillator();
+  osc.type = "square";
+  osc.frequency.setValueAtTime(1500, t0);
+  osc.frequency.exponentialRampToValueAtTime(700, t0 + 0.04);
+  const g = a.ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(0.07, t0 + 0.005);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.05);
+  osc.connect(g).connect(a.out);
+  osc.start(t0);
+  osc.stop(t0 + 0.06);
+}
+
+/** A win: a rising fanfare (longer and higher for a big one). */
+export function fanfare(big = false): void {
+  const a = audio();
+  if (!a || muted) return;
+  const notes = big ? [523, 659, 784, 1047, 784, 1047, 1319, 1568] : [523, 659, 784, 1047];
+  notes.forEach((f, i) => {
+    const t0 = a.ctx.currentTime + i * (big ? 0.11 : 0.13);
+    for (const [type, mul, vol] of [["triangle", 1, 0.13], ["sawtooth", 0.5, 0.04]] as const) {
+      const osc = a.ctx.createOscillator();
+      osc.type = type;
+      osc.frequency.value = f * mul;
+      const g = a.ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + (i === notes.length - 1 ? 0.9 : 0.3));
+      osc.connect(g).connect(a.out);
+      osc.start(t0);
+      osc.stop(t0 + 1);
+    }
+  });
+}

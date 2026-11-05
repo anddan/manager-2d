@@ -5,6 +5,7 @@
 // every fourth year) in the last weeks of the season. Matches are played out in the background.
 import {FORMATIONS, SEASON_WEEKS, roleAt, type Slot} from "./constants";
 import {NATIONALITIES} from "./names";
+import {collectTrophy} from "./album";
 import {addMessage, fullName} from "./helpers";
 import {isAvailable, pickBestLineup} from "./lineup";
 import {effectiveRating, overall} from "./ratings";
@@ -426,6 +427,7 @@ export function nationalWeek(state: GameState, rng: Rng): void {
     // The manager's country on the podium: the champion, the beaten finalist (silver), a beaten semi-finalist (bronze).
     const lost = (r: number) => (t.rounds?.[r] ?? []).some((p) => (p.a === job.country || p.b === job.country) && p.w !== job.country);
     const place = next[0] === job.country ? 1 : lost(3) ? 2 : lost(2) ? 3 : 0;
+    if (place) collectTrophy(state, `${t.comp}${place}`);
     if (place) state.celebrations = [...(state.celebrations ?? []), {kind: "tournament", season: state.season, comp: t.comp, place: place as 1 | 2 | 3, country: job.country}];
     const ours = next[0] === job.country;
     t.alive = false;

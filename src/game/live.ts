@@ -35,7 +35,15 @@ export class LiveMatch {
   /** Whether the user takes set pieces themselves; off, the computer plays them all. */
   manualSetPieces = true;
   /** Whether the user makes substitutions for injuries; off, the assistant does it without stopping. */
-  manualSubs = true;
+  private subsByUser = true;
+  get manualSubs(): boolean {
+    return this.subsByUser;
+  }
+  /** Also tells the engine: with "myself" chosen, it makes no tactical substitutions of its own for the user's side (before, it did until the first one was made by hand). */
+  set manualSubs(value: boolean) {
+    this.subsByUser = value;
+    if (this.teams) this.teams[this.userSide].manualSubs = value;
+  }
   /**
    * The minute the engine is parked before, or is in the middle of when it's
    * stopped at a set piece, an injury or half-time.
@@ -63,6 +71,7 @@ export class LiveMatch {
     this.report = match.report;
     this.run = match.run;
     this.teams = match.teams;
+    this.teams[this.userSide].manualSubs = this.subsByUser;
     this.inputs = {...live.inputs};
     // Start the generator; it parks before minute 1.
     this.resume(undefined);

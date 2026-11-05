@@ -180,3 +180,36 @@ function rewardBurst(from: Element | null | undefined, label: string, icon: stri
 export function energySpent(from: Element | null | undefined, amount: number): void {
   if (amount > 0) spendBurst("energy", String(amount), from);
 }
+
+/** Confetti raining over the whole screen (and a few streamers), for a big win. */
+export function confettiBurst(pieces = 90): void {
+  if (typeof document === "undefined" || !effectsOn()) return;
+  if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+  const layer = document.createElement("div");
+  layer.className = "fx-confetti";
+  const colours = ["#fde047", "#f97316", "#ef4444", "#ec4899", "#8b5cf6", "#38bdf8", "#4ade80", "#ffffff"];
+  for (let i = 0; i < pieces; i++) {
+    const bit = document.createElement("span");
+    bit.className = i % 5 === 0 ? "fx-piece streamer" : i % 3 === 0 ? "fx-piece round" : "fx-piece";
+    bit.style.left = `${Math.random() * 100}%`;
+    bit.style.background = colours[i % colours.length];
+    bit.style.setProperty("--dx", `${(Math.random() - 0.5) * 220}px`);
+    bit.style.setProperty("--rot", `${(Math.random() - 0.5) * 1440}deg`);
+    bit.style.animationDuration = `${2.2 + Math.random() * 1.8}s`;
+    bit.style.animationDelay = `${Math.random() * 0.7}s`;
+    layer.appendChild(bit);
+  }
+  document.body.appendChild(layer);
+  setTimeout(() => layer.remove(), 5000);
+}
+
+/** A bright flash over the screen that fades (the moment a big prize lands). */
+export function screenFlash(colour = "#fde047"): void {
+  if (typeof document === "undefined" || !effectsOn()) return;
+  if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+  const flash = document.createElement("div");
+  flash.className = "fx-flash";
+  flash.style.background = `radial-gradient(circle at 50% 45%, ${colour}, transparent 70%)`;
+  document.body.appendChild(flash);
+  flash.addEventListener("animationend", () => flash.remove());
+}

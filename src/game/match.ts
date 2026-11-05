@@ -475,9 +475,9 @@ class Replay {
     const pos = this.posOf(team, from);
     if (pos !== "CM" && pos !== "AM" && pos !== "W" && pos !== "DM") return undefined;
     const progress = progressFor(team.side, this.ball.x);
-    if (progress < 35 || progress > 78) return undefined;
+    if (progress < 28 || progress > 78) return undefined;
     const style = level(team, from, "passing");
-    const chance = (0.16 + this.state.players[from].attrs.vision / 500) * (style < 0 ? 1.6 : style > 0 ? 0.6 : 1) * (this.fired === team.side ? 2 : 1);
+    const chance = (0.24 + this.state.players[from].attrs.vision / 400) * (style < 0 ? 1.6 : style > 0 ? 0.6 : 1) * (this.fired === team.side ? 2 : 1);
     if (!this.rng.chance(chance)) return undefined;
     const runners = team.onPitch.filter((o) => {
       const p = team.slots[o.slot].pos;
@@ -491,6 +491,42 @@ class Replay {
     const width = team.side === "home" ? spot.y : 100 - spot.y;
     const at = fromSide(team.side, clamp(progressFor(team.side, spot.x) + this.rng.range(8, 14), 10, 90), clamp(width + this.rng.range(-6, 6), 8, 92));
     return {to, at, flight: "through"};
+  }
+
+  /**
+   * A triangle: A passes to B (out wide or ahead), B lays it off first time to C (close to A, a little back or square),
+   * and C plays it on into the space ahead of A, who has run on. Three short passes that end further up the pitch.
+   * Returns who has it, or undefined when there is no one to do it with.
+   */
+  private triangle(team: Team, a: string, add: AddTouch): {carrier: string; lastPasser: string} | undefined {
+    const side = team.side;
+    const start = this.ball;
+    const progress = progressFor(side, start.x);
+    const mates = team.onPitch.filter((o) => o.id !== a && team.slots[o.slot].pos !== "GK");
+    if (mates.length < 3) return undefined;
+    const dist = (id: string) => distance(this.spot(team, id, true), start);
+    // B: ahead of A, 8 to 24 units off, preferably wide. C: close to both, further in.
+    const bs = mates.filter((o) => {
+      const sp = this.spot(team, o.id, true);
+      const d = dist(o.id);
+      return progressFor(side, sp.x) >= progress - 2 && d > 8 && d < 26;
+    });
+    if (bs.length === 0) return undefined;
+    const b = this.rng.weighted(bs, (o) => (["W", "FB", "AM", "CM"].includes(team.slots[o.slot].pos) ? 2 : 1) * (1 + this.state.players[o.id].attrs.technique / 100));
+    const bSpot = this.spot(team, b.id, true);
+    const cs = mates.filter((o) => o.id !== b.id && distance(this.spot(team, o.id, true), start) < 22 && distance(this.spot(team, o.id, true), bSpot) < 24);
+    if (cs.length === 0) return undefined;
+    const c = this.rng.weighted(cs, (o) => 1 + this.state.players[o.id].attrs.passing / 100);
+    const cSpot = this.spot(team, c.id, true);
+    const across = (p: Point) => (side === "home" ? p.y : 100 - p.y);
+    const here = progressFor(side, start.x);
+    // The ball goes to B, back in towards C, and on up the pitch for A.
+    add("pass", b.id, this.jitter(bSpot, 2), side);
+    add("pass", c.id, this.jitter({x: cSpot.x, y: cSpot.y}, 2), side);
+    const ahead = clamp(Math.max(here, progressFor(side, bSpot.x)) + this.rng.range(7, 12), 20, DANGER_DEPTH + 6);
+    const lane = clamp(across(start) + (50 - across(start)) * 0.15 + this.rng.range(-6, 6), 8, 92);
+    add("pass", a, fromSide(side, ahead, lane), side, ahead - here > 14 ? "through" : undefined);
+    return {carrier: a, lastPasser: c.id};
   }
 
   /** Switching play: a long ball from one flank out to a winger or full-back on the other. */
@@ -605,7 +641,7 @@ class Replay {
       if (team.slots[o.slot].pos === "GK") w *= 0.25;
       // Football is played on the flanks: out to the winger or overlapping full-back.
       const wide = team.slots[o.slot].pos === "W" || team.slots[o.slot].pos === "FB";
-      if (wide && progress > 30 && progress < 78) w *= fromPos === "W" || fromPos === "FB" ? 1.2 : 1.7;
+      if (wide && progress > 30 && progress < 78) w *= fromPos === "W" || fromPos === "FB" ? 1.5 : 2.3;
       return w * (0.6 + this.state.players[o.id].attrs.technique / 200);
     }).id;
   }
@@ -737,8 +773,15 @@ class Replay {
     const pending = outcome.type !== "none" && !outcome.setPiece ? outcome.shooterId : undefined;
     const flush = () => (ledUp ? this.flush(minute, touches, LEAD_UP_SHARE, 1) : this.flush(minute, touches));
 
+    // A shot from outside the box is decided here, so the build-up stays out of the box (and no cross or ball in behind is played).
+    const shooterNow = pending ? this.state.players[pending] : undefined;
+    const shooterPosNow = pending ? this.posOf(attacking, pending) : undefined;
+    const longPlan =
+      !!pending && !ledUp && progressFor(side, this.ball.x) < 68 &&
+      this.rng.chance((shooterPosNow === "ST" ? 0.16 : 0.46) * (outcome.type === "goal" ? 0.6 : 1.3) * (0.6 + (shooterNow?.attrs.technique ?? 50) / 125));
+
     // At least two touches in a quiet minute, or the one would be spread over the whole minute (a player standing on the ball).
-    let passes = outcome.type === "none" ? this.rng.int(2, 3) : outcome.setPiece ? 0 : this.rng.int(0, 2);
+    let passes = outcome.type === "none" ? this.rng.int(3, 4) : outcome.setPiece ? 0 : this.rng.int(1, 3);
     // Already camped in their half (not just won it or restarted): the box has filled up for a cross.
     const settled = touches.length === 0 && progressFor(side, this.ball.x) > 45;
     let lastPasser: string | undefined;
@@ -746,8 +789,8 @@ class Replay {
     let driveOn = false;
     // An attack that goes somewhere often goes down a flank first: out to a winger or
     // full-back high up, who then crosses it (below).
-    const goingSomewhere = !ledUp && passes > 0 && (outcome.type !== "none" || (turnover && touches.length === 0));
-    if (goingSomewhere && !this.inFrontOfGoal(side) && progressFor(side, this.ball.x) > 35 && this.rng.chance(0.45)) {
+    const goingSomewhere = !ledUp && !longPlan && passes > 0 && (outcome.type !== "none" || turnover);
+    if (goingSomewhere && !this.inFrontOfGoal(side) && progressFor(side, this.ball.x) > 35 && this.rng.chance(0.82)) {
       const flank = attacking.onPitch.filter((o) => o.id !== carrier && (attacking.slots[o.slot].pos === "W" || attacking.slots[o.slot].pos === "FB"));
       if (flank.length > 0) {
         const o = this.rng.weighted(flank, (f) => (attacking.slots[f.slot].pos === "W" ? 3 : 1));
@@ -764,12 +807,21 @@ class Replay {
       if (this.inFrontOfGoal(side)) break;
       // Wide in the final third: take it down the line and cross it into the box.
       // (In a minute that ends with them keeping the ball, nothing goes into the box.)
-      const intoBox = outcome.type !== "none" || turnover;
+      const intoBox = (outcome.type !== "none" || turnover) && !longPlan;
       // Into the box only for the one who is to shoot: no one else is carried in free, to hand it on from there.
       const mayEnter = intoBox && (!pending || carrier === pending);
-      if (intoBox && (settled || progressFor(side, this.ball.x) > 60) && this.wideAndHigh(attacking, carrier) && this.rng.chance(0.7)) {
+      if (intoBox && (settled || progressFor(side, this.ball.x) > 60) && this.wideAndHigh(attacking, carrier) && this.rng.chance(0.95)) {
         carrier = this.crossIn(attacking, carrier, add, pending) ?? carrier;
         break;
+      }
+      // A triangle: out to a teammate, laid off to a third, and played on to the first, who has run on past them.
+      if (!pending && !fired && progressFor(side, this.ball.x) > 26 && progressFor(side, this.ball.x) < 66 && this.rng.chance(0.2)) {
+        const tri = this.triangle(attacking, carrier, add);
+        if (tri) {
+          lastPasser = tri.lastPasser;
+          carrier = tri.carrier;
+          continue;
+        }
       }
       // A ball in behind for a forward to run onto, or a long one out to the far flank.
       const special: {to: string; at: Point; flight: "through" | "long"} | undefined = (intoBox ? this.throughBall(attacking, carrier, pending) : undefined) ?? this.switchPlay(attacking, carrier);
@@ -900,7 +952,7 @@ class Replay {
       }
     } else if (outcome.type !== "none") {
       const onPitch = (id?: string) => !!id && attacking.onPitch.some((o) => o.id === id);
-      let finalBall: "cross" | "through" | undefined;
+      let finalBall: "cross" | "through" | "cutback" | undefined;
       // Already in front of goal: they go straight for it (or square it to the shooter), no ball back out first.
       if (outcome.type === "goal" && onPitch(outcome.assistId) && outcome.assistId !== carrier && !this.inFrontOfGoal(side)) {
         // To the provider, in the final third and never further back than the ball.
@@ -912,23 +964,24 @@ class Replay {
         const pos = this.posOf(attacking, carrier);
         if ((pos === "W" || pos === "FB") && this.rng.chance(0.7)) {
           this.toByline(side, carrier, add);
-          finalBall = "cross";
+          // Mostly crossed in, now and then pulled back to the edge of the box for someone arriving.
+          finalBall = this.rng.chance(0.3) ? "cutback" : "cross";
         } else if (pos !== "W" && pos !== "FB" && this.rng.chance(0.45)) finalBall = "through";
       }
       // From distance: midfielders above all, more with technique, and fewer of them go in.
       const shooter = this.state.players[outcome.shooterId];
       const shooterPos = this.posOf(attacking, outcome.shooterId);
-      const longChance = (shooterPos === "ST" ? 0.07 : 0.26) * (outcome.type === "goal" ? 0.6 : 1.3) * (0.6 + (shooter?.attrs.technique ?? 50) / 125);
-      const fromDistance = !finalBall && !this.inFrontOfGoal(side) && this.rng.chance(longChance);
-      const shotDepth = fromDistance ? this.rng.range(69, 76) : finalBall === "through" ? this.rng.range(84, 90) : this.rng.range(80, 90);
+      const longChance = (shooterPos === "ST" ? 0.12 : 0.4) * (outcome.type === "goal" ? 0.6 : 1.3) * (0.6 + (shooter?.attrs.technique ?? 50) / 125);
+      const fromDistance = !finalBall && (longPlan || (!this.inFrontOfGoal(side) && this.rng.chance(longChance)));
+      const shotDepth = fromDistance ? this.rng.range(64, 76) : finalBall === "through" ? this.rng.range(84, 90) : finalBall === "cutback" ? this.rng.range(78, 84) : this.rng.range(80, 90);
       const shotWidth = fromDistance ? this.rng.range(28, 72) : this.rng.range(32, 68);
       // Never played back: to the shooter level with the passer at the least (a lay-off), or further on.
       const passFrom = progressFor(side, this.ball.x);
-      const boxDepth = outcome.shooterId !== carrier && finalBall !== "cross" ? clamp(Math.max(shotDepth, passFrom), 0, 91) : shotDepth;
+      const boxDepth = outcome.shooterId !== carrier && finalBall !== "cross" && finalBall !== "cutback" ? clamp(Math.max(shotDepth, passFrom), 0, 91) : shotDepth;
       const box = fromSide(side, boxDepth, shotWidth);
       // Free with the ball: played in short of the shot (in behind, or in space), the shooter
       // runs at goal and hits it. A cross is met first time; already in front of goal, it's straight in.
-      const runAtGoal = outcome.shooterId !== carrier && finalBall !== "cross" && !this.inFrontOfGoal(side) && this.rng.chance(fromDistance ? 0.6 : 0.7);
+      const runAtGoal = outcome.shooterId !== carrier && finalBall !== "cross" && finalBall !== "cutback" && !this.inFrontOfGoal(side) && this.rng.chance(fromDistance ? 0.6 : 0.7);
       if (runAtGoal) {
         const from = progressFor(side, this.ball.x);
         // Never further back than where the ball already is (a long shot from just inside the zone would otherwise be played back first).
@@ -936,7 +989,7 @@ class Replay {
         add("pass", outcome.shooterId, fromSide(side, runFrom, clamp(shotWidth + this.rng.range(-10, 10), 12, 88)), side, finalBall === "through" ? "through" : undefined);
         add("dribble", outcome.shooterId, box);
       } else {
-        add(outcome.shooterId === carrier ? "dribble" : "pass", outcome.shooterId, box, side, outcome.shooterId === carrier ? undefined : finalBall);
+        add(outcome.shooterId === carrier ? "dribble" : "pass", outcome.shooterId, box, side, outcome.shooterId === carrier ? undefined : finalBall === "cutback" ? "cross" : finalBall);
       }
       // Aimed where the goal is open: mostly the far side from where it was hit (the keeper
       // covers the near post), now and then the near post. In the attacking view, width 50 is

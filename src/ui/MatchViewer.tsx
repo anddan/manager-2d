@@ -18,11 +18,12 @@
 // penalties, free kicks and corners stop play while the players line up.
 import {STAND_MAX} from "../game/stadium";
 import {Icon, iconize, type IconName} from "./Icon";
+import {MatchIntro, introOn} from "./MatchIntro";
 import {ClubCrest, TeamOvr} from "./LineupSheet";
 import {useKeepScroll} from "./scrollKeep";
 import {Jersey} from "./Jersey";
 import {GearPicture} from "./Gear";
-import {MATCH_VIEWS, readMatchView, readShowRatings, writeMatchView, writeShowRatings, type MatchView} from "./matchView";
+import {MATCH_VIEWS, readMatchView, readShowRatings, readZoneMove, writeMatchView, writeShowRatings, type MatchView} from "./matchView";
 import {MatchStats, ZonePanel, matchStats, playerMarks, possessionShares, usePlateBar, zoneShares} from "./ZonePanel";
 import {matchClubs} from "../game/kit";
 import {boardSpots} from "./views/Tactics";
@@ -541,7 +542,7 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
       // Played into space for someone to run onto: the shooting position, a cross into
       // the box, a ball in behind. Never further than they can get to in time (then it's
       // played nearer to them, on their way there), so nobody else is left standing by it.
-      if (isShotSetup(ctx.frames, k) || isCross(ctx.frames, k) || f.flight === "through") {
+      if (isShotSetup(ctx.frames, k) || isCross(ctx.frames, k) || f.flight === "through" || (f.flight === "long" && f.kind === "pass")) {
         // Carried into the shot: it stays at the shooter's feet.
         if (f.kind === "dribble") return (f.playerId && bodies[f.playerId]) || f;
         const rb = f.playerId ? bodies[f.playerId] : undefined;
@@ -866,19 +867,44 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
             target = supportSpots.get(id)!;
             hurry = distance(body, target) > 6;
           } else if (pos === "ST" && ballDepth > 35) {
-            // Runs in behind, then checks back: always on the shoulder of the last defender.
+            // Runs in behind, then checks back: always on the shoulder of the last defender. With a creative player on the
+            // ball (a midfielder or winger with a pass on), the run goes into the channel on the far side, the ball played into it.
             const run = Math.sin(t * 1.1 + hashOf(id)) * 0.5 + 0.5;
-            depth = Math.max(depth, offside - 1 - run * 7);
-            width += Math.sin(t * 0.9 + hashOf(id)) * 8;
-            hurry = run > 0.75;
+            const creator = carrierId && bodies[carrierId] && distance(bodies[carrierId], body) < 38 ? carrierId : undefined;
+            if (creator && ballDepth < 78 && run > 0.45) {
+              depth = Math.max(depth, offside - 0.8);
+              width = ballWidth < 50 ? 62 + run * 8 : 38 - run * 8;
+              sprint = run > 0.8;
+              hurry = true;
+            } else {
+              depth = Math.max(depth, offside - 1 - run * 7);
+              width += Math.sin(t * 0.9 + hashOf(id)) * 8;
+              hurry = run > 0.75;
+            }
           } else if (pos === "W" && ballDepth > 30) {
-            // Hug the touchline to stretch the defence.
-            width = slotInfo.y < 50 ? Math.min(width, 9) : Math.max(width, 91);
-            depth = Math.max(depth, Math.min(offside - 2, ballDepth + 8));
-          } else if (pos === "FB" && ballDepth > 50 && (ballWidth < 50) === (slotInfo.y < 50)) {
-            // Overlap down their own flank.
-            depth = Math.max(depth, ballDepth + 4);
-            width = slotInfo.y < 50 ? 8 : 92;
+            // Hug the touchline to stretch the defence; the winger on the far side from the ball comes in towards the far post.
+            const farSide = (slotInfo.y < 50) !== (ballWidth < 50);
+            if (farSide && ballDepth > 60) {
+              width = slotInfo.y < 50 ? 24 : 76;
+              depth = Math.max(depth, Math.min(offside - 1, ballDepth + 6));
+              hurry = true;
+            } else {
+              width = slotInfo.y < 50 ? Math.min(width, 9) : Math.max(width, 91);
+              depth = Math.max(depth, Math.min(offside - 2, ballDepth + 8));
+            }
+          } else if (pos === "FB" && ballDepth > 40 && (ballWidth < 50) === (slotInfo.y < 50)) {
+            // Overlap down their own flank, outside the winger.
+            depth = Math.max(depth, ballDepth + 5);
+            width = slotInfo.y < 50 ? 7 : 93;
+            hurry = true;
+          } else if (pos === "DM" && ballDepth < 30) {
+            // Drops in between the centre-backs to give them a way out.
+            depth = Math.min(depth, 20);
+            width = 50 + (ballWidth - 50) * 0.2;
+          } else if ((pos === "CM" || pos === "AM") && ballDepth > 60 && ballDepth < 82) {
+            // Arrives late at the edge of the box, ready for a pass back or a loose ball.
+            depth = Math.min(Math.max(depth, 74), offside - 3);
+            width = 50 + (slotInfo.y - 50) * 0.5 + (ballWidth - 50) * -0.15;
             hurry = true;
           } else if (pos === "AM" || pos === "CM") {
             // Find a pocket between the opposition's lines.
@@ -1650,7 +1676,17 @@ export function LiveMatchViewer() {
     });
     if (said) notify(said.worn ? "tt.worn" : said.key, {}, said.fit > 0 ? "good" : said.fit < 0 ? "error" : "info");
   };
-  return <MatchScreen report={live.report} live={live} onClose={() => finish()} onFinish={finish} />;
+  // The walk-through first (the teams, the VS, the countdown); then the match.
+  const [intro, setIntro] = useState(introOn);
+  // The walk-through fades out into the match: a dark sheet over the match that thins away.
+  const [fade, setFade] = useState(false);
+  if (intro) return <MatchIntro report={live.report} onDone={() => { setFade(true); setIntro(false); }} />;
+  return (
+    <>
+      <MatchScreen report={live.report} live={live} onClose={() => finish()} onFinish={finish} />
+      {fade && <div className="intro-fade" aria-hidden onAnimationEnd={() => setFade(false)} />}
+    </>
+  );
 }
 
 /** What the manager says after the match. */
@@ -1972,6 +2008,8 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   // Watch the pitch, only follow the commentary, or see the zones the ball is in (remembered; a finished match from "Se matchen" always opens on the pitch). Without the pitch, set pieces are the assistant's.
   const [matchView, setMatchViewState] = useState<MatchView>(() => (live ? readMatchView() : "pitch"));
   const textOnly = matchView !== "pitch";
+  // The players moving about on the zones board is a setting.
+  const [zoneMove] = useState(readZoneMove);
   useEffect(() => {
     if (!live) return;
     if (textOnly) live.manualSetPieces = false;
@@ -2836,7 +2874,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
 
       {!maxed && matchView !== "pitch" && (
         <MatchStats
-          // The first ten minutes the numbers hold still (they jump back and forth while the play finds its shape).
+          // The first five minutes the numbers hold still (they jump back and forth while the play finds its shape).
           possession={view.time < 10 ? [50, 50] : possessionShares(report.frames ?? [], view.time)}
           stats={matchStats(report.events, view.time)}
           home={home}
@@ -2883,7 +2921,9 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
             // The lineup as in Tactics, the ball's zones behind it and the possession above.
             const side = userSide;
             const slots = live && side ? live.previewSlots() : side ? report.slots?.[side] ?? FORMATIONS[report.formations[side]] : undefined;
-            const lineup = live && side ? live.team().onPitch.map((o) => { const sub = live.pendingSubs().find((c) => c.type === "sub" && c.outId === o.id); return {id: sub && sub.type === "sub" ? sub.inId : o.id, index: o.slot}; }) : side ? report.lineups[side].map((id, index) => ({id, index})).filter((x) => x.id) : [];
+            // At the final whistle: everyone who is on the pitch then, from the report (not the live match, which is winding up).
+            const over = finished || freeze?.kind === "fulltime";
+            const lineup = over && side ? [...onPitchAt(report, side, 999)].map(([index, id]) => ({id, index})) : live && side ? live.team().onPitch.map((o) => { const sub = live.pendingSubs().find((c) => c.type === "sub" && c.outId === o.id); return {id: sub && sub.type === "sub" ? sub.inId : o.id, index: o.slot}; }) : side ? report.lineups[side].map((id, index) => ({id, index})).filter((x) => x.id) : [];
             const marks = playerMarks(report.events, view.time);
             // Sent off: still on the board, greyed out with the red card (a sent-off player is no longer on the pitch).
             const redIds = side ? report.events.filter((e) => e.type === "red" && e.side === side && e.playerId && e.minute - 1 <= view.time).map((e) => e.playerId!) : [];
@@ -2903,6 +2943,13 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
               freeze?.kind === "setup" && freeze.sp && freeze.side === side ? freeze.sp.takerId
               : freeze?.kind === "restart" && freeze.restart && freeze.side === side ? freeze.restart.playerId
               : lastTouch && lastTouch.possession === side && !["goal", "nogoal", "out"].includes(lastTouch.kind ?? "") ? lastTouch.playerId : undefined;
+            // The pass just made (by our side): who gave it, who got it.
+            const lastIdx = touchIndex(report.frames ?? [], view.time);
+            const prevTouch = lastIdx > 0 ? report.frames?.[lastIdx - 1] : undefined;
+            const passInfo =
+              lastTouch && prevTouch && holderId && lastTouch.playerId === holderId && prevTouch.possession === side && prevTouch.playerId && prevTouch.playerId !== holderId
+                ? {from: prevTouch.playerId, to: holderId, key: lastIdx}
+                : undefined;
             const captainId = pickCaptain((side === "away" ? away : home).roles?.captain, lineup.map((l) => l.id), game.players);
             const goalNow = freeze?.kind === "goal" && freeze.side === side && !replay ? freeze : undefined;
             const zonePlayers = withRed.flatMap(({id, index}) => {
@@ -2912,8 +2959,13 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
             return (
               <ZonePanel
                 // The first ten minutes the numbers hold still (they jump back and forth while the play finds its shape).
-                shares={view.time < 10 ? [33, 34, 33] : zoneShares(report.frames ?? [], userSide ?? "home", view.time)}
+                shares={view.time < 5 ? [33, 34, 33] : zoneShares(report.frames ?? [], userSide ?? "home", view.time)}
                 forza={forzaOn}
+                pass={passInfo}
+                leaving={finished || freeze?.kind === "fulltime" || freeze?.kind === "halftime"}
+                over={finished || freeze?.kind === "fulltime"}
+                still={!zoneMove}
+                hold={view.time < 5 || (() => { const ht = report.events.find((e) => e.type === "halftime"); return !!ht && view.time >= ht.minute && view.time < ht.minute + 5; })()}
                 instructed={shouts.some((s) => !s.cry && s.playerId === "") ? "all" : shouts.filter((s) => !s.cry && s.playerId).map((s) => s.playerId)}
                 home={home}
                 away={away}

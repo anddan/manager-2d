@@ -2,6 +2,7 @@
 // Given at the end of the season, from the season's ratings, goals and assists (and how each club did
 // against what its squad should manage). One mail tells who won; if someone of ours did, it lights up
 // and a celebration is shown.
+import {collectTrophy} from "./album";
 import {addMessage, fullName} from "./helpers";
 import {clubStrength} from "./ratings";
 import type {GameState, Player} from "./types";
@@ -86,5 +87,6 @@ export function announceAwards(state: GameState, awards: SeasonAwards): void {
     },
     action: {type: "ack"},
   });
+  for (const a of everyone) if (a.mine) collectTrophy(state, `award.${a.key}`);
   if (ours.length > 0) state.celebrations = [...(state.celebrations ?? []), {kind: "award", season: state.season, awards: everyone}];
 }

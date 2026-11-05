@@ -30,8 +30,8 @@ describe("tackling hard", () => {
   }, 60000);
 
   it("wins some balls back with a slide, never the keeper", () => {
-    // Over a few matches (one match's play changes with every tweak of the engine).
-    const slides = [4, 5, 6, 7, 8, 9].flatMap((seed) => simulateMatch(structuredClone(game), new Rng(seed), fixture, true).frames.filter((f) => f.slide));
+    // Over a dozen matches (one match's play changes with every tweak of the engine, and a slide is only some of the tackles).
+    const slides = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].flatMap((seed) => simulateMatch(structuredClone(game), new Rng(seed), fixture, true).frames.filter((f) => f.slide));
     expect(slides.length).toBeGreaterThan(0);
     for (const f of slides) {
       expect(f.kind).toBe("tackle");

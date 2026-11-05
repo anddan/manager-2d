@@ -3,6 +3,8 @@
 import type {Slot} from "./constants";
 import type {StadiumState} from "./stadium";
 import type {Daily} from "./daily";
+import type {Album} from "./album";
+import type {Spending} from "./spending";
 import type {Tutorial} from "./tutorial";
 import type {BankLoan} from "./loans";
 import type {GearItem} from "./gear";
@@ -105,6 +107,8 @@ export interface Player {
   shin?: GearItem;
   /** The id their looks are drawn from, when they came from another game (their id here is new). */
   lookId?: string;
+  /** Came up through the user's own academy (for the album's rare ones). */
+  homegrown?: boolean;
   /** A look the manager picked (skin, hair, beard…); missing means the one the player came with. */
   look?: {skin: string; hair: string; style: string; beard: string; eyes?: string; glasses?: boolean; lashes?: boolean; highlights?: boolean; shape?: string; ears?: string; browStyle?: string; headband?: string};
   age: number;
@@ -497,6 +501,8 @@ export const FINANCE_CATEGORIES = [
   "transfers",
   "loanRepay",
   "signing",
+  "wheel",
+  "reward",
   "scouting",
   "equipment",
   "operations",
@@ -632,6 +638,12 @@ export interface GameState {
   packChoice?: string[];
   /** Boots and gloves bought and not worn by anyone. */
   gearBag?: GearItem[];
+  /** The collector's album: presents, kit, packs and trophies had so far. */
+  album?: Album;
+  /** What has been spent this week, towards the weekly spending package. */
+  spending?: Spending;
+  /** The lucky wheel: today's spins. */
+  wheel?: {day: string; used: number};
   /** The coach's tips (on easy): which comes next, the week one was last shown, and if they're off. */
   coachTips?: {next?: number; lastWeek?: number; off?: boolean};
   /** Trades with friends (by offer id) already settled here, so none is paid or received twice. */

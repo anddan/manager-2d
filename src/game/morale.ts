@@ -1,5 +1,6 @@
 // Happiness (long-term) and what unhappy players do about it, plus the
 // manager's talks and the promises they create.
+import {collectGift} from "./album";
 import {addMessage, book, newId, playerName} from "./helpers";
 import {recentPointsPerGame} from "./league";
 import {deservedRole, expectedWage, overall, teamOvr} from "./ratings";
@@ -107,6 +108,8 @@ export const GIFTS = [
   {id: "watch", icon: "watch", cost: 150_000, morale: 13, sharpness: 18, form: 8, happiness: 17, relation: 9},
   {id: "motorcycle", icon: "motorcycle", cost: 400_000, morale: 18, sharpness: 26, form: 15, happiness: 24, relation: 13},
   {id: "sportsCar", icon: "sportsCar", cost: 1_500_000, morale: 45, sharpness: 55, form: 30, happiness: 60, relation: 36},
+  // A luxury house: everything full, and it stays full for as long as they are with the club.
+  {id: "mansion", icon: "home", cost: 10_000_000, morale: 100, sharpness: 100, form: 100, happiness: 100, relation: 100},
 ] as const;
 export type GiftId = (typeof GIFTS)[number]["id"];
 
@@ -124,12 +127,29 @@ export function parseGift(kept: string): {id: string; variant: string | undefine
   return {id, variant: variant ?? GIFT_VARIANTS[id]?.[0]};
 }
 
+/** Lives in a mansion: always full on every bar. */
+export const hasMansion = (p: Player): boolean => !!p.gifts?.includes("mansion");
+
+/** Tops up every bar for the players of the club who have a mansion (after every action, so it holds through matches and weeks). */
+export function topUpMansions(state: GameState): void {
+  for (const p of Object.values(state.players)) {
+    if (p.clubId !== state.userClubId || !hasMansion(p)) continue;
+    p.fitness = 100;
+    p.morale = 100;
+    p.sharpness = 100;
+    p.happiness = 100;
+    p.form = 100;
+    p.relation = 100;
+  }
+}
+
 /** Gives a player a bonus or a present, paid by the club. An i18n key for how it went (a talk, so once a week for each player). */
 export function giveGift(state: GameState, playerId: string, giftId: GiftId, variant?: string): string {
   const p = state.players[playerId];
   const gift = GIFTS.find((g) => g.id === giftId);
   const club = state.clubs[state.userClubId];
   if (!p || !gift || p.clubId !== club.id) return "talk.bonus.no";
+  if (gift.id === "mansion" && hasMansion(p)) return "talk.bonus.owned";
   if (state.absWeek - p.lastTalkWeek < 1) return "talk.tooSoon";
   if (club.cash < gift.cost) return "talk.bonus.noMoney";
   p.lastTalkWeek = state.absWeek;
@@ -143,7 +163,10 @@ export function giveGift(state: GameState, playerId: string, giftId: GiftId, var
   const colours = GIFT_VARIANTS[gift.id];
   const colour = colours ? (variant && colours.includes(variant) ? variant : colours[0]) : null;
   p.gifts = [...(p.gifts ?? []), colour ? `${gift.id}:${colour}` : gift.id].slice(-99);
+  if (colour) collectGift(state, `${gift.id}:${colour}`);
+  else if (gift.id === "mansion") collectGift(state, "mansion");
   if (p.wantsToLeave && p.happiness >= 35) p.wantsToLeave = false;
+  if (gift.id === "mansion") p.fitness = 100;
   return "talk.bonus.paid";
 }
 

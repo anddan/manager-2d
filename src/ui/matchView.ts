@@ -46,3 +46,14 @@ export function writeShowRatings(on: boolean): void {
     // Only for now.
   }
 }
+
+const ZONE_MOVE_KEY = "manager2d.zoneMove";
+
+/** Whether the players move about on the zones board with how the play goes (on to begin with). */
+export function readZoneMove(): boolean {
+  try {
+    return localStorage.getItem(ZONE_MOVE_KEY) !== "off";
+  } catch {
+    return true;
+  }
+}

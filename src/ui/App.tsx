@@ -9,6 +9,10 @@ import {CrestOf, Modal} from "./common";
 import {unseenScouted} from "../game/transfers";
 import {recentSpend} from "../game/finance";
 import {dailyToCollect, ensureDaily} from "../game/daily";
+import {wheelStatus} from "../game/wheel";
+import {claimable} from "../game/album";
+import {openTiers, thisWeek} from "../game/spending";
+import {today} from "./DailyTasks";
 import {claimDailyBonus, msToNextEnergy, regenerateEnergy} from "../game/monetization";
 import {finishWeek, startWeek} from "../game/week";
 import {useT, type TKey} from "../i18n";
@@ -23,6 +27,7 @@ import {diamondBurst} from "./effects";
 import {ManagerProfile} from "./ManagerProfile";
 import {TrophyCelebration} from "./TrophyCelebration";
 import {BoardWarningPopup} from "./BoardWarning";
+import {DailyWheelPopup} from "./LuckyWheel";
 import {TutorialCoach} from "./TutorialCoach";
 import {useUpdates} from "./updates";
 import {NewGame} from "./NewGame";
@@ -43,6 +48,7 @@ import {Tactics} from "./views/Tactics";
 import {Training} from "./views/Training";
 import {Transfers} from "./views/Transfers";
 import {Storage} from "./views/Storage";
+import {Album} from "./views/Album";
 import {National} from "./views/National";
 import {Tournament} from "./views/Tournament";
 import {tournamentOf} from "../game/national";
@@ -76,6 +82,7 @@ const ICONS: Record<View, IconName> = {
   contracts: "pen",
   finance: "wallet",
   storage: "boot",
+  album: "trophy",
   // The Shop keeps the old outlined diamond in the menu.
   shop: "diamondLine",
   settings: "settings",
@@ -89,7 +96,7 @@ const NAV_GROUPS: {id: "home" | "team" | "matches" | "club"; icon: IconName; vie
   {id: "club", icon: "shield", views: ["finance", "transfers", "shop", "settings"]},
 ];
 /** Pages shown as a sub-tab of another (three tabs fit a phone): Contracts under Squad, Arena under Finance. */
-const SUB_PAGES: Partial<Record<View, View[]>> = {squad: ["squad", "contracts", "national"], transfers: ["transfers", "codes"], finance: ["finance", "stadium"], cup: ["cup", "friends", "tournament"]};
+const SUB_PAGES: Partial<Record<View, View[]>> = {squad: ["squad", "contracts", "national"], transfers: ["transfers", "codes"], finance: ["finance", "stadium"], storage: ["storage", "album"], cup: ["cup", "friends", "tournament"]};
 /** The national team's page is only there once the manager coaches a country (set as the menu is drawn). */
 let NATIONAL_ON = false;
 /** The tournament's page (the World Cup or the Euros of the year, e.g. "VM 2028") only in a year with one, once the manager coaches a country. */
@@ -123,6 +130,7 @@ const SCREENS: Record<View, () => React.JSX.Element> = {
   finance: Finance,
   shop: Shop,
   storage: Storage,
+  album: Album,
   settings: Settings,
 };
 
@@ -187,6 +195,7 @@ function Game() {
       <DealEffects />
       <CoachTips />
       <BoardWarningPopup />
+      <DailyWheelPopup />
       <TutorialCoach />
       <ToastView />
     </div>
@@ -211,9 +220,14 @@ function useBadges(): Partial<Record<View, number>> {
     contracts: expiringContracts(game).n,
     // The last weeks spent more than came in: a red circle (see the economy page).
     finance: (recentSpend(game)?.used ?? 0) > 100 ? 1 : 0,
-    overview: dailyToCollect(game.daily),
+    // The daily tasks to collect, and the wheel when today's free spin is not taken.
+    overview: dailyToCollect(game.daily) + (wheelStatus(game, today()).free ? 1 : 0),
     // Kit bought but not put on anyone yet.
     storage: game.gearBag?.length ?? 0,
+    // Things in the album to open (each gives diamonds).
+    album: claimable(game).length,
+    // Levels of the weekly spending package open and not picked from.
+    shop: openTiers(game, thisWeek()).length,
     // Bids on our players, and the ones listed for sale and scouted (a blue reminder, like the tabs).
     transfers: game.incomingBids.length
       + Object.values(game.players).filter((p) => p.clubId === game.userClubId && (p.transferListed || p.loanListed)).length
@@ -228,7 +242,7 @@ function useBadges(): Partial<Record<View, number>> {
 }
 
 /** Pages whose number is a reminder rather than something waiting (shown in blue, not red). */
-const BLUE_BADGES: View[] = ["storage", "codes", "transfers"];
+const BLUE_BADGES: View[] = ["storage", "codes", "transfers", "album", "shop"];
 /** How soon the first contract runs out: this season (red), next season (yellow), or no hurry (set as the menu is drawn). */
 let CONTRACT_TONE: "red" | "yellow" | null = null;
 type BadgeTone = "red" | "warn" | "blue";

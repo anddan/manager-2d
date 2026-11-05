@@ -113,10 +113,15 @@ const BROWS: Record<string, {thick: number; tilt: number; short?: number; lift?:
   pointed2: {thick: 0.550, tilt: 1.100},
 };
 // A slimmer head: narrower cheeks and a longer, more pointed chin.
-HEADS.narrow = "M31 41 C29.500 23 35 10.500 50 10.500 C65 10.500 70.500 23 69 41 L66.500 53 Q62 63 56 68 Q50 72 44 68 Q38 63 33.500 53Z";
+HEADS.narrow = "M31 41 C29.500 23 35 10.500 50 10.500 C65 10.500 70.500 23 69 41 L66.500 53 Q62 64.500 56 71 Q50 75 44 71 Q38 64.500 33.500 53Z";
 // A strong, square jaw: the cheeks go straight down to an angled jaw and a broad, flat chin.
-HEADS.square = "M30 41 C28.500 23 33.500 10.500 50 10.500 C66.500 10.500 71.500 23 70 41 L69.500 55 Q69 59.500 63 66 L58.500 68.800 Q50 70.500 41.500 68.800 L37 66 Q31 59.500 30.500 55Z";
-const headOf = (look: Look) => (look.shape === "narrow" ? HEADS.narrow : look.shape === "square" ? HEADS.square : faceParts(look).wide ? HEADS.pointed : HEADS.oval);
+HEADS.square = "M30 41 C28.500 23 33.500 10.500 50 10.500 C66.500 10.500 71.500 23 70 41 L69.500 55 Q69 61 63 69 L58.500 71.800 Q50 73.500 41.500 71.800 L37 69 Q31 61 30.500 55Z";
+// The faces with a dimple (the third and fourth head) have the chin a few pixels longer.
+HEADS.dimple = "M31.500 40 C29.500 23 34 10.500 50 10.500 C66 10.500 70.500 23 68.500 40 L66.500 53 Q62.500 64 57 68.500 Q50.500 72.500 44 68.500 Q38.500 64 33.500 53Z";
+HEADS.dimpleWide = "M30 41 C28.500 23 33.500 10.500 50 10.500 C66.500 10.500 71.500 23 70 41 L67.800 53 Q62.500 64.500 57 69 Q50.500 72.500 44 69 Q38.500 64.500 32.200 53Z";
+/** The heads with a longer chin (a few pixels) and a smaller mouth: the two with a dimple, the narrow and the square. The beard grows down with the chin. */
+const longChin = (look: Look) => look.shape === "narrow" || look.shape === "square" || faceParts(look).dimple;
+const headOf = (look: Look) => (look.shape === "narrow" ? HEADS.narrow : look.shape === "square" ? HEADS.square : faceParts(look).dimple ? (faceParts(look).wide ? HEADS.dimpleWide : HEADS.dimple) : faceParts(look).wide ? HEADS.pointed : HEADS.oval);
 
 /** Hair behind the head (long styles). */
 /** The outline of the hair hanging down behind the head (the longer styles), for the highlights to be cut to. */
@@ -343,27 +348,34 @@ function Mouth({mood}: {mood: Mood}) {
 /** The head, face and hair in the 100x100 box (the neck and shoulders are drawn by the portrait). */
 function ToonFace({look, mood}: {look: Look; mood: Mood}) {
   const uid = useId();
-  const skin = warm(look.skin);
+  const skin = shade(warm(look.skin), look.tone ?? 0);
   const shadow = shade(skin, -0.12);
   const earIn = shade(skin, -0.18);
   const nose = shade(skin, -0.14);
   const browColor = look.hair === "#e3c27a" ? "#8a6a2a" : look.style === "bald" && look.hair === "#9ca3af" ? "#6b7280" : look.hair;
   const iris = look.eyes ?? "#8a5a2b";
   const sad = mood === "sad" || mood === "upset";
+  const gap = Math.max(7, Math.min(9.6, (look.eyeGap ?? 8) + 0.1));
   // A brow: thick, arched, higher at the inner end (`side` -1 left, 1 right; the left is drawn, the right mirrors it).
   const brow = (side: -1 | 1) => {
-    const x = (v: number) => (side === -1 ? v : 100 - v);
+    const x = (v: number) => (side === -1 ? v - d : 100 - v + d);
     const shape = BROWS[faceParts(look).brows] ?? BROWS.normal;
     const th = shape.thick;
     const tilt = (mood === "upset" ? 1.600 : mood === "sad" ? -1.600 : look.brows * 0.4) + shape.tilt;
     const sh = shape.short ?? 0;
     const ap = shape.apart ?? 0;
+    // Eyes set wider apart or closer take the brows with them.
+    // (never inwards by more than a little: the inner ends would meet in the middle)
+    const d = Math.max(-0.3, gap - 8.100);
     // All brows sit a little higher (clear of the eyes), the outer ends a little more.
     const up = (shape.lift ?? 0) + 1.300;
     const out = 0.900;
     return `M${x(36 + sh)} ${37.400 - tilt - up - out} Q${x(41.500 + sh / 2)} ${33 + tilt - up} ${x(48.700 - ap)} ${36.400 + tilt - up} L${x(48.900 - ap)} ${36.400 + 2.400 * th + tilt - up} Q${x(42 + sh / 2)} ${33.800 + 2.200 * th + tilt - up} ${x(36.400 + sh)} ${37.400 + 2.200 * th - tilt - up - out}Z`;
   };
-  const eyes = [41.900, 58.100] as const;
+  const eyes = [50 - gap, 50 + gap] as const;
+  const es = look.eyeSize ?? 1;
+  const eo = look.eyeOpen ?? 1;
+  const ns = look.nose ?? 1;
   const ear = EARS[faceParts(look).ears] ?? EARS.normal;
   return (
     <g strokeLinejoin="round" strokeLinecap="round">
@@ -390,10 +402,13 @@ function ToonFace({look, mood}: {look: Look; mood: Mood}) {
       {/* A faint jaw bone: a soft line from each ear down towards the chin. */}
       <path d="M34 49 Q36.500 60 45 65.500 M66 49 Q63.500 60 55 65.500" fill="none" stroke={shade(skin, -0.22)} strokeWidth={0.600} strokeLinecap="round" opacity={look.shape === "jaw" ? 0.85 : 0.5} />
       {faceParts(look).dimple && <path d="M50 66 L50 68.200" stroke={shade(skin, -0.3)} strokeWidth={0.700} />}
+      {/* The beard and the stubble reach the chin however long it is. */}
+      <g transform={longChin(look) ? "translate(0 46) scale(1 1.12) translate(0 -46)" : undefined}>
       {look.beard === "stubble" && <path d="M32.500 48 Q35 66 50 69 Q65 66 67.500 48 Q62 58 56 58 Q50 57 44 58 Q38 58 32.500 48Z" fill={look.hair} opacity={0.28} />}
       {look.beard === "beard" && (
         <path d="M31.800 46 Q33 68 50 71 Q67 68 68.200 46 Q64 55 58.500 56.500 Q50 55 41.500 56.500 Q36 55 31.800 46Z" fill={look.hair} stroke={INK} strokeWidth={0.500} />
       )}
+      </g>
       {(look.beard === "moustache" || look.beard === "beard") && <path d="M43 53.500 Q47 51.500 50 53 Q53 51.500 57 53.500 Q53.500 55.500 50 54.500 Q46.500 55.500 43 53.500Z" fill={look.hair} stroke={INK} strokeWidth={0.400} />}
       <HairTop style={look.style} hair={look.hair} highlights={look.highlights} />
       {look.headband && <path d="M31 28 Q50 22 69 28 L69 32.500 Q50 27 31 32.500Z" fill={look.headband} stroke={INK} strokeWidth={0.500} />}
@@ -404,9 +419,9 @@ function ToonFace({look, mood}: {look: Look; mood: Mood}) {
       </g>
       {/* Eyes: a white almond, a big iris with a small pupil and a glint, a thick upper lid, a thin lower lid. */}
       {eyes.map((x, i) => {
-        const w = 4.600;
+        const w = 4.600 * es;
         const y = sad ? 41.200 : 40.300;
-        const white = `M${x - w} ${y} Q${x} ${y - 6} ${x + w} ${y} Q${x} ${y + 3.800} ${x - w} ${y}Z`;
+        const white = `M${x - w} ${y} Q${x} ${y - 6 * eo} ${x + w} ${y} Q${x} ${y + 3.800 * eo} ${x - w} ${y}Z`;
         return (
           <g key={x}>
             <clipPath id={`${uid}-eye${i}`}>
@@ -418,8 +433,8 @@ function ToonFace({look, mood}: {look: Look; mood: Mood}) {
               <circle cx={x + 0.200} cy={y - 0.300} r={1.400} fill={INK} />
               <circle cx={x + 1.100} cy={y - 1.200} r={0.850} fill="#fff" />
             </g>
-            <path d={`M${x - w - 0.500} ${y + 0.300} Q${x} ${y - 6.200} ${x + w + 0.500} ${y + 0.300}`} fill="none" stroke={INK} strokeWidth={0.950} />
-            <path d={`M${x - w + 0.800} ${y + 1.100} Q${x} ${y + 4.200} ${x + w - 0.800} ${y + 1.100}`} fill="none" stroke={shade(skin, -0.4)} strokeWidth={0.350} />
+            <path d={`M${x - w - 0.500} ${y + 0.300} Q${x} ${y - 6.200 * eo} ${x + w + 0.500} ${y + 0.300}`} fill="none" stroke={INK} strokeWidth={0.950} />
+            <path d={`M${x - w + 0.800} ${y + 1.100} Q${x} ${y + 4.200 * eo} ${x + w - 0.800} ${y + 1.100}`} fill="none" stroke={shade(skin, -0.4)} strokeWidth={0.350} />
             {look.lashes && look.beard === "none" && <path d={`M${x + (i === 0 ? -w : w)} ${y} l${i === 0 ? -1.400 : 1.400} -1.600`} fill="none" stroke={INK} strokeWidth={0.600} />}
           </g>
         );
@@ -432,8 +447,15 @@ function ToonFace({look, mood}: {look: Look; mood: Mood}) {
       )}
       {/* The nose: a flat rounded tip, a faint line down the bridge. */}
       <path d="M50.700 43 Q51.600 46 51.200 48" fill="none" stroke={shade(skin, -0.2)} strokeWidth={0.350} />
-      <ellipse cx={50.200} cy={49.800} rx={5.200} ry={2.500} fill={nose} />
-      <Mouth mood={mood} />
+      {look.freckles && (
+        <g fill={shade(skin, -0.4)} opacity={0.55}>
+          {[[37, 49], [41, 51.200], [35.500, 52], [63, 49], [59, 51.200], [64.500, 52], [39, 47], [61, 47], [44.500, 52.500], [55.500, 52.500]].map(([cx, cy]) => <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r={0.55} />)}
+        </g>
+      )}
+      {look.mole && <circle cx={look.mole === "left" ? 38.500 : look.mole === "right" ? 61.500 : 56} cy={look.mole === "lip" ? 60 : 53} r={0.75} fill={shade(skin, -0.55)} />}
+      <ellipse cx={50.200} cy={49.800} rx={5.200 * ns} ry={2.500 * (0.9 + 0.1 * ns)} fill={nose} />
+      {/* A smaller mouth on the faces with the longer chin. */}
+      <g transform={longChin(look) ? "translate(50 57) scale(0.8 1) translate(-50 -57)" : undefined}><Mouth mood={mood} /></g>
       {/* A small shadow under the lip. */}
       <path d="M47.500 61.400 Q50.500 62.600 53.500 61.400" fill="none" stroke={shade(skin, -0.25)} strokeWidth={0.500} />
     </g>

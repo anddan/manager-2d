@@ -1,7 +1,7 @@
 // Contract demands and negotiation. Players (via agents) accept, counter or
 // walk away depending on quality, age, form, interest and happiness.
 import {addMessage, book, playerName} from "./helpers";
-import {deservedRole, expectedWage, overall, wageBill} from "./ratings";
+import {clubPlayers, deservedRole, expectedWage, overall, wageBill} from "./ratings";
 import {clamp} from "./rng";
 import type {Contract, GameState, Player, SquadRole} from "./types";
 
@@ -180,4 +180,75 @@ export function signContract(state: GameState, playerId: string, clubId: string,
       action: {type: "player", playerId},
     });
   }
+}
+
+/** What the automatic renewal does with one player whose contract runs out this season. */
+export interface AutoRenewItem {
+  playerId: string;
+  /** The new contract (what the player asks for), if it is to be renewed. */
+  offer?: ContractOffer;
+  /** Why not, if it isn't (an i18n key under con.auto.reason). */
+  reason?: "refuses" | "old" | "weak" | "budget" | "cash";
+}
+
+/**
+ * Works out which expiring contracts to renew, smartly: the most important first (key players, then the best),
+ * on what each player asks for (always accepted), while the wage bill stays within the budget and the club can
+ * pay the signing bonuses. Players who won't stay, the old and the weak are left to go.
+ */
+/** `ignoreBudget`: renew even if the contracts break the wage budget (the manager has said so). */
+export function autoRenewPlan(state: GameState, ignoreBudget = false): AutoRenewItem[] {
+  const club = state.clubs[state.userClubId];
+  const squad = clubPlayers(state, club.id);
+  const median = squad.map(overall).sort((a, b) => a - b)[Math.floor(squad.length / 2)] ?? 0;
+  const expiring = squad
+    .filter((p) => p.contract.expiresSeason <= state.season)
+    .sort((a, b) => ROLE_RANK[b.contract.role] - ROLE_RANK[a.contract.role] || overall(b) - overall(a));
+  let bill = wageBill(state, club.id);
+  let cash = club.cash;
+  const items: AutoRenewItem[] = [];
+  for (const p of expiring) {
+    const neg = startNegotiation(state, p.id, club.id, "renewal");
+    if ("refused" in neg) {
+      items.push({playerId: p.id, reason: "refuses"});
+      continue;
+    }
+    const ovr = overall(p);
+    const promising = p.age <= 21 && p.potential - ovr >= 6;
+    const worth = promising || ROLE_RANK[p.contract.role] >= 2 || ovr >= median;
+    if (p.age >= 34 && p.contract.role !== "key") {
+      items.push({playerId: p.id, reason: "old"});
+      continue;
+    }
+    if (!worth) {
+      items.push({playerId: p.id, reason: "weak"});
+      continue;
+    }
+    const offer = neg.demand;
+    const nextBill = bill - p.contract.wage + offer.wage;
+    // The same room the club gives itself when it signs (a little over the budget is let through).
+    if (offer.wage > p.contract.wage && nextBill > club.wageBudget * 1.02 && !ignoreBudget) {
+      items.push({playerId: p.id, reason: "budget"});
+      continue;
+    }
+    if (offer.signingBonus > cash) {
+      items.push({playerId: p.id, reason: "cash"});
+      continue;
+    }
+    bill = nextBill;
+    cash -= offer.signingBonus;
+    items.push({playerId: p.id, offer});
+  }
+  return items;
+}
+
+/** Renews what the plan says; how many were renewed. */
+export function autoRenew(state: GameState, ignoreBudget = false): number {
+  let n = 0;
+  for (const item of autoRenewPlan(state, ignoreBudget)) {
+    if (!item.offer) continue;
+    signContract(state, item.playerId, state.userClubId, item.offer);
+    n++;
+  }
+  return n;
 }

@@ -64,6 +64,13 @@ export interface Look {
   headband?: string;
   /** Eye colour; missing means brown. */
   eyes?: string;
+  /** What sets one face apart from the next (missing: as usual): the eyes' size and how open they are, the nose, a tone of the skin, freckles, a mole. */
+  eyeSize?: number;
+  eyeOpen?: number;
+  nose?: number;
+  tone?: number;
+  freckles?: boolean;
+  mole?: "left" | "right" | "lip";
 }
 
 function seedOf(id: string): number {
@@ -105,7 +112,50 @@ export function lookFor(p: Player): Look {
 
 /** The look a player comes with: from their id, nationality, age and gender. */
 function bornLook(p: Player): Look {
-  return {...bornFace(p), eyes: bornEyes(p)};
+  const face = bornFace(p);
+  return {...face, ...bornExtras(p, face), eyes: bornEyes(p)};
+}
+
+/** The heads, the ears and the brows a generated player can have (the same ones the look editor offers). */
+const BORN_HEADS: [FaceShape, number][] = [["oval", 4], ["wide", 3], ["dimple", 2.5], ["wideDimple", 2]];
+const BORN_EARS: [string, number][] = [["normal", 5], ["small", 2], ["tilted", 2], ["long", 1.5], ["big", 1.5]];
+const BORN_BROWS: [string, number][] = [["normal", 4], ["thin", 2], ["thick", 3], ["soft", 2], ["angled", 2], ["thinAngled", 1], ["high", 1.5]];
+
+/**
+ * What makes players look different from each other beyond skin and hair: the head, the ears, the brows, the eyes
+ * and the nose, a wider choice of hair, now and then glasses, a headband, highlights, freckles or a mole.
+ * From a seed of its own, so the rest of a look stays as it was.
+ */
+function bornExtras(p: Player, face: Look): Partial<Look> {
+  const id = p.lookId ?? p.id;
+  if (FIXED_LOOKS[id]) return {};
+  const rng = new Rng(seedOf(id + ":face2"));
+  const dark = SKIN.indexOf(face.skin) >= 3;
+  const out: Partial<Look> = {
+    shape: rng.weighted(BORN_HEADS, ([, w]) => w)[0],
+    ears: rng.weighted(BORN_EARS, ([, w]) => w)[0],
+    browStyle: rng.weighted(BORN_BROWS, ([, w]) => w)[0],
+  };
+  // A wider choice of hair for many (not for the bald).
+  if (face.style !== "bald" && rng.chance(0.5)) {
+    const pool: [HairStyle, number][] =
+      p.gender === "f"
+        ? [["halfup", 3], ["topknot", 2], ["swept", 2], ["dreads", dark ? 3 : 0.3], ["coils", dark ? 3 : 0.4]]
+        : [["fade", 3], ["quiff", 3], ["swept", 2.5], ["topknot", 1], ["halfup", 0.8], ["dreads", dark ? 3 : 0.2], ["coils", dark ? 3 : 0.3], ["jamal", dark ? 1.5 : 0.1], ["messi", 1], ["cristiano", 1], ["haaland", 0.6]];
+    out.style = rng.weighted(pool, ([, w]) => w)[0];
+  }
+  // The small things that make one face differ from the next.
+  out.eyeGap = rng.range(7.6, 9.3);
+  out.eyeSize = rng.range(0.86, 1.16);
+  out.eyeOpen = rng.range(0.8, 1.14);
+  out.nose = rng.range(0.78, 1.32);
+  out.tone = rng.range(-0.055, 0.055);
+  if (rng.chance(SKIN.indexOf(face.skin) <= 2 ? 0.24 : 0.04)) out.freckles = true;
+  if (rng.chance(0.12)) out.mole = rng.pick(["left", "right", "lip"] as const);
+  if (rng.chance(p.age >= 22 ? 0.07 : 0.03)) out.glasses = true;
+  if (rng.chance(0.05)) out.headband = rng.pick(HEADBANDS);
+  if (rng.chance(0.06) && HAIR.indexOf(face.hair) <= 2) out.highlights = true;
+  return out;
 }
 
 /** Eye colour from its own seed (so the rest of everyone's look stays as it was): light eyes mostly up north. */

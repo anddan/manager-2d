@@ -2,6 +2,7 @@
 // squad. Better packs give better players; within a pack the lower end is
 // most likely.
 import {SQUAD_MAX, SQUAD_TEMPLATE} from "./constants";
+import {collectPack} from "./album";
 import {taskProgress} from "./daily";
 import {createPlayer} from "./generate";
 import {rollBonusGear, type GearItem} from "./gear";
@@ -53,6 +54,7 @@ export function drawDiamondChoice(state: GameState, rng: Rng): string[] {
     ids.push(p.id);
   }
   state.packChoice = ids;
+  collectPack(state, "diamond");
   taskProgress(state, "pack");
   return ids;
 }
@@ -85,6 +87,7 @@ export function openPack(state: GameState, rng: Rng, id: PlayerPackId): {playerI
   const player = createPlayer(state, rng, {position, level, age: rng.int(19, 31), clubId: state.userClubId, season: state.season});
   player.contract.expiresSeason = state.season + 3;
   state.scouted[player.id] = state.absWeek;
+  collectPack(state, id);
   taskProgress(state, "pack");
   // A small chance of a piece of kit as well.
   return {playerId: player.id, gear: rollBonusGear(state, rng, 0.08)};

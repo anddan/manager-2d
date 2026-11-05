@@ -8,6 +8,8 @@ import type {Negotiation} from "./game/contracts";
 import {newGame} from "./game/generate";
 import {fixShirts} from "./game/shirts";
 import {Rng} from "./game/rng";
+import {addSpending, thisWeek} from "./game/spending";
+import {topUpMansions} from "./game/morale";
 import {deleteSave, loadGame, saveGame} from "./game/save";
 import type {GameState, ManagerLook, PlayersGender} from "./game/types";
 import type {Params} from "./i18n";
@@ -32,6 +34,7 @@ export const VIEWS = [
   "contracts",
   "finance",
   "storage",
+  "album",
   "shop",
   "settings",
 ] as const;
@@ -117,10 +120,17 @@ export const useGame = create<Store>((set, get) => ({
     if (!current) throw new Error("No game loaded");
     const draft = structuredClone(current);
     const rng = new Rng(draft.rngState);
+    const before = {diamonds: current.monetization.diamonds, cash: current.clubs[current.userClubId]?.cash ?? 0, week: current.absWeek, club: current.userClubId};
     const result = fn(draft, rng);
+    // What was spent by hand (not a week's wages): counts towards the weekly spending package.
+    if (draft.absWeek === before.week && draft.userClubId === before.club) {
+      addSpending(draft, thisWeek(), before.diamonds - draft.monetization.diamonds, before.cash - (draft.clubs[draft.userClubId]?.cash ?? 0));
+    }
     draft.rngState = rng.state;
     // Everyone has a number of their own (new signings, loans back, a changed club).
     fixShirts(draft);
+    // Those with a mansion are always full on every bar.
+    topUpMansions(draft);
     saveGame(draft);
     set({game: draft});
     return result;

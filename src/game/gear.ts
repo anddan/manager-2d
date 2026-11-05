@@ -2,6 +2,7 @@
 // attributes while they're worn. Bought in the shop into the kit bag, put on (and
 // taken off) in the player's profile; they never wear out. The bonus counts in the
 // match and the line-up, not in the player's own attributes (so not in value or training).
+import {collectGear, collectPack} from "./album";
 import {book} from "./helpers";
 import type {Rng} from "./rng";
 import type {Attribute, GameState, Player} from "./types";
@@ -107,6 +108,7 @@ export function buyGear(state: GameState, item: GearItem, rng?: Rng): string | n
   // Now and then the piece comes with a perk (shown like a kit pack's).
   if (rng && !bought.perk && rng.next() < BOUGHT_PERK_CHANCE) bought.perk = rollPerk(rng, bought.kind);
   (state.gearBag ??= []).push(bought);
+  collectGear(state, bought);
   return null;
 }
 
@@ -199,6 +201,8 @@ export function rollBonusGear(state: GameState, rng: Rng, chance: number): GearI
   if (rng.next() >= chance) return undefined;
   const item = rollGearPack(rng);
   (state.gearBag ??= []).push(item);
+  collectGear(state, item);
+  collectPack(state, "kit");
   return item;
 }
 
@@ -208,5 +212,6 @@ export function openGearPack(state: GameState, rng: Rng): GearItem | string {
   state.monetization.diamonds -= GEAR_PACK.price;
   const item = rollGearPack(rng);
   (state.gearBag ??= []).push(item);
+  collectGear(state, item);
   return item;
 }

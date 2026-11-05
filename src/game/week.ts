@@ -11,6 +11,7 @@ import {finishCupStage, setupCup, userCupResult} from "./cup";
 import {announceAwards, seasonAwards} from "./awards";
 import {nationalWeek, offerNational} from "./national";
 import {weeklyStadium} from "./stadium";
+import {updateAlbum} from "./album";
 import {taskProgress} from "./daily";
 import {tutorialMatchSeed} from "./tutorial";
 import {addMessage, book, cupFixturesInStage, currentCupStage, currentRound, findFixture, fixturesInRound, fullName, leagueClubs, playerName} from "./helpers";
@@ -147,6 +148,7 @@ export function finishWeek(state: GameState, rng: Rng): MatchReport | undefined 
   weeklyMorale(state, rng);
   weeklyTransfers(state, rng);
   weeklyStadium(state, played);
+  updateAlbum(state);
   weeklyFinances(state, played);
   // The national team plays its friendlies and tournament matches.
   nationalWeek(state, rng);
@@ -248,14 +250,17 @@ function endSeason(state: GameState, rng: Rng): void {
     const count = rng.int(2, 3);
     const names: string[] = [];
     for (let i = 0; i < count; i++) {
+      // Now and then a wonder-kid comes through our own academy (the better the academy, the likelier); a stream of its own, so nothing else shifts.
+      const wonder = club.id === state.userClubId && new Rng(state.season * 7919 + i * 31 + 5).chance(0.03 + 0.012 * (club.stadium?.academy ?? 0));
       const p = createPlayer(state, rng, {
         position: rng.pick(POSITIONS),
         level: Math.round(level - rng.range(16, 24)),
         age: rng.int(16, 17),
         clubId: club.id,
         season: state.season,
-        potential: Math.round(clamp(level + rng.normal(0, 8) + club.facilities, 45, 92)),
+        potential: wonder ? 99 : Math.round(clamp(level + rng.normal(0, 8) + club.facilities, 45, 92)),
       });
+      if (club.id === state.userClubId) p.homegrown = true;
       p.contract.expiresSeason = state.season + 2;
       p.contract.role = "youth";
       if (club.id === state.userClubId) {
