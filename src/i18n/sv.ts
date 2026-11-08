@@ -1253,6 +1253,8 @@ export const sv = {
   "match.zoomIn": "Zooma in",
   "match.view3dTurn": "Rotera kameran",
   "match.view3d": "3D-vy",
+  "match.view3dLoading": "Laddar 3D … {pct} %",
+  "match.view3dError": "3D kunde inte starta på den här enheten ({why})",
   "match.view3dMissing": "3D-bygget saknas.",
   "match.zoomHint": "＋ Zooma in: planen tar hela rutan så du ser spelet närmare. − Zooma ut: hela arenan med publiken.",
   "match.help": "Vad gör knapparna?",

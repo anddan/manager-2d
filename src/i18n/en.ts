@@ -1249,6 +1249,8 @@ export const en: Record<keyof typeof sv, string> = {
   "match.zoomIn": "Zoom in",
   "match.view3dTurn": "Turn the camera",
   "match.view3d": "3D view",
+  "match.view3dLoading": "Loading 3D … {pct}%",
+  "match.view3dError": "3D could not start on this device ({why})",
   "match.view3dMissing": "The 3D build is missing.",
   "match.zoomHint": "＋ Zoom in: the pitch fills the frame so you see the play up close. − Zoom out: the whole stadium with the crowd.",
   "match.help": "What do the buttons do?",

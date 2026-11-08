@@ -223,6 +223,9 @@ export function useUnity3d(enabled: boolean, home: Club, away: Club, stands?: {n
   const known = useRef(new Set<string>());
   // Where the goal is on screen during a set piece (Unity tells us).
   const [goalRect, setGoalRect] = useState<GoalRect | null>(null);
+  // How loading goes (0..1), and why it failed if it did.
+  const [progress, setProgress] = useState(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!enabled) return;
@@ -243,6 +246,14 @@ export function useUnity3d(enabled: boolean, home: Club, away: Club, stands?: {n
     }
     const onMessage = (e: MessageEvent) => {
       if (e.source !== frame.current?.contentWindow) return;
+      if (e.data?.src === "forza-unity" && e.data.type === "progress") {
+        setProgress(Number(e.data.value) || 0);
+        return;
+      }
+      if (e.data?.src === "forza-unity" && e.data.type === "error") {
+        setLoadError(String(e.data.message ?? "?"));
+        return;
+      }
       if (e.data?.src === "forza-unity" && e.data.type === "goalRect") {
         setGoalRect(e.data as GoalRect);
         return;
@@ -284,5 +295,5 @@ export function useUnity3d(enabled: boolean, home: Club, away: Club, stands?: {n
     frame.current?.contentWindow?.postMessage({src: "forza", ...message}, "*");
   };
 
-  return {frame: frame as RefObject<HTMLIFrameElement>, ready, available, send, post, goalRect};
+  return {frame: frame as RefObject<HTMLIFrameElement>, ready, available, send, post, goalRect, progress, loadError};
 }

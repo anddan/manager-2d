@@ -1249,6 +1249,8 @@ export const es: Record<keyof typeof sv, string> = {
   "match.zoomIn": "Acercar",
   "match.view3dTurn": "Girar la cámara",
   "match.view3d": "Vista 3D",
+  "match.view3dLoading": "Cargando 3D … {pct} %",
+  "match.view3dError": "El 3D no pudo iniciarse en este dispositivo ({why})",
   "match.view3dMissing": "Falta la versión 3D.",
   "match.zoomHint": "＋ Acercar: el campo llena el recuadro para ver el juego de cerca. − Alejar: todo el estadio con el público.",
   "match.help": "¿Qué hacen los botones?",

@@ -1238,6 +1238,8 @@ export const fr: Record<keyof typeof sv, string> = {
   "match.zoomIn": "Zoomer",
   "match.view3dTurn": "Tourner la caméra",
   "match.view3d": "Vue 3D",
+  "match.view3dLoading": "Chargement de la 3D … {pct} %",
+  "match.view3dError": "La 3D n'a pas pu démarrer sur cet appareil ({why})",
   "match.view3dMissing": "La version 3D est absente.",
   "match.zoomHint": "＋ Zoomer : le terrain remplit le cadre pour voir le jeu de près. − Dézoomer : tout le stade avec le public.",
   "match.help": "À quoi servent les boutons ?",

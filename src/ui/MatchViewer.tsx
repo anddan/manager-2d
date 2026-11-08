@@ -2022,7 +2022,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   // Opens upwards when there's room above the button, otherwise downwards.
   const [menuUp, setMenuUp] = useState(true);
   // Watch the pitch, only follow the commentary, or see the zones the ball is in (remembered; a finished match from "Se matchen" always opens on the pitch). Without the pitch, set pieces are the assistant's.
-  const [matchView, setMatchViewState] = useState<MatchView>(() => (live ? readMatchView() : "pitch"));
+  const [matchView, setMatchViewState] = useState<MatchView>(() => (live ? readMatchView() : readMatchView() === "3d" ? "3d" : "pitch"));
   // Only the zones board hides the pitch; 3D is the pitch seen in 3D.
   const textOnly = matchView === "zones";
   const view3d = matchView === "3d";
@@ -3143,6 +3143,11 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
             </div>
           )}
           {view3d && !textOnly && unity.available && <iframe ref={unity.frame} className={`unity-frame${unity.ready ? " ready" : ""}`} src={UNITY_URL} title="3D" allow="autoplay" />}
+          {view3d && !textOnly && unity.available && !unity.ready && (
+            <div className="unity-loading" role="status">
+              {unity.loadError ? t("match.view3dError", {why: unity.loadError.slice(0, 80)}) : t("match.view3dLoading", {pct: Math.round(unity.progress * 100)})}
+            </div>
+          )}
           {view3d && !textOnly && unity.available === false && <div className="unity-missing" role="status">{t("match.view3dMissing")}</div>}
           {!textOnly && view3d && unity.ready && (
             <div className="view3d-zoom">

@@ -23,6 +23,10 @@
     var queue = [];
     var latest = null;
     var isMobile = /iPhone|iPad|Android/i.test(navigator.userAgent);
+    // Tell the page (the football manager) how loading goes, so it can show it: the frame itself is invisible until Unity is ready.
+    function tell(o) { try { o.src = "forza-unity"; window.parent.postMessage(o, "*"); } catch (e) {} }
+    window.addEventListener("error", function (e) { tell({type: "error", message: String(e.message || e)}); });
+    window.addEventListener("unhandledrejection", function (e) { tell({type: "error", message: String(e.reason)}); });
 
     window.addEventListener("message", function (e) {
       var d = e.data;
@@ -46,6 +50,7 @@
       devicePixelRatio: isMobile ? 1.5 : 1,
     }, function (p) {
       document.getElementById("fill").style.width = Math.round(p * 100) + "%";
+      tell({type: "progress", value: p});
     }).then(function (instance) {
       unity = instance;
       document.getElementById("loading").style.display = "none";
@@ -55,6 +60,7 @@
       window.parent.postMessage({src: "forza-unity", type: "ready"}, "*");
     }).catch(function (m) {
       document.getElementById("loading").textContent = String(m);
+      tell({type: "error", message: String(m)});
     });
   </script>
 </body>
