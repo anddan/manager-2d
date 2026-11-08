@@ -47,15 +47,27 @@ export function squeezeTops(places: {top: number; keeper: boolean}[], lean: numb
   return out;
 }
 
-/** Percent of the match so far that the ball has been in [own third, middle, opponent's third], from `side`'s view. */
-export function zoneShares(frames: Frame[], side: Side, upTo: number): [number, number, number] {
+/**
+ * Percent of the time that the ball has been in [own third, middle, opponent's third], from `side`'s view:
+ * over the last `window` minutes up to `upTo` (the whole match so far if it is not given).
+ */
+export function zoneShares(frames: Frame[], side: Side, upTo: number, window = Infinity): [number, number, number] {
   const time = [0, 0, 0];
-  for (let i = 0; i < frames.length; i++) {
+  const from = upTo - window;
+  // Frames are in time order: find the touch the window starts in, instead of walking from kick-off every frame.
+  let lo = 0;
+  let hi = frames.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (frames[mid].minute <= from) lo = mid + 1;
+    else hi = mid;
+  }
+  for (let i = Math.max(0, lo - 1); i < frames.length; i++) {
     const f = frames[i];
     if (f.minute >= upTo) break;
     // The ball stays where it was played until the next touch.
     const end = Math.min(frames[i + 1]?.minute ?? upTo, upTo);
-    const dt = end - f.minute;
+    const dt = end - Math.max(f.minute, from);
     if (dt <= 0) continue;
     const p = progressFor(side, f.x);
     time[p < 100 / 3 ? 0 : p < 200 / 3 ? 1 : 2] += dt;

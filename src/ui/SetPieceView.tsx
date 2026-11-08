@@ -9,6 +9,7 @@
 // Corners: tap the zone the cross should go to; each zone shows who goes up.
 import {iconize} from "./Icon";
 import {useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode} from "react";
+import {createPortal} from "react-dom";
 import {shortName} from "../game/helpers";
 import {
   CORNER_TARGETS,
@@ -32,6 +33,7 @@ import {Football} from "./Ball";
 import {Flag} from "./common";
 import {Figure, type Pose} from "./Figure";
 import {crowd, kick} from "./sound";
+import {DEFAULT_GOAL, goalToScreen, screenToGoal, type GoalRect} from "./unity3d";
 
 // Goal in SVG units: posts at x 20 and 100, bar at y 12, ground at y 52.
 const LEFT = 20;
@@ -69,6 +71,8 @@ interface Props {
   outcome?: SetPieceOutcome;
   onAnswer: (input: SetPieceInput | null) => void;
   onDone: () => void;
+  /** Penalties and free kicks shown in 3D (Unity): the aiming is laid over the 3D view instead of the drawn goal. */
+  stage3d?: {host: HTMLElement; post: (message: Record<string, unknown>) => void; goalRect: GoalRect | null};
 }
 
 export function SetPieceView(props: Props) {
@@ -194,9 +198,12 @@ function Crowd({colors}: {colors: string[]}) {
   );
 }
 
-function ShotView({sp, role, taker, keeper, defenders, shooters, keepers, outcome, onAnswer, onDone}: Props) {
+function ShotView({sp, role, taker, keeper, defenders, shooters, keepers, outcome, onAnswer, onDone, stage3d}: Props) {
   const {t} = useT();
   const svgRef = useRef<SVGSVGElement>(null);
+  const padRef = useRef<HTMLDivElement>(null);
+  const stageRef = useRef(stage3d);
+  stageRef.current = stage3d;
   const [drag, setDrag] = useState<{x: number; y: number} | null>(null);
   // Shooting: once aimed, a bar to stop in the green for a more exact shot (aim again to start over).
   const [aimed, setAimed] = useState<{x: number; y: number} | null>(null);
@@ -238,18 +245,23 @@ function ShotView({sp, role, taker, keeper, defenders, shooters, keepers, outcom
     if (outcome && struck === null) setStruck(nowRef.current);
   }, [outcome, struck]);
 
-  const toGoal = (e: PointerEvent<SVGSVGElement>) => {
+  const toGoal = (e: PointerEvent<Element>) => {
+    if (stageRef.current && padRef.current) {
+      // 3D: the touch is found in the goal from where Unity says the goal is on the screen.
+      const box = padRef.current.getBoundingClientRect();
+      return screenToGoal(stageRef.current.goalRect ?? DEFAULT_GOAL, (e.clientX - box.left) / box.width, (e.clientY - box.top) / box.height);
+    }
     const rect = svgRef.current!.getBoundingClientRect();
     const vx = ((e.clientX - rect.left) / rect.width) * 120;
     const vy = ((e.clientY - rect.top) / rect.height) * 75;
     return {x: (vx - CENTER) / (WIDTH / 2), y: (GROUND - vy) / HEIGHT};
   };
-  const onDown = (e: PointerEvent<SVGSVGElement>) => {
+  const onDown = (e: PointerEvent<Element>) => {
     if (outcome) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     setDrag(toGoal(e));
   };
-  const onMove = (e: PointerEvent<SVGSVGElement>) => {
+  const onMove = (e: PointerEvent<Element>) => {
     if (drag && !outcome) setDrag(toGoal(e));
   };
   const onUp = () => {
@@ -275,6 +287,31 @@ function ShotView({sp, role, taker, keeper, defenders, shooters, keepers, outcom
     const pool = (defenders ?? []).filter((p) => p.position !== "GK").sort((a, b) => b.attrs.physical - a.attrs.physical);
     return [0, 1, 2, 3].map((i) => pool[i]);
   }, [defenders]);
+
+  // 3D: tell Unity to set the scene when this opens and to let go of it when it closes, and how the kick went once it is taken.
+  useEffect(() => {
+    const st = stageRef.current;
+    if (!st) return;
+    st.post({
+      type: "sp",
+      active: true,
+      kind: sp.kind,
+      side: sp.side,
+      takerId: taker.id,
+      keeperId: keeper?.id ?? "",
+      role,
+      wallIds: wallPlayers.filter((w): w is Player => !!w).map((w) => w.id),
+      spotX: sp.spot.x * 1.05,
+      spotZ: sp.spot.y * 0.68,
+      wallSide: sp.wallSide,
+    });
+    return () => stageRef.current?.post({type: "sp", active: false});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const st = stageRef.current;
+    if (!st || !outcome) return;
+    st.post({type: "spShot", kind: sp.kind, result: outcome.result, shotX: outcome.shot.x, shotY: outcome.shot.y, dive: outcome.dive, wallSide: sp.wallSide});
+  }, [outcome]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The timeline after the choice: run-up, strike, flight, the result.
   const RUNUP = 450;
@@ -358,6 +395,65 @@ function ShotView({sp, role, taker, keeper, defenders, shooters, keepers, outcom
   const takerAt = {x: lerp(BALL.x - 14, BALL.x - 4.5, run), y: lerp(81, 77, run)};
   const takerPose: Pose = !outcome ? "ready" : e < RUNUP ? "run" : e < RUNUP + 300 ? "kick" : "ready";
   const goalNow = outcome?.result === "goal" && arrived;
+
+  if (stage3d) {
+    const rect = stage3d.goalRect ?? DEFAULT_GOAL;
+    const pct = (gx: number, gy: number) => {
+      const q = goalToScreen(rect, gx, gy);
+      return {x: q[0] * 100, y: q[1] * 100};
+    };
+    const halfW = (Math.abs(rect.br[0] - rect.bl[0]) / 2) * 100;
+    const goalH = Math.abs(rect.bl[1] - rect.tl[1]) * 100;
+    const at = drag ?? aimed;
+    const sg = shotSpread(taker, sp.kind) * (drag ? 1 : timingFactor(liveTiming)) * 1.3;
+    const ballAt = {x: rect.ball[0] * 100, y: rect.ball[1] * 100};
+    return createPortal(
+      <div className="sp3d">
+        {/* The pad catches the aiming; the panels above it keep their own taps. */}
+        <div className="sp3d-pad" ref={padRef} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} />
+        <svg className="sp3d-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
+          {ours && at && !outcome && <line x1={ballAt.x} y1={ballAt.y} x2={pct(at.x, at.y).x} y2={pct(at.x, at.y).y} className="sp3d-aimline" vectorEffect="non-scaling-stroke" />}
+          {role === "keeper" && drag && !outcome && <line x1={pct(0, 0.3).x} y1={pct(0, 0.3).y} x2={pct(drag.x, 0.3).x} y2={pct(drag.x, 0.3).y} className="sp3d-aimline keeper" vectorEffect="non-scaling-stroke" />}
+        </svg>
+        {ours && at && !outcome && (
+          <>
+            <div className="sp3d-spread" style={{left: `${pct(at.x, at.y).x}%`, top: `${pct(at.x, at.y).y}%`, width: `${sg * halfW * 2}%`, height: `${sg * 0.8 * goalH * 2}%`}} />
+            <div className="sp3d-target" style={{left: `${pct(at.x, at.y).x}%`, top: `${pct(at.x, at.y).y}%`}} />
+          </>
+        )}
+        <div className="sp3d-top">
+          <strong>{title}</strong>
+          <span className="sp3d-duel">{shortName(taker)}{keeper ? ` – ${shortName(keeper)}` : ""}</span>
+          {!outcome && <span className="clock">{iconize(t("sp.seconds", {s: left}))}</span>}
+        </div>
+        <div className="sp3d-bottom">
+          {outcome && showResult ? (
+            <p className={`sp-result sp-${outcome.result}`}>{iconize(t(`sp.result.${outcome.result}`))}</p>
+          ) : role === "shooter" && aimed ? (
+            <div className="sp-timing-wrap">
+              <button type="button" className="sp-timing" data-level={level} disabled={outcome !== undefined} onClick={stop} aria-label={t("sp.shoot")}>
+                <span className="sp-timing-track">
+                  <span className="sp-timing-sweet" />
+                  <span className="sp-timing-ticks" />
+                  <span className="sp-timing-marker" style={{left: `${(stoppedAt ?? markerAt) * 100}%`}} />
+                </span>
+                <span className="sp-timing-label">{outcome ? rated ?? "\u00a0" : iconize(t("sp.shoot"))}</span>
+              </button>
+              {!outcome && <p className="muted small">{iconize(t("sp.timingHint"))}</p>}
+            </div>
+          ) : outcome ? null : (
+            <>
+              <p className="sp3d-hint">{ours ? t("sp.aimHint", {name: shortName(taker)}) : t("sp.diveHint", {name: shortName(taker), keeper: (keeper ? shortName(keeper) : undefined) ?? "?"})}</p>
+              <div className="btn-row">
+                <button className="btn small" onClick={() => answer(null)}>{iconize(t("sp.auto"))}</button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>,
+      stage3d.host
+    );
+  }
 
   return (
     <div className="setpiece">

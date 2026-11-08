@@ -998,7 +998,7 @@ class Replay {
       const near = this.rng.chance(0.25);
       const low = near ? !farLow : farLow;
       const corner = low ? this.rng.range(45.2, 47.5) : this.rng.range(52.5, 54.8);
-      const reach = low ? this.rng.range(45.8, 48.8) : this.rng.range(51.2, 54.2);
+      const reach = low ? this.rng.range(45.6, 48.2) : this.rng.range(51.8, 54.4);
       if (outcome.type === "goal") {
         add("goal", undefined, fromSide(side, 100, corner));
         this.carrier = null;
@@ -1038,6 +1038,13 @@ class Replay {
       Object.assign(last, {kind, playerId: id, possession: defending.side});
       if (id) this.carrier = {id, side: defending.side};
     };
+    // A ball in behind that gets to the forward (in the box): they are through on the keeper, so they shoot, and the keeper has to save it.
+    if (last?.kind === "pass" && last.flight === "through" && last.playerId && keeper && progressFor(attacking.side, last.x) > 72) {
+      const low = this.rng.chance(0.5);
+      add("save", keeper, fromSide(attacking.side, 97, low ? this.rng.range(45.6, 48.2) : this.rng.range(51.8, 54.4)), defending.side);
+      this.restart = {side: defending.side, kind: "keeper"};
+      return;
+    }
     if (last?.kind === "pass" && inBox && keeper && (last.flight === "cross" || last.flight === "through") && this.rng.chance(KEEPER_CLAIM_CHANCE)) {
       won("save", keeper);
       this.restart = {side: defending.side, kind: "keeper"};

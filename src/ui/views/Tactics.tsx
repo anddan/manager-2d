@@ -211,7 +211,7 @@ export function Tactics() {
     <li key={p.id} className={!isAvailable(p) ? "out-row" : onBench ? "bench-row" : "rest-row"} data-zone={isAvailable(p) ? (onBench ? "bench" : "rest") : undefined} data-player={p.id}>
       <div className="pick">
         <span className="drag-handle" title={t("tac.dragIn")} onPointerDown={isAvailable(p) ? (e) => drag.start(e, p.id, null, shortName(p)) : undefined}>
-          <Jersey color={kit.color} trim={kit.color2} pattern={kit.pattern} trim3={kit.color3} collar={kit.collar} sleeves={kit.sleeves} keeper={p.position === "GK"} size={26} />
+          <Jersey color={kit.color} trim={kit.color2} pattern={kit.pattern} trim3={kit.color3} collar={kit.collar} sleeves={kit.sleeves} keeper={p.position === "GK"} number={p.shirt} size={30} />
         </span>
         <input type="checkbox" className="bench-check" aria-label={t("tac.toBench")} checked={onBench} disabled={!isAvailable(p)} onChange={() => toggleBench(p.id)} />
         <PosBadge pos={p.position} />
@@ -588,7 +588,7 @@ function NextMatch() {
                   {cup ? <><Icon name="trophy" size={16} /> {iconize(t("cup.name"))} · {iconize(t(CUP_STAGES[next.stage]))}</> : <><Icon name="ball" size={16} /> {game.leagueName} · {iconize(t("ov.round", {round: next.round}))}</>}
                 </button>
               }
-              b={<span className="mp-what static"><Icon name="clock" size={16} /> {t("ov.nextMatch")}</span>}
+              b={<button type="button" className="mp-what" onClick={() => setView(cup ? "cup" : "table")}><Icon name="clock" size={16} /> {t("ov.nextMatch")}</button>}
             />
             {/* The weather and the time (only for show) and home or away take turns. */}
             <Swap

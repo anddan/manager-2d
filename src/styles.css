@@ -3292,3 +3292,30 @@ body:has(.intro) .modal-backdrop { z-index: 200; }
 
 /* The leaning is done by the browser: the places glide when the percentages change (nothing is moved every frame). */
 .zone-slot:not(.leaving) { transition: top 1.2s ease-out; }
+
+/* The 3D match (Unity) laid over the pitch; the 2D pitch under it stays clickable. */
+.unity-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; border-radius: 8px; background: #0b1430; pointer-events: none; opacity: 0; transition: opacity 0.4s; }
+.unity-frame.ready { opacity: 1; }
+.unity-missing { position: absolute; top: 6px; left: 50px; z-index: 2; padding: 6px 12px; border-radius: 999px; background: rgb(11 20 48 / 0.85); color: #fff; font-size: 0.8rem; font-weight: 700; }
+
+/* Zoom for the 3D camera: plus and minus under the 3D button. */
+.view3d-zoom { position: absolute; top: 48px; left: 6px; z-index: 2; display: grid; gap: 6px; }
+.view3d-zoom .btn { width: 36px; height: 36px; padding: 0; border-radius: 50%; display: inline-grid; place-items: center; background: rgb(11 20 48 / 0.75); color: #fff; border-color: rgb(255 255 255 / 0.25); }
+.view3d-zoom .ctl-icon { width: 16px; height: 16px; fill: currentColor; }
+.pitch-wrap.maxed .view3d-zoom { top: calc(var(--edge-t, 14px) + 42px); left: var(--edge-r, 14px); }
+
+/* A penalty or free kick in 3D: the aiming laid over the 3D view. */
+.sp3d { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
+.sp3d-pad { position: absolute; inset: 0; pointer-events: auto; touch-action: none; cursor: crosshair; }
+.sp3d-lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.sp3d-aimline { stroke: #fde047; stroke-width: 2; stroke-dasharray: 5 4; opacity: 0.9; }
+.sp3d-aimline.keeper { stroke: #38bdf8; stroke-width: 3; stroke-dasharray: none; }
+.sp3d-spread { position: absolute; transform: translate(-50%, -50%); border-radius: 50%; border: 2px dashed rgb(253 224 71 / 0.8); background: rgb(253 224 71 / 0.12); pointer-events: none; }
+.sp3d-target { position: absolute; width: 14px; height: 14px; transform: translate(-50%, -50%); border-radius: 50%; background: #fde047; box-shadow: 0 0 0 3px rgb(0 0 0 / 0.45); pointer-events: none; }
+.sp3d-top, .sp3d-bottom { position: absolute; left: 8px; right: 8px; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 12px; pointer-events: none; }
+.sp3d-top { top: 8px; padding: 6px 12px; border-radius: 12px; background: rgb(11 20 48 / 0.78); color: #fff; }
+.sp3d-top .sp3d-duel { opacity: 0.85; font-size: 0.85rem; }
+.sp3d-bottom { bottom: 8px; flex-direction: column; }
+.sp3d-bottom > * { pointer-events: auto; }
+.sp3d-hint { margin: 0; padding: 4px 12px; border-radius: 999px; background: rgb(11 20 48 / 0.78); color: #fff; font-size: 0.82rem; text-align: center; }
+.sp3d-bottom .sp-result { margin: 0; padding: 6px 16px; border-radius: 12px; background: rgb(11 20 48 / 0.85); }

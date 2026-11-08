@@ -6,6 +6,15 @@ import {zoneColor, zoneShares} from "./ZonePanel";
 const f = (minute: number, x: number): Frame => ({minute, x, y: 50, possession: "home"});
 
 describe("zoneShares", () => {
+  it("can look at only the last minutes", () => {
+    // 30 minutes in the own third, then 10 in the opponent's: the last 10 minutes are all attack.
+    const frames = [f(0, 10), f(30, 90)];
+    expect(zoneShares(frames, "home", 40)).toEqual([75, 0, 25]);
+    expect(zoneShares(frames, "home", 40, 10)).toEqual([0, 0, 100]);
+    // A window that starts in the middle of a touch counts only the part inside it.
+    expect(zoneShares(frames, "home", 40, 20)).toEqual([50, 0, 50]);
+  });
+
   it("adds up to 100 and follows where the ball was and for how long", () => {
     // Home attacks towards x = 100: 10 minutes in its own third, 10 in the middle, 20 in the opponent's.
     const frames = [f(0, 10), f(10, 50), f(20, 90)];

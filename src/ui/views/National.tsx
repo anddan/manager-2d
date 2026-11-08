@@ -186,7 +186,11 @@ export function National() {
                   ) : (
                     <span className="mp-what"><Icon name="ball" size={16} /> {stage ? `${title} · ${stage}` : title}</span>
                   )}
-                  b={<span className="mp-what static"><Icon name="clock" size={16} /> {t(played ? "national.fullTime" : "ov.nextMatch")}</span>}
+                  b={comp === "wc" || comp === "ec" ? (
+                    <button type="button" className="mp-what" onClick={() => setView("tournament")}><Icon name="clock" size={16} /> {t(played ? "national.fullTime" : "ov.nextMatch")}</button>
+                  ) : (
+                    <span className="mp-what static"><Icon name="clock" size={16} /> {t(played ? "national.fullTime" : "ov.nextMatch")}</span>
+                  )}
                 />
                 {/* The weather and the time take turns with how long it is to the match. */}
                 {cond && (

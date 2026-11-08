@@ -26,6 +26,7 @@ import {GearPicture} from "./Gear";
 import {MATCH_VIEWS, readMatchView, readShowRatings, readZoneMove, writeMatchView, writeShowRatings, type MatchView} from "./matchView";
 import {MatchStats, ZonePanel, matchStats, playerMarks, possessionShares, usePlateBar, zoneShares} from "./ZonePanel";
 import {matchClubs} from "../game/kit";
+import {UNITY_URL, ZOOM_STEPS, playerInfo, prefetchUnity, readSide3d, readZoom3d, toMetres, useUnity3d, writeSide3d, writeZoom3d} from "./unity3d";
 import {boardSpots} from "./views/Tactics";
 import {FORMATION_IDS, type FormationId} from "../game/types";
 import {memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode} from "react";
@@ -102,6 +103,8 @@ const SHOUT_MS = 3200;
 const SET_PIECES_KEY = "manager2d.manualSetPieces";
 const SUBS_KEY = "manager2d.manualSubs";
 const SPEED_KEY = "manager2d.matchSpeed";
+/** The zones (the percentages, and how the lines lean) follow the last this many minutes of play. */
+const ZONE_WINDOW = 10;
 /** Finishing above this: every shot flies with a tail of fire. */
 const FIRE_FINISHING = 95;
 
@@ -539,6 +542,8 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
       const f = fr(k);
       // A goal ends up in the back of the net.
       if (f.kind === "goal" || f.kind === "nogoal") return {x: f.x > 50 ? NET_DEPTH : 100 - NET_DEPTH, y: f.y};
+      // A shot that is saved goes where the save is made (the keeper gets across to it), not at wherever the keeper stands.
+      if (f.kind === "save" && !f.flight) return f;
       // Played into space for someone to run onto: the shooting position, a cross into
       // the box, a ball in behind. Never further than they can get to in time (then it's
       // played nearer to them, on their way there), so nobody else is left standing by it.
@@ -660,7 +665,9 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
     const travelling = !!heading && flying;
     const held = reached >= 0 ? fr(reached) : undefined;
     const carrierId = !travelling && held?.playerId && held.kind !== "goal" ? held.playerId : undefined;
-    const receiver = travelling && heading.playerId && heading.minute - t < 1 ? heading : undefined;
+    // (A keeper only reacts once the shot is struck, and dives late, not as soon as the ball is played.)
+    const shotSave = travelling && heading.kind === "save" && !heading.flight;
+    const receiver = travelling && heading.playerId && heading.minute - t < (shotSave ? 0.3 : 1) ? heading : undefined;
     const receiverId = receiver?.playerId;
     // Players who get the ball in the next few touches start heading there now.
     const upcoming = new Map<string, Frame>();
@@ -966,7 +973,7 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
         if (receiverId === id && receiver) {
           // Meeting a pass or carrying a dribble: as fast as it takes to be there on time (within reason).
           const need = distance(body, receiver) / Math.max(0.05, receiver.minute - t);
-          top = Math.min(top * CATCH_UP, Math.max(top, need));
+          top = Math.min(top * (shotSave && receiver.kind === "save" ? 3.2 : CATCH_UP), Math.max(top, need));
         } else if (late && (id === carrierId || upcoming.has(id))) {
           // The ball is waiting on them.
           top *= CATCH_UP;
@@ -1983,6 +1990,13 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
       return true;
     }
   });
+  // The 3D view (Unity) on top of the pitch, if the manager has chosen it.
+  const [zoom3d, setZoom3d] = useState(readZoom3d);
+  const [side3d, setSide3d] = useState(() => readSide3d(live?.userSide));
+  // The 3D build is fetched in the background while the match starts, so switching 3D on is quick.
+  useEffect(() => {
+    prefetchUnity();
+  }, []);
   // Zoomed out: the home ground, however big it has been built.
   const homeStands = game.clubs[report.homeId]?.stadium?.stands ?? NO_STANDS;
   const standsKey = `${homeStands.north}-${homeStands.south}-${homeStands.west}-${homeStands.east}`;
@@ -2009,7 +2023,9 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   const [menuUp, setMenuUp] = useState(true);
   // Watch the pitch, only follow the commentary, or see the zones the ball is in (remembered; a finished match from "Se matchen" always opens on the pitch). Without the pitch, set pieces are the assistant's.
   const [matchView, setMatchViewState] = useState<MatchView>(() => (live ? readMatchView() : "pitch"));
-  const textOnly = matchView !== "pitch";
+  // Only the zones board hides the pitch; 3D is the pitch seen in 3D.
+  const textOnly = matchView === "zones";
+  const view3d = matchView === "3d";
   // The players moving about on the zones board is a setting.
   const [zoneMove] = useState(readZoneMove);
   useEffect(() => {
@@ -2770,7 +2786,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   if (touchedRef.current.k !== view.reached) touchedRef.current = {k: view.reached, at: view.time};
   const sinceTouch = view.time - touchedRef.current.at;
   const lastTouch = report.frames[view.reached];
-  const air: Record<string, {lift: number; dive?: number}> = {};
+  const air: Record<string, {lift: number; dive?: number; slide?: boolean}> = {};
   if (lastTouch?.playerId && sinceTouch >= 0 && sinceTouch < 0.12) {
     const who = view.subs?.[view.reached] ?? lastTouch.playerId;
     const pop = Math.sin((sinceTouch / 0.12) * Math.PI);
@@ -2793,7 +2809,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
     }
     if (lastTouch.kind === "tackle" && lastTouch.slide && view.bodies[who] && prev) {
       const b = view.bodies[who];
-      air[who] = {lift: pop * 0.7, dive: (Math.atan2((prev.y - b.y) * 0.68, (prev.x - b.x) * 1.05) * 180) / Math.PI};
+      air[who] = {lift: pop * 0.7, slide: true, dive: (Math.atan2((prev.y - b.y) * 0.68, (prev.x - b.x) * 1.05) * 180) / Math.PI};
     }
     if (lastTouch.kind === "save" && view.bodies[who]) {
       const b = view.bodies[who];
@@ -2802,6 +2818,66 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
     }
   }
 
+  // The 3D view is told where everyone is, every frame; Unity only draws.
+  const unity = useUnity3d(view3d, home, away, homeStands, report.crowd?.rate ?? 1);
+  const setPieceOpen = !!live && (needsShootout || !!current);
+  // A penalty or a free kick the manager takes over, with 3D on: Unity shows it, and the aiming is laid over the 3D view.
+  const sp3d = !!live && !needsShootout && !!current && current.sp.kind !== "corner" && view3d && unity.ready && !!unity.available;
+  useEffect(() => {
+    if (!view3d) return;
+    const onPitch = (["home", "away"] as const).flatMap((side) => [...onPitchAt(report, side, view.time).values()].map((id) => ({id, side})));
+    const ballAt = toMetres(view.ball.x, view.ball.y);
+    const captains = {
+      home: pickCaptain(home.roles?.captain, onPitch.filter((o) => o.side === "home").map((o) => o.id), game.players),
+      away: pickCaptain(away.roles?.captain, onPitch.filter((o) => o.side === "away").map((o) => o.id), game.players),
+    };
+    const celebrateSide = freeze?.kind === "goal" && !replay ? freeze.side : celebrating;
+    unity.send(
+      {
+        time: view.time,
+        zoom: ZOOM_STEPS[zoom3d],
+        view: side3d,
+        fire: fireShot,
+        running,
+        ball: {x: ballAt.x, z: ballAt.z, h: +(height * 8).toFixed(2)},
+        carrier: carrierId,
+        phase: replay ? "replay" : freeze?.kind ?? "play",
+        side: freeze?.side,
+        players: onPitch.flatMap(({id, side}) => {
+          const b = view.bodies[id];
+          if (!b || (finished && b.y > IN_TUNNEL)) return [];
+          const at = toMetres(b.x, b.y);
+          const a = air[id];
+          const mine = side === userSide;
+          return [{
+            id,
+            side,
+            x: at.x,
+            z: at.z,
+            vx: +(b.vx * 1.05).toFixed(2),
+            vz: +(b.vy * 0.68).toFixed(2),
+            sprint: b.sprint,
+            lift: a?.lift ?? 0,
+            dive: a?.dive ?? 0,
+            diving: a?.dive !== undefined,
+            slide: !!a?.slide,
+            // What the manager has done: "Forza!" lights up the side, orders light up the players they are for, the one picked for orders has a ring.
+            forza: forzaSide === side,
+            shouted: mine && (shoutedAt.has(id) || toEveryone),
+            selected: id === selected,
+            celebrate: celebrateSide === side,
+            captain: captains[side] === id,
+            mark: !replay && freeze?.kind === "goal" && id === freeze.scorerId ? "scorer" : !replay && freeze?.kind === "goal" && id === freeze.assistId ? "assist" : "",
+          }];
+        }),
+      },
+      (id) => {
+        const p = live?.player(id) ?? game.players[id];
+        if (!p) return undefined;
+        return playerInfo(p, onPitch.find((o) => o.id === id)?.side ?? "home");
+      }
+    );
+  });
 
   const scorer = freeze?.kind === "goal" ? game.players[freeze.scorerId ?? ""] : undefined;
   const scoringClub = freeze?.kind === "goal" ? (freeze.side === "home" ? home : away) : undefined;
@@ -2827,7 +2903,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
     // In the zones view the manager calls out at the touchline of the board itself.
     if (matchView === "zones" || shouts.length === 0 || !userSide || typeof document === "undefined") return null;
     const r = pitchRef.current?.getBoundingClientRect();
-    if (!r) return null;
+    if (!r || r.width === 0) return null;
     const bottom = window.innerHeight - r.bottom + (maxed ? 60 : 6);
     const at = userSide === "home" ? {right: window.innerWidth - (r.left + r.width * 0.48)} : {left: r.left + r.width * 0.52};
     return createPortal(
@@ -2874,7 +2950,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
         )}
       </div>
 
-      {!maxed && matchView !== "pitch" && (
+      {!maxed && matchView === "zones" && (
         <MatchStats
           // The first five minutes the numbers hold still (they jump back and forth while the play finds its shape).
           possession={view.time < 10 ? [50, 50] : possessionShares(report.frames ?? [], view.time)}
@@ -2904,6 +2980,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
         <div className={maxed ? "setpiece-max" : undefined}>
         <SetPieceView
           key={current.sp.index}
+          stage3d={sp3d && pitchRef.current ? {host: pitchRef.current, post: unity.post, goalRect: unity.goalRect} : undefined}
           sp={current.sp}
           role={live.role(current.sp) ?? "shooter"}
           taker={game.players[current.sp.takerId]}
@@ -2917,8 +2994,11 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
           onDone={() => setShown(null)}
         />
         </div>
-      ) : (
-        <div className={`pitch-wrap ${maxed ? "maxed" : ""} ${textOnly ? "text-only" : ""} ${matchView === "zones" ? "zones" : ""}`} ref={pitchRef}>
+      ) : null}
+
+      {/* During a set piece or a shootout the pitch is only hidden when the 3D view is on: unmounting it would make Unity load all over again. */}
+      {(!setPieceOpen || (view3d && unity.available)) && (
+        <div className={`pitch-wrap ${maxed ? "maxed" : ""} ${textOnly ? "text-only" : ""} ${matchView === "zones" ? "zones" : ""}`} ref={pitchRef} style={setPieceOpen && !sp3d ? {display: "none"} : undefined}>
           {matchView === "zones" && (() => {
             // The lineup as in Tactics, the ball's zones behind it and the possession above.
             const side = userSide;
@@ -2961,7 +3041,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
             return (
               <ZonePanel
                 // The first ten minutes the numbers hold still (they jump back and forth while the play finds its shape).
-                shares={view.time < 5 ? [33, 34, 33] : zoneShares(report.frames ?? [], userSide ?? "home", view.time)}
+                shares={view.time < 5 ? [33, 34, 33] : zoneShares(report.frames ?? [], userSide ?? "home", view.time, ZONE_WINDOW)}
                 forza={forzaOn}
                 pass={passInfo}
                 leaving={finished || freeze?.kind === "fulltime" || freeze?.kind === "halftime"}
@@ -2982,7 +3062,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
               />
             );
           })()}
-          <svg className="pitch" viewBox={viewBox} role="img" aria-label={t("match.pitch")}>
+          <svg className="pitch" viewBox={viewBox} role="img" aria-label={t("match.pitch")} style={view3d && unity.ready && unity.available ? {visibility: "hidden"} : undefined}>
             <Stands home={home} away={away} cheering={(freeze?.kind === "goal" || (freeze?.kind === "fulltime" && decided)) && !replay ? freeze.side : null} boards={(userSide === "away" ? away : home).color} fill={report.crowd?.rate ?? 1} />
             {PITCH}
             <Dugouts home={home} away={away} />
@@ -3062,9 +3142,21 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
               </button>
             </div>
           )}
-          <button className="btn small zoom-btn" onClick={toggleZoom} aria-pressed={zoomedIn} title={zoomedIn ? t("match.zoomOut") : t("match.zoomIn")} aria-label={zoomedIn ? t("match.zoomOut") : t("match.zoomIn")}>
+          {view3d && !textOnly && unity.available && <iframe ref={unity.frame} className={`unity-frame${unity.ready ? " ready" : ""}`} src={UNITY_URL} title="3D" allow="autoplay" />}
+          {view3d && !textOnly && unity.available === false && <div className="unity-missing" role="status">{t("match.view3dMissing")}</div>}
+          {!textOnly && view3d && unity.ready && (
+            <div className="view3d-zoom">
+              <button className="btn small" onClick={() => setZoom3d((z) => { const n = Math.max(0, z - 1); writeZoom3d(n); return n; })} disabled={zoom3d === 0} title={t("match.zoomIn")} aria-label={t("match.zoomIn")}><ControlIcon kind="plus" /></button>
+              <button className="btn small" onClick={() => setZoom3d((z) => { const n = Math.min(ZOOM_STEPS.length - 1, z + 1); writeZoom3d(n); return n; })} disabled={zoom3d === ZOOM_STEPS.length - 1} title={t("match.zoomOut")} aria-label={t("match.zoomOut")}><ControlIcon kind="minus" /></button>
+              <button className="btn small" onClick={() => setSide3d((v) => { const n = (v + 1) % 4; writeSide3d(n); return n; })} title={t("match.view3dTurn")} aria-label={t("match.view3dTurn")}>
+                <svg className="ctl-icon" viewBox="0 0 16 16" aria-hidden><path d="M8 2.5a5.5 5.5 0 1 0 5.2 3.7l-1.5.5A4 4 0 1 1 8 4V6l3-2.500-3-2.500v1.500z" /></svg>
+              </button>
+            </div>
+          )}
+          {/* The 3D view has its own zoom buttons. */}
+          {!(view3d && unity.ready && unity.available) && <button className="btn small zoom-btn" onClick={toggleZoom} aria-pressed={zoomedIn} title={zoomedIn ? t("match.zoomOut") : t("match.zoomIn")} aria-label={zoomedIn ? t("match.zoomOut") : t("match.zoomIn")}>
             <ControlIcon kind={zoomedIn ? "minus" : "plus"} />
-          </button>
+          </button>}
           {freeze?.kind === "nogoal" && !replay && <NoGoalBanner key={freeze.key} style={sideBorder(freeze.side)} reason={report.events.find((e) => e.type === "disallowed" && e.side === freeze.side && e.minute === Math.ceil(freeze.time))?.note} />}
           {freeze?.kind === "restart" && freeze.restart && !replay && (
             <div className="setup-banner" style={sideBorder(freeze.side)}>
@@ -3186,7 +3278,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
                     <span className="speed-group manager-view" role="group">
                       {MATCH_VIEWS.map((v) => (
                         <button key={v} className={matchView === v ? "chip active" : "chip"} title={t(`match.view.${v}`)} onClick={() => { setMatchView(v); setMenuOpen(false); }}>
-                          <Icon name={v === "pitch" ? "video" : v === "text" ? "chat" : "chart"} size={16} /> {t(`match.viewShort.${v}`)}
+                          <Icon name={v === "pitch" ? "video" : v === "3d" ? "ball" : "chart"} size={16} /> {t(`match.viewShort.${v}`)}
                         </button>
                       ))}
                     </span>

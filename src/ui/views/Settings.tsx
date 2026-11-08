@@ -62,7 +62,7 @@ export function Settings() {
   const [avatarStyle, setAvatarStyle] = useState<AvatarStyle>(readAvatarStyle());
   // How a match is played: the way to watch it, how fast, who takes set pieces and changes, the view, buzz and effects.
   const [matchView, setMatchViewState] = useState<MatchView>(() => readMatchView());
-  const noPitch = matchView !== "pitch";
+  const noPitch = matchView === "zones";
   const [speed, setSpeed] = usePref<string>("manager2d.matchSpeed", "1");
   const [setPieces, setSetPieces] = usePref<"auto" | "self">("manager2d.manualSetPieces", "auto");
   const [subs, setSubs] = usePref<"auto" | "self">("manager2d.manualSubs", "auto");
@@ -145,7 +145,7 @@ export function Settings() {
             <span className="speed-group manager-view" role="radiogroup" aria-label={t("settings.view")}>
               {MATCH_VIEWS.map((v) => (
                 <button key={v} type="button" role="radio" aria-checked={matchView === v} className={matchView === v ? "chip active" : "chip"} title={t(`match.view.${v}`)} onClick={() => { setMatchViewState(v); writeMatchView(v); if (v !== "pitch") setSetPieces("auto"); }}>
-                  <Icon name={v === "pitch" ? "video" : v === "text" ? "chat" : "chart"} size={16} /> {t(`match.viewShort.${v}`)}
+                  <Icon name={v === "pitch" ? "video" : v === "3d" ? "ball" : "chart"} size={16} /> {t(`match.viewShort.${v}`)}
                 </button>
               ))}
             </span>
