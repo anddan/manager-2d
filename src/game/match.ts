@@ -362,6 +362,8 @@ class Replay {
   private fired: Side | null = null;
   private state: GameState;
   private rng: Rng;
+  /** The side without the ball in the minute being drawn (to see who is free and who is marked). */
+  private opp: Team | null = null;
 
   constructor(state: GameState, rng: Rng) {
     this.state = state;
@@ -642,6 +644,15 @@ class Replay {
       // Football is played on the flanks: out to the winger or overlapping full-back.
       const wide = team.slots[o.slot].pos === "W" || team.slots[o.slot].pos === "FB";
       if (wide && progress > 30 && progress < 78) w *= fromPos === "W" || fromPos === "FB" ? 1.5 : 2.3;
+      // Football intelligence: pass to the man who is free, not the one with a defender on him. Passers who see the game (vision) pick
+      // the free man far more reliably, and a pass into the open is worth more the further up the pitch it is.
+      if (this.opp) {
+        let nearest = Infinity;
+        for (const d of this.opp.onPitch) nearest = Math.min(nearest, distance(this.spot(this.opp, d.id, false), spot));
+        const space = clamp(nearest / 9, 0.4, 1.8);
+        const reads = 0.25 + vision / 90;
+        w *= 1 + (space - 1) * reads * (progress > 40 ? 1.2 : 1);
+      }
       return w * (0.6 + this.state.players[o.id].attrs.technique / 200);
     }).id;
   }
@@ -728,6 +739,7 @@ class Replay {
    */
   leadUp(minute: number, attacking: Team, defending: Team, sp: {kind: SetPieceKind; spot: Point}): void {
     const side = attacking.side;
+    this.opp = defending;
     this.fired = minute < attacking.forzaUntil ? side : null;
     const {touches, add} = this.recorder(side);
     let carrier = this.opening(attacking, defending, add);
@@ -751,6 +763,18 @@ class Replay {
       carrier = to;
     }
     add("dribble", carrier, runTo);
+    // A free kick or a penalty comes from a foul: the defender goes in with a tackle (often a slide) and the one with the ball goes down.
+    if (sp.kind === "freekick" || sp.kind === "penalty") {
+      const foulBy = this.nearest(defending, runTo, false);
+      if (foulBy) {
+        const keep = this.carrier;
+        const foul = add("tackle", foulBy, this.jitter(runTo, 0.8), defending.side);
+        foul.foul = true;
+        foul.slide = sp.kind === "penalty" ? this.rng.chance(0.7) : this.rng.chance(0.55);
+        // The ball stays with the side that was fouled (they take the kick).
+        this.carrier = keep;
+      }
+    }
     if (sp.kind === "corner") {
       add("out", undefined, fromSide(side, 99.6, spotWidth < 50 ? this.rng.range(8, 30) : this.rng.range(70, 92)));
     }
@@ -761,6 +785,7 @@ class Replay {
   /** `turnover`: the other side has the ball next minute (after a shot, or won off them). */
   minute(minute: number, attacking: Team, defending: Team, outcome: ShotOutcome, turnover = false): void {
     const side = attacking.side;
+    this.opp = defending;
     this.fired = minute < attacking.forzaUntil ? side : null;
     const fired = this.fired === side;
     const {touches, add} = this.recorder(side);
@@ -847,7 +872,9 @@ class Replay {
           passes++;
           // The feint: a quick shift sideways past the defender before the burst.
           const step = (nowWide < 50 ? 1 : -1) * this.rng.range(5, 9) * (this.rng.chance(0.75) ? 1 : -1);
-          add("dribble", carrier, fromSide(side, clamp(progress + 2, 5, 88), clamp(nowWide + step, 5, 95)));
+          const feint = add("dribble", carrier, fromSide(side, clamp(progress + 2, 5, 88), clamp(nowWide + step, 5, 95)));
+          // A spin past the defender: the player turns on the ball (shown by the 3D view).
+          feint.skill = "spin";
         }
         // Faster players get further with the ball; a winger out wide often cuts inside.
         const cutIn = this.posOf(attacking, carrier) === "W" && (nowWide < 25 || nowWide > 75) && this.rng.chance(0.4);
@@ -967,6 +994,20 @@ class Replay {
           // Mostly crossed in, now and then pulled back to the edge of the box for someone arriving.
           finalBall = this.rng.chance(0.3) ? "cutback" : "cross";
         } else if (pos !== "W" && pos !== "FB" && this.rng.chance(0.45)) finalBall = "through";
+      } else if (
+        !this.inFrontOfGoal(side) && !longPlan && !ledUp && outcome.shooterId !== carrier &&
+        ["ST", "AM", "CM", "W"].includes(this.posOf(attacking, outcome.shooterId) ?? "") && this.rng.chance(0.3)
+      ) {
+        // Not every chance is made on the ground: a winger or full-back takes it to the byline and crosses, and the shot is a header.
+        const flank = attacking.onPitch.filter((o) => o.id !== outcome.shooterId && o.id !== carrier && (attacking.slots[o.slot].pos === "W" || attacking.slots[o.slot].pos === "FB"));
+        if (flank.length > 0) {
+          const o = this.rng.pick(flank);
+          const left = attacking.slots[o.slot].y < 50;
+          add("pass", o.id, fromSide(side, this.rng.range(62, 74), left ? this.rng.range(6, 16) : this.rng.range(84, 94)), side, "long");
+          carrier = o.id;
+          this.toByline(side, carrier, add);
+          finalBall = "cross";
+        }
       }
       // From distance: midfielders above all, more with technique, and fewer of them go in.
       const shooter = this.state.players[outcome.shooterId];

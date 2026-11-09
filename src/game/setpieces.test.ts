@@ -82,8 +82,9 @@ describe("set piece build-up", () => {
             expect(last.kind).toBe("out");
             expect(depth(last.x)).toBeGreaterThan(99);
           } else {
-            // The foul: in the box for a penalty, by the spot for a free kick.
-            expect(last.kind).toBe("dribble");
+            // The foul: a tackle by the defender, in the box for a penalty, by the spot for a free kick.
+            expect(last.kind).toBe("tackle");
+            expect(last.foul).toBe(true);
             expect(Math.hypot(last.x - sp.spot.x, last.y - sp.spot.y)).toBeLessThan(sp.kind === "penalty" ? 14 : 6);
           }
           // In the first part of the set piece's minute.

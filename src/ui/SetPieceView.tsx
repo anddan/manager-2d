@@ -72,7 +72,7 @@ interface Props {
   onAnswer: (input: SetPieceInput | null) => void;
   onDone: () => void;
   /** Penalties and free kicks shown in 3D (Unity): the aiming is laid over the 3D view instead of the drawn goal. */
-  stage3d?: {host: HTMLElement; post: (message: Record<string, unknown>) => void; goalRect: GoalRect | null};
+  stage3d?: {host: HTMLElement; post: (message: Record<string, unknown>) => void; goalRect: GoalRect | null; cornerZones?: [number, number][] | null};
 }
 
 export function SetPieceView(props: Props) {
@@ -426,6 +426,9 @@ function ShotView({sp, role, taker, keeper, defenders, shooters, keepers, outcom
           <span className="sp3d-duel">{shortName(taker)}{keeper ? ` – ${shortName(keeper)}` : ""}</span>
           {!outcome && <span className="clock">{iconize(t("sp.seconds", {s: left}))}</span>}
         </div>
+        {!outcome && !(role === "shooter" && aimed) && (
+          <p className="sp3d-hint top">{ours ? t("sp.aimHint", {name: shortName(taker)}) : t("sp.diveHint", {name: shortName(taker), keeper: (keeper ? shortName(keeper) : undefined) ?? "?"})}</p>
+        )}
         <div className="sp3d-bottom">
           {outcome && showResult ? (
             <p className={`sp-result sp-${outcome.result}`}>{iconize(t(`sp.result.${outcome.result}`))}</p>
@@ -443,7 +446,6 @@ function ShotView({sp, role, taker, keeper, defenders, shooters, keepers, outcom
             </div>
           ) : outcome ? null : (
             <>
-              <p className="sp3d-hint">{ours ? t("sp.aimHint", {name: shortName(taker)}) : t("sp.diveHint", {name: shortName(taker), keeper: (keeper ? shortName(keeper) : undefined) ?? "?"})}</p>
               <div className="btn-row">
                 <button className="btn small" onClick={() => answer(null)}>{iconize(t("sp.auto"))}</button>
               </div>
@@ -631,7 +633,7 @@ interface Placed {
   at: Point;
 }
 
-function CornerView({sp, taker, attackers = [], defenders = [], keeper, shooters, keepers, outcome, onAnswer, onDone}: Props) {
+function CornerView({sp, taker, attackers = [], defenders = [], keeper, shooters, keepers, outcome, onAnswer, onDone, stage3d}: Props) {
   const {t} = useT();
   const left = useCountdown(outcome, onAnswer, onDone, 2700);
   const now = useFrameTime();
@@ -672,6 +674,38 @@ function CornerView({sp, taker, attackers = [], defenders = [], keeper, shooters
     });
     return {mine: placed, theirs: marked};
   }, [attackers, defenders, taker.id, flag]);
+
+  // 3D: Unity sets the scene (who stands where) and acts out the corner; the choice is made over it.
+  const stageRef = useRef(stage3d);
+  stageRef.current = stage3d;
+  useEffect(() => {
+    const st = stageRef.current;
+    if (!st) return;
+    const zones: CornerTarget[] = ["near", "penalty", "far", "short"];
+    st.post({
+      type: "sp",
+      active: true,
+      kind: "corner",
+      side: sp.side,
+      takerId: taker.id,
+      keeperId: keeper?.id ?? "",
+      role: "shooter",
+      zoneIds: zones.map((z) => lineup[z]?.id ?? ""),
+      markerIds: zones.map((z) => {
+        const at = mine.findIndex((m) => m.player.id === lineup[z]?.id);
+        return at >= 0 ? theirs[at]?.player.id ?? "" : "";
+      }),
+      spotX: sp.spot.x * 1.05,
+      spotZ: sp.spot.y * 0.68,
+      wallSide: sp.wallSide,
+    });
+    return () => stageRef.current?.post({type: "sp", active: false});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const st = stageRef.current;
+    if (!st || !outcome) return;
+    st.post({type: "spShot", kind: "corner", result: outcome.result, shotX: outcome.shot.x, shotY: outcome.shot.y, dive: outcome.dive, wallSide: sp.wallSide, target: outcome.target, headerId: outcome.headerId ?? "", defenderId: outcome.defenderId ?? ""});
+  }, [outcome]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The timeline after the choice: cross in, the jump, then the ball goes on.
   const CROSS_START = 250;
@@ -778,6 +812,49 @@ function CornerView({sp, taker, attackers = [], defenders = [], keeper, shooters
   const takerStep = outcome ? lerp(0, flag < 0 ? 2.5 : -2.5, clamp01(e / CROSS_START)) : 0;
   const shadowY = outcome && e >= CROSS_START && !landed ? lerp(flagAt.y, meet.y + 30 * cScale(meet.y), crossK) : ball.y + ball.r;
   const spin = outcome && e >= CROSS_START ? Math.min(e - CROSS_START, CROSS + AFTER) * 0.6 : 0;
+
+  if (stage3d) {
+    return createPortal(
+      <div className="sp3d">
+        <div className="sp3d-top">
+          <strong>{iconize(t("sp.cornerUs"))}</strong>
+          <span className="sp3d-duel">{shortName(taker)}</span>
+          {!outcome && <span className="clock">{iconize(t("sp.seconds", {s: left}))}</span>}
+        </div>
+        {/* Where the ball goes is chosen on the pitch itself: tap the place in the box (the circles lie where the players wait). */}
+        {!outcome && stage3d.cornerZones && stage3d.cornerZones.length === 4 && CORNER_TARGETS.map((z, i) => {
+          const at = stage3d.cornerZones![i];
+          return (
+            <button
+              key={z}
+              type="button"
+              className="sp3d-zone"
+              style={{left: `${at[0] * 100}%`, top: `${at[1] * 100}%`}}
+              onClick={() => pick(z)}
+              aria-label={t(`sp.zone.${z}`)}
+              title={t(`sp.zone.${z}`)}
+            >
+              <span className="sp3d-zone-ring" />
+              <span className="sp3d-zone-label">{iconize(t(`sp.zone.${z}`))}</span>
+            </button>
+          );
+        })}
+        {!outcome && <p className="sp3d-hint top">{iconize(t("sp.cornerHint", {name: shortName(taker)}))}</p>}
+        <div className="sp3d-bottom">
+          {outcome && showResult ? (
+            <p className={`sp-result sp-${outcome.result}`}>
+              {iconize(t(`sp.result.${outcome.result}`))} {header && outcome.result !== "cleared" && <small className="muted">({shortName(header)})</small>}
+            </p>
+          ) : outcome ? null : (
+            <div className="btn-row">
+              <button className="btn small" onClick={() => onAnswer(null)}>{iconize(t("sp.auto"))}</button>
+            </div>
+          )}
+        </div>
+      </div>,
+      stage3d.host
+    );
+  }
 
   return (
     <div className="setpiece">

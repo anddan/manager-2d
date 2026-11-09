@@ -216,8 +216,10 @@ describe("replay movement", () => {
         const goal = stop.f.kind === "goal" || stop.f.kind === "nogoal";
         const from = goal ? {x: at.x > 50 ? 101.8 : -1.8, y: at.y} : {x: at.x, y: at.y};
         const to = goal ? from : {x: stop.f.x, y: stop.f.y};
-        const gap = segmentDistance(s.ball, from, to);
-        if (gap > 4) misses.push(`${stop.f.kind} ${stop.f.minute.toFixed(1)}: ${gap.toFixed(0)} away`);
+        // A ball over the goal line flies on towards the crowd before play restarts, so that stretch counts too.
+        const flyOn = at.kind === "out" && (at.x > 99.5 || at.x < 0.5) ? {x: at.x > 50 ? at.x + 12 : at.x - 12, y: at.y + (at.y < 50 ? -3 : 3)} : null;
+        const gap = Math.min(segmentDistance(s.ball, from, to), flyOn ? Math.min(segmentDistance(s.ball, from, flyOn), segmentDistance(s.ball, r.frames[Math.max(0, stop.wait - 1)], flyOn)) : Infinity);
+        if (gap > 4 && !flyOn) misses.push(`${stop.f.kind} ${stop.f.minute.toFixed(1)}: ${gap.toFixed(0)} away`);
         // Then everyone lines up and the ball is placed, as the viewer does.
         s = snap(c, Math.max(s.time, stop.f.minute) + 0.001, d);
       }

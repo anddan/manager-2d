@@ -11,6 +11,20 @@ import {lookFor} from "./Avatar";
  */
 
 export const UNITY_URL = `${import.meta.env.BASE_URL}unity3d/index.html`;
+
+/**
+ * The address the 3D frame is opened with: it says how much the device can take (`q=low` for phones and tablets), so the
+ * 3D view can draw less on them (no outlines or glow, fewer effects). On a computer it draws everything.
+ */
+export function unityFrameUrl(): string {
+  let low = false;
+  try {
+    low = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  } catch {
+    // Unknown: the full look.
+  }
+  return `${UNITY_URL}?q=${low ? "low" : "high"}`;
+}
 const KEY = "manager2d.view3d";
 
 let prefetched = false;
@@ -124,11 +138,41 @@ export interface PlayerState {
   selected: boolean;
   celebrate: boolean;
   captain: boolean;
+  /** Lying hurt on the pitch (an injury) and booked (a yellow card). */
+  hurt: boolean;
+  booked: boolean;
   /** "scorer" or "assist" while a goal is celebrated. */
   mark: string;
 }
 
+/** Something that happens in the match that the 3D view acts out (a boot on the ball, a tackle, a save). */
+export interface UnityEvent {
+  k: "kick" | "tackle" | "save" | "receive" | "header" | "fall" | "spin";
+  /** Who does it. */
+  id: string;
+  /** A kick: how hard (0..1). */
+  p?: number;
+  /** A kick: a shot at goal; or a tackle: a slide. */
+  s?: boolean;
+  /** A kick: a long or high ball. */
+  a?: boolean;
+  /** A kick: where the ball is going (metres as in the state), and who it is for. */
+  x?: number;
+  z?: number;
+  to?: string;
+  /** A kick: what the ball is leaving (a pass, a dribble, a tackle won, a free kick or corner, a goal kick, a throw-in, the kick-off, a keeper's save). */
+  from?: string;
+  /** A shot: how it ends (goal, save, out), so the keeper can act it out. */
+  res?: "goal" | "save" | "out";
+}
+
 export interface MatchState3D {
+  /** When this was sent, in seconds (the page's clock): the 3D view smooths the movement between messages with it. */
+  ts: number;
+  /** How fast the match runs (1 normal .. 5 fast-forward), so the animation does not run faster than it can follow. */
+  rate: number;
+  /** What happened since the last message. */
+  ev?: UnityEvent[];
   time: number;
   /** How far away the camera is (see ZOOM_STEPS). */
   zoom: number;
@@ -223,6 +267,8 @@ export function useUnity3d(enabled: boolean, home: Club, away: Club, stands?: {n
   const known = useRef(new Set<string>());
   // Where the goal is on screen during a set piece (Unity tells us).
   const [goalRect, setGoalRect] = useState<GoalRect | null>(null);
+  // Where the four zones of a corner are on screen (0..1 from the top left), for the choice of where the ball goes.
+  const [cornerZones, setCornerZones] = useState<[number, number][] | null>(null);
   // How loading goes (0..1), and why it failed if it did.
   const [progress, setProgress] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -258,6 +304,10 @@ export function useUnity3d(enabled: boolean, home: Club, away: Club, stands?: {n
         setGoalRect(e.data as GoalRect);
         return;
       }
+      if (e.data?.src === "forza-unity" && e.data.type === "cornerZones") {
+        setCornerZones(Array.isArray(e.data.zones) ? (e.data.zones as [number, number][]) : null);
+        return;
+      }
       if (e.data?.src === "forza-unity" && e.data.type === "ready") {
         known.current = new Set();
         frame.current?.contentWindow?.postMessage(setupMessage(home, away, stands, fill), "*");
@@ -270,12 +320,12 @@ export function useUnity3d(enabled: boolean, home: Club, away: Club, stands?: {n
 
   /** Sends the newest state; players Unity has not seen yet are described first. */
   const lastSent = useRef(0);
-  const send = (state: MatchState3D, info: (id: string) => PlayerInfo | undefined) => {
+  const send = (state: Omit<MatchState3D, "ts">, info: (id: string) => PlayerInfo | undefined): boolean => {
     const win = frame.current?.contentWindow;
-    if (!enabled || !ready || !win) return;
+    if (!enabled || !ready || !win) return false;
     // About 40 times a second is plenty: Unity smooths the movement between the messages.
     const now = performance.now();
-    if (now - lastSent.current < 25) return;
+    if (now - lastSent.current < 25) return false;
     lastSent.current = now;
     const fresh: PlayerInfo[] = [];
     for (const p of state.players) {
@@ -287,7 +337,8 @@ export function useUnity3d(enabled: boolean, home: Club, away: Club, stands?: {n
       }
     }
     if (fresh.length) win.postMessage({src: "forza", type: "players", players: fresh}, "*");
-    win.postMessage({src: "forza", type: "state", ...state}, "*");
+    win.postMessage({src: "forza", type: "state", ts: now / 1000, ...state}, "*");
+    return true;
   };
 
   /** Any other message to Unity (a set piece starting, a kick). */
@@ -295,5 +346,5 @@ export function useUnity3d(enabled: boolean, home: Club, away: Club, stands?: {n
     frame.current?.contentWindow?.postMessage({src: "forza", ...message}, "*");
   };
 
-  return {frame: frame as RefObject<HTMLIFrameElement>, ready, available, send, post, goalRect, progress, loadError};
+  return {frame: frame as RefObject<HTMLIFrameElement>, ready, available, send, post, goalRect, cornerZones, progress, loadError};
 }

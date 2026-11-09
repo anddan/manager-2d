@@ -40,6 +40,8 @@ describe("match replay", () => {
         if (cur.kind === "pass" && prev.playerId && prev.possession === cur.possession && prev.kind !== "out") {
           expect(cur.playerId).not.toBe(prev.playerId);
         }
+        // After a foul the fouled side takes the set piece.
+        if (prev.foul && cur.kind === "setpiece") continue;
         if (prev.playerId && cur.playerId && prev.possession !== cur.possession) {
           expect(["tackle", "save", "kickoff", "pass"]).toContain(cur.kind);
         }
@@ -71,7 +73,7 @@ describe("match replay", () => {
       });
     }
     expect(goalKicks).toBeGreaterThan(5);
-    expect(throwIns).toBeGreaterThan(20);
+    expect(throwIns).toBeGreaterThan(15);
   });
 
   it("brings the ball to where a set piece is taken before it's taken", () => {

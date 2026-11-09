@@ -353,6 +353,10 @@ export interface Frame {
   flight?: "through" | "long" | "cross";
   /** A tackle won with a slide (drawn stretched out at the ball). */
   slide?: boolean;
+  /** A tackle that is a foul (the one who had the ball goes down; a free kick or a penalty follows). */
+  foul?: boolean;
+  /** A move with the ball: a spin past a defender (the 3D view plays the spin animation). */
+  skill?: "spin";
 }
 
 export interface MatchReport {
