@@ -67,7 +67,7 @@ export class LiveMatch {
     this.userSide = fixture.homeId === state.userClubId ? "home" : "away";
     // Shared with the generator, which reads it before every minute.
     this.commands = [...(live.commands ?? [])];
-    const match = createMatch(this.copy, new Rng(live.seed), fixture, true, this.commands, this.userSide);
+    const match = createMatch(this.copy, new Rng(live.seed), fixture, true, this.commands, this.userSide, live.engine);
     this.report = match.report;
     this.run = match.run;
     this.teams = match.teams;

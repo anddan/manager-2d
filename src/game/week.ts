@@ -17,7 +17,7 @@ import {tutorialMatchSeed} from "./tutorial";
 import {addMessage, book, cupFixturesInStage, currentCupStage, currentRound, findFixture, fixturesInRound, fullName, leagueClubs, playerName} from "./helpers";
 import {makeFixtures, standings} from "./league";
 import {pickBestLineup, repairLineup} from "./lineup";
-import {applyMatch, simulateMatch} from "./match";
+import {ENGINE, applyMatch, simulateMatch} from "./match";
 import {spendEnergy} from "./monetization";
 import {updatePromises, weeklyMorale} from "./morale";
 import {clubStrength, marketValue, overall, playerOfTheMatch} from "./ratings";
@@ -82,7 +82,7 @@ export function startWeek(state: GameState, rng: Rng, now: number, opts = {useEn
         state.tutorial.firstMatch = true;
         seed = tutorialMatchSeed(state, f, f.homeId === state.userClubId ? "home" : "away", seed);
       }
-      state.liveMatch = {fixtureId: f.id, seed, inputs: {}, commands: []};
+      state.liveMatch = {fixtureId: f.id, seed, inputs: {}, commands: [], engine: ENGINE.mode};
       live = true;
     } else {
       applyMatch(state, simulateMatch(state, rng, f, false));
@@ -102,7 +102,7 @@ export function finishWeek(state: GameState, rng: Rng): MatchReport | undefined 
     const f = findFixture(state, live.fixtureId)!;
     const user = state.clubs[state.userClubId];
     const managed = f.homeId === user.id ? "home" : "away";
-    const report = simulateMatch(state, new Rng(live.seed), f, true, live.inputs, live.commands ?? [], managed);
+    const report = simulateMatch(state, new Rng(live.seed), f, true, live.inputs, live.commands ?? [], managed, live.engine);
     applyMatch(state, report);
     state.liveMatch = null;
     userReport = report;

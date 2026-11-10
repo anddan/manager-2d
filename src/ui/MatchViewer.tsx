@@ -72,7 +72,7 @@ import {diamondBurst, effectsOn, energySpent} from "./effects";
 import {chatter, chime, rallyFanfare, crowd, crowdMurmur, isMuted, kick, onMutedChange, setMuted, whistle} from "./sound";
 
 /** Fast-forward goes up one step per press, to this. */
-const MAX_SPEED = 5;
+const MAX_SPEED = 3;
 /** Real milliseconds per match minute at 1x. */
 const MS_PER_MINUTE = 1200;
 /** Normal play (▶, not fast-forward) runs a bit slower than that, so it is easy to follow. */
@@ -2087,7 +2087,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   const [speed, setSpeedState] = useState(() => {
     try {
       const v = Number(localStorage.getItem(SPEED_KEY));
-      return Number.isInteger(v) && v >= 1 && v <= MAX_SPEED ? v : 1;
+      return Number.isInteger(v) && v >= 1 ? Math.min(v, MAX_SPEED) : 1;
     } catch {
       return 1;
     }
@@ -2497,6 +2497,19 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   }, [freeze, endFreeze]);
 
   const finished = time >= length - 1e-6 && (!live || live.done);
+  // When the match is over, the maximised view closes after a second or two (the result and what comes next are in the normal view).
+  useEffect(() => {
+    if (!finished || !maxed) return;
+    const id = setTimeout(() => {
+      setMaxed(false);
+      try {
+        if (document.fullscreenElement) void document.exitFullscreen?.().catch(() => undefined);
+      } catch {
+        // Not supported: nothing to leave.
+      }
+    }, 1500);
+    return () => clearTimeout(id);
+  }, [finished, maxed]);
   // A cup tie level at the end: the user takes the shoot-out (once; it's saved on the fixture).
   const tie = live ? findFixture(game, report.fixtureId) : undefined;
   const [pens, setPens] = useState<[number, number] | null>(null);
@@ -3186,7 +3199,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
     );
   })();
 
-  // Pause, play at normal speed, fast-forward (each press a step faster, up to 5×) and to the end: one group.
+  // Pause, play at normal speed, fast-forward (each press a step faster, up to 3×) and to the end: one group.
   const playControls = (
     <span className="speed-group play-controls" role="group" aria-label={t("match.speed")}>
       <button className={!playing ? "chip active" : "chip"} disabled={!!current} title={t("match.pause")} aria-label={t("match.pause")} onClick={() => setPlaying(false)}><ControlIcon kind="pause" /></button>

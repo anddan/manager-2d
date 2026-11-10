@@ -375,6 +375,8 @@ export interface MatchReport {
   onTarget: [number, number];
   /** What the chances were worth (expected goals), home and away. */
   xg?: [number, number];
+  /** The tick engine's match statistics (home, away): passes, passes that came off, tackles, interceptions, fouls, offsides and corners. */
+  stats?: Record<string, [number, number]>;
   lineups: {home: string[]; away: string[]};
   formations: {home: FormationId; away: FormationId};
   /** The slots each side played in (custom formations included). Missing in old saves. */
@@ -401,6 +403,8 @@ export interface LiveMatchState {
   inputs: Record<number, SetPieceInput>;
   /** Substitutions and instructions, in order. Missing in older saves. */
   commands?: MatchCommand[];
+  /** Which engine plays the match (missing: the old, minute by minute one). */
+  engine?: "minute" | "tick";
 }
 
 export interface PlayingTimePromise {

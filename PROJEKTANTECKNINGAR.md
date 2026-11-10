@@ -63,6 +63,7 @@ Den här filen är till för Claude (och dig) så att inget behöver upprepas. L
 - **Kalibrering** (`src/game/engineStats.test.ts`, 240 matcher i två ligor): mål/match 2,5–3,0; skott (öppet spel) 20–21; skott på mål 8; hemmaseger 40–50 %; oavgjort ~25 %; gula 3,5; röda ~0,15; straffar 0,3; hörnor ~6,4 (verkligt ~10, medvetet lägre); 5+ mål 9–16 %.
 - Konstanter: `CHANCE_BASE 0.18`, `CHANCE_POWER 1.2`, `HOME_ADVANTAGE 1.06`, `PENALTY_RATE 0.0038`, `FREEKICK_RATE 0.015`, `CORNER_RATE 0.082`.
 - **Chans-test:** `src/game/chanceReplay.test.ts`.
+- **Det finns två motorer:** den gamla minutmotorn (standard) och den nya tick-motorn (se avsnitt 13). Valet görs i Inställningar > Matchmotor.
 
 ## 6. Bollen och spelarna i visningen (src/ui/MatchViewer.tsx, `advance`)
 
@@ -103,6 +104,21 @@ Den här filen är till för Claude (och dig) så att inget behöver upprepas. L
 - [ ] Album: (x/y), fällknapparna. Träning: rubriken. Roller i laget: knappen på samma ställe. Ekonomi: (i) på rubrikraden (visas när ekonomin är i rött).
 - [ ] Landslagsknappen visar flaggan.
 
+**Ny matchmotor (tick) – testa i Inställningar > Matchmotor > "Ny (test)"** (se avsnitt 13)
+- [ ] Spela en hel match i 2D/Överblick med nya motorn: flyter bilden, ser passningar, dueller, offside och rörelser rimliga ut (inga spelare som står stilla, bollen som fastnar eller hoppar)?
+- [ ] Hörnor, frisparkar och straffar: kommer de upp vid rätt plats, kan du ta dem själv, och blir resultatet (mål/räddning/miss) det du ser?
+- [ ] Kort/utvisning, byten och skada fungerar som förut; halvtid stannar.
+- [ ] **Resultatet du ser = resultatet som räknas** (tabellen efter veckan). Testat automatiskt, men titta även själv.
+- [ ] Hur känns det: spelmässigt realistiskt (laget håller formation, press, passningsspel, avslut i rimliga lägen)? Statistiken får vara högre än i verkligheten.
+- [ ] Prestanda på mobil: hur lång tid tar det att spela/hoppa till slutet av en match, och veckans övriga matcher?
+- [ ] Vill du tillbaka: välj "Standard" i Inställningar > Matchmotor, så används gamla motorn igen.
+- [ ] Mobil stående, hörna i 3D: spelarna syns (kameran vinklad). Max zoom i 3D: kameran följer bollhållaren. Maxläge stänger sig själv någon sekund efter slutsignal. Hastighet 1×–3× i Inställningar.
+
+**Nyast (2026-11-10, kräver nytt WebGL-bygge för Unity-delen)**
+- [ ] 3D-hörna: nickaren och hans försvarare **hoppar och nickar** (nickklippet spelas, kontakt när bollen kommer). Loggat i labbet att klippet startar för båda; själva utseendet är inte kontrollerat från sidan.
+- [ ] Fasta situationer i 3D (straff, frispark, hörna): beskrivningen ("Sikta…", "Välj var…", timing-texten) visas bara **tills du rör skärmen**, sedan döljs den. Tolkat så; säg till om du menade något annat.
+- [ ] Maxläge: zoom +/- ligger uppe till vänster (hörnet), kommentar- och publikraden flyttas åt sidan. Play/paus/framåt är mer genomskinliga. Kolla på stående mobil att inget krockar uppe till vänster.
+
 **Unity (SampleScene, Play)**
 - [ ] Nät på målen, publik rätt väg, frisyrerna (särskilt spiky, ponytail, bun, coils, haaland).
 - [ ] Målvakten tittar upp mot planen efter en miss.
@@ -124,4 +140,37 @@ Den här filen är till för Claude (och dig) så att inget behöver upprepas. L
 - `src/game/match.ts` (motor + `Replay`), `chances.ts`, `setpieces.ts`, `live.ts`, `national.ts`, `album.ts`, `conditions.ts`.
 - `src/ui/MatchViewer.tsx` (visning, `advance`), `SetPieceView.tsx`, `unity3d.ts`, `matchView.ts`, `views/Tournament.tsx`, `views/Album.tsx`, `views/Training.tsx`, `views/Squad.tsx`, `views/Finance.tsx`, `common.tsx` (`FoldButton`, `Hint`).
 - Unity (`Assets/Scripts/Forza`): `MatchRoot.cs`, `PlayerView*.cs`, `BallView.cs`, `SetPieceStage.cs`, `Pitch.cs`, `Messages.cs`, `Web.cs`, `Demo.cs`, `Lab/LabRunner.cs`.
-- Tester: `npx vitest run` (183 st vid senaste körning) och `npx tsc --noEmit -p .`.
+- `src/game/tick.ts` (nya tick-motorn), `src/game/tickEngine.test.ts`, `src/ui/BenchPage.tsx` (`#bench`).
+- Tester: `npx vitest run` (187 godkända, 1 hoppad vid senaste körning 2026-11-10) och `npx tsc --noEmit -p .`.
+
+## 12. Prototyp: vad kostar en matchsimulering i små steg? (mätt 2026-11-10)
+
+Fristående prototyp i `src/game/proto/` (`tickSim.ts`, mätning i `tickSim.bench.test.ts`; körs bara med `PROTO_OUT=fil npx vitest run src/game/proto`). Den används inte av spelet. 22 spelare + boll, rörelse, separation, bollens flykt, tacklingar, och ett beslut var 0,6:e sekund där passningslinjer kontrolleras mot alla 11 försvarare. "Heavy" = varje spelare söker bättre plats en gång i sekunden. Mätt i Node (V8) på utvecklingsdatorn, 95 matchminuter.
+
+| Variant | Steg | Tid per match (median) |
+|---|---|---|
+| 4 Hz | 22 800 | 52 ms |
+| 5 Hz | 28 500 | 67 ms |
+| 10 Hz | 57 000 | 124 ms |
+| 5 Hz, heavy | 28 500 | 169 ms |
+| 10 Hz, heavy | 57 000 | 237 ms |
+| 5 Hz med inspelning (2,7 MB/match) | 28 500 | 80 ms |
+
+- Att titta på en match i realtid: 6 steg per bildruta kostar 0,03 ms (värsta 0,3 ms) mot en budget på 16,7 ms. Inga problem.
+- 10 matcher i rad (5 Hz): cirka 0,6 s; 20 matcher cirka 1,3 s på dator. Uppskattat 3–5 gånger så mycket på en mellanklassmobil (ej mätt).
+- Samma slumpfrö ger samma match (kontrollerat). Använd inte `Math.sin/cos/hypot` i det som måste vara identiskt mellan webbläsare.
+- Prototypen är enklare på vissa sätt (inget riktigt AI-beslutsträd, inga regler) och mer aktiv på andra (cirka 500 skott och 2 000 tacklingar per match); en riktig motor kan kosta 2–4 gånger "heavy".
+- Slutsats: vad man tittar på och "hoppa till slutet" går bra (under en sekund på dator), men resten av ligan ska behålla minutmodellen eller köras i en Web Worker.
+
+## 13. Ny matchmotor: tick-motorn (src/game/tick.ts) – kan återställas
+
+**Mål (användarens förtydligande):** statistiken (skott, tacklingar, dribblingar, mål) får gärna vara högre än i verkligheten, det är kul för spelaren. Det som ska vara realistiskt är **spelet**: hur spelarna rör sig, passar, pressar, tacklas, hamnar offside och avslutar.
+
+- **Vad den är:** 22 spelare och bollen simuleras i små steg (5 per sekund, i meter) med bollfysik, beslut var 1–4:e sekund (passa, driva, skjuta), passningar som kan brytas, dueller, offside, fouls/kort, målvakt och fasta situationer. Den sänder samma `Frame`-format som gamla motorn, så visningen (2D och 3D) är oförändrad.
+- **Val:** Inställningar > Matchmotor (Standard / Ny (test)). Sparas i `manager2d.engine`, läses till `ENGINE.mode` i `matchView.ts`. Varje match minns sin motor (`LiveMatchState.engine`), så en match som började med en motor räknas om med samma.
+- **Standard är gamla motorn.** Återställa = välj Standard (eller sätt `ENGINE.mode = "minute"`). Vill man ta bort motorn helt: ta bort `tick.ts`, `playTick`/`simTeam` i `match.ts`, valet i `Settings.tsx`/`matchView.ts` och `match.engine*` i språkfilerna.
+- **Samma regler som förut:** kommandon, byten, skador, trötthet, halvtid, tilläggstid, betyg, straffar/hörnor/frisparkar som användaren kan ta själv (`takeSetPiece(..., at)` + `drawSetPiece`), samma slumpfrö ger samma match.
+- **Mätt/justerad (inte i verkligheten, bara balans):** ungefär 3,4 mål, 28 skott och 22 fouls per match efter justering.
+- **Tester som körs automatiskt** (`tickEngine.test.ts`): rimlig statistik, determinism (samma frö, samma match med och utan bildrutor), en hel match med set pieces, och att en live-match som användaren spelat räknas **exakt som den visades** (testet sätter `live.manualSubs = false`, som appen gör som standard).
+- **Känd skillnad (gäller även gamla motorn):** `LiveMatch` börjar med `manualSubs = true` (användaren byter själv) medan omräkningen i `finishWeek` utgår från att assistenten byter om inga kommandon finns. Appen sätter "auto" som standard (`MatchViewer.tsx`), så det syns bara om man väljer "Själv" och inte gör några byten.
+- **Inte gjort än:** prestandaoptimering (ca 0,6 s per match på dator, mobilen ej mätt), fler beteenden (djupledslöpningar, inlägg/nickar, målvaktens utspel), kontroll i riktiga visningen/Unity.

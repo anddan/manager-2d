@@ -11,7 +11,7 @@ import {isAvailable, pickBestLineup} from "./lineup";
 import {effectiveRating, overall} from "./ratings";
 import {Rng} from "./rng";
 import {createPlayer} from "./generate";
-import {simulateMatch} from "./match";
+import {ENGINE, simulateMatch} from "./match";
 import type {Club, CupFixture, FormationId, GameState, NationalJob, NationalResult, Player, Position, ShirtPattern} from "./types";
 
 /** A country needs this many players in the game to have a team. */
@@ -638,7 +638,7 @@ export function startNationalMatch(state: GameState, rng: Rng): string | null {
   const fixture: CupFixture = {id: `nat-${state.season}-${state.week}`, round: 0, homeId: mine.id, awayId: other.id, played: false, homeGoals: 0, awayGoals: 0, stage: due.knockout ? 3 : 0};
   state.nationalMatch = {realClubId: state.userClubId, fixture, what: due.what, opponent: due.opponent, knockout: due.knockout, tempPlayers};
   state.userClubId = mine.id;
-  state.liveMatch = {fixtureId: fixture.id, seed: rng.int(1, 2 ** 31 - 1), inputs: {}, commands: []};
+  state.liveMatch = {fixtureId: fixture.id, seed: rng.int(1, 2 ** 31 - 1), inputs: {}, commands: [], engine: ENGINE.mode};
   return null;
 }
 
@@ -650,7 +650,7 @@ export function finishNationalMatch(state: GameState, rng: Rng): void {
   const job = state.national;
   if (!nm || !live) return;
   const f = nm.fixture;
-  const report = simulateMatch(state, new Rng(live.seed), f, true, live.inputs, live.commands ?? [], "home");
+  const report = simulateMatch(state, new Rng(live.seed), f, true, live.inputs, live.commands ?? [], "home", live.engine);
   const us = report.homeGoals;
   const them = report.awayGoals;
   const pens = f.penalties && us === them ? ([f.penalties[0], f.penalties[1]] as [number, number]) : undefined;

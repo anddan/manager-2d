@@ -16,7 +16,8 @@ import {injure} from "./injuries";
 import {hasTrait} from "./traits";
 import {assignToSlots, isAvailable} from "./lineup";
 import {distance, fromSide, progressFor, teamSpot, type Point} from "./pitch";
-import {FORM_EFFECT, effectiveRating} from "./ratings";
+import {FORM_EFFECT, dayFormParts, effectiveRating} from "./ratings";
+import {TickMatch, type SimEvent, type SimPlayer, type SimTeam} from "./tick";
 import {Rng, clamp} from "./rng";
 import {
   CORNER_RATE,
@@ -127,6 +128,12 @@ export interface Team {
 }
 
 /** "Forza!": how much it lifts the whole team, and for how many minutes. */
+/**
+ * Which engine plays the manager's own match: "minute" (the old one: a minute at a time, the replay drawn afterwards) or "tick" (the new one:
+ * every player and the ball in small steps). Set from the settings; kept with the match when it starts (see LiveMatchState.engine).
+ */
+export const ENGINE: {mode: "minute" | "tick"} = {mode: "minute"};
+
 export const FORZA = {boost: 1.2, minutes: 10, onTarget: 0.92, goalBonus: 0.08};
 
 /** A small, stable number from a string (the same string, the same number). */
@@ -212,6 +219,28 @@ function lines(state: GameState, team: Team, home: boolean, minute = 0): {def: n
     att: (sums[2] / LINE_NORM[2]) * m.att * h,
     gk: gk * h,
   };
+}
+
+/** A team for the tick engine: what each player can do on the day (attributes with form, fitness and morale counted in) and what the manager asked. */
+function simTeam(state: GameState, team: Team, home: boolean, minute: number): SimTeam {
+  const lift = 1 + ((home ? 1.02 : 1) * forzaLift(team.forzaUntil, minute) - 1) * 0.5;
+  const mentality = team.club.mentality === "attacking" ? 1 : team.club.mentality === "defensive" ? -1 : 0;
+  const players: SimPlayer[] = team.onPitch.map((o) => {
+    const p = state.players[o.id];
+    const slot = team.slots[o.slot];
+    const a = geared(p).attrs;
+    const d = dayFormParts(p, slot.pos);
+    const day = d.position * d.fitness * d.form * d.morale * d.sharpness * d.attitude * lift;
+    const told = (k: InstructionKey) => level(team, o.id, k);
+    return {
+      id: o.id, pos: slot.pos, slot,
+      pace: a.pace * day, stamina: a.stamina, passing: a.passing * day, vision: a.vision * day, technique: a.technique * day, finishing: a.finishing * day,
+      tackling: a.defending * day, strength: a.physical * day, aerial: (a.physical * 0.55 + a.finishing * 0.25 + a.technique * 0.2) * day, keeping: a.goalkeeping * day,
+      aggression: effect(team, o.id, (e) => e.foul), shooting: told("shooting"), directness: -told("passing"), dribbling: told("dribbling"), push: told("position"),
+    };
+  });
+  const tire = players.length ? team.onPitch.reduce((sum, o) => sum + effect(team, o.id, (e) => e.tire), 0) / players.length : 1;
+  return {players, mentality, pressing: clamp(1 + (team.teamInstructions.tackling ?? 0) * 0.3 + mentality * 0.12, 0.6, 1.6), lift, tire: tire * (mentality > 0 ? 1.08 : 1)};
 }
 
 const SHOOTER_WEIGHT: Record<Position, number> = {GK: 0, CB: 0.4, FB: 0.4, DM: 0.5, CM: 1.2, AM: 3, W: 2.5, ST: 5};
@@ -1244,7 +1273,8 @@ export function createMatch(
   fixture: Fixture,
   withFrames: boolean,
   commands: MatchCommand[] = [],
-  managed?: Side
+  managed?: Side,
+  engine: "minute" | "tick" = "minute"
 ): MatchRun {
   const homeClub = state.clubs[fixture.homeId];
   const awayClub = state.clubs[fixture.awayId];
@@ -1265,7 +1295,7 @@ export function createMatch(
   // The replay gets its own random stream, so watching a match never changes
   // its result. The seed is drawn either way to keep the main stream identical.
   const visualSeed = rng.int(1, 2 ** 31 - 1);
-  const replay = withFrames ? new Replay(state, new Rng(visualSeed)) : null;
+  const replay = withFrames && engine === "minute" ? new Replay(state, new Rng(visualSeed)) : null;
   ctx.events.push({minute: 0, type: "kickoff"});
 
   const report: MatchReport = {
@@ -1377,7 +1407,8 @@ export function createMatch(
     kind: SetPieceKind,
     minute: number,
     attacking: Team,
-    defending: Team
+    defending: Team,
+    at?: Point
   ): Generator<MatchStep, ShotOutcome, SetPieceInput | null | undefined> {
     const attackers = attacking.onPitch.map((o) => state.players[o.id]);
     const roles = attacking.club.roles;
@@ -1385,10 +1416,14 @@ export function createMatch(
     if (!taker) return {type: "none"};
     const keeperSlot = defending.onPitch.find((o) => defending.slots[o.slot].pos === "GK");
     const keeper = keeperSlot ? state.players[keeperSlot.id] : undefined;
-    const wallSide: -1 | 1 = rng.chance(0.5) ? -1 : 1;
+    const drawn: -1 | 1 = rng.chance(0.5) ? -1 : 1;
+    // From the play (the tick engine): the side the corner is taken from, or the side the foul was on, decides which way the wall stands.
+    const across = at ? (attacking.side === "home" ? at.y : 100 - at.y) : 50;
+    const wallSide: -1 | 1 = at && Math.abs(across - 50) > 0.5 ? (across < 50 ? -1 : 1) : drawn;
     const spot =
       kind === "penalty" ? fromSide(attacking.side, 89.5, 50)
       : kind === "corner" ? fromSide(attacking.side, 99.5, wallSide < 0 ? 1 : 99)
+      : at ? {x: clamp(at.x, 1, 99), y: clamp(at.y, 2, 98)}
       : fromSide(attacking.side, rng.range(72, 80), 50 + wallSide * rng.range(8, 22));
     const sp: SetPiece = {
       index: report.setPieces!.length,
@@ -1683,7 +1718,222 @@ export function createMatch(
     return report;
   }
 
-  return {report, teams: {home, away}, run: play()};
+  /** Puts a set piece on the pitch as frames: the taker at the ball, the cross or the shot, and what came of it. */
+  function drawSetPiece(sim: TickMatch, outcome: ShotOutcome, attacking: Team, defending: Team): void {
+    if (outcome.type === "none" || !outcome.setPiece) return;
+    const sp = outcome.setPiece;
+    const side = attacking.side;
+    const defSide = defending.side;
+    const defIdx: 0 | 1 = defending === home ? 0 : 1;
+    const width = (x: number) => clamp(50 + x * GOAL_HALF_WIDTH, 1, 99);
+    sim.addFrame("setpiece", sp.takerId, sp.spot.x, sp.spot.y, side);
+    if (sp.kind === "corner") {
+      const zone = cornerZone(sp.target ?? "penalty", sp.wallSide);
+      const at = fromSide(side, zone.depth, zone.width);
+      if (outcome.type === "cleared") {
+        sim.addFrame("tackle", sp.defenderId ?? sim.nearestOf(defIdx, at.x, at.y), at.x, at.y, defSide);
+        return;
+      }
+      sim.addFrame("pass", outcome.shooterId, at.x, at.y, side);
+    }
+    if (outcome.type === "goal") {
+      const p = fromSide(side, 100, width(sp.shot.x));
+      sim.addFrame("goal", undefined, p.x, p.y, side);
+    } else if (outcome.type === "saved") {
+      const p = fromSide(side, 98, width(sp.dive));
+      sim.addFrame("save", outcome.keeperId, p.x, p.y, defSide);
+    } else if (outcome.type === "blocked" || outcome.type === "cleared") {
+      const wallAt = fromSide(side, progressFor(side, sp.spot.x) + 9, side === "home" ? sp.spot.y : 100 - sp.spot.y);
+      sim.addFrame("tackle", sim.nearestOf(defIdx, wallAt.x, wallAt.y), wallAt.x, wallAt.y, defSide);
+    } else {
+      const p = fromSide(side, 100, clamp(50 + sp.shot.x * GOAL_HALF_WIDTH, 30, 70));
+      sim.addFrame("out", undefined, p.x, p.y, side);
+    }
+  }
+
+  /**
+   * The same match as `play`, with the tick engine playing each minute: commands, injuries, tiring, substitutions, half-time and added time are
+   * the same, but what happens on the pitch (who has the ball, passes, tackles, fouls, offside, shots, set pieces) is played out by `TickMatch`.
+   */
+  function* playTick(): Generator<MatchStep, MatchReport, SetPieceInput | null | undefined> {
+    const hz = 5;
+    // How strict this match's referee is: the same for the same match.
+    const strict = 0.65 + ((hashString(fixture.id) % 100) / 100) * 0.75;
+    const build = (minute: number): [SimTeam, SimTeam] => [simTeam(state, home, true, minute), simTeam(state, away, false, minute)];
+    const sim = new TickMatch(rng, hz, build(1), (f) => { if (withFrames) report.frames.push(f); }, strict);
+    const xg = {home: 0, away: 0};
+    const teamAt = (t: 0 | 1) => (t === 0 ? home : away);
+    sim.kickoff(0);
+    let minute = 0;
+    let end = Infinity;
+    let kickOffAfterBreak: 0 | 1 | null = null;
+
+    function* handle(ev: SimEvent): Generator<MatchStep, void, SetPieceInput | null | undefined> {
+      if (ev.t === "shot") {
+        const att = teamAt(ev.team);
+        const def = teamAt(ev.team === 0 ? 1 : 0);
+        att.shots++;
+        xg[att.side] += ev.xg;
+        if (ev.result === "goal" || ev.result === "saved") att.onTarget++;
+        rate(ev.shooter, ev.result === "goal" ? 0.1 : 0.05);
+        if (ev.result === "saved") {
+          ctx.events.push({minute, type: "saved", side: att.side, playerId: ev.shooter, otherId: ev.keeper});
+          rate(ev.keeper, 0.3);
+        } else if (ev.result === "missed") {
+          if (rng.chance(0.45)) ctx.events.push({minute, type: "missed", side: att.side, playerId: ev.shooter});
+          rate(ev.shooter, -0.05);
+        } else if (ev.result === "blocked") {
+          ctx.events.push({minute, type: "blocked", side: att.side, playerId: ev.shooter});
+          rate(ev.blocker, 0.1);
+        }
+        void def;
+      } else if (ev.t === "goal") {
+        const att = teamAt(ev.team);
+        const def = teamAt(ev.team === 0 ? 1 : 0);
+        att.goals++;
+        const keeper = def.onPitch.find((o) => def.slots[o.slot].pos === "GK");
+        ctx.events.push({minute, type: "goal", side: att.side, playerId: ev.scorer, otherId: ev.assist});
+        rate(ev.scorer, 1);
+        rate(ev.assist, 0.6);
+        rate(keeper?.id, -0.3);
+        for (const o of def.onPitch) if (["CB", "FB", "DM"].includes(def.slots[o.slot].pos)) rate(o.id, -0.12);
+        report.homeGoals = home.goals;
+        report.awayGoals = away.goals;
+      } else if (ev.t === "foul") {
+        if (ev.card === "none") return;
+        const team = teamAt(ev.team === 0 ? 1 : 0);
+        if (!team.onPitch.some((o) => o.id === ev.fouler)) return;
+        if (ev.card === "red" || team.booked.has(ev.fouler)) {
+          ctx.events.push({minute, type: "red", side: team.side, playerId: ev.fouler});
+          rate(ev.fouler, -1.5);
+          ctx.sentOff.add(ev.fouler);
+          ctx.minutes[ev.fouler].off = minute;
+          removePlayer(team, ev.fouler, state);
+          sim.setTeams(build(minute));
+        } else {
+          team.booked.add(ev.fouler);
+          ctx.events.push({minute, type: "yellow", side: team.side, playerId: ev.fouler});
+          rate(ev.fouler, -0.3);
+        }
+      } else if (ev.t === "setpiece") {
+        const att = teamAt(ev.team);
+        const def = teamAt(ev.team === 0 ? 1 : 0);
+        const outcome = yield* takeSetPiece(ev.kind, minute, att, def, {x: ev.x, y: ev.y});
+        drawSetPiece(sim, outcome, att, def);
+        sim.resume(outcome.type === "none" ? "cleared" : outcome.type === "disallowed" ? "cleared" : outcome.type, ev.team);
+        report.homeGoals = home.goals;
+        report.awayGoals = away.goals;
+      }
+    }
+
+    while (minute < end) {
+      minute++;
+      yield {type: "minute", minute};
+      applyCommands(minute);
+      if (rival && minute === rivalForzaAt && rival.forzaUntil <= minute) {
+        const them = rival === home ? away : home;
+        if (rival.goals <= them.goals) {
+          rival.forzaUntil = minute + FORZA.minutes;
+          ctx.events.push({minute, type: "instruction", side: rival.side, note: "forzaRival"});
+        }
+      }
+      sim.setTeams(build(minute));
+      sim.setContext(minute, home.goals - away.goals);
+      sim.clockTo((minute - 1) * 60);
+      if (kickOffAfterBreak !== null) {
+        sim.kickoff(kickOffAfterBreak);
+        kickOffAfterBreak = null;
+      }
+      for (let k = 0; k < hz * 60; k++) {
+        sim.step();
+        for (const ev of sim.takeEvents()) yield* handle(ev);
+      }
+      report.homeGoals = home.goals;
+      report.awayGoals = away.goals;
+
+      // Injuries: tired legs get hurt more often.
+      const worn = (id: string) => (state.players[id].fitness >= 70 ? 1 : 1 + ((70 - state.players[id].fitness) / 70) * 2);
+      const onField = [...home.onPitch, ...away.onPitch];
+      const tiredness = onField.length > 0 ? onField.reduce((sum, o) => sum + worn(o.id), 0) / onField.length : 1;
+      if (rng.chance(0.003 * tiredness)) {
+        const team = rng.chance(0.5) ? home : away;
+        const picked = team.onPitch.length > 0 ? rng.weighted(team.onPitch, (o) => (hasTrait(state.players[o.id], "fragile") ? 1.5 : 1) * worn(o.id)) : undefined;
+        const guard = picked && state.players[picked.id].shin;
+        const hurt = guard && rng.chance(SHIN_PROTECT[guard.tier]) ? undefined : picked;
+        if (hurt) {
+          const p = state.players[hurt.id];
+          injure(p, rng.weighted([1, 2, 3, 5, 8, 14], (w) => ({1: 40, 2: 22, 3: 15, 5: 12, 8: 7, 14: 4})[w] ?? 1), "match", minute + state.absWeek);
+          ctx.events.push({minute, type: "injury", side: team.side, playerId: hurt.id});
+          if (team.side === managed && team.subsLeft > 0 && team.bench.length > 0) {
+            ctx.minutes[hurt.id].off = minute;
+            removePlayer(team, hurt.id, state);
+            team.injured.push(hurt);
+            yield {type: "injury", minute, side: team.side, playerId: hurt.id, pos: team.slots[hurt.slot].pos};
+          } else if (!substitute(ctx, team, hurt, minute)) {
+            ctx.minutes[hurt.id].off = minute;
+            removePlayer(team, hurt.id, state);
+          }
+        }
+      }
+
+      // Tiring and tactical substitutions.
+      for (const team of [home, away]) {
+        const extra = team.club.mentality === "attacking" ? 1.1 : 1;
+        for (const o of team.onPitch) {
+          const p = state.players[o.id];
+          const told = effect(team, o.id, (e) => e.tire);
+          p.fitness = clamp(p.fitness - (0.24 - p.attrs.stamina * 0.0013) * extra * told, 0, 100);
+        }
+        if (!team.manualSubs && minute >= 58 && minute <= 85 && team.subsLeft > 0 && rng.chance(0.25)) {
+          const tired = team.onPitch
+            .filter((o) => team.slots[o.slot].pos !== "GK")
+            .sort((x, y) => state.players[x.id].fitness - state.players[y.id].fitness)[0];
+          if (tired && state.players[tired.id].fitness < 70) substitute(ctx, team, tired, minute);
+        }
+      }
+
+      if (minute === 45) added[0] = stoppage(0, 1, 4);
+      if (minute === 45 + added[0]) {
+        ctx.events.push({minute, type: "halftime"});
+        kickOffAfterBreak = 1;
+        yield {type: "halftime", minute};
+      }
+      if (minute === 90 + added[0]) {
+        added[1] = stoppage(45 + added[0], 2, 7);
+        end = minute + added[1];
+      }
+    }
+    ctx.events.push({minute, type: "fulltime"});
+
+    // What each player did counts towards the rating (passes that came off and ones that did not, key passes, tackles, interceptions, saves,
+    // fouls and so on), then the result and the clean sheet.
+    for (const id of Object.keys(ctx.ratings)) {
+      const pf = sim.perfOf(id);
+      if (!pf) continue;
+      const adj = pf.passOk * 0.012 - pf.passBad * 0.05 + pf.keyPass * 0.25 + pf.tackleWon * 0.15 - pf.tackleLost * 0.04 + pf.intercept * 0.12 + pf.dribbleWon * 0.04 + pf.saves * 0.1 + pf.headers * 0.05 - pf.fouls * 0.1 - pf.offsides * 0.1;
+      ctx.ratings[id] += clamp(adj, -1.2, 1.2);
+    }
+    for (const [team, other] of [[home, away], [away, home]] as const) {
+      const result = team.goals > other.goals ? 0.3 : team.goals < other.goals ? -0.2 : 0;
+      for (const id of Object.keys(ctx.minutes)) {
+        const p = state.players[id];
+        if (p.clubId !== team.club.id) continue;
+        rate(id, result + rng.normal(0, 0.15));
+        if (other.goals === 0 && ["GK", "CB", "FB"].includes(p.position)) rate(id, 0.4);
+      }
+    }
+    for (const id of Object.keys(ctx.ratings)) ctx.ratings[id] = Math.round(clamp(ctx.ratings[id], 3, 10) * 10) / 10;
+    const pos = sim.stats.possession;
+    report.possessionHome = Math.round((pos[0] / Math.max(1, pos[0] + pos[1])) * 100);
+    report.shots = [home.shots, away.shots];
+    report.onTarget = [home.onTarget, away.onTarget];
+    report.xg = [Math.round(xg.home * 100) / 100, Math.round(xg.away * 100) / 100];
+    const st = sim.stats;
+    report.stats = {passes: st.passes, passesOk: st.passesOk, tackles: st.tackles, interceptions: st.interceptions, fouls: st.fouls, offsides: st.offsides, corners: st.corners};
+    return report;
+  }
+
+  return {report, teams: {home, away}, run: engine === "tick" ? playTick() : play()};
 }
 
 /** Plays a whole match at once. Set pieces use `inputs` where given, else the computer decides. */
@@ -1694,9 +1944,10 @@ export function simulateMatch(
   withFrames: boolean,
   inputs: Record<number, SetPieceInput> = {},
   commands: MatchCommand[] = [],
-  managed?: Side
+  managed?: Side,
+  engine: "minute" | "tick" = "minute"
 ): MatchReport {
-  const {run} = createMatch(state, rng, fixture, withFrames, commands, managed);
+  const {run} = createMatch(state, rng, fixture, withFrames, commands, managed, engine);
   let step = run.next();
   while (!step.done) {
     step = run.next(step.value.type === "setpiece" ? inputs[step.value.sp.index] ?? null : undefined);

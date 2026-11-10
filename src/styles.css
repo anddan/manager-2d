@@ -1359,10 +1359,10 @@ button.manager-item:hover:not(:disabled) { background: rgb(127 127 127 / 0.1); }
 /* The row is short now (manager + play controls): let it wrap rather than scroll, so the manager's menu isn't cut off. */
 .match-controls { overflow: visible; flex-wrap: wrap; }
 /* Maximised: the play controls see-through on the pitch, like the maximise button. */
-.max-controls .speed-group { background: rgb(11 20 48 / 0.75); border-color: rgb(255 255 255 / 0.25); }
+.max-controls .speed-group { background: rgb(11 20 48 / 0.32); border-color: rgb(255 255 255 / 0.16); }
 .max-controls .speed-group .chip { background: transparent; color: #fff; }
 .max-controls .speed-group .chip .ctl-icon { fill: currentColor; }
-.max-controls .speed-group .chip.active { background: rgb(255 255 255 / 0.22); color: #fff; }
+.max-controls .speed-group .chip.active { background: rgb(255 255 255 / 0.16); color: #fff; }
 .max-controls .speed-group .chip:hover:not(:disabled) { background: rgb(255 255 255 / 0.12); }
 /* The manager's menu opens upwards, over the pitch, so it's never below the fold. */
 .manager-pop { top: auto; bottom: calc(100% + 6px); }
@@ -3300,10 +3300,20 @@ body:has(.intro) .modal-backdrop { z-index: 200; }
 .unity-missing { position: absolute; top: 6px; left: 50px; z-index: 2; padding: 6px 12px; border-radius: 999px; background: rgb(11 20 48 / 0.85); color: #fff; font-size: 0.8rem; font-weight: 700; }
 
 /* Zoom for the 3D camera: plus and minus under the 3D button. */
-.view3d-zoom { position: absolute; top: 48px; left: 6px; z-index: 2; display: grid; gap: 6px; }
+.view3d-zoom { position: absolute; top: 6px; left: 6px; z-index: 2; display: grid; gap: 6px; }
 .view3d-zoom .btn { width: 36px; height: 36px; padding: 0; border-radius: 50%; display: inline-grid; place-items: center; background: rgb(11 20 48 / 0.75); color: #fff; border-color: rgb(255 255 255 / 0.25); }
 .view3d-zoom .ctl-icon { width: 16px; height: 16px; fill: currentColor; }
-.pitch-wrap.maxed .view3d-zoom { top: calc(var(--edge-t, 14px) + 42px); left: var(--edge-r, 14px); }
+/* Maximised: in the top left corner; the commentary and crowd lines move aside for it (not on a phone held upright, where they sit under the score). */
+/* Not maximised: the crowd line (top left) moves aside for the zoom buttons. */
+.view3d-zoom ~ .crowd-banner, .zoom-btn ~ .crowd-banner { left: 52px; }
+/* The zoom button in the overview sits where the 3D zoom buttons do: top left. */
+.pitch-wrap .zoom-btn { top: 6px; bottom: auto; left: 6px; right: auto; }
+.pitch-wrap.maxed .zoom-btn { top: var(--edge-t, 14px); bottom: auto; left: var(--edge-l, 14px); right: auto; }
+.pitch-wrap:has(.zoom-btn) .replay-badge { left: 52px; }
+.pitch-wrap.maxed .view3d-zoom { top: var(--edge-t, 14px); left: var(--edge-l, 14px); }
+@media (orientation: landscape), (min-width: 701px) {
+  .pitch-wrap.maxed .view3d-zoom ~ .setup-banner, .pitch-wrap.maxed .view3d-zoom ~ .crowd-banner, .pitch-wrap.maxed .zoom-btn ~ .setup-banner, .pitch-wrap.maxed .zoom-btn ~ .crowd-banner { left: calc(var(--edge-l, 14px) + 46px); }
+}
 
 /* A penalty or free kick in 3D: the aiming laid over the 3D view. */
 .sp3d { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
@@ -3348,6 +3358,13 @@ body:has(.intro) .modal-backdrop { z-index: 200; }
 /* Maximised in 3D: the play, forward and pause buttons sit over the 3D picture, at the bottom in the middle (the picture is laid over them otherwise). */
 .pitch-wrap.maxed .max-controls { z-index: 8; pointer-events: none; }
 .pitch-wrap.maxed .max-controls .speed-group { pointer-events: auto; }
+/* All the buttons on the picture (zoom, shrink, maximise, Forza, orders), maximised or not, as see-through as play, pause and forward. */
+.pitch-wrap .max-btn, .pitch-wrap .zoom-btn, .pitch-wrap .view3d-zoom .btn, .pitch-wrap .max-manager .btn, .pitch-wrap .replay-btn, .pitch-wrap .replay-skip {
+  background: rgb(11 20 48 / 0.32); border-color: rgb(255 255 255 / 0.16); color: #fff; box-shadow: none;
+}
+.pitch-wrap .max-btn:hover:not(:disabled), .pitch-wrap .zoom-btn:hover:not(:disabled), .pitch-wrap .view3d-zoom .btn:hover:not(:disabled), .pitch-wrap .max-manager .btn:hover:not(:disabled), .pitch-wrap .replay-btn:hover:not(:disabled), .pitch-wrap .replay-skip:hover:not(:disabled) {
+  background: rgb(255 255 255 / 0.12);
+}
 
 /* The corner's markers pop up one after another once the camera has come round (they are only sent to the page then). */
 @keyframes sp3d-pop { 0% { scale: 0.05; opacity: 0; } 60% { scale: 1.18; opacity: 1; } 100% { scale: 1; opacity: 1; } }
@@ -3380,3 +3397,11 @@ body:has(.intro) .modal-backdrop { z-index: 200; }
 .card-head:has(.album-toggle) .hint-btn.in-head { order: 8; margin-left: auto; margin-right: 6px; }
 .card-head:has(.album-toggle) .hint-btn.in-head + .card-actions, .card-head:has(.album-toggle) .card-actions:has(+ .hint-btn) { margin-left: 0; }
 .card-head:has(.hint-btn.in-head) .card-actions:has(.album-toggle) { margin-left: 0; }
+
+/* A phone on its side: the zones board is laid down (the team attacks to the right) and fills the height; the board itself is turned and
+   everything on it turned back, so the shirts and the writing stand upright. */
+.zone-frame.flat { --zv: clamp(200px, calc(100dvh - 150px), 400px); width: calc(var(--zv) * 1.282); height: var(--zv); justify-self: center; margin-left: auto; margin-right: auto; }
+.zone-frame.flat .zone-board { position: absolute; left: 50%; top: 50%; width: var(--zv); height: calc(var(--zv) * 1.282); max-width: none; aspect-ratio: auto; margin: 0; transform: translate(-50%, -50%) rotate(90deg); }
+.zone-frame.flat .zone-slot, .zone-frame.flat .zone-slot:hover { transform: translate(-50%, 0) rotate(-90deg) scale(0.84); }
+.zone-frame.flat .zone-label { transform: translateY(-50%) rotate(-90deg); }
+.zone-frame.flat .zone-shout { transform: rotate(-90deg); }

@@ -8,7 +8,7 @@ import {useGame, useGameState} from "../../store";
 import {Card, Hint} from "../common";
 import {isMuted, onMutedChange, setMuted} from "../sound";
 import {BUILD_ID, checkForUpdate} from "../updates";
-import {MATCH_VIEWS, readMatchView, writeMatchView, type MatchView} from "../matchView";
+import {MATCH_VIEWS, readEngine, readMatchView, writeEngine, writeMatchView, type MatchView} from "../matchView";
 import {readForceDecisions, writeForceDecisions} from "../decisions";
 import {readAvatarStyle, writeAvatarStyle, type AvatarStyle} from "../ToonAvatar";
 
@@ -62,6 +62,7 @@ export function Settings() {
   const [avatarStyle, setAvatarStyle] = useState<AvatarStyle>(readAvatarStyle());
   // How a match is played: the way to watch it, how fast, who takes set pieces and changes, the view, buzz and effects.
   const [matchView, setMatchViewState] = useState<MatchView>(() => readMatchView());
+  const [engine, setEngineState] = useState<"minute" | "tick">(() => readEngine());
   const [speed, setSpeed] = usePref<string>("manager2d.matchSpeed", "1");
   const [setPieces, setSetPieces] = usePref<"auto" | "self">("manager2d.manualSetPieces", "auto");
   const [subs, setSubs] = usePref<"auto" | "self">("manager2d.manualSubs", "auto");
@@ -150,9 +151,14 @@ export function Settings() {
             </span>
           </dd>
           <dt><Icon name="skip" size={18} /> {iconize(t("match.speed"))}</dt>
-          <dd><Choice label={t("match.speed")} value={speed} onPick={setSpeed} options={[["1", "1×"], ["2", "2×"], ["3", "3×"], ["4", "4×"], ["5", "5×"]]} /></dd>
+          <dd><Choice label={t("match.speed")} value={String(Math.min(3, Number(speed) || 1))} onPick={setSpeed} options={[["1", "1×"], ["2", "2×"], ["3", "3×"]]} /></dd>
           <dt><Icon name="target" size={18} /> {iconize(t("match.setPieces"))}</dt>
           <dd><Choice label={t("match.setPieces")} value={setPieces} onPick={setSetPieces} options={[["self", t("match.self")], ["auto", t("match.auto")]]} /></dd>
+          <dt><Icon name="bolt" size={18} /> {iconize(t("match.engine"))}</dt>
+          <dd>
+            <Choice label={t("match.engine")} value={engine} onPick={(v) => { setEngineState(v); writeEngine(v); }} options={[["minute", t("match.engine.minute")], ["tick", t("match.engine.tick")]]} />
+            <p className="muted small tight">{iconize(t("match.engineHint"))}</p>
+          </dd>
           <dt><Icon name="swap" size={18} /> {iconize(t("match.subsWho"))}</dt>
           <dd><Choice label={t("match.subsWho")} value={subs} onPick={setSubs} options={[["self", t("match.self")], ["auto", t("match.auto")]]} /></dd>
           <dt><Icon name="eye" size={18} /> {iconize(t("settings.pitchView"))}</dt>

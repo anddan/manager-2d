@@ -256,8 +256,12 @@ function ShotView({sp, role, taker, keeper, defenders, shooters, keepers, outcom
     const vy = ((e.clientY - rect.top) / rect.height) * 75;
     return {x: (vx - CENTER) / (WIDTH / 2), y: (GROUND - vy) / HEIGHT};
   };
+  // The description is shown only until the screen is touched (on a phone it covers the picture).
+  const [touchedFor, setTouchedFor] = useState<number | null>(null);
+  const touched = touchedFor === sp.index;
   const onDown = (e: PointerEvent<Element>) => {
     if (outcome) return;
+    setTouchedFor(sp.index);
     e.currentTarget.setPointerCapture(e.pointerId);
     setDrag(toGoal(e));
   };
@@ -426,7 +430,7 @@ function ShotView({sp, role, taker, keeper, defenders, shooters, keepers, outcom
           <span className="sp3d-duel">{shortName(taker)}{keeper ? ` – ${shortName(keeper)}` : ""}</span>
           {!outcome && <span className="clock">{iconize(t("sp.seconds", {s: left}))}</span>}
         </div>
-        {!outcome && !(role === "shooter" && aimed) && (
+        {!outcome && !touched && !(role === "shooter" && aimed) && (
           <p className="sp3d-hint top">{ours ? t("sp.aimHint", {name: shortName(taker)}) : t("sp.diveHint", {name: shortName(taker), keeper: (keeper ? shortName(keeper) : undefined) ?? "?"})}</p>
         )}
         <div className="sp3d-bottom">
@@ -442,7 +446,7 @@ function ShotView({sp, role, taker, keeper, defenders, shooters, keepers, outcom
                 </span>
                 <span className="sp-timing-label">{outcome ? rated ?? "\u00a0" : iconize(t("sp.shoot"))}</span>
               </button>
-              {!outcome && <p className="muted small">{iconize(t("sp.timingHint"))}</p>}
+              {!outcome && !touched && <p className="muted small">{iconize(t("sp.timingHint"))}</p>}
             </div>
           ) : outcome ? null : (
             <>
@@ -643,6 +647,9 @@ function CornerView({sp, taker, attackers = [], defenders = [], keeper, shooters
   useEffect(() => {
     if (outcome && struck === null) setStruck(nowRef.current);
   }, [outcome, struck]);
+  // The description is shown only until the screen is touched (on a phone it covers the picture).
+  const [touchedFor, setTouchedFor] = useState<number | null>(null);
+  const touched = touchedFor === sp.index;
   const flag = sp.wallSide;
   // Who goes to each zone (the same players that are drawn standing there).
   const lineup = useMemo(() => cornerLineup(attackers, taker.id), [attackers, taker.id]);
@@ -815,7 +822,7 @@ function CornerView({sp, taker, attackers = [], defenders = [], keeper, shooters
 
   if (stage3d) {
     return createPortal(
-      <div className="sp3d">
+      <div className="sp3d" onPointerDownCapture={() => setTouchedFor(sp.index)}>
         <div className="sp3d-top">
           <strong>{iconize(t("sp.cornerUs"))}</strong>
           <span className="sp3d-duel">{shortName(taker)}</span>
@@ -840,7 +847,7 @@ function CornerView({sp, taker, attackers = [], defenders = [], keeper, shooters
             </button>
           );
         })}
-        {!outcome && <p className="sp3d-hint top">{iconize(t("sp.cornerHint", {name: shortName(taker)}))}</p>}
+        {!outcome && !touched && <p className="sp3d-hint top">{iconize(t("sp.cornerHint", {name: shortName(taker)}))}</p>}
         <div className="sp3d-bottom">
           {outcome && showResult ? (
             <p className={`sp-result sp-${outcome.result}`}>
