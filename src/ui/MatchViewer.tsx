@@ -26,7 +26,7 @@ import {GearPicture} from "./Gear";
 import {MATCH_VIEWS, readMatchView, readShowRatings, readZoneMove, writeMatchView, writeShowRatings, type MatchView} from "./matchView";
 import {MatchStats, ZonePanel, matchStats, playerMarks, possessionShares, usePlateBar, zoneShares} from "./ZonePanel";
 import {matchClubs} from "../game/kit";
-import {ZOOM_STEPS, unityFrameUrl, type UnityEvent, playerInfo, prefetchUnity, readSide3d, readZoom3d, toMetres, useUnity3d, writeSide3d, writeZoom3d} from "./unity3d";
+import {ZOOM_STEPS, unityFrameUrl, type UnityEvent, playerInfo, prefetchUnity, readZoom3d, toMetres, useUnity3d, writeZoom3d} from "./unity3d";
 import {boardSpots} from "./views/Tactics";
 import {FORMATION_IDS, type FormationId} from "../game/types";
 import {memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode} from "react";
@@ -2125,7 +2125,19 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   });
   // The 3D view (Unity) on top of the pitch, if the manager has chosen it.
   const [zoom3d, setZoom3d] = useState(readZoom3d);
-  const [side3d, setSide3d] = useState(() => readSide3d(live?.userSide));
+  // The camera is not turned by hand: held upright (portrait) the picture is from the short side of the manager's own team (behind the goal it
+  // defends, looking up the pitch); on its side (landscape) it is from the long side, with the team attacking to the right.
+  const [portrait, setPortrait] = useState(() => (typeof window !== "undefined" && window.matchMedia ? window.matchMedia("(orientation: portrait)").matches : true));
+  useEffect(() => {
+    const q = window.matchMedia?.("(orientation: portrait)");
+    if (!q) return;
+    const on = () => setPortrait(q.matches);
+    on();
+    q.addEventListener?.("change", on);
+    return () => q.removeEventListener?.("change", on);
+  }, []);
+  const mySide = live?.userSide ?? "home";
+  const side3d = portrait ? (mySide === "away" ? 3 : 1) : mySide === "away" ? 2 : 0;
   // The 3D build is fetched in the background while the match starts, so switching 3D on is quick.
   useEffect(() => {
     prefetchUnity();
@@ -2154,7 +2166,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   // Opens upwards when there's room above the button, otherwise downwards.
   const [menuUp, setMenuUp] = useState(true);
-  // Watch the pitch, only follow the commentary, or see the zones the ball is in (remembered; a finished match from "Se matchen" always opens on the pitch). Without the pitch, set pieces are the assistant's.
+  // Watch the pitch, only follow the commentary, or see the zones the ball is in (remembered; a finished match from "Se matchen" always opens on the pitch). Set pieces are the manager's own choice in every view (2D in Overview and Zones).
   const [matchView, setMatchViewState] = useState<MatchView>(() => (live ? readMatchView() : readMatchView() === "3d" ? "3d" : "pitch"));
   // Only the zones board hides the pitch; 3D is the pitch seen in 3D.
   const textOnly = matchView === "zones";
@@ -2163,13 +2175,11 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   const [zoneMove] = useState(readZoneMove);
   useEffect(() => {
     if (!live) return;
-    if (textOnly) live.manualSetPieces = false;
-    else {
-      try {
-        live.manualSetPieces = localStorage.getItem(SET_PIECES_KEY) === "self";
-      } catch {
-        // Keeps what it was.
-      }
+    // The manager's choice (Self or Auto) holds in every view: in Overview and Zones the set piece is shown in 2D, in 3D in 3D.
+    try {
+      live.manualSetPieces = localStorage.getItem(SET_PIECES_KEY) === "self";
+    } catch {
+      // Keeps what it was.
     }
   }, [live, textOnly]);
   const setMatchView = (v: MatchView) => {
@@ -3417,9 +3427,6 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
             <div className="view3d-zoom">
               <button className="btn small" onClick={() => setZoom3d((z) => { const n = Math.max(0, z - 1); writeZoom3d(n); return n; })} disabled={zoom3d === 0} title={t("match.zoomIn")} aria-label={t("match.zoomIn")}><ControlIcon kind="plus" /></button>
               <button className="btn small" onClick={() => setZoom3d((z) => { const n = Math.min(ZOOM_STEPS.length - 1, z + 1); writeZoom3d(n); return n; })} disabled={zoom3d === ZOOM_STEPS.length - 1} title={t("match.zoomOut")} aria-label={t("match.zoomOut")}><ControlIcon kind="minus" /></button>
-              <button className="btn small" onClick={() => setSide3d((v) => { const n = (v + 1) % 4; writeSide3d(n); return n; })} title={t("match.view3dTurn")} aria-label={t("match.view3dTurn")}>
-                <svg className="ctl-icon" viewBox="0 0 16 16" aria-hidden><path d="M8 2.5a5.5 5.5 0 1 0 5.2 3.7l-1.5.5A4 4 0 1 1 8 4V6l3-2.500-3-2.500v1.500z" /></svg>
-              </button>
             </div>
           )}
           {/* The 3D view has its own zoom buttons. */}
@@ -3564,11 +3571,11 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
                       <span><Icon name="megaphone" size={18} /> {iconize(t("match.giveOrders"))}</span>
                       <Icon name="chevron" size={16} />
                     </button>
-                    <div className={textOnly ? "manager-item manager-toggle greyed" : "manager-item manager-toggle"} data-tour="setpieces" aria-disabled={textOnly}>
+                    <div className="manager-item manager-toggle" data-tour="setpieces">
                       <span><Icon name="target" size={18} /> {iconize(t("match.setPieces"))}</span>
                       <span className="speed-group" role="group" aria-label={t("match.setPieces")}>
                         {([true, false] as const).map((self) => (
-                          <button key={String(self)} disabled={textOnly} className={live.manualSetPieces === self ? "chip active" : "chip"} onClick={() => {
+                          <button key={String(self)} className={live.manualSetPieces === self ? "chip active" : "chip"} onClick={() => {
                             live.manualSetPieces = self;
                             try {
                               localStorage.setItem(SET_PIECES_KEY, self ? "self" : "auto");

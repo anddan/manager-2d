@@ -63,7 +63,9 @@ describe("match replay", () => {
           goalKicks++;
           // In the six-yard box, by the keeper.
           expect(next.x < 10 || next.x > 90).toBe(true);
-          expect(game.players[next.playerId!].position).toBe("GK");
+          // (With the keeper sent off or hurt and no one to replace him, the best of the others goes in goal.)
+          const keeperGone = r.events.some((e) => (e.type === "red" || e.type === "injury") && e.side === next.possession && game.players[e.playerId!]?.position === "GK" && e.minute <= Math.ceil(next.minute));
+          if (!keeperGone) expect(game.players[next.playerId!].position).toBe("GK");
         } else {
           throwIns++;
           expect(next.y <= 1 || next.y >= 99).toBe(true);
@@ -173,7 +175,9 @@ describe("match replay", () => {
         if (f.kind !== "save" || !next || next.kind === "kickoff") return; // Half-time can come first.
         // Walks it to the edge of the box, then plays it to a teammate who keeps it.
         expect(next.kind).toBe("dribble");
-        expect(next.playerId).toBe(f.playerId);
+        // (Unless the keeper was sent off or hurt just after the save.)
+        const gone = r.events.some((e) => (e.type === "red" || e.type === "injury") && e.playerId === f.playerId && e.minute >= Math.floor(f.minute));
+        if (!gone) expect(next.playerId).toBe(f.playerId);
         const out = r.frames[i + 2];
         if (!out) return;
         expect(out.kind).toBe("pass");

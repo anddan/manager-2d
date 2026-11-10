@@ -343,6 +343,8 @@ export type TouchKind = "kickoff" | "pass" | "dribble" | "tackle" | "setpiece" |
  * minute/x/y/possession.
  */
 export interface Frame {
+  /** On the touch that ends a shot: what kind of chance it was (a header from a cross, a ball in behind, a shot from distance and so on). */
+  chance?: "close" | "box" | "cutback" | "through" | "header" | "long";
   minute: number;
   x: number;
   y: number;

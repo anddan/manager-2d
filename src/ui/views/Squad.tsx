@@ -7,7 +7,7 @@ import {POSITIONS, TEAM_ROLES, type Player, type TeamRole} from "../../game/type
 import {useT, type TKey} from "../../i18n";
 import {useGame, useGameState} from "../../store";
 import {Avatar} from "../Avatar";
-import {Bar, Card, Face, Flag, FormArrow, Modal, PosBadge, StatusIcons, Hint} from "../common";
+import {Bar, Card, Face, FoldButton, Flag, FormArrow, Modal, PosBadge, StatusIcons, Hint} from "../common";
 import {quickSellMany} from "../../game/transfers";
 import {multiSaleBurst, rewardShownLately} from "../effects";
 
@@ -253,10 +253,9 @@ function TeamRolesCard() {
   return (
     <Card
       className="roles-card"
-      title={
-        <button className="card-toggle" aria-expanded={shown} onClick={toggle}>
-          <Icon name="shirt" size={18} /> {iconize(t("roles.title"))} <span className="card-toggle-arrow" aria-hidden>{shown ? "▲" : "▼"}</span>
-        </button>
+      title={<><Icon name="shirt" size={18} /> {iconize(t("roles.title"))}</>}
+      actions={
+        <FoldButton open={shown} onClick={toggle} />
       }
     >
       {!shown && (

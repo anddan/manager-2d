@@ -62,7 +62,6 @@ export function Settings() {
   const [avatarStyle, setAvatarStyle] = useState<AvatarStyle>(readAvatarStyle());
   // How a match is played: the way to watch it, how fast, who takes set pieces and changes, the view, buzz and effects.
   const [matchView, setMatchViewState] = useState<MatchView>(() => readMatchView());
-  const noPitch = matchView === "zones";
   const [speed, setSpeed] = usePref<string>("manager2d.matchSpeed", "1");
   const [setPieces, setSetPieces] = usePref<"auto" | "self">("manager2d.manualSetPieces", "auto");
   const [subs, setSubs] = usePref<"auto" | "self">("manager2d.manualSubs", "auto");
@@ -144,7 +143,7 @@ export function Settings() {
           <dd>
             <span className="speed-group manager-view" role="radiogroup" aria-label={t("settings.view")}>
               {MATCH_VIEWS.map((v) => (
-                <button key={v} type="button" role="radio" aria-checked={matchView === v} className={matchView === v ? "chip active" : "chip"} title={t(`match.view.${v}`)} onClick={() => { setMatchViewState(v); writeMatchView(v); if (v !== "pitch") setSetPieces("auto"); }}>
+                <button key={v} type="button" role="radio" aria-checked={matchView === v} className={matchView === v ? "chip active" : "chip"} title={t(`match.view.${v}`)} onClick={() => { setMatchViewState(v); writeMatchView(v); }}>
                   <Icon name={v === "pitch" ? "video" : v === "3d" ? "ball" : "chart"} size={16} /> {t(`match.viewShort.${v}`)}
                 </button>
               ))}
@@ -153,7 +152,7 @@ export function Settings() {
           <dt><Icon name="skip" size={18} /> {iconize(t("match.speed"))}</dt>
           <dd><Choice label={t("match.speed")} value={speed} onPick={setSpeed} options={[["1", "1×"], ["2", "2×"], ["3", "3×"], ["4", "4×"], ["5", "5×"]]} /></dd>
           <dt><Icon name="target" size={18} /> {iconize(t("match.setPieces"))}</dt>
-          <dd><Choice label={t("match.setPieces")} value={noPitch ? "auto" : setPieces} disabled={noPitch} onPick={setSetPieces} options={[["self", t("match.self")], ["auto", t("match.auto")]]} /></dd>
+          <dd><Choice label={t("match.setPieces")} value={setPieces} onPick={setSetPieces} options={[["self", t("match.self")], ["auto", t("match.auto")]]} /></dd>
           <dt><Icon name="swap" size={18} /> {iconize(t("match.subsWho"))}</dt>
           <dd><Choice label={t("match.subsWho")} value={subs} onPick={setSubs} options={[["self", t("match.self")], ["auto", t("match.auto")]]} /></dd>
           <dt><Icon name="eye" size={18} /> {iconize(t("settings.pitchView"))}</dt>

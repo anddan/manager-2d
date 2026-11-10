@@ -70,9 +70,9 @@ const MENTALITY: Record<Mentality, {def: number; att: number}> = {
   attacking: {def: 0.92, att: 1.09},
 };
 
-const HOME_ADVANTAGE = 1.045;
+const HOME_ADVANTAGE = 1.06;
 // Lower than it would be without added time and the frequent set pieces, which add goals of their own.
-const CHANCE_BASE = 0.42;
+const CHANCE_BASE = 0.18;
 /**
  * How sharply strength differences turn into possession and chances. Kept
  * moderate so teams at about the same level get even matches where both
@@ -82,6 +82,10 @@ const POSSESSION_POWER = 2.2;
 /** On top of midfield strength, how often the side with the ball keeps it into the next minute (fewer turnovers, same possession share). */
 const POSSESSION_KEEP = 0.4;
 const CHANCE_POWER = 1.2;
+/** How much more often a side with the ball gets a chance building up (0), in the final third (1) and in the box (2): well over three times as often there. */
+const TERRITORY_CHANCE = [0.6, 1.2, 3.6];
+/** How often a side that keeps the ball gets a step further up the pitch in a minute. */
+const TERRITORY_STEP = 0.55;
 
 /**
  * What each instruction does, at "more" (+1). "Less" (-1) is the inverse.
@@ -214,6 +218,19 @@ const SHOOTER_WEIGHT: Record<Position, number> = {GK: 0, CB: 0.4, FB: 0.4, DM: 0
 const ASSIST_WEIGHT: Record<Position, number> = {GK: 0.05, CB: 0.4, FB: 1.5, DM: 1.2, CM: 3, AM: 4, W: 3.5, ST: 2};
 const FOUL_WEIGHT: Record<Position, number> = {GK: 0.2, CB: 3, FB: 2, DM: 3, CM: 2, AM: 1, W: 1, ST: 1};
 
+/** Who sets a chance up, by how it came about: crosses and pull-backs come from the wings, balls in behind from the middle of the park. */
+function assistFit(kind: Chance["kind"], pos: Position): number {
+  const table: Record<Chance["kind"], Partial<Record<Position, number>>> = {
+    header: {W: 3, FB: 2.5, AM: 0.8, CM: 0.5, ST: 0.3, DM: 0.3, CB: 0.15, GK: 0.05},
+    cutback: {W: 3, FB: 2.5, AM: 0.8, CM: 0.5, ST: 0.3, DM: 0.3, CB: 0.15, GK: 0.05},
+    through: {AM: 2, CM: 2, DM: 1, W: 1, ST: 0.6, FB: 0.3, CB: 0.2, GK: 0.05},
+    close: {W: 1.5, FB: 1.2, CM: 1.2, AM: 1.2, ST: 0.8, DM: 0.5, CB: 0.2, GK: 0.05},
+    box: {},
+    long: {},
+  };
+  return table[kind][pos] ?? 1;
+}
+
 function shotSkill(team: Team, player: Player): number {
   const p = geared(player);
   const raw = p.attrs.finishing * 0.65 + p.attrs.technique * 0.2 + p.attrs.vision * 0.15;
@@ -282,8 +299,15 @@ function substitute(ctx: SimContext, team: Team, out: OnPitch, minute: number, c
   return true;
 }
 
-function removePlayer(team: Team, id: string): void {
+function removePlayer(team: Team, id: string, state?: GameState): void {
+  const gone = team.onPitch.find((o) => o.id === id);
   team.onPitch = team.onPitch.filter((o) => o.id !== id);
+  // The keeper is off and there is no one to replace him: the best of the others in goal (as in any match) takes his place, in his gloves' slot.
+  if (gone && team.slots[gone.slot].pos === "GK" && team.onPitch.length > 0 && !team.onPitch.some((o) => team.slots[o.slot].pos === "GK")) {
+    const rating = (pid: string) => state?.players[pid]?.attrs.goalkeeping ?? 0;
+    const best = [...team.onPitch].sort((a, b) => rating(b.id) - rating(a.id))[0];
+    best.slot = gone.slot;
+  }
 }
 
 /** How a set piece went, for drawing it in the replay. */
@@ -818,9 +842,13 @@ class Replay {
     // A shot from outside the box is decided here, so the build-up stays out of the box (and no cross or ball in behind is played).
     const shooterNow = pending ? this.state.players[pending] : undefined;
     const shooterPosNow = pending ? this.posOf(attacking, pending) : undefined;
+    // The chance the engine decided on: how it comes about (a cross for a header, a ball in behind, a shot from distance) and where it is struck from.
+    const planned = outcome.type !== "none" && !outcome.setPiece ? outcome.chance : undefined;
     const longPlan =
       !!pending && !ledUp && progressFor(side, this.ball.x) < 68 &&
-      this.rng.chance((shooterPosNow === "ST" ? 0.16 : 0.46) * (outcome.type === "goal" ? 0.6 : 1.3) * (0.6 + (shooterNow?.attrs.technique ?? 50) / 125));
+      (planned
+        ? planned.kind === "long"
+        : this.rng.chance((shooterPosNow === "ST" ? 0.16 : 0.46) * (outcome.type === "goal" ? 0.6 : 1.3) * (0.6 + (shooterNow?.attrs.technique ?? 50) / 125)));
 
     // At least two touches in a quiet minute, or the one would be spread over the whole minute (a player standing on the ball).
     let passes = outcome.type === "none" ? this.rng.int(3, 4) : outcome.setPiece ? 0 : this.rng.int(1, 3);
@@ -852,7 +880,7 @@ class Replay {
       const intoBox = (outcome.type !== "none" || turnover) && !longPlan;
       // Into the box only for the one who is to shoot: no one else is carried in free, to hand it on from there.
       const mayEnter = intoBox && (!pending || carrier === pending);
-      if (intoBox && (settled || progressFor(side, this.ball.x) > 60) && this.wideAndHigh(attacking, carrier) && this.rng.chance(0.95)) {
+      if (intoBox && (settled || progressFor(side, this.ball.x) > 60) && this.wideAndHigh(attacking, carrier) && (!planned || planned.kind === "header" || planned.kind === "cutback") && this.rng.chance(0.95)) {
         carrier = this.crossIn(attacking, carrier, add, pending) ?? carrier;
         break;
       }
@@ -1021,14 +1049,17 @@ class Replay {
         carrier = outcome.assistId!;
         // Wingers and full-backs mostly set goals up from the byline.
         const pos = this.posOf(attacking, carrier);
-        if ((pos === "W" || pos === "FB") && this.rng.chance(0.7)) {
+        const wideMan = pos === "W" || pos === "FB";
+        if (wideMan && (planned ? planned.kind === "header" || planned.kind === "cutback" : this.rng.chance(0.7))) {
           this.toByline(side, carrier, add);
           // Mostly crossed in, now and then pulled back to the edge of the box for someone arriving.
-          finalBall = this.rng.chance(0.3) ? "cutback" : "cross";
-        } else if (pos !== "W" && pos !== "FB" && this.rng.chance(0.45)) finalBall = "through";
+          finalBall = planned ? (planned.kind === "cutback" ? "cutback" : "cross") : this.rng.chance(0.3) ? "cutback" : "cross";
+        } else if (!wideMan && (planned ? planned.kind === "through" : this.rng.chance(0.45))) finalBall = "through";
       } else if (
         !this.inFrontOfGoal(side) && !longPlan && !ledUp && outcome.shooterId !== carrier &&
-        ["ST", "AM", "CM", "W"].includes(this.posOf(attacking, outcome.shooterId) ?? "") && this.rng.chance(0.3)
+        (planned
+          ? planned.kind === "header" || planned.kind === "cutback"
+          : ["ST", "AM", "CM", "W"].includes(this.posOf(attacking, outcome.shooterId) ?? "") && this.rng.chance(0.3))
       ) {
         // Not every chance is made on the ground: a winger or full-back takes it to the byline and crosses, and the shot is a header.
         const flank = attacking.onPitch.filter((o) => o.id !== outcome.shooterId && o.id !== carrier && (attacking.slots[o.slot].pos === "W" || attacking.slots[o.slot].pos === "FB"));
@@ -1038,23 +1069,27 @@ class Replay {
           add("pass", o.id, fromSide(side, this.rng.range(62, 74), left ? this.rng.range(6, 16) : this.rng.range(84, 94)), side, "long");
           carrier = o.id;
           this.toByline(side, carrier, add);
-          finalBall = "cross";
+          finalBall = planned?.kind === "cutback" ? "cutback" : "cross";
         }
+      } else if (planned?.kind === "through" && !this.inFrontOfGoal(side) && !ledUp && outcome.shooterId !== carrier) {
+        // A ball in behind: the forward is played in and is alone with the keeper.
+        finalBall = "through";
       }
       // From distance: midfielders above all, more with technique, and fewer of them go in.
       const shooter = this.state.players[outcome.shooterId];
       const shooterPos = this.posOf(attacking, outcome.shooterId);
       const longChance = (shooterPos === "ST" ? 0.12 : 0.4) * (outcome.type === "goal" ? 0.6 : 1.3) * (0.6 + (shooter?.attrs.technique ?? 50) / 125);
-      const fromDistance = !finalBall && (longPlan || (!this.inFrontOfGoal(side) && this.rng.chance(longChance)));
-      const shotDepth = fromDistance ? this.rng.range(64, 76) : finalBall === "through" ? this.rng.range(84, 90) : finalBall === "cutback" ? this.rng.range(78, 84) : this.rng.range(80, 90);
-      const shotWidth = fromDistance ? this.rng.range(28, 72) : this.rng.range(32, 68);
+      const fromDistance = !finalBall && (planned ? planned.kind === "long" && progressFor(side, this.ball.x) < 78 : longPlan || (!this.inFrontOfGoal(side) && this.rng.chance(longChance)));
+      // Where it is struck from: where the chance was (the engine has already worked out what it is worth from there).
+      const shotDepth = planned ? planned.depth : fromDistance ? this.rng.range(64, 76) : finalBall === "through" ? this.rng.range(84, 90) : finalBall === "cutback" ? this.rng.range(78, 84) : this.rng.range(80, 90);
+      const shotWidth = planned ? planned.width : fromDistance ? this.rng.range(28, 72) : this.rng.range(32, 68);
       // Never played back: to the shooter level with the passer at the least (a lay-off), or further on.
       const passFrom = progressFor(side, this.ball.x);
-      const boxDepth = outcome.shooterId !== carrier && finalBall !== "cross" && finalBall !== "cutback" ? clamp(Math.max(shotDepth, passFrom), 0, 91) : shotDepth;
+      const boxDepth = outcome.shooterId !== carrier && finalBall !== "cross" && finalBall !== "cutback" ? clamp(Math.max(shotDepth, passFrom), 0, Math.max(91, planned?.depth ?? 0)) : shotDepth;
       const box = fromSide(side, boxDepth, shotWidth);
       // Free with the ball: played in short of the shot (in behind, or in space), the shooter
       // runs at goal and hits it. A cross is met first time; already in front of goal, it's straight in.
-      const runAtGoal = outcome.shooterId !== carrier && finalBall !== "cross" && finalBall !== "cutback" && !this.inFrontOfGoal(side) && this.rng.chance(fromDistance ? 0.6 : 0.7);
+      const runAtGoal = outcome.shooterId !== carrier && finalBall !== "cross" && finalBall !== "cutback" && !this.inFrontOfGoal(side) && (finalBall === "through" || this.rng.chance(fromDistance ? 0.6 : 0.7));
       if (runAtGoal) {
         const from = progressFor(side, this.ball.x);
         // Never further back than where the ball already is (a long shot from just inside the zone would otherwise be played back first).
@@ -1092,6 +1127,9 @@ class Replay {
         this.carrier = null;
         this.restart = {side: defending.side, kind: "goalKick"};
       }
+      // The shot's last touch says what kind of chance it was (for the tests, and for whoever draws it).
+      const lastTouch = touches[touches.length - 1];
+      if (planned && lastTouch && ["goal", "nogoal", "save", "out"].includes(lastTouch.kind ?? "")) lastTouch.chance = planned.kind;
     }
     flush();
   }
@@ -1421,6 +1459,10 @@ export function createMatch(
     // Who has the ball: the home side kicks off. It changes hands after a shot
     // (the other side restarts) or when it is won off them (see the end of the minute).
     let holder: Team = home;
+    // How far up the pitch the side with the ball has got: 0 building up, 1 in the final third, 2 in the box. A side that keeps the ball works
+    // its way up (a minute at a time) and the nearer the goal, the more chances: inside the box shots come thick and fast. A shot, a set piece
+    // or the ball lost sends it back to 0.
+    let territory = 0;
     let minute = 0;
     // The second half's added time is only known at 90 minutes.
     let end = Infinity;
@@ -1447,8 +1489,12 @@ export function createMatch(
 
       let outcome: ShotOutcome = {type: "none"};
 
-      const ratio = att.att / Math.max(def.def, 1);
-      const pChance = clamp(CHANCE_BASE * ratio ** CHANCE_POWER, 0.07, 0.62);
+      // How the attack does against the defence it meets, taken against how the two sides' attacks do against each other's defences:
+      // the strength of the league (how good the attackers are compared with the defenders in it) must not decide how many chances there are,
+      // only which of the two sides is stronger.
+      const balance = Math.sqrt((h.att / Math.max(a.def, 1)) * (a.att / Math.max(h.def, 1)));
+      const ratio = att.att / Math.max(def.def, 1) / Math.max(balance, 0.2);
+      const pChance = clamp(CHANCE_BASE * ratio ** CHANCE_POWER * TERRITORY_CHANCE[territory], 0.04, 0.8);
       if (rng.chance(pChance)) {
         const shooterSlot = pickOnPitch(rng, state, attacking, SHOOTER_WEIGHT, (p) => (p.attrs.finishing / 50) * effect(attacking, p.id, (e) => e.shoot) * (hasTrait(p, "poacher") ? 1.12 : 1));
         if (shooterSlot) {
@@ -1468,7 +1514,7 @@ export function createMatch(
           const pGoal = clamp(chance.xg * duel * pressure + (fired ? FORZA.goalBonus * 0.5 : 0), 0.01, 0.92);
           xg[attacking.side] += pGoal;
           // Shots from close in and well struck are on target more often.
-          let pOnTarget = fired ? FORZA.onTarget : clamp(0.2 + chance.xg * 1.0 + (skill - 50) / 300 + (ratio - 1) * 0.08, 0.14, 0.85);
+          let pOnTarget = fired ? FORZA.onTarget : clamp(0.12 + chance.xg * 1.0 + (skill - 50) / 300 + (ratio - 1) * 0.08, 0.1, 0.85);
           pOnTarget = Math.max(pOnTarget, Math.min(0.97, pGoal / 0.85));
           if (rng.chance(pOnTarget)) {
             attacking.onTarget++;
@@ -1483,7 +1529,7 @@ export function createMatch(
             } else if (scored) {
               attacking.goals++;
               const assist = rng.chance(chance.kind === "long" ? 0.35 : 0.78)
-                ? pickOnPitch(rng, state, attacking, ASSIST_WEIGHT, (p) => ((p.attrs.passing + p.attrs.vision) / 100) * effect(attacking, p.id, (e) => e.assist) * (hasTrait(p, "playmaker") ? 1.12 : 1), shooterSlot.id)
+                ? pickOnPitch(rng, state, attacking, ASSIST_WEIGHT, (p) => ((p.attrs.passing + p.attrs.vision) / 100) * effect(attacking, p.id, (e) => e.assist) * (hasTrait(p, "playmaker") ? 1.12 : 1) * assistFit(chance.kind, p.position), shooterSlot.id)
                 : undefined;
               outcome = {type: "goal", shooterId: shooterSlot.id, assistId: assist?.id, chance};
               ctx.events.push({minute, type: "goal", side: attacking.side, playerId: shooterSlot.id, otherId: assist?.id});
@@ -1525,6 +1571,8 @@ export function createMatch(
       const share = attacking === home ? pHome : 1 - pHome;
       const turnover = outcome.type !== "none" || !rng.chance(POSSESSION_KEEP + (1 - POSSESSION_KEEP) * share);
       holder = turnover ? defending : attacking;
+      // Kept the ball: a step nearer the goal (about every other minute). Lost it, or ended it with a shot or a set piece: back to the start.
+      territory = turnover ? 0 : Math.min(2, territory + (rng.chance(TERRITORY_STEP) ? 1 : 0));
       // Drawn before cards and injuries: those players were still on during this minute.
       replay?.minute(minute, attacking, defending, outcome, turnover);
       report.homeGoals = home.goals;
@@ -1548,7 +1596,7 @@ export function createMatch(
             rate(fouler.id, -1.5);
             ctx.sentOff.add(fouler.id);
             ctx.minutes[fouler.id].off = minute;
-            removePlayer(team, fouler.id);
+            removePlayer(team, fouler.id, state);
           } else {
             team.booked.add(fouler.id);
             ctx.events.push({minute, type: "yellow", side: team.side, playerId: fouler.id});
@@ -1574,12 +1622,12 @@ export function createMatch(
           if (team.side === managed && team.subsLeft > 0 && team.bench.length > 0) {
             // Off for treatment; the manager picks who comes on next minute.
             ctx.minutes[hurt.id].off = minute;
-            removePlayer(team, hurt.id);
+            removePlayer(team, hurt.id, state);
             team.injured.push(hurt);
             yield {type: "injury", minute, side: team.side, playerId: hurt.id, pos: team.slots[hurt.slot].pos};
           } else if (!substitute(ctx, team, hurt, minute)) {
             ctx.minutes[hurt.id].off = minute;
-            removePlayer(team, hurt.id);
+            removePlayer(team, hurt.id, state);
           }
         }
       }

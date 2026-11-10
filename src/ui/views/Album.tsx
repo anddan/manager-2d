@@ -7,7 +7,7 @@ import {GEAR_COLOR, GEAR_KINDS, GEAR_PRICE, GEAR_TIERS, type GearKind, type Gear
 import {GIFTS, GIFT_VARIANTS} from "../../game/morale";
 import {useT, type TKey} from "../../i18n";
 import {useGame, useGameState} from "../../store";
-import {Card, Hint, Modal} from "../common";
+import {Card, FoldButton, Hint, Modal} from "../common";
 import {confettiBurst, diamondBurst, screenFlash} from "../effects";
 import {GearPicture} from "../Gear";
 import {GiftPicture} from "../GiftArt";
@@ -99,6 +99,8 @@ export function Album() {
   const act = useGame((s) => s.act);
   const [picked, setPicked] = useState<string | null>(null);
   const [opening, setOpening] = useState<string | null>(null);
+  // Each collection can be folded away (all open to begin with) and says how many of it you have, like "4/12".
+  const [shut, setShut] = useState<Record<string, boolean>>({});
   // The rare ones reached are noted when the album is opened.
   useEffect(() => { act((g) => updateAlbum(g)); }, [act]);
   const owned = ownedKeys(game);
@@ -158,6 +160,8 @@ export function Album() {
     );
   };
 
+  const count = (keys: string[]) => `${keys.filter((k) => owned.has(k)).length}/${keys.length}`;
+  const toggle = (id: string) => <FoldButton open={!shut[id]} onClick={() => setShut((v) => ({...v, [id]: !v[id]}))} />;
   return (
     <div className="grid">
       <Card
@@ -171,30 +175,30 @@ export function Album() {
         </div>
       </Card>
 
-      <Card title={<><Icon name="trophy" size={18} /> {iconize(t("album.section.trophies"))} ({TROPHIES.filter((k) => owned.has(`trophy:${k}`)).length}/{TROPHIES.length})</>} className="span-2">
-        <div className="album-grid">{TROPHIES.map((k) => tile(`trophy:${k}`))}</div>
+      <Card title={<><Icon name="trophy" size={18} /> {iconize(t("album.section.trophies"))} ({count(TROPHIES.map((k) => `trophy:${k}`))})</>} actions={toggle("trophies")} className="span-2">
+        {!shut.trophies && <div className="album-grid">{TROPHIES.map((k) => tile(`trophy:${k}`))}</div>}
       </Card>
 
-      <Card title={<><Icon name="sparkle" size={18} /> {iconize(t("album.section.rare"))}</>} className="span-2 album-rare-card">
-        <div className="album-grid">{RARES.map((k) => tile(`rare:${k}`))}</div>
+      <Card title={<><Icon name="sparkle" size={18} /> {iconize(t("album.section.rare"))} ({count(RARES.map((k) => `rare:${k}`))})</>} actions={toggle("rare")} className="span-2 album-rare-card">
+        {!shut.rare && <div className="album-grid">{RARES.map((k) => tile(`rare:${k}`))}</div>}
       </Card>
 
-      <Card title={<><Icon name="gift" size={18} /> {iconize(t("album.section.gifts"))}</>} className="span-2">
-        {Object.keys(GIFT_VARIANTS).map((id) => (
+      <Card title={<><Icon name="gift" size={18} /> {iconize(t("album.section.gifts"))} ({count(albumGifts().map((k) => `gift:${k}`))})</>} actions={toggle("gifts")} className="span-2">
+        {!shut.gifts && Object.keys(GIFT_VARIANTS).map((id) => (
           <div key={id} className="album-group">
             <h3>{t(`gift.${id}` as TKey)}</h3>
             <div className="album-grid">{albumGifts().filter((g) => g.startsWith(`${id}:`)).map((k) => tile(`gift:${k}`, t(`gift.v.${k.split(":")[1]}` as TKey)))}</div>
           </div>
         ))}
         {/* The house: one only, with no colours. */}
-        <div className="album-group">
+        {!shut.gifts && <div className="album-group">
           <h3>{t("gift.mansion")}</h3>
           <div className="album-grid">{tile("gift:mansion", t("gift.mansion"))}</div>
-        </div>
+        </div>}
       </Card>
 
-      <Card title={<><Icon name="boot" size={18} /> {iconize(t("album.section.gear"))}</>} className="span-2">
-        {GEAR_KINDS.map((kind) => (
+      <Card title={<><Icon name="boot" size={18} /> {iconize(t("album.section.gear"))} ({count(albumGear().map((k) => `gear:${k}`))})</>} actions={toggle("gear")} className="span-2">
+        {!shut.gear && GEAR_KINDS.map((kind) => (
           <div key={kind} className="album-group">
             <h3>{t(`gear.kind.${kind}` as TKey)}</h3>
             <div className="album-grid">{GEAR_TIERS.filter((tier) => albumGear().includes(`${kind}:${tier}`)).map((tier) => tile(`gear:${kind}:${tier}`, t(`gear.tier.${tier}` as TKey)))}</div>
@@ -202,8 +206,8 @@ export function Album() {
         ))}
       </Card>
 
-      <Card title={<><Icon name="gift" size={18} /> {iconize(t("album.section.packs"))}</>} className="span-2">
-        <div className="album-grid">{ALBUM_PACKS.map((k) => tile(`pack:${k}`))}</div>
+      <Card title={<><Icon name="gift" size={18} /> {iconize(t("album.section.packs"))} ({count(ALBUM_PACKS.map((k) => `pack:${k}`))})</>} actions={toggle("packs")} className="span-2">
+        {!shut.packs && <div className="album-grid">{ALBUM_PACKS.map((k) => tile(`pack:${k}`))}</div>}
       </Card>
       {detail()}
       {opening && <OpenDialog itemKey={opening} label={nameOf(opening)} onClose={() => setOpening(null)} />}

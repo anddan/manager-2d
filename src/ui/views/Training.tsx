@@ -10,7 +10,7 @@ import {useState} from "react";
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
 import {FocusModal, FocusPicker} from "../FocusPicker";
-import {Bar, Card, Delta, PosBadge, SortTh, sortRows, useSort, Hint, StatusIcons} from "../common";
+import {Bar, Card, Delta, FoldButton, PosBadge, SortTh, sortRows, useSort, Hint, StatusIcons} from "../common";
 
 type TrainingSort = "pos" | "name" | "age" | "ovr" | "fitness" | "change" | "focus";
 
@@ -31,6 +31,8 @@ export function Training() {
   const openPlayer = useGame((s) => s.openPlayer);
   // Picking several players to give the same individual training at once (as in the squad).
   const [selecting, setSelecting] = useState(false);
+  // The programme card can be folded away; its heading says what the programme is ("Auto · Physical · Normal").
+  const [programOpen, setProgramOpen] = useState(true);
   // Less to begin with (on a phone): who, rating, fitness and the week's change; "Show more" adds age, the biggest changes and the focus.
   const [more, setMore] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
@@ -89,7 +91,14 @@ export function Training() {
 
   return (
     <div className="grid">
-      <Card title={t("train.programme")}>
+      <Card
+        className="train-card"
+        title={<>{t("train.programme")} <small className="card-sub" title={`${t(`train.mode.${mode}`)} · ${t(`focus.${plan.focus}`)} · ${t(`intensity.${plan.intensity}`)}`}>({t(`train.mode.${mode}`)} · {t(`focus.${plan.focus}`)} · {t(`intensity.${plan.intensity}`)})</small></>}
+        actions={
+          <FoldButton open={programOpen} onClick={() => setProgramOpen((v) => !v)} />
+        }
+      >
+        {programOpen && (<>
         {/* One tap: let the assistant plan it, rest, or choose. */}
         <div className="real-tabs" role="tablist" aria-label={t("train.programme")}>
           {(["auto", "rest", "own"] as const).map((m) => (
@@ -131,6 +140,7 @@ export function Training() {
             </div>
           </div>
         </div>
+        </>)}
       </Card>
 
       <Card title={t("train.extra")}>

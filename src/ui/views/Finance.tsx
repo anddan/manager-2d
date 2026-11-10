@@ -6,7 +6,7 @@ import {wageBill} from "../../game/ratings";
 import {FINANCE_CATEGORIES, type FinanceLines} from "../../game/types";
 import {useT} from "../../i18n";
 import {useGame, useGameState} from "../../store";
-import {Bar, Card, Empty, Modal, NumberInput, Hint} from "../common";
+import {Bar, Card, Empty, FoldButton, Modal, NumberInput, Hint} from "../common";
 import {loanLeft, loanOffers, repayLoan, takeLoan} from "../../game/loans";
 import {Fragment, useState, type ReactNode} from "react";
 
@@ -69,7 +69,7 @@ export function Finance() {
           const used = recent.used;
           return (
             <div className="econ-glance">
-              {used > 100 && <p className="callout error"><Icon name="warn" size={18} /> <strong>{iconize(t("fin.redShort"))}</strong> <Hint inline>{iconize(t("fin.redWarning"))}</Hint></p>}
+              {used > 100 && <p className="callout error callout-row"><span><Icon name="warn" size={18} /> <strong>{iconize(t("fin.redShort"))}</strong></span><Hint inline>{iconize(t("fin.redWarning"))}</Hint></p>}
               <Bar value={used} color={used < 75 ? "good" : used <= 100 ? "mid" : "bad"} label={t("fin.spendUsed")} />
               <p>{iconize(t("fin.spendOfIncome", {spent, income: sums.income}))}</p>
               <p className={sums.net >= 0 ? "pos-num strong" : "neg strong"}>{iconize(t("fin.netWeek", {net: sums.net}))}</p>
@@ -192,7 +192,7 @@ function Folding({title, net, children, className}: {title: ReactNode; net?: num
     <Card
       title={title}
       className={className}
-      actions={<button type="button" className="btn small" aria-expanded={open} aria-label={t(open ? "tbl.showLess" : "tbl.showMore")} onClick={() => setOpen(!open)}>{open ? "▲" : "▼"}</button>}
+      actions={<FoldButton open={open} onClick={() => setOpen(!open)} />}
     >
       {open ? (
         children

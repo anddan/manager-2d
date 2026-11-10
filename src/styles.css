@@ -3348,3 +3348,35 @@ body:has(.intro) .modal-backdrop { z-index: 200; }
 /* Maximised in 3D: the play, forward and pause buttons sit over the 3D picture, at the bottom in the middle (the picture is laid over them otherwise). */
 .pitch-wrap.maxed .max-controls { z-index: 8; pointer-events: none; }
 .pitch-wrap.maxed .max-controls .speed-group { pointer-events: auto; }
+
+/* The corner's markers pop up one after another once the camera has come round (they are only sent to the page then). */
+@keyframes sp3d-pop { 0% { scale: 0.05; opacity: 0; } 60% { scale: 1.18; opacity: 1; } 100% { scale: 1; opacity: 1; } }
+.sp3d-zone { transform-origin: 50% 100%; animation: sp3d-pop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) both; }
+.sp3d-zone:nth-of-type(2) { animation-delay: 0.09s; }
+.sp3d-zone:nth-of-type(3) { animation-delay: 0.18s; }
+.sp3d-zone:nth-of-type(4) { animation-delay: 0.27s; }
+@media (prefers-reduced-motion: reduce) { .sp3d-zone { animation: none; } }
+
+/* The economy warning: the heading and the (i) on one row. */
+.callout-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.callout-row .hint-btn.inline { position: static; flex: none; margin: -4px -4px -4px 0; }
+
+/* The album's sections fold away with a round button (the arrow turns up when it is closed). */
+.album-toggle { display: inline-grid; place-items: center; width: 30px; height: 30px; padding: 0; border-radius: 50%; border: 1px solid rgb(255 255 255 / 0.22); background: rgb(11 20 48 / 0.6); color: var(--text, #fff); cursor: pointer; }
+.album-toggle svg { width: 16px; height: 16px; fill: currentColor; transition: transform 0.2s; }
+/* Folded: the arrow points down; open: up. */
+.album-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+.album-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+/* The training programme's heading: the programme in small type after the title, cut short with "…" if it does not fit on the row with the button. */
+.train-card .card-head { gap: 8px; }
+.train-card .card-head h2 { display: flex; align-items: baseline; gap: 6px; min-width: 0; flex: 1 1 auto; white-space: nowrap; }
+.train-card .card-head h2 .card-sub { font-size: 0.62em; font-weight: 600; opacity: 0.75; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: 0; text-transform: none; }
+.train-card .card-actions { flex: none; }
+
+/* The fold button is always at the far right end of a card's heading row, whatever else sits there: the (i) goes just before it. */
+.card-head:has(.album-toggle) { justify-content: flex-start; }
+.card-head:has(.album-toggle) .card-actions { order: 9; margin-left: auto; flex: none; }
+.card-head:has(.album-toggle) .hint-btn.in-head { order: 8; margin-left: auto; margin-right: 6px; }
+.card-head:has(.album-toggle) .hint-btn.in-head + .card-actions, .card-head:has(.album-toggle) .card-actions:has(+ .hint-btn) { margin-left: 0; }
+.card-head:has(.hint-btn.in-head) .card-actions:has(.album-toggle) { margin-left: 0; }

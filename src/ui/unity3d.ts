@@ -65,7 +65,6 @@ export function read3d(): boolean {
 export const ZOOM_STEPS = [0.4, 0.55, 0.75, 1, 1.35, 1.8, 2.4, 3.2];
 const ZOOM_KEY = "manager2d.zoom3d2";
 const DEFAULT_ZOOM = 4;
-const VIEW_KEY = "manager2d.view3dSide";
 
 export function readZoom3d(): number {
   try {
@@ -84,26 +83,7 @@ export function writeZoom3d(i: number) {
   }
 }
 
-/** Which side of the pitch the camera looks from: 0 a touchline, 1 behind the left goal, 2 the other touchline, 3 behind the right goal. */
-export function readSide3d(userSide?: "home" | "away"): number {
-  // Behind the goal your team attacks away from: the home side attacks to the right (the camera behind the left goal, 1), the away side to the left (3).
-  const fallback = userSide === "away" ? 3 : 1;
-  try {
-    const raw = localStorage.getItem(VIEW_KEY);
-    const i = Number(raw);
-    return raw !== null && Number.isInteger(i) && i >= 0 && i < 4 ? i : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-export function writeSide3d(i: number) {
-  try {
-    localStorage.setItem(VIEW_KEY, String(i));
-  } catch {
-    // Only for this match.
-  }
-}
+/** Which side of the pitch the camera looks from: 0 a touchline (the home side attacking to the right), 1 behind the left goal, 2 the other touchline, 3 behind the right goal. It follows the way the phone is held (see MatchViewer). */
 
 export function write3d(on: boolean) {
   try {
@@ -176,7 +156,7 @@ export interface MatchState3D {
   time: number;
   /** How far away the camera is (see ZOOM_STEPS). */
   zoom: number;
-  /** Which side the camera is on (see readSide3d). */
+  /** Which side the camera is on (0 a touchline, 1 behind the left goal, 2 the other touchline, 3 behind the right goal). */
   view: number;
   running: boolean;
   ball: {x: number; z: number; h: number};

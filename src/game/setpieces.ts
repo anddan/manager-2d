@@ -9,11 +9,11 @@ import {clamp, type Rng} from "./rng";
 import type {Player, Side} from "./types";
 
 /** Per minute, scaled by how much the attack dominates. About 0.45 penalties a match. */
-export const PENALTY_RATE = 0.005;
+export const PENALTY_RATE = 0.0038;
 /** About 2 dangerous free kicks a match. */
-export const FREEKICK_RATE = 0.028;
+export const FREEKICK_RATE = 0.015;
 /** About 3 corners per team and match (a real match has 10 or so; the ones the manager takes over are kept to a number that is fun to play). */
-export const CORNER_RATE = 0.095;
+export const CORNER_RATE = 0.082;
 
 export type SetPieceKind = "penalty" | "freekick" | "corner";
 
@@ -136,10 +136,10 @@ export function resolveCorner(
   }
   const attack = (target === "near" ? quickness(header) : aerial(header)) + (delivery(taker) - 60) * 0.4;
   const defend = defender ? marking(defender) : 30;
-  const pWin = 0.5 / (1 + Math.exp(-(attack - defend) / 10));
+  const pWin = 0.42 / (1 + Math.exp(-(attack - defend) / 10));
   if (u[1] >= pWin) return {result: "cleared", shot, dive: 0, target, headerId: header.id, defenderId: defender?.id};
   if (u[3] >= 0.5) return {result: "missed", shot: {x: shot.x > 0 ? 1.2 : -1.2, y: shot.y}, dive: 0, target, headerId: header.id};
-  const pGoal = clamp(0.4 - (gk - 60) / 250 + (aerial(header) - 60) / 300, 0.15, 0.65);
+  const pGoal = clamp(0.32 - (gk - 60) / 250 + (aerial(header) - 60) / 300, 0.12, 0.6);
   return {result: u[4] < pGoal ? "goal" : "saved", shot, dive: shot.x * 0.8, target, headerId: header.id};
 }
 

@@ -291,3 +291,14 @@ export function FormArrow({form, size = 16}: {form: number; size?: number}) {
     </svg>
   );
 }
+
+/** The round button that folds a card up or out: the arrow points down while it is folded (it opens downwards) and up while it is open. The same everywhere. */
+export function FoldButton({open, onClick}: {open: boolean; onClick: () => void}) {
+  const {t} = useT();
+  const label = t(open ? "common.collapse" : "common.expand");
+  return (
+    <button type="button" className="album-toggle" aria-expanded={open} aria-label={label} title={label} onClick={onClick}>
+      <svg viewBox="0 0 16 16" aria-hidden><path d="M3.500 6h9L8 11.500z" /></svg>
+    </button>
+  );
+}

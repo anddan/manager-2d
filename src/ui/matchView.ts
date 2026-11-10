@@ -1,12 +1,11 @@
 // How a match is watched, remembered on this device: the pitch in 2D, the zones the ball has been in (the
-// start), or the match in 3D. With the zones, the set pieces are the assistant's.
+// start), or the match in 3D. Whether the manager takes the set pieces is a choice of its own, in every view.
 export const MATCH_VIEWS = ["pitch", "zones", "3d"] as const;
 export type MatchView = (typeof MATCH_VIEWS)[number];
 
 const KEY = "manager2d.matchView";
 // Before the 3D view was a way of its own it was a button on the pitch.
 const OLD_3D_KEY = "manager2d.view3d";
-const SET_PIECES_KEY = "manager2d.manualSetPieces";
 
 export function readMatchView(): MatchView {
   try {
@@ -24,8 +23,6 @@ export function readMatchView(): MatchView {
 export function writeMatchView(view: MatchView): void {
   try {
     localStorage.setItem(KEY, view);
-    // On the zones board there is nothing to aim on: the set pieces become the assistant's.
-    if (view === "zones") localStorage.setItem(SET_PIECES_KEY, "auto");
     // The old 3D button is not used any more.
     localStorage.removeItem(OLD_3D_KEY);
   } catch {
