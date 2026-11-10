@@ -35,7 +35,7 @@ import type {PointerEvent as ReactPointerEvent} from "react";
 import {addMessage, findFixture, fullName, isCupFixture, isKnockout, listName, playerName, shortName, difficulty} from "../game/helpers";
 import {shootoutOver} from "../game/cup";
 import {WIN_VIDEO_DIAMONDS, taskProgress, videoAfterWin} from "../game/daily";
-import {Rng} from "../game/rng";
+import {Rng, clamp} from "../game/rng";
 import {finishNationalMatch} from "../game/national";
 import {matchVerdict, PLAYER_TALKS, TEAM_TALKS, talkFit, teamTalk, type PlayerTalk, type TeamTalk} from "../game/morale";
 import {boardAt, clockLabel, matchLength} from "../game/clock";
@@ -60,6 +60,7 @@ import {
 } from "../game/types";
 import {finishWeek} from "../game/week";
 import {useT} from "../i18n";
+import {daylightOf, leagueCountry, matchConditions} from "../game/conditions";
 import {useGame, useGameState} from "../store";
 import {Avatar, ManagerAvatar, defaultManagerLook} from "./Avatar";
 import {Football} from "./Ball";
@@ -91,6 +92,8 @@ const BALL_LEAD = 1.1;
 /** How much faster a player runs when the ball is waiting on them. */
 const CATCH_UP = 1.7;/** How fast the ball is brought to the spot for a set piece or restart. */
 const BALL_PLACE_SPEED = 90;
+/** How fast a loose ball rolls in to the player who is on it (per match minute): a little faster than a quick player runs. */
+const BALL_GLIDE = 80;
 /** Fastest the ball moves (a hard pass or shot), in pitch units per match minute. */
 const BALL_TOP_SPEED = 550;
 /** How quickly players reach the speed they want (per match minute). */
@@ -135,6 +138,10 @@ export interface Scene {
    * picked up by whoever of that side gets there first (touch index -> player).
    */
   subs?: Record<number, string>;
+  /** Where the ball is aimed for the touch it is on its way to, when that is a spot worked out on the way off (it does not move afterwards). */
+  aimLock?: {k: number; at: Point};
+  /** A pass that arrived with nobody on it keeps rolling on in the direction it was going, slowing down (units a minute), until someone gets to it. */
+  roll?: Point;
 }
 
 export interface Ctx {
@@ -514,6 +521,8 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
   let reached = prev.reached;
   let flying = prev.flying ?? false;
   let reachedAt = prev.reachedAt ?? -1;
+  let aimLock = prev.aimLock;
+  let roll = prev.roll;
   const subs = {...(prev.subs ?? {})};
   const fr = (k: number): Frame => {
     const f = ctx.frames[k];
@@ -559,6 +568,8 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
         if (f.kind === "dribble") return (f.playerId && bodies[f.playerId]) || f;
         const rb = f.playerId ? bodies[f.playerId] : undefined;
         if (!rb) return f;
+        // Worked out once when the ball sets off, then it keeps to it (it must not bend after the runner as he moves).
+        if (aimLock && aimLock.k === k) return aimLock.at;
         const reach = topSpeed(ctx, f.playerId!, t) * CATCH_UP * Math.max(0, f.minute - t) + 1.5;
         const d = distance(rb, f);
         if (d <= reach) return f;
@@ -568,25 +579,47 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
           const depth = (q: number) => progressFor(f.possession, rb.x + (f.x - rb.x) * q);
           if (depth(k2) < 70 && depth(1) > depth(0)) k2 = Math.min(1, Math.max(k2, (70 - depth(0)) / (depth(1) - depth(0))));
         }
-        return {x: rb.x + (f.x - rb.x) * k2, y: rb.y + (f.y - rb.y) * k2};
+        const at = {x: rb.x + (f.x - rb.x) * k2, y: rb.y + (f.y - rb.y) * k2};
+        if (flying) aimLock = {k, at};
+        return at;
       }
       // A shot (or a ball) over the goal line, out of play: it does not stop at the line but flies on, to the boards and the crowd.
-      if (f.kind === "out" && progressFor(f.possession, f.x) >= 99.5) return {x: f.x > 50 ? f.x + OUT_FLIGHT : f.x - OUT_FLIGHT, y: f.y + (f.y < 50 ? -3 : 3)};
+      if (f.kind === "out" && progressFor(f.possession, f.x) >= 99.5) {
+        // It crosses the line exactly where the engine says (outside the posts) and carries on in the same direction: aimed at a spot further
+        // out from wherever the shooter stands it could cross the line inside the goal, and look like a goal that was not given.
+        if (aimLock && aimLock.k === k) return aimLock.at;
+        const dx = f.x - ball.x;
+        const dy = f.y - ball.y;
+        const len = Math.hypot(dx, dy);
+        const at = len < 0.5 ? {x: f.x > 50 ? f.x + OUT_FLIGHT : f.x - OUT_FLIGHT, y: f.y} : {x: f.x + (dx / len) * OUT_FLIGHT, y: f.y + (dy / len) * OUT_FLIGHT};
+        if (flying) aimLock = {k, at};
+        return at;
+      }
       // Placed balls go to the spot. Everything else, dribbles included (carried
       // at the player's feet), goes to the player.
       const toSpot = ["setpiece", "kickoff", "goalkick", "throwin"].includes(f.kind ?? "");
       // A pass goes to the spot it was aimed at, a fixed point, and the receiver runs to the same spot: the ball does not bend
       // towards whoever it is for as he moves (that looks like a magnet). A carried ball or a tackle still goes to the player.
+      // It never changes its aim on the way. If he cannot get to the spot in time, it is played to the nearest place he can (worked out
+      // once, as it sets off): the ball goes there, and he runs to the same place, so the two meet instead of the ball stopping short.
       if (f.kind === "pass" && !toSpot) {
-        // (Only for the last few steps does it settle at his feet, if he got there.)
         const rb = f.playerId ? bodies[f.playerId] : undefined;
         if (!rb || !f.playerId) return f;
-        // Only if he can get to that spot in time; otherwise it still goes to him (a pass he cannot reach would lie there).
+        if (aimLock && aimLock.k === k) return aimLock.at;
         const reach = topSpeed(ctx, f.playerId, t) * CATCH_UP * Math.max(0, f.minute - t) + 1.5;
-        if (distance(rb, f) > reach) return rb;
-        return distance(ball, f) < 3.5 && distance(rb, f) < 6 ? rb : f;
+        const d = distance(rb, f);
+        if (d <= reach) return f;
+        const q = reach / d;
+        const at = {x: rb.x + (f.x - rb.x) * q, y: rb.y + (f.y - rb.y) * q};
+        if (flying) aimLock = {k, at};
+        return at;
       }
+      // A foul: play stops where it happened, so the ball goes there (not to wherever the one who fouled happened to be).
+      if (f.kind === "tackle" && f.foul) return f;
       const body = f.playerId && !toSpot ? bodies[f.playerId] : undefined;
+      // A tackle: the ball stays where it was won; only once the tackler is almost on it does it settle at his feet (no ball flying across
+      // the pitch to a tackler who is far away).
+      if (f.kind === "tackle" && body && distance(body, ball) > 4) return f;
       return body ?? f;
     };
     const holderOf = (k: number) => {
@@ -608,9 +641,36 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
     const controlled = control === 0 || reachedAt < 0 || t - reachedAt >= control;
     if (due && !flying && (reached < 0 || (atFeet(reached) && controlled))) {
       // Played on from the player's foot.
-      const h = reached >= 0 ? holderOf(reached) : undefined;
-      if (h) ball = {x: h.x, y: h.y};
+      // (From where it lies at his feet: it is not moved onto him first.)
       flying = true;
+      roll = undefined;
+      // The pass goes to a man who can get to it: if the one it was meant for cannot reach the spot in time, the passer picks the nearest
+      // teammate who can (as a player would pick the free man), and that one gets this touch and the ones that follow.
+      const meant = fr(reached + 1);
+      const passer = reached >= 0 ? fr(reached)?.playerId : undefined;
+      if (meant && meant.kind === "pass" && meant.playerId && meant.possession === fr(reached)?.possession && !isShotSetup(ctx.frames, reached + 1)) {
+        const timeLeft = Math.max(0, meant.minute - t);
+        const can = (id: string) => {
+          const b = bodies[id];
+          return !!b && distance(b, meant) <= topSpeed(ctx, id, t) * CATCH_UP * timeLeft + 1.5;
+        };
+        if (!can(meant.playerId)) {
+          let pick: string | undefined;
+          let pickD = Infinity;
+          for (const [slot, id] of onPitchAt(ctx.report, meant.possession, t)) {
+            if (id === passer || id === meant.playerId || cs[meant.possession][slot].pos === "GK" || !can(id)) continue;
+            const d = distance(bodies[id], meant);
+            if (d < pickD) {
+              pickD = d;
+              pick = id;
+            }
+          }
+          if (pick) {
+            const original = meant.playerId;
+            for (let j = reached + 1; j < ctx.frames.length && ctx.frames[j].playerId === original; j++) subs[j] = pick;
+          }
+        }
+      }
       // Won off them: by whoever of that side is nearest the ball, not someone far away.
       const won = fr(reached + 1);
       const tackler = won?.kind === "tackle" && won.playerId ? bodies[won.playerId] : undefined;
@@ -643,6 +703,7 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
       const timeLeft = Math.max(meet.minute - t, eta);
       const speed = Math.min(BALL_TOP_SPEED, timeLeft > dt ? gap / timeLeft : BALL_TOP_SPEED);
       const move = Math.min(gap, speed * dt);
+      const stepFrom = ball;
       if (gap > 0) ball = {x: ball.x + ((to.x - ball.x) / gap) * move, y: ball.y + ((to.y - ball.y) / gap) * move};
       // A dribble is done when the run is (the ball rides along at their feet until then).
       // The run to a foul or out for a corner goes all the way there (play stops there, and waits for it).
@@ -656,6 +717,14 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
         reached = k;
         reachedAt = t;
         flying = false;
+        // A pass that arrives where nobody is does not stop dead (least of all in the air): it keeps going the way it was going and rolls out.
+        const arrived = fr(k);
+        const onIt = arrived.playerId ? bodies[arrived.playerId] : undefined;
+        if (arrived.kind === "pass" && arrived.flight !== "cross" && !isShotSetup(ctx.frames, k) && dt > 0 && (!onIt || distance(onIt, ball) > 2.2)) {
+          const mx = ball.x - stepFrom.x;
+          const my = ball.y - stepFrom.y;
+          if (Math.hypot(mx, my) > 0.05) roll = {x: (mx / dt) * 0.4, y: (my / dt) * 0.4};
+        } else roll = undefined;
         // Lying loose with the player it was meant for far off: a nearer teammate takes it.
         const lying = fr(k);
         const meant = lying.playerId ? bodies[lying.playerId] : undefined;
@@ -663,8 +732,10 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
           const side = onPitchAt(ctx.report, lying.possession, t);
           let best: string | undefined;
           let bestD = distance(meant, ball) - 3;
+          // Never the one who just played it (a throw-in taker does not pass it to himself).
+          const passer = lying.kind === "pass" ? fr(k - 1)?.playerId : undefined;
           for (const [slot, id] of side) {
-            if (cs[lying.possession][slot].pos === "GK" || !bodies[id]) continue;
+            if (cs[lying.possession][slot].pos === "GK" || !bodies[id] || id === passer) continue;
             const d = distance(bodies[id], ball);
             if (d < bestD) {
               bestD = d;
@@ -684,7 +755,19 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
       const carrier = holderOf(reached);
       // Fouled, or the ball has gone out for a corner: it stays where it is for the set piece.
       const stopped = fr(reached + 1)?.kind === "setpiece";
-      if (carrier && !stopped && distance(carrier, ball) < 2.2) ball = {x: carrier.x, y: carrier.y};
+      // (It rolls to his feet at about the pace of a quick player, it does not jump onto him: that looks like a magnet.)
+      const toCarrier = carrier ? distance(carrier, ball) : Infinity;
+      if (carrier && !stopped && toCarrier < 2.2) {
+        const glide = Math.min(toCarrier, BALL_GLIDE * dt);
+        if (toCarrier > 0) ball = {x: ball.x + ((carrier.x - ball.x) / toCarrier) * glide, y: ball.y + ((carrier.y - ball.y) / toCarrier) * glide};
+        roll = undefined;
+      } else if (roll && !stopped) {
+        // Rolling on, slowing down.
+        ball = {x: clamp(ball.x + roll.x * dt, 0.5, 99.5), y: clamp(ball.y + roll.y * dt, 0.5, 99.5)};
+        const slow = Math.exp(-18 * dt);
+        roll = {x: roll.x * slow, y: roll.y * slow};
+        if (Math.hypot(roll.x, roll.y) < 8) roll = undefined;
+      } else roll = undefined;
     }
 
     const sides = {home: onPitchAt(ctx.report, "home", t), away: onPitchAt(ctx.report, "away", t)};
@@ -815,10 +898,13 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
         let boxRun = false;
 
         if (receiverId === id && receiver) {
-          target = receiver.kind === "tackle" ? {x: ball.x, y: ball.y} : {x: receiver.x, y: receiver.y};
+          // He runs to where the ball is really going (it may be played short of the recorded spot if he could not get there).
+          const meet = aimLock && aimLock.k === reached + 1 ? aimLock.at : receiver;
+          target = receiver.kind === "tackle" && !receiver.foul ? {x: ball.x, y: ball.y} : {x: meet.x, y: meet.y};
           sprint = true;
         } else if (keeperRunId === id && saveAhead) {
-          target = {x: saveAhead.x, y: saveAhead.y};
+          // Part of the way across; the rest of it is a dive.
+          target = {x: saveAhead.x, y: spot.y + (saveAhead.y - spot.y) * 0.55};
           sprint = true;
         } else if (override?.targets[id]) {
           target = override.targets[id];
@@ -903,8 +989,9 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
               depth = 86;
               width = 50;
             } else {
-              depth = 77;
-              width = slotInfo.y;
+              // A midfielder arriving late at the edge of the box, towards the middle.
+              depth = 84;
+              width = 50 + (slotInfo.y - 50) * 0.5;
             }
             sprint = pos !== "CM";
             hurry = true;
@@ -1063,7 +1150,7 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
   // Drop players who went off.
   const onNow = new Set([...onPitchAt(ctx.report, "home", t1).values(), ...onPitchAt(ctx.report, "away", t1).values()]);
   for (const id of Object.keys(bodies)) if (!onNow.has(id)) delete bodies[id];
-  return {time: t1, ball, bodies, reached, flying, subs, reachedAt};
+  return {time: t1, ball, bodies, reached, flying, subs, reachedAt, aimLock, roll};
 }
 
 /** While play is stopped: everyone jogs (or sprints) to their target spots. */
@@ -2367,6 +2454,11 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
     const fz = freezeRef.current;
     if (!fz) return;
     done.current.add(fz.key);
+    // In a live match the minute after a goal or half-time is not played yet when the stop ends: make it now, so that it is known who
+    // takes the kick-off and he can stand on the ball.
+    if ((fz.kind === "halftime" || fz.kind === "goal") && live && !live.done && !live.stop && !live.pending && !ctx.frames.some((f) => f.kind === "kickoff" && f.minute > fz.time)) {
+      live.advanceTo(Math.floor(fz.time) + 2);
+    }
     setScene((prev) => {
       const bodies = {...prev.bodies};
       // After half-time or a goal in a live match, the kick-off was not played yet when the stop began, so nobody was told to stand on
@@ -2387,7 +2479,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
       return {...prev, bodies, ball, reached: restartTouch(ctx.frames, fz, prev.reached), flying: false};
     });
     setFreeze(null);
-  }, [ctx]);
+  }, [ctx, live]);
   useEffect(() => {
     if (!freeze || !Number.isFinite(freeze.duration)) return;
     const id = setTimeout(endFreeze, freeze.duration);
@@ -2425,6 +2517,23 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   }, [finished, needsShootout, shootoutScore, freeze, replay, report, ctx, time, scene.bodies]);
 
   const current = shown ?? (pendingReady ? {sp: pendingReady} : null);
+
+  /** After a set piece shown in 3D: play goes on from what it came to (the goal, the save, the clearance), not from the kick again. */
+  const skipStagedKick = (spIndex: number) => {
+    setScene((prev) => {
+      let j = prev.reached;
+      // The set piece's own touch, then (for a corner) the cross, then what it came to.
+      while (j < ctx.frames.length && ctx.frames[j]?.kind !== "setpiece") j++;
+      if (j >= ctx.frames.length) return prev;
+      let k = j + 1;
+      while (ctx.frames[k]?.kind === "pass") k++;
+      const end = ctx.frames[k];
+      if (!end) return prev;
+      const at = end.kind === "goal" || end.kind === "nogoal" ? {x: end.x > 50 ? NET_DEPTH : 100 - NET_DEPTH, y: end.y} : {x: end.x, y: end.y};
+      void spIndex;
+      return {...prev, reached: k, flying: false, ball: at, time: Math.max(prev.time, end.minute)};
+    });
+  };
 
   const answer = useCallback(
     (input: SetPieceInput | null) => {
@@ -2826,11 +2935,15 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   let height = 0;
   if (lofted) {
     const from = report.frames[view.reached];
-    const to = report.frames[view.reached + 1];
+    const recorded = report.frames[view.reached + 1];
+    // Where it is really going (played short of the recorded spot if the receiver could not get there).
+    const to = view.aimLock && view.aimLock.k === view.reached + 1 ? view.aimLock.at : recorded;
     if (from && to) {
       const total = distance(from, to);
       const done = total > 0.1 ? Math.min(1, distance(from, view.ball) / total) : 1;
       height = 4 * done * (1 - done) * Math.min(1, total / 30);
+      // A cross comes down to head height at the one who meets it (he jumps for it); a long ball comes down to the ground.
+      if (flightNow === "cross") height += done * 0.55;
     }
   }
   // A shot on its way from distance rises a little.
@@ -2905,7 +3018,12 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   }
 
   // The 3D view is told where everyone is, every frame; Unity only draws.
-  const unity = useUnity3d(view3d, home, away, homeStands, report.crowd?.rate ?? 1);
+  // Day or night in 3D from the kick-off time (and the weather).
+  const sky = useMemo(() => {
+    const c = matchConditions(report.fixtureId, game.week, leagueCountry(game.leagueId));
+    return {daylight: daylightOf(c.time), weather: c.weather};
+  }, [report.fixtureId, game.week, game.leagueId]);
+  const unity = useUnity3d(view3d, home, away, homeStands, report.crowd?.rate ?? 1, sky);
   const frameUrl = useMemo(() => unityFrameUrl(), []);
   unityWait.current = view3d && !textOnly && unity.available !== false && !unity.ready && !unity.loadError;
   const setPieceOpen = !!live && (needsShootout || !!current);
@@ -2949,10 +3067,12 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
       // A pass or a loose ball reaching a player: he receives it.
       if (now.kind === "pass" && who(view.reached)) {
         const goesOn = next && (["goal", "nogoal", "save"].includes(next.kind ?? "") || (next.kind === "out" && progressFor(next.possession, next.x) >= 99.5));
-        // A cross to someone who shoots is met with the header that is the shot (sent when the ball leaves him); other crosses are headed on.
-        if (now.flight === "cross") {
-          if (!goesOn) out.push({k: "header", id: who(view.reached)!});
-        } else out.push({k: "receive", id: who(view.reached)!, a: now.flight === "long"});
+        // A cross is met with the header that is what he does next (sent when the ball leaves him).
+        void goesOn;
+        // Only he who is at the ball takes it (a pass that lands where nobody is is not received: he has to run onto it).
+        const rcv = view.bodies[who(view.reached)!];
+        const atBall = !!rcv && Math.hypot((rcv.x - view.ball.x) * 1.05, (rcv.y - view.ball.y) * 0.68) < 3;
+        if (now.flight !== "cross" && atBall) out.push({k: "receive", id: who(view.reached)!, a: now.flight === "long"});
       }
     }
     if (out.length) evQueue.current = [...evQueue.current, ...out].slice(-24);
@@ -3132,7 +3252,10 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
           keepers={current.sp.side === "home" ? away : home}
           outcome={current.outcome}
           onAnswer={answer}
-          onDone={() => setShown(null)}
+          onDone={() => {
+            if (sp3d) skipStagedKick(current.sp.index);
+            setShown(null);
+          }}
         />
         </div>
       ) : null}

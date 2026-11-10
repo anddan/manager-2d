@@ -246,9 +246,15 @@ export function screenToGoal(r: GoalRect, sx: number, sy: number): {x: number; y
   return {x: u * 2 - 1, y: v};
 }
 
+/** The light of the match: 0 night .. 1 day (from the kick-off time), and the weather (clouds make the day greyer). */
+export interface SkyLook {
+  daylight: number;
+  weather: string;
+}
+
 /** Everything that stays the same through a match: the kits, and who is who. */
-export function setupMessage(home: Club, away: Club, stands?: {north: number; south: number; west: number; east: number}, fill = 1) {
-  return {src: "forza", type: "setup", home: kit(home), away: kit(away), stands, fill};
+export function setupMessage(home: Club, away: Club, stands?: {north: number; south: number; west: number; east: number}, fill = 1, look?: SkyLook) {
+  return {src: "forza", type: "setup", home: kit(home), away: kit(away), stands, fill, daylight: look?.daylight ?? -1, weather: look?.weather ?? ""};
 }
 
 export function playerInfo(p: Player, side: "home" | "away"): PlayerInfo {
@@ -259,7 +265,7 @@ export function playerInfo(p: Player, side: "home" | "away"): PlayerInfo {
  * Keeps the Unity iframe in step with the match. Returns what the page needs to show the frame and a `send`
  * that is called with the newest state whenever the match has moved.
  */
-export function useUnity3d(enabled: boolean, home: Club, away: Club, stands?: {north: number; south: number; west: number; east: number}, fill = 1) {
+export function useUnity3d(enabled: boolean, home: Club, away: Club, stands?: {north: number; south: number; west: number; east: number}, fill = 1, look?: SkyLook) {
   const frame = useRef<HTMLIFrameElement>(null);
   const [ready, setReady] = useState(false);
   // Whether the Unity build is really there: without it the server answers with the app itself (a window in a window).
@@ -310,7 +316,7 @@ export function useUnity3d(enabled: boolean, home: Club, away: Club, stands?: {n
       }
       if (e.data?.src === "forza-unity" && e.data.type === "ready") {
         known.current = new Set();
-        frame.current?.contentWindow?.postMessage(setupMessage(home, away, stands, fill), "*");
+        frame.current?.contentWindow?.postMessage(setupMessage(home, away, stands, fill, look), "*");
         setReady(true);
       }
     };
@@ -343,6 +349,11 @@ export function useUnity3d(enabled: boolean, home: Club, away: Club, stands?: {n
 
   /** Any other message to Unity (a set piece starting, a kick). */
   const post = (message: Record<string, unknown>) => {
+    // A new set piece (or the end of one): what Unity said about the last one (where the zones were on screen) is no longer true.
+    if (message.type === "sp") {
+      setCornerZones(null);
+      setGoalRect(null);
+    }
     frame.current?.contentWindow?.postMessage({src: "forza", ...message}, "*");
   };
 

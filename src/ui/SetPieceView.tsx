@@ -834,8 +834,9 @@ function CornerView({sp, taker, attackers = [], defenders = [], keeper, shooters
               aria-label={t(`sp.zone.${z}`)}
               title={t(`sp.zone.${z}`)}
             >
-              <span className="sp3d-zone-ring" />
               <span className="sp3d-zone-label">{iconize(t(`sp.zone.${z}`))}</span>
+              <span className="sp3d-marker"><span className="sp3d-marker-dot" /></span>
+              <span className="sp3d-marker-foot" />
             </button>
           );
         })}
@@ -916,7 +917,13 @@ function CornerView({sp, taker, attackers = [], defenders = [], keeper, shooters
               aria-label={`${t(`sp.zone.${z}`)}: ${(who ? shortName(who) : undefined) ?? "?"}`}
               onKeyDown={(ev) => (ev.key === "Enter" || ev.key === " ") && pick(z)}
             >
-              <ellipse cx={at.x} cy={at.y} rx={17 * cScale(at.y)} ry={6 * cScale(at.y)} />
+              {/* A marker pin on the spot (as in 3D) instead of a circle; the big invisible ellipse is what is pressed. */}
+              <ellipse className="zone-hit" cx={at.x} cy={at.y - 3} rx={14 * cScale(at.y)} ry={7 * cScale(at.y)} />
+              <g transform={`translate(${at.x} ${at.y - 13 * cScale(at.y)}) scale(${cScale(at.y)})`} className="zone-pin">
+                <ellipse className="zone-pin-foot" cx={0} cy={0.3} rx={3.4} ry={1.1} />
+                <path className="zone-pin-body" d="M0 0 C-1.6 -2.6 -4 -4.4 -4 -7.4 A4 4 0 1 1 4 -7.4 C4 -4.4 1.6 -2.6 0 0 Z" />
+                <circle className="zone-pin-dot" cx={0} cy={-7.4} r={1.5} />
+              </g>
             </g>
           );
         })}

@@ -57,3 +57,13 @@ export function matchConditions(fixtureId: string, week: number, country?: strin
   )[0];
   return {weather, temp, time};
 }
+
+/** How light it is at kick-off, 1 in the afternoon down to 0 on a late evening: dusk in between (18:00 is about half). */
+export function daylightOf(time: string): number {
+  const [h, m] = time.split(":").map(Number);
+  const hour = (h || 0) + (m || 0) / 60;
+  if (hour <= 16) return 1;
+  if (hour <= 18) return 1 - ((hour - 16) / 2) * 0.55;
+  if (hour <= 19.5) return 0.45 - ((hour - 18) / 1.5) * 0.4;
+  return Math.max(0, 0.05 - ((hour - 19.5) / 1.5) * 0.05);
+}

@@ -3318,13 +3318,33 @@ body:has(.intro) .modal-backdrop { z-index: 200; }
 .sp3d-top .sp3d-duel { opacity: 0.85; font-size: 0.85rem; }
 .sp3d-bottom { bottom: 8px; flex-direction: column; }
 .sp3d-bottom > * { pointer-events: auto; }
-.sp3d-hint.top { position: absolute; top: 60px; left: 50%; transform: translateX(-50%); max-width: 92%; z-index: 1; }
-.sp3d-zone { position: absolute; transform: translate(-50%, -50%); width: 74px; height: 74px; padding: 0; border: 0; background: transparent; pointer-events: auto; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 5; }
-.sp3d-zone-ring { width: 56px; height: 34px; border-radius: 50%; border: 3px solid rgb(253 224 71 / 0.95); background: rgb(253 224 71 / 0.22); box-shadow: 0 0 0 2px rgb(0 0 0 / 0.35); animation: zone-pulse 1.2s ease-in-out infinite alternate; }
-.sp3d-zone:active .sp3d-zone-ring, .sp3d-zone:hover .sp3d-zone-ring { background: rgb(253 224 71 / 0.5); }
-.sp3d-zone-label { margin-top: 2px; padding: 1px 7px; border-radius: 999px; background: rgb(11 20 48 / 0.78); color: #fff; font-size: 0.68rem; white-space: nowrap; }
-@keyframes zone-pulse { from { transform: scale(0.92); } to { transform: scale(1.06); } }
-.sp3d-hint { margin: 0; padding: 4px 12px; border-radius: 999px; background: rgb(11 20 48 / 0.78); color: #fff; font-size: 0.82rem; text-align: center; }
+.sp3d-hint.top { position: absolute; top: 56px; left: 50%; transform: translateX(-50%); max-width: 80%; z-index: 1; }
+.sp3d-zone { position: absolute; transform: translate(-50%, -100%); width: 80px; height: 84px; padding: 0; border: 0; background: transparent; pointer-events: auto; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; z-index: 5; }
+/* A pin standing on the spot where the ball will go: a teardrop with a dot, and a small shadow on the grass. */
+.sp3d-marker { position: relative; width: 30px; height: 30px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: #fde047; box-shadow: 0 0 0 2px rgb(0 0 0 / 0.4), 0 3px 6px rgb(0 0 0 / 0.45); animation: marker-bob 1s ease-in-out infinite alternate; }
+.sp3d-marker-dot { position: absolute; left: 50%; top: 50%; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; border-radius: 50%; background: #1e3a8a; }
+.sp3d-marker-foot { width: 22px; height: 8px; margin-top: 2px; border-radius: 50%; background: rgb(0 0 0 / 0.35); }
+.sp3d-zone:active .sp3d-marker, .sp3d-zone:hover .sp3d-marker { background: #fff; }
+.sp3d-zone-label { margin-bottom: 8px; padding: 1px 7px; border-radius: 999px; background: rgb(11 20 48 / 0.78); color: #fff; font-size: 0.68rem; white-space: nowrap; }
+@keyframes marker-bob { from { margin-bottom: 0; } to { margin-bottom: 5px; } }
+.sp3d-hint { margin: 0; padding: 2px 9px; border-radius: 999px; background: rgb(11 20 48 / 0.3); color: rgb(255 255 255 / 0.85); font-size: 0.68rem; line-height: 1.25; text-align: center; text-shadow: 0 1px 2px rgb(0 0 0 / 0.6); }
 .sp3d-bottom .sp-result { margin: 0; padding: 6px 16px; border-radius: 12px; background: rgb(11 20 48 / 0.85); }
 
 .unity-loading { position: absolute; top: 6px; left: 50%; transform: translateX(-50%); z-index: 3; max-width: calc(100% - 16px); padding: 6px 14px; border-radius: 999px; background: rgb(11 20 48 / 0.88); color: #fff; font-size: 0.8rem; font-weight: 700; text-align: center; }
+
+/* The corner in 2D: marker pins (like the ones in 3D) on the places the ball can be crossed to, instead of circles. */
+.zone .zone-hit { fill: transparent; stroke: none; }
+.zone:hover .zone-hit, .zone:focus-visible .zone-hit { fill: rgb(253 224 71 / 0.14); }
+.zone.active .zone-hit { fill: rgb(253 224 71 / 0.2); stroke: none; }
+.zone .zone-pin-foot { fill: rgb(0 0 0 / 0.35); stroke: none; }
+.zone-pin-body { fill: #fde047; stroke: rgb(0 0 0 / 0.45); stroke-width: 0.5; transition: fill 0.15s; }
+.zone-pin-dot { fill: #1e3a8a; }
+.zone:hover .zone-pin-body, .zone:focus-visible .zone-pin-body { fill: #fff; }
+.zone.active .zone-pin-body { fill: #f59e0b; }
+.zone-pin { pointer-events: none; }
+@media (prefers-reduced-motion: no-preference) { .zone:not(.locked) .zone-pin { animation: zone-pin-bob 1s ease-in-out infinite alternate; } }
+@keyframes zone-pin-bob { from { transform: translateY(0); } to { transform: translateY(-1px); } }
+
+/* Maximised in 3D: the play, forward and pause buttons sit over the 3D picture, at the bottom in the middle (the picture is laid over them otherwise). */
+.pitch-wrap.maxed .max-controls { z-index: 8; pointer-events: none; }
+.pitch-wrap.maxed .max-controls .speed-group { pointer-events: auto; }

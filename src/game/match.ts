@@ -9,6 +9,7 @@
 // user can take it). simulateMatch runs one straight through.
 import {SHIN_PROTECT, geared} from "./gear";
 import {DIAMONDS_PER_WIN, FORMATIONS, MAX_SUBS, clubSlots, roleAt, type Slot} from "./constants";
+import {pickChance, type Chance} from "./chances";
 import {crowdFor, matchAppeal} from "./finance";
 import {book, findFixture, isCupFixture, isKnockout} from "./helpers";
 import {injure} from "./injuries";
@@ -69,9 +70,9 @@ const MENTALITY: Record<Mentality, {def: number; att: number}> = {
   attacking: {def: 0.92, att: 1.09},
 };
 
-const HOME_ADVANTAGE = 1.02;
+const HOME_ADVANTAGE = 1.045;
 // Lower than it would be without added time and the frequent set pieces, which add goals of their own.
-const CHANCE_BASE = 0.29;
+const CHANCE_BASE = 0.42;
 /**
  * How sharply strength differences turn into possession and chances. Kept
  * moderate so teams at about the same level get even matches where both
@@ -80,9 +81,7 @@ const CHANCE_BASE = 0.29;
 const POSSESSION_POWER = 2.2;
 /** On top of midfield strength, how often the side with the ball keeps it into the next minute (fewer turnovers, same possession share). */
 const POSSESSION_KEEP = 0.4;
-/** A shot on target goes in this often against a keeper as good as the shooter. */
-const GOAL_BASE = 0.22;
-const CHANCE_POWER = 1.5;
+const CHANCE_POWER = 1.2;
 
 /**
  * What each instruction does, at "more" (+1). "Less" (-1) is the inverse.
@@ -301,11 +300,11 @@ interface SetPieceShot {
 
 type ShotOutcome =
   | {type: "none"}
-  | {type: "goal"; shooterId: string; assistId?: string; setPiece?: SetPieceShot}
+  | {type: "goal"; shooterId: string; assistId?: string; setPiece?: SetPieceShot; chance?: Chance}
   /** In the net, but ruled out: offside, a foul or handball. */
-  | {type: "disallowed"; shooterId: string; reason: DisallowReason; setPiece?: undefined}
-  | {type: "saved"; shooterId: string; keeperId?: string; setPiece?: SetPieceShot}
-  | {type: "missed"; shooterId: string; setPiece?: SetPieceShot}
+  | {type: "disallowed"; shooterId: string; reason: DisallowReason; setPiece?: undefined; chance?: Chance}
+  | {type: "saved"; shooterId: string; keeperId?: string; setPiece?: SetPieceShot; chance?: Chance}
+  | {type: "missed"; shooterId: string; setPiece?: SetPieceShot; chance?: Chance}
   | {type: "blocked"; shooterId: string; setPiece: SetPieceShot}
   | {type: "cleared"; shooterId: string; setPiece: SetPieceShot};
 
@@ -554,6 +553,17 @@ class Replay {
     return progressFor(side, this.ball.x) > DANGER_DEPTH && width > 22 && width < 78;
   }
 
+  /** The one with the ball is free: well up the pitch and no opponent (the keeper aside) near him. He does not play it back, he carries on. */
+  private isFree(side: Side): boolean {
+    if (!this.opp || progressFor(side, this.ball.x) < 45) return false;
+    let nearest = Infinity;
+    for (const d of this.opp.onPitch) {
+      if (this.opp.slots[d.slot].pos === "GK") continue;
+      nearest = Math.min(nearest, distance(this.spot(this.opp, d.id, false), this.ball));
+    }
+    return nearest > 11;
+  }
+
   /** A winger or full-back with the ball out wide in the final third. */
   private wideAndHigh(team: Team, id: string): boolean {
     const pos = this.posOf(team, id);
@@ -622,7 +632,7 @@ class Replay {
     // In the final third, everyone looks forward (and fired up, everyone everywhere).
     const backTolerance = fired ? 2.5 : progress > 66 ? 5 : fromPos === "ST" || fromPos === "W" || fromPos === "AM" ? 7 : deep ? 18 : 11;
     // Close to goal (in front of it: free, or nearly) a pass never goes back: on towards goal, or square at the least.
-    const noBack = progress > 70;
+    const noBack = progress > 70 || this.isFree(team.side);
     const options = team.onPitch.filter((o) => {
       if (o.id === from) return false;
       if (noBack && progressFor(team.side, this.spot(team, o.id, true).x) < progress - 1) return false;
@@ -676,7 +686,7 @@ class Replay {
       if (kind === "pass" && touchSide === side && flight !== "cross") {
         const here = progressFor(side, this.ball.x);
         const across = side === "home" ? this.ball.y : 100 - this.ball.y;
-        if (here > DANGER_DEPTH && across > 22 && across < 78 && progressFor(side, at.x) < here) at = fromSide(side, here, side === "home" ? at.y : 100 - at.y);
+        if (((here > DANGER_DEPTH && across > 22 && across < 78) || this.isFree(side)) && progressFor(side, at.x) < here) at = fromSide(side, here, side === "home" ? at.y : 100 - at.y);
       }
       const touch: Frame = {minute: 0, x: at.x, y: at.y, possession: touchSide, playerId: id, kind, ...(flight ? {flight} : {})};
       touches.push(touch);
@@ -751,14 +761,21 @@ class Replay {
       : fromSide(side, progressFor(side, sp.spot.x) + 1.5, clamp(spotWidth + this.rng.range(-4, 4), 5, 95));
     // From far away, it's played up to whoever is already up there (long if it
     // has to be): no dribble runs half the pitch, and nobody has to sprint 40 m to get it.
-    const mates = attacking.onPitch.filter((o) => o.id !== carrier && attacking.slots[o.slot].pos !== "GK");
     // (Not from in front of goal when the set piece is further back: the one with the ball is not played back out.)
     const awayFromGoal = this.inFrontOfGoal(side) && progressFor(side, runTo.x) < progressFor(side, this.ball.x);
-    if (carrier && mates.length > 0 && distance(this.ball, runTo) > 22 && !awayFromGoal) {
+    // The last run is short: nobody carries it 20 m in the few seconds a build-up has. Further off, it is played on (up to three times) to
+    // whoever is already up there, and only the last stretch is run.
+    for (let hops = 0; hops < 4 && carrier && !awayFromGoal && distance(this.ball, runTo) > 12; hops++) {
+      const mates = attacking.onPitch.filter((o) => o.id !== carrier && attacking.slots[o.slot].pos !== "GK");
+      if (mates.length === 0) break;
       let to = mates[0].id;
       for (const o of mates) if (distance(this.spot(attacking, o.id, true), runTo) < distance(this.spot(attacking, to, true), runTo)) to = o.id;
       const spot = this.spot(attacking, to, true);
-      const at = this.jitter({x: spot.x + (runTo.x - spot.x) * 0.4, y: spot.y + (runTo.y - spot.y) * 0.4}, 2);
+      // Towards the place, not all the way: the one who gets it carries it the rest.
+      const part = distance(this.ball, runTo) > 30 ? 0.55 : 0.8;
+      const at = this.jitter({x: spot.x + (runTo.x - spot.x) * part, y: spot.y + (runTo.y - spot.y) * part}, 2);
+      // (Never further back than the ball already is.)
+      if (progressFor(side, at.x) < progressFor(side, this.ball.x) - 3 && distance(this.ball, runTo) < 40) break;
       add("pass", to, at, side, distance(this.ball, at) > 35 ? "long" : undefined);
       carrier = to;
     }
@@ -837,6 +854,21 @@ class Replay {
       const mayEnter = intoBox && (!pending || carrier === pending);
       if (intoBox && (settled || progressFor(side, this.ball.x) > 60) && this.wideAndHigh(attacking, carrier) && this.rng.chance(0.95)) {
         carrier = this.crossIn(attacking, carrier, add, pending) ?? carrier;
+        break;
+      }
+      // Down the wing and in with a cross, even when nothing comes of it: someone in the box heads or lays it off to a teammate at the
+      // edge of it, and the side keeps the ball. (Without this the box was only used when a shot followed.)
+      if (!intoBox && !pending && outcome.type === "none" && !turnover && progressFor(side, this.ball.x) > 58 && this.wideAndHigh(attacking, carrier) && this.rng.chance(0.5)) {
+        const met = this.crossIn(attacking, carrier, add);
+        if (met) {
+          const edge = attacking.onPitch.filter((o) => o.id !== met && o.id !== carrier && !["GK", "CB"].includes(attacking.slots[o.slot].pos));
+          if (edge.length > 0) {
+            const to = this.rng.pick(edge);
+            add("pass", to.id, fromSide(side, this.rng.range(72, 78), this.rng.range(34, 66)), side);
+            lastPasser = met;
+            carrier = to.id;
+          } else carrier = met;
+        }
         break;
       }
       // A triangle: out to a teammate, laid off to a third, and played on to the first, who has run on past them.
@@ -1384,6 +1416,8 @@ export function createMatch(
 
   function* play(): Generator<MatchStep, MatchReport, SetPieceInput | null | undefined> {
     let homePossession = 0;
+    // Expected goals: what the chances were worth (for the report, and for checking the engine against real football).
+    const xg = {home: 0, away: 0};
     // Who has the ball: the home side kicks off. It changes hands after a shot
     // (the other side restarts) or when it is won off them (see the end of the minute).
     let holder: Team = home;
@@ -1414,35 +1448,44 @@ export function createMatch(
       let outcome: ShotOutcome = {type: "none"};
 
       const ratio = att.att / Math.max(def.def, 1);
-      const pChance = clamp(CHANCE_BASE * ratio ** CHANCE_POWER, 0.05, 0.42);
+      const pChance = clamp(CHANCE_BASE * ratio ** CHANCE_POWER, 0.07, 0.62);
       if (rng.chance(pChance)) {
         const shooterSlot = pickOnPitch(rng, state, attacking, SHOOTER_WEIGHT, (p) => (p.attrs.finishing / 50) * effect(attacking, p.id, (e) => e.shoot) * (hasTrait(p, "poacher") ? 1.12 : 1));
         if (shooterSlot) {
           const shooter = state.players[shooterSlot.id];
           const skill = shotSkill(attacking, shooter);
           attacking.shots++;
-          outcome = {type: "missed", shooterId: shooterSlot.id};
+          // The chance first: where it comes from and how it came about; how likely it is to go in follows from that.
+          const shooterPos = attacking.slots[shooterSlot.slot].pos;
+          const chance = pickChance(rng, ratio, shooterPos, level(attacking, shooterSlot.id, "shooting"));
+          outcome = {type: "missed", shooterId: shooterSlot.id, chance};
           // Fired up ("Forza!"): nearly every shot is on target.
           const fired = minute < attacking.forzaUntil;
-          const pOnTarget = fired ? FORZA.onTarget : clamp(0.3 + (skill - 50) / 180 + (ratio - 1) * 0.15, 0.15, 0.65);
+          // Better finishers than the keeper in front of them score more of the same chances, worse ones fewer; a strong defence keeps more of
+          // them out (a shooter as good as the keeper is neutral).
+          const duel = clamp(1 + (skill - def.gk) / 130, 0.6, 1.6);
+          const pressure = clamp(ratio, 0.6, 1.6) ** 0.3;
+          const pGoal = clamp(chance.xg * duel * pressure + (fired ? FORZA.goalBonus * 0.5 : 0), 0.01, 0.92);
+          xg[attacking.side] += pGoal;
+          // Shots from close in and well struck are on target more often.
+          let pOnTarget = fired ? FORZA.onTarget : clamp(0.2 + chance.xg * 1.0 + (skill - 50) / 300 + (ratio - 1) * 0.08, 0.14, 0.85);
+          pOnTarget = Math.max(pOnTarget, Math.min(0.97, pGoal / 0.85));
           if (rng.chance(pOnTarget)) {
             attacking.onTarget++;
             rate(shooterSlot.id, 0.1);
-            // ...and hit hard: a little harder to keep out.
-            const pGoal = clamp(GOAL_BASE + (skill - def.gk) / 150 + (fired ? FORZA.goalBonus : 0), 0.12, 0.7);
             const keeper = defending.onPitch.find((o) => defending.slots[o.slot].pos === "GK");
-            const scored = rng.chance(pGoal);
+            const scored = rng.chance(clamp(pGoal / pOnTarget, 0.02, 0.95));
             if (scored && rng.chance(DISALLOWED_CHANCE)) {
               // In the net, but the referee (or VAR) rules it out.
               const reason = rng.pick(DISALLOW_REASONS);
-              outcome = {type: "disallowed", shooterId: shooterSlot.id, reason};
+              outcome = {type: "disallowed", shooterId: shooterSlot.id, reason, chance};
               ctx.events.push({minute, type: "disallowed", side: attacking.side, playerId: shooterSlot.id, note: reason});
             } else if (scored) {
               attacking.goals++;
-              const assist = rng.chance(0.75)
+              const assist = rng.chance(chance.kind === "long" ? 0.35 : 0.78)
                 ? pickOnPitch(rng, state, attacking, ASSIST_WEIGHT, (p) => ((p.attrs.passing + p.attrs.vision) / 100) * effect(attacking, p.id, (e) => e.assist) * (hasTrait(p, "playmaker") ? 1.12 : 1), shooterSlot.id)
                 : undefined;
-              outcome = {type: "goal", shooterId: shooterSlot.id, assistId: assist?.id};
+              outcome = {type: "goal", shooterId: shooterSlot.id, assistId: assist?.id, chance};
               ctx.events.push({minute, type: "goal", side: attacking.side, playerId: shooterSlot.id, otherId: assist?.id});
               rate(shooterSlot.id, 1);
               rate(assist?.id, 0.6);
@@ -1451,7 +1494,7 @@ export function createMatch(
                 if (["CB", "FB", "DM"].includes(defending.slots[o.slot].pos)) rate(o.id, -0.12);
               }
             } else {
-              outcome = {type: "saved", shooterId: shooterSlot.id, keeperId: keeper?.id};
+              outcome = {type: "saved", shooterId: shooterSlot.id, keeperId: keeper?.id, chance};
               ctx.events.push({minute, type: "saved", side: attacking.side, playerId: shooterSlot.id, otherId: keeper?.id});
               rate(keeper?.id, 0.3);
             }
@@ -1495,9 +1538,9 @@ export function createMatch(
         const team = rng.chance(foulsDef / (foulsDef + foulsAtt)) ? defending : attacking;
         const fouler = pickOnPitch(rng, state, team, FOUL_WEIGHT, (p) => effect(team, p.id, (e) => e.foul));
         if (fouler) {
-          const straightRed = rng.chance(0.03);
+          const straightRed = rng.chance(0.015);
           // Told to hold back, a booked player usually pulls out of the second foul.
-          const careful = team.booked.has(fouler.id) && level(team, fouler.id, "tackling") === -1 && rng.chance(0.7);
+          const careful = team.booked.has(fouler.id) && (rng.chance(0.65) || (level(team, fouler.id, "tackling") === -1 && rng.chance(0.7)));
           if (careful) {
             // No card.
           } else if (straightRed || team.booked.has(fouler.id)) {
@@ -1588,6 +1631,7 @@ export function createMatch(
     report.possessionHome = Math.round((homePossession / minute) * 100);
     report.shots = [home.shots, away.shots];
     report.onTarget = [home.onTarget, away.onTarget];
+    report.xg = [Math.round(xg.home * 100) / 100, Math.round(xg.away * 100) / 100];
     return report;
   }
 

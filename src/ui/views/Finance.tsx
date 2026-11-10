@@ -69,7 +69,7 @@ export function Finance() {
           const used = recent.used;
           return (
             <div className="econ-glance">
-              {used > 100 && <p className="callout error"><Icon name="warn" size={18} /> {iconize(t("fin.redWarning"))}</p>}
+              {used > 100 && <p className="callout error"><Icon name="warn" size={18} /> <strong>{iconize(t("fin.redShort"))}</strong> <Hint inline>{iconize(t("fin.redWarning"))}</Hint></p>}
               <Bar value={used} color={used < 75 ? "good" : used <= 100 ? "mid" : "bad"} label={t("fin.spendUsed")} />
               <p>{iconize(t("fin.spendOfIncome", {spent, income: sums.income}))}</p>
               <p className={sums.net >= 0 ? "pos-num strong" : "neg strong"}>{iconize(t("fin.netWeek", {net: sums.net}))}</p>

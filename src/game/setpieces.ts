@@ -10,10 +10,10 @@ import type {Player, Side} from "./types";
 
 /** Per minute, scaled by how much the attack dominates. About 0.45 penalties a match. */
 export const PENALTY_RATE = 0.005;
-/** About 1.5 dangerous free kicks a match. */
-export const FREEKICK_RATE = 0.016;
-/** About 2.5 corners per team and match. */
-export const CORNER_RATE = 0.052;
+/** About 2 dangerous free kicks a match. */
+export const FREEKICK_RATE = 0.028;
+/** About 3 corners per team and match (a real match has 10 or so; the ones the manager takes over are kept to a number that is fun to play). */
+export const CORNER_RATE = 0.095;
 
 export type SetPieceKind = "penalty" | "freekick" | "corner";
 
@@ -217,7 +217,11 @@ export function resolveSetPiece(
   const aim = input?.aim ?? autoAim;
 
   const spread = shotSpread(taker, sp.kind) * timingFactor(input?.timing);
-  const shot: Aim = {x: aim.x + noiseX * spread, y: Math.max(0.02, aim.y + noiseY * spread * 0.8)};
+  let shot: Aim = {x: aim.x + noiseX * spread, y: Math.max(0.02, aim.y + noiseY * spread * 0.8)};
+  // A perfectly timed strike goes where it was aimed (a ball put in the top corner is not sent over the bar by a bit of noise); it can still be saved.
+  if (input?.timing !== undefined && input.timing >= 0.8 && Math.abs(aim.x) <= 1 && aim.y <= 1) {
+    shot = {x: clamp(shot.x, -0.97, 0.97), y: clamp(shot.y, 0.02, 0.96)};
+  }
 
   // Penalty keepers guess; on free kicks they see it coming and react.
   const gk = keeper?.attrs.goalkeeping ?? 20;

@@ -2,6 +2,7 @@ import {useEffect, useState, useRef} from "react";
 import {ENERGY_COST_MATCH, SEASON_WEEKS} from "../game/constants";
 import {energySpent} from "./effects";
 import {Icon, type IconName, iconize} from "./Icon";
+import {FlagIcon} from "./Flag";
 import {clubSlots, ENERGY_MAX, MIN_PLAYERS} from "../game/constants";
 import {fixtureWeek, nextUserFixture, userClub} from "../game/helpers";
 import {lineupProblems, pickBestLineup} from "../game/lineup";
@@ -109,6 +110,13 @@ const tabOf = (v: View): View => (Object.entries(SUB_PAGES).find(([, subs]) => s
 const groupOf = (v: View) => NAV_GROUPS.find((g) => g.views.includes(tabOf(v)));
 /** Every page a group holds, sub-tabs too (for the guide to find a page's group). */
 const groupPages = (g: (typeof NAV_GROUPS)[number]) => g.views.flatMap((v) => pagesOf(v));
+
+/** A page's icon in the menus; the national team's page shows the flag of the country the manager coaches (the flag icon until then). */
+function NavIcon({view, size}: {view: View; size?: number}) {
+  const country = useGameState().national?.country;
+  if (view === "national" && country) return <FlagIcon code={country} size={size ? size + 4 : 30} />;
+  return <Icon name={ICONS[view]} size={size} />;
+}
 
 const SCREENS: Record<View, () => React.JSX.Element> = {
   overview: Overview,
@@ -270,7 +278,7 @@ function Nav() {
   CONTRACT_TONE = expiringContracts(natGame).tone;
   // The year's tournament, or the last one played (to look at after it is over).
   const lastTournament = natGame.national?.tournament;
-  TOURNAMENT_LABEL = lastTournament ? `${t(`national.comp.${lastTournament.comp}` as never)} ${lastTournament.season}` : tournamentOf(natGame.season) ? `${t(`national.comp.${tournamentOf(natGame.season)}` as never)} ${natGame.season}` : null;
+  TOURNAMENT_LABEL = lastTournament ? `${t(`national.comp.${lastTournament.comp}` as never)} ${lastTournament.season}` : tournamentOf(natGame.season, natGame.national?.country) ? `${t(`national.comp.${tournamentOf(natGame.season, natGame.national?.country)}` as never)} ${natGame.season}` : null;
   const view = useGame((s) => s.view);
   const setView = useGame((s) => s.setView);
   const badges = useBadges();
@@ -315,7 +323,7 @@ function Nav() {
                   style={{transform: `translate(${x.toFixed(0)}px, ${y.toFixed(0)}px)`, animationDelay: `${i * 30}ms`}}
                   onClick={(e) => { e.stopPropagation(); setView(v); setOpen(null); window.scrollTo({top: 0}); }}
                 >
-                  <span className="arc-circle"><Icon name={ICONS[v]} /></span>
+                  <span className="arc-circle"><NavIcon view={v} size={undefined} /></span>
                   <span className="arc-label">{navLabel(v, t)}</span>
                   {(badges[v] ?? 0) > 0 && <span className={badgeClass(v)}>{badges[v]}</span>}
                 </button>
@@ -377,7 +385,7 @@ function GroupTabs() {
         <div className="real-tabs" role="tablist">
           {subs.map((v) => (
             <button key={v} role="tab" aria-selected={v === view} data-tour={`nav-${v}`} className={v === view ? "real-tab active" : "real-tab"} onClick={() => setView(v)}>
-              <Icon name={ICONS[v]} size={18} />
+              <NavIcon view={v} size={18} />
               <span>{navLabel(v, t)}</span>
               {(badges[v] ?? 0) > 0 && <span className={badgeClass(v)}>{badges[v]}</span>}
             </button>

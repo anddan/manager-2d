@@ -18,10 +18,10 @@ export function Tournament() {
   const openPlayer = useGame((s) => s.openPlayer);
   // This year's, or else the last one played (so the winner and the tables can be looked at after it is over, also when out of it).
   const tr = job?.tournament;
-  const comp = tr?.comp ?? tournamentOf(game.season);
+  const comp = tr?.comp ?? tournamentOf(game.season, job?.country);
   if (!job || !comp) return <Card title={t("nav.cup")}><Empty>{iconize(t("national.none"))}</Empty></Card>;
   const year = tr?.season ?? game.season;
-  const comingUp = tournamentOf(game.season) !== null && year !== game.season;
+  const comingUp = tournamentOf(game.season, job?.country) !== null && year !== game.season;
   const [tree, setTree] = useState(false);
   // A country tapped: its team and rating.
   const [sheet, setSheet] = useState<string | null>(null);
@@ -29,10 +29,13 @@ export function Tournament() {
   const [onlyMine, setOnlyMine] = useState(true);
   type Pair = {a: string; b: string; ga: number; gb: number; w: string};
   const played = tr?.rounds ?? [];
-  const rounds: {done: boolean; known: boolean; pairs: Pair[]}[] = [0, 1, 2, 3].map((i) => {
+  // 32 countries: four knockout rounds (the last sixteen first); 16 countries (a continental tournament): three.
+  const nRounds = tr && tr.groups.length === 4 ? 3 : 4;
+  const off = 4 - nRounds;
+  const rounds: {done: boolean; known: boolean; pairs: Pair[]}[] = Array.from({length: nRounds}, (_, i) => i).map((i) => {
     if (played[i]) return {done: true, known: true, pairs: played[i]};
     const coming = i === played.length && tr && !tr.champion && tr.bracket.length > 1;
-    const pairs: Pair[] = coming ? tr.bracket.reduce<Pair[]>((acc, c, k) => (k % 2 === 0 ? [...acc, {a: c, b: tr.bracket[k + 1], ga: 0, gb: 0, w: ""}] : acc), []) : Array.from({length: 8 >> i}, () => ({a: "", b: "", ga: 0, gb: 0, w: ""}));
+    const pairs: Pair[] = coming ? tr.bracket.reduce<Pair[]>((acc, c, k) => (k % 2 === 0 ? [...acc, {a: c, b: tr.bracket[k + 1], ga: 0, gb: 0, w: ""}] : acc), []) : Array.from({length: (nRounds === 4 ? 8 : 4) >> i}, () => ({a: "", b: "", ga: 0, gb: 0, w: ""}));
     return {done: false, known: !!coming, pairs};
   });
   const name = (c: string) => t(`nat.${c}` as TKey);
@@ -49,7 +52,7 @@ export function Tournament() {
             {tr.champion && <p className="strong"><Icon name="trophy" size={18} /> {iconize(t("national.champion", {country: `nat.${tr.champion}`}))}</p>}
             {/* The two in the final, once they are known (also when we are out of it). */}
             {!tr.champion && tr.bracket.length === 2 && <p className="strong"><Icon name="trophy" size={18} /> {iconize(t("national.round.final"))}: {row(tr.bracket[0])} <span className="muted">–</span> {row(tr.bracket[1])}</p>}
-            {!tr.champion && <p className="muted small tight">{iconize(t("national.stillIn", {n: tr.bracket.length > 0 ? tr.bracket.length : 32}))}</p>}
+            {!tr.champion && <p className="muted small tight">{iconize(t("national.stillIn", {n: tr.bracket.length > 0 ? tr.bracket.length : tr.groups.length * 4}))}</p>}
           </>
         )}
       </Card>
@@ -83,9 +86,12 @@ export function Tournament() {
             // The bracket from both sides in to the final in the middle: the last sixteen at the edges, then the quarter-finals,
             // the semi-finals, and the final in the centre (flags and country codes, so all seven columns fit a phone).
             <div className="ko-tree sym">
-              {([[0, 0, 4], [1, 0, 2], [2, 0, 1], [3, 0, 1], [2, 1, 2], [1, 2, 4], [0, 4, 8]] as const).map(([r, from, to], col) => (
-                <div key={col} className={r === 3 ? "ko-col final" : "ko-col"}>
-                  <h4 title={t(ROUNDS[r] as TKey)}>{iconize(t(ROUNDS[r] as TKey))}</h4>
+              {(nRounds === 4
+                ? ([[0, 0, 4], [1, 0, 2], [2, 0, 1], [3, 0, 1], [2, 1, 2], [1, 2, 4], [0, 4, 8]] as const)
+                : ([[0, 0, 2], [1, 0, 1], [2, 0, 1], [1, 1, 2], [0, 2, 4]] as const)
+              ).map(([r, from, to], col) => (
+                <div key={col} className={r === nRounds - 1 ? "ko-col final" : "ko-col"}>
+                  <h4 title={t(ROUNDS[r + off] as TKey)}>{iconize(t(ROUNDS[r + off] as TKey))}</h4>
                   <div className="ko-col-matches">
                     {rounds[r].pairs.slice(from, to).map((p, k) => (
                       <div key={k} className={`ko-match ${p.a === job.country || p.b === job.country ? "mine" : ""}`}>
@@ -104,7 +110,7 @@ export function Tournament() {
           ) : (
             rounds.filter((r) => r.done || r.known).map((round, i) => (
               <div key={i} className="ko-round">
-                <h4>{iconize(t(ROUNDS[rounds.indexOf(round)] as TKey))}</h4>
+                <h4>{iconize(t(ROUNDS[rounds.indexOf(round) + off] as TKey))}</h4>
                 <ul className="plain-list ko-list">
                   {round.pairs.map((p) => (
                     <li key={p.a + p.b} className={p.a === job.country || p.b === job.country ? "mine" : undefined}>

@@ -20,12 +20,26 @@ const NATION_MIN = 14;
 export const FRIENDLY_WEEKS = [8, 18];
 /** The tournament: three group matches, then the last sixteen, quarter-finals, semi-finals and final, in the last seven weeks of the season. */
 export const TOURNAMENT_WEEKS = [SEASON_WEEKS - 6, SEASON_WEEKS - 5, SEASON_WEEKS - 4, SEASON_WEEKS - 3, SEASON_WEEKS - 2, SEASON_WEEKS - 1, SEASON_WEEKS];
-const KNOCKOUT_NAMES = ["r16", "qf", "sf", "final"];
+/** The tournaments: the World Cup for every country, and the continental one for the country's own confederation. */
+export type Comp = "wc" | "ec" | "copa" | "gold" | "afcon" | "asia";
+/** Which continental tournament a country plays in: the Euros (Europe), Copa América (South America), the Gold Cup (North America), the Africa Cup and the Asian Cup. */
+const CONFEDERATION: Record<string, Comp> = {
+  SE: "ec", NO: "ec", DK: "ec", FI: "ec", ES: "ec", DE: "ec", NL: "ec", GB: "ec", FR: "ec", IT: "ec", PT: "ec", BE: "ec", HR: "ec", PL: "ec", CH: "ec", AT: "ec", IS: "ec", RS: "ec", TR: "ec",
+  BR: "copa", AR: "copa", UY: "copa", CO: "copa",
+  US: "gold", MX: "gold",
+  NG: "afcon", MA: "afcon", SN: "afcon", GH: "afcon", CI: "afcon", CM: "afcon",
+  JP: "asia", KR: "asia",
+};
+export const continentalOf = (country?: string): Comp => (country && CONFEDERATION[country]) || "ec";
+/** How many countries play: 32 in the World Cup, 16 in a continental tournament (that country's confederation first, then invited guests, as Copa América has them). */
+export const fieldSize = (comp: Comp): number => (comp === "wc" ? 32 : 16);
+/** The knockout rounds of a field, by name (the last sixteen only with 32 countries). */
+const koNames = (size: number): string[] => (size === 32 ? ["r16", "qf", "sf", "final"] : ["qf", "sf", "final"]);
 export const TOURNAMENT_WINNER_DIAMONDS = 30;
 
-/** Which tournament a season has, if any: the World Cup every fourth year, the Euros two years after it. */
-export function tournamentOf(season: number): "wc" | "ec" | null {
-  return season % 4 === 0 ? "wc" : season % 4 === 2 ? "ec" : null;
+/** Which tournament a season has, if any: the World Cup every fourth year, two years after it the continental one (the Euros, Copa América and so on, by the country's confederation). */
+export function tournamentOf(season: number, country?: string): Comp | null {
+  return season % 4 === 0 ? "wc" : season % 4 === 2 ? continentalOf(country) : null;
 }
 
 /** The countries that have a team, strongest first: the average of their best fourteen. */
@@ -231,15 +245,20 @@ function simulate(rng: Rng, a: number, b: number, knockout: boolean): {ga: numbe
 }
 
 /** The draw: 32 countries (the strongest, and ours), four pots of eight, one from each in every group. */
-function drawGroups(state: GameState, rng: Rng, own: string): string[][] {
+function drawGroups(state: GameState, rng: Rng, own: string, comp: Comp = "wc"): string[][] {
   const strength = strengths(state);
   const ranked = [...strength.entries()].sort((x, y) => y[1] - x[1]).map(([code]) => code);
-  const field = ranked.slice(0, 32);
-  if (!field.includes(own)) field[31] = own;
+  const size = fieldSize(comp);
+  // The World Cup: the strongest 32. A continental tournament: the confederation's own countries first, then the strongest guests.
+  const field = comp === "wc"
+    ? ranked.slice(0, size)
+    : [...ranked.filter((c) => continentalOf(c) === comp), ...ranked.filter((c) => continentalOf(c) !== comp)].slice(0, size);
+  if (!field.includes(own)) field[size - 1] = own;
   field.sort((x, y) => strength.get(y)! - strength.get(x)!);
-  const pots = [0, 1, 2, 3].map((p) => field.slice(p * 8, p * 8 + 8));
+  const per = size / 4;
+  const pots = [0, 1, 2, 3].map((p) => field.slice(p * per, p * per + per));
   for (const pot of pots) for (let i = pot.length - 1; i > 0; i--) { const j = rng.int(0, i); [pot[i], pot[j]] = [pot[j], pot[i]]; }
-  return Array.from({length: 8}, (_, g) => pots.map((pot) => pot[g]));
+  return Array.from({length: per}, (_, g) => pots.map((pot) => pot[g]));
 }
 
 /** The group places in order: points, goal difference, goals scored. */
@@ -294,8 +313,9 @@ function tournamentAwards(state: GameState, t: Tournament): void {
   const keys = Object.keys(stats);
   if (keys.length === 0) return;
   const last = (r: number) => new Set((t.rounds?.[r] ?? []).flatMap((p) => [p.a, p.b]));
-  const finalists = last(3);
-  const semis = last(2);
+  const R = t.groups.length === 4 ? 3 : 4;
+  const finalists = last(R - 1);
+  const semis = last(R - 2);
   const bonus = (c: string) => (c === t.champion ? 6 : finalists.has(c) ? 4 : semis.has(c) ? 2 : 0);
   const top = (score: (k: string) => number) => keys.reduce((best, k) => (score(k) > score(best) ? k : best), keys[0]);
   const scorer = top((k) => stats[k].goals * 10 + stats[k].assists);
@@ -324,7 +344,7 @@ function tournamentAwards(state: GameState, t: Tournament): void {
 export function nationalWeek(state: GameState, rng: Rng): void {
   const job = state.national;
   if (!job) return;
-  const tournament = tournamentOf(state.season);
+  const tournament = tournamentOf(state.season, job.country);
   const step = TOURNAMENT_WEEKS.indexOf(state.week);
   const friendly = FRIENDLY_WEEKS.includes(state.week);
   if (friendly) {
@@ -338,13 +358,17 @@ export function nationalWeek(state: GameState, rng: Rng): void {
   const strength = strengths(state);
   if (step === 0 || !job.tournament || job.tournament.season !== state.season) {
     if (step !== 0) return;
-    const groups = drawGroups(state, new Rng(state.season * 7919 + 13), job.country);
+    const groups = drawGroups(state, new Rng(state.season * 7919 + 13), job.country, tournament);
     const table: Record<string, {pl: number; gf: number; ga: number; pts: number}> = {};
     for (const code of groups.flat()) table[code] = {pl: 0, gf: 0, ga: 0, pts: 0};
     job.tournament = {comp: tournament, season: state.season, alive: true, groups, table, bracket: []};
   }
   const t = job.tournament;
   if (t.champion) return;
+  // The knockout rounds of this field (three for 16 countries, four for 32): the final is the last of them.
+  const size = t.groups.length * 4;
+  const rounds = size === 32 ? 4 : 3;
+  if (step > 3 + rounds - 1) return;
 
   if (step <= 2) {
     // A group matchday: every group plays its two matches (ours with the manager's team).
@@ -378,7 +402,7 @@ export function nationalWeek(state: GameState, rng: Rng): void {
       // The two best in each group go on, crossed over between neighbouring groups.
       const top = t.groups.map((g) => standingsOf(g, t.table).slice(0, 2));
       t.bracket = [];
-      for (let g = 0; g < 8; g += 2) t.bracket.push(top[g][0], top[g + 1][1], top[g + 1][0], top[g][1]);
+      for (let g = 0; g < t.groups.length; g += 2) t.bracket.push(top[g][0], top[g + 1][1], top[g + 1][0], top[g][1]);
       if (t.alive && !t.bracket.includes(job.country)) {
         t.alive = false;
         addMessage(state, {kind: "news", key: "msg.nationalOut", params: {country: `nat.${job.country}`, comp: `national.comp.${t.comp}`}});
@@ -388,7 +412,7 @@ export function nationalWeek(state: GameState, rng: Rng): void {
   }
 
   // A knockout round: the last sixteen (3), quarter-finals (4), semi-finals (5), the final (6).
-  const name = KNOCKOUT_NAMES[step - 3];
+  const name = koNames(size)[step - 3];
   const next: string[] = [];
   const round: {a: string; b: string; ga: number; gb: number; w: string}[] = [];
   for (let i = 0; i < t.bracket.length; i += 2) {
@@ -421,12 +445,12 @@ export function nationalWeek(state: GameState, rng: Rng): void {
   }
   t.rounds = [...(t.rounds ?? []), round];
   t.bracket = next;
-  if (step === 6) {
+  if (step === 3 + rounds - 1) {
     t.champion = next[0];
     tournamentAwards(state, t);
     // The manager's country on the podium: the champion, the beaten finalist (silver), a beaten semi-finalist (bronze).
     const lost = (r: number) => (t.rounds?.[r] ?? []).some((p) => (p.a === job.country || p.b === job.country) && p.w !== job.country);
-    const place = next[0] === job.country ? 1 : lost(3) ? 2 : lost(2) ? 3 : 0;
+    const place = next[0] === job.country ? 1 : lost(rounds - 1) ? 2 : lost(rounds - 2) ? 3 : 0;
     if (place) collectTrophy(state, `${t.comp}${place}`);
     if (place) state.celebrations = [...(state.celebrations ?? []), {kind: "tournament", season: state.season, comp: t.comp, place: place as 1 | 2 | 3, country: job.country}];
     const ours = next[0] === job.country;
@@ -524,13 +548,15 @@ export function dueNationalMatch(state: GameState): {what: string; opponent: str
   if (!job || state.nationalMatch || state.liveMatch || recorded(job, state)) return null;
   const strength = strengths(state);
   if (FRIENDLY_WEEKS.includes(state.week)) return {what: "friendly", opponent: friendlyOpponent(state, job, strength), knockout: false};
-  const tournament = tournamentOf(state.season);
+  const tournament = tournamentOf(state.season, job.country);
   const step = TOURNAMENT_WEEKS.indexOf(state.week);
   if (!tournament || step < 0) return null;
   const t = job.tournament && job.tournament.season === state.season ? job.tournament : undefined;
   if (t && (!t.alive || t.champion)) return null;
+  const size = t ? t.groups.length * 4 : fieldSize(tournament);
+  if (step > 3 + (size === 32 ? 4 : 3) - 1) return null;
   if (step <= 2) {
-    const groups = t?.groups ?? drawGroups(state, new Rng(state.season * 7919 + 13), job.country);
+    const groups = t?.groups ?? drawGroups(state, new Rng(state.season * 7919 + 13), job.country, tournament);
     const group = groups.find((g) => g.includes(job.country));
     if (!group) return null;
     const me = group.indexOf(job.country);
@@ -540,7 +566,7 @@ export function dueNationalMatch(state: GameState): {what: string; opponent: str
   }
   const i = t?.bracket.indexOf(job.country) ?? -1;
   if (!t || i < 0) return null;
-  return {what: `${tournament}.${KNOCKOUT_NAMES[step - 3]}`, opponent: t.bracket[i % 2 === 0 ? i + 1 : i - 1], knockout: true};
+  return {what: `${tournament}.${koNames(size)[step - 3]}`, opponent: t.bracket[i % 2 === 0 ? i + 1 : i - 1], knockout: true};
 }
 
 /** A country as a club for the length of a match (the user's club as the base for everything a club needs). */
@@ -654,21 +680,23 @@ export function upcomingNational(state: GameState): {week: number; what: string;
   const out: {week: number; what: string; opponent?: string}[] = [];
   const playedWeek = (week: number) => job.results.some((r) => r.season === state.season && r.week === week);
   for (const week of FRIENDLY_WEEKS) if (week >= state.week && !playedWeek(week)) out.push({week, what: "friendly", opponent: friendlyOpponent(state, job, strength, week)});
-  const tournament = tournamentOf(state.season);
+  const tournament = tournamentOf(state.season, job.country);
   const t = job.tournament && job.tournament.season === state.season ? job.tournament : undefined;
   if (tournament && (!t || (t.alive && !t.champion))) {
     const nextKnockout = 3 + (t?.rounds?.length ?? 0);
+    const size = t ? t.groups.length * 4 : fieldSize(tournament);
+    const lastStep = 3 + (size === 32 ? 4 : 3) - 1;
     TOURNAMENT_WEEKS.forEach((week, step) => {
-      if (week < state.week || playedWeek(week)) return;
+      if (week < state.week || playedWeek(week) || step > lastStep) return;
       if (step <= 2) {
-        const groups = t?.groups ?? drawGroups(state, new Rng(state.season * 7919 + 13), job.country);
+        const groups = t?.groups ?? drawGroups(state, new Rng(state.season * 7919 + 13), job.country, tournament);
         const group = groups.find((g) => g.includes(job.country));
         const me = group?.indexOf(job.country) ?? -1;
         const pair = MATCHDAYS[step].find(([i, j]) => i === me || j === me);
         out.push({week, what: `${tournament}.g`, opponent: group && pair ? group[pair[0] === me ? pair[1] : pair[0]] : undefined});
       } else {
         const i = step === nextKnockout ? (t?.bracket.indexOf(job.country) ?? -1) : -1;
-        out.push({week, what: `${tournament}.${KNOCKOUT_NAMES[step - 3]}`, opponent: i >= 0 ? t!.bracket[i % 2 === 0 ? i + 1 : i - 1] : undefined});
+        out.push({week, what: `${tournament}.${koNames(size)[step - 3]}`, opponent: i >= 0 ? t!.bracket[i % 2 === 0 ? i + 1 : i - 1] : undefined});
       }
     });
   }
@@ -676,10 +704,10 @@ export function upcomingNational(state: GameState): {week: number; what: string;
 }
 
 /** The week (of this season) of the next international match, if there is one left. */
-export function nextNationalWeek(state: GameState): {week: number; what: "friendly" | "wc" | "ec"} | null {
-  const t = tournamentOf(state.season);
+export function nextNationalWeek(state: GameState): {week: number; what: "friendly" | Comp} | null {
   const job = state.national;
-  const options: {week: number; what: "friendly" | "wc" | "ec"}[] = [
+  const t = tournamentOf(state.season, job?.country);
+  const options: {week: number; what: "friendly" | Comp}[] = [
     ...FRIENDLY_WEEKS.map((week) => ({week, what: "friendly" as const})),
     ...(t && (!job?.tournament || job.tournament.season !== state.season || job.tournament.alive) ? [{week: TOURNAMENT_WEEKS[0], what: t}] : []),
   ];

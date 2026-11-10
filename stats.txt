@@ -1,0 +1,8 @@
+matches 400
+goals/match 3.00
+shots/match 27.59
+on target/match 10.73
+conversion 0.109 of shots, 0.279 of on-target
+home wins 0.43 draws 0.23
+corners/match 5.25 freekicks 1.29 penalties 0.24 yellows 3.38 reds 0.19
+goal distribution {"0":27,"1":55,"2":79,"3":84,"4":84,"5":43,"6":18,"7":7,"8":2,"9":1}

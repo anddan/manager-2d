@@ -171,7 +171,7 @@ export function Album() {
         </div>
       </Card>
 
-      <Card title={<><Icon name="trophy" size={18} /> {iconize(t("album.section.trophies"))}</>} className="span-2">
+      <Card title={<><Icon name="trophy" size={18} /> {iconize(t("album.section.trophies"))} ({TROPHIES.filter((k) => owned.has(`trophy:${k}`)).length}/{TROPHIES.length})</>} className="span-2">
         <div className="album-grid">{TROPHIES.map((k) => tile(`trophy:${k}`))}</div>
       </Card>
 

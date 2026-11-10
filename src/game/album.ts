@@ -27,8 +27,8 @@ export interface Album {
   claimed?: string[];
 }
 
-/** The trophies to win. The medals of the World Cup and the Euros are one each: gold, silver, bronze. */
-export const TROPHIES = ["league", "cup", "wc1", "wc2", "wc3", "ec1", "ec2", "ec3", "award.player", "award.keeper", "award.talent", "award.manager"] as const;
+/** The trophies to win: the league, the cup, the World Cup and each continental tournament (gold only: silver and bronze are not kept), and the awards. */
+export const TROPHIES = ["league", "cup", "wc1", "ec1", "copa1", "gold1", "afcon1", "asia1", "award.player", "award.keeper", "award.talent", "award.manager"] as const;
 export type TrophyKey = (typeof TROPHIES)[number];
 
 /** The packs to open. */
@@ -157,7 +157,7 @@ export function claimable(state: GameState): string[] {
 export function rewardOf(key: string): number {
   const [kind, a, b] = key.split(":");
   if (kind === "trophy") {
-    const R: Record<string, number> = {league: 30, cup: 50, wc1: 100, ec1: 80, wc2: 50, ec2: 40, wc3: 30, ec3: 25};
+    const R: Record<string, number> = {league: 30, cup: 50, wc1: 100, ec1: 80, copa1: 80, gold1: 80, afcon1: 80, asia1: 80, wc2: 50, ec2: 40, wc3: 30, ec3: 25};
     return R[a] ?? 25;
   }
   if (kind === "gift") return ({gaming: 3, watch: 4, motorcycle: 6, sportsCar: 10, mansion: 40} as Record<string, number>)[a] ?? 3;

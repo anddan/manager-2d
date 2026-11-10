@@ -4,8 +4,13 @@ import {Rng} from "./rng";
 import {acceptNational, nationalSquad, nationalWeek, nations, offerNational, tournamentOf, FRIENDLY_WEEKS, TOURNAMENT_WEEKS} from "./national";
 
 describe("national team", () => {
-  it("has the World Cup every fourth year and the Euros two years after it", () => {
-    expect([1, 2, 3, 4, 5, 6, 8].map(tournamentOf)).toEqual([null, "ec", null, "wc", null, "ec", "wc"]);
+  it("has the World Cup every fourth year and the continental tournament of the country two years after it", () => {
+    expect([1, 2, 3, 4, 5, 6, 8].map((n) => tournamentOf(n))).toEqual([null, "ec", null, "wc", null, "ec", "wc"]);
+    expect(tournamentOf(2, "BR")).toBe("copa");
+    expect(tournamentOf(2, "JP")).toBe("asia");
+    expect(tournamentOf(6, "NG")).toBe("afcon");
+    expect(tournamentOf(6, "US")).toBe("gold");
+    expect(tournamentOf(4, "BR")).toBe("wc");
   });
 
   it("offers a country, picks its best players and plays a friendly and a tournament", () => {
