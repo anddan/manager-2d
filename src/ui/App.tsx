@@ -26,6 +26,7 @@ import {LiveMatchViewer, MatchViewer} from "./MatchViewer";
 import {GameOver} from "./GameOver";
 import {diamondBurst} from "./effects";
 import {ManagerProfile} from "./ManagerProfile";
+import {LevelRing} from "./ManagerLevel";
 import {TrophyCelebration} from "./TrophyCelebration";
 import {BoardWarningPopup} from "./BoardWarning";
 import {DailyWheelPopup} from "./LuckyWheel";
@@ -529,7 +530,7 @@ function TopBar() {
           </span>
         </button>
         <button className="topbar-manager" onClick={() => setProfile(true)} title={game.managerName}>
-          <ManagerAvatar look={game.managerLook ?? defaultManagerLook(game.managerName)} size={62} tie={club.color} />
+          <LevelRing size={66}><ManagerAvatar look={game.managerLook ?? defaultManagerLook(game.managerName)} size={66} tie={club.color} /></LevelRing>
           <span>{game.managerName}</span>
         </button>
       </div>

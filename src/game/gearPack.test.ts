@@ -1,6 +1,6 @@
 // The kit pack: a random piece with a perk; mostly small perks, now and then a big one.
 import {describe, expect, it} from "vitest";
-import {GEAR_PACK, gearBonus, openGearPack, rollGearPack} from "./gear";
+import {GEAR_PACK, gearBonus, gearPerkMax, openGearPack, rollGearPack} from "./gear";
 import {newGame} from "./generate";
 import {Rng} from "./rng";
 
@@ -22,5 +22,17 @@ describe("the kit pack", () => {
     expect(items.filter((it) => (it.perk?.n ?? 0) <= 2).length).toBeGreaterThan(1000);
     // A special shop pair lifts +5 (gloves +10): a pack piece goes past that now and then.
     expect(items.some((it) => it.kind !== "gloves" && best(it) > 5)).toBe(true);
+  });
+
+  it("gives an extra of at most twice what the piece lifts (a special pair, +5: up to +10), and now and then the very most", () => {
+    const items = Array.from({length: 3000}, (_, i) => rollGearPack(new Rng(i + 10_000)));
+    expect(items.every((it) => it.perk!.n >= 1 && it.perk!.n <= gearPerkMax(it))).toBe(true);
+    expect(gearPerkMax({kind: "speed", tier: "special"})).toBe(10);
+    expect(gearPerkMax({kind: "gloves", tier: "special"})).toBe(20);
+    const specials = items.filter((it) => it.tier === "special" && it.kind === "speed");
+    expect(specials.some((it) => it.perk!.n > 5)).toBe(true);
+    expect(items.some((it) => it.perk!.n === gearPerkMax(it))).toBe(true);
+    // The very most is rare.
+    expect(items.filter((it) => it.perk!.n === gearPerkMax(it) && gearPerkMax(it) >= 6).length / items.length).toBeLessThan(0.1);
   });
 });

@@ -6,7 +6,7 @@ import {Hint, Modal} from "./common";
 import {PackArt} from "./PackArt";
 import {chime} from "./sound";
 import {useState} from "react";
-import {GEAR_ATTRS, GEAR_KIND_COLOR, GEAR_KINDS, SHIN_PROTECT, gearIn, gearSlot, type GearSlot, GEAR_PRICE, GEAR_TIERS, GEAR_PACK, buyGear, openGearPack, equipGear, gearBonus, gearFits, unequipGear, type GearItem, type GearKind, type GearTier, groupBag} from "../game/gear";
+import {GEAR_ATTRS, GEAR_KIND_COLOR, GEAR_KINDS, SHIN_PROTECT, gearIn, gearSlot, type GearSlot, GEAR_PRICE, GEAR_TIERS, GEAR_PACK, buyGear, openGearPack, equipGear, gearBonus, gearFits, gearPerkMax, unequipGear, type GearItem, type GearKind, type GearTier, groupBag} from "../game/gear";
 import type {Attribute, Player} from "../game/types";
 import {useT} from "../i18n";
 import {useGame, useGameState} from "../store";
@@ -124,7 +124,8 @@ export function GearCard({item, small, count = 1}: {item: GearItem; small?: bool
       <div className="gear-card-stats">
         {bonus.map(([a, n]) => (
           // The pack's perk stands out (its attribute, with the extra in it).
-          <div key={a} className={item.perk?.attr === a ? "fut-stat perk" : "fut-stat"}>
+          // (Yellow; red when the extra is as big as the piece can carry.)
+          <div key={a} className={item.perk?.attr === a ? (item.perk.n >= gearPerkMax(item) ? "fut-stat perk top" : "fut-stat perk") : "fut-stat"}>
             <strong>+{n}</strong>
             <span>{iconize(t(`attr.${a}`))}</span>
           </div>
@@ -220,8 +221,8 @@ export function GearShop() {
             <GearCard item={opened} />
           </div>
           {opened.perk && (
-            <p className={opened.perk.n >= 5 ? "gear-perk-line lucky" : "gear-perk-line"}>
-              {iconize(t(opened.perk.n >= 5 ? "gear.perkLucky" : "gear.perkGot", {n: opened.perk.n, attr: t(`attr.${opened.perk.attr}`)}))}
+            <p className={opened.perk.n >= gearPerkMax(opened) ? "gear-perk-line lucky" : "gear-perk-line"}>
+              {iconize(t(opened.perk.n >= gearPerkMax(opened) ? "gear.perkLucky" : "gear.perkGot", {n: opened.perk.n, attr: t(`attr.${opened.perk.attr}`)}))}
             </p>
           )}
           <div className="btn-row dialog-actions">

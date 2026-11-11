@@ -5,6 +5,7 @@ import {useEffect, useRef, useState, type ReactNode} from "react";
 import {ALBUM_PACKS, RARES, TROPHIES, albumGear, albumGifts, albumProgress, claimable, claimItem, ownedKeys, rewardOf, updateAlbum} from "../../game/album";
 import {GEAR_COLOR, GEAR_KINDS, GEAR_PRICE, GEAR_TIERS, type GearKind, type GearTier} from "../../game/gear";
 import {GIFTS, GIFT_VARIANTS} from "../../game/morale";
+import {MANAGER_TITLES, MAX_LEVEL, TITLE_COUNT, managerStanding, offerRange, xpAtLevel} from "../../game/manager";
 import {useT, type TKey} from "../../i18n";
 import {useGame, useGameState} from "../../store";
 import {Card, FoldButton, Hint, Modal} from "../common";
@@ -99,6 +100,8 @@ export function Album() {
   const act = useGame((s) => s.act);
   const [picked, setPicked] = useState<string | null>(null);
   const [opening, setOpening] = useState<string | null>(null);
+  // The manager's titles: which one is looked at.
+  const [titlePicked, setTitlePicked] = useState<number | null>(null);
   // Each collection can be folded away (all open to begin with) and says how many of it you have, like "4/12".
   const [shut, setShut] = useState<Record<string, boolean>>({});
   // The rare ones reached are noted when the album is opened.
@@ -145,6 +148,28 @@ export function Album() {
     );
   };
 
+  const standing = managerStanding(game);
+  /** One title: what it is, what it gives and what it needs. */
+  const titleDetail = () => {
+    if (titlePicked === null) return null;
+    const n = titlePicked;
+    const lv = MANAGER_TITLES[n - 1].level;
+    const have = n <= standing.title;
+    const authority = (lv - 1) / (MAX_LEVEL - 1);
+    const reward = MANAGER_TITLES[n - 1].reward;
+    const [from, to] = offerRange(lv);
+    return (
+      <Modal compact title={<><Icon name="star" size={20} /> {t(`mgr.level.${n}` as TKey, {name: game.managerName})}</>} onClose={() => setTitlePicked(null)}>
+        <div className={have ? "album-big have" : "album-big"}><span className="album-medal title-medal big"><b>{lv}</b></span></div>
+        <p className="muted">{iconize(t("mgr.levelN", {n: lv}))} · {have ? t("album.title.have") : t("album.title.needs", {level: lv, xp: xpAtLevel(lv)})}</p>
+        <p className="album-gems small">{iconize(reward?.diamonds ? t("album.title.rewardDiamonds", {n: reward.diamonds}) : reward?.money ? t("album.title.rewardMoney", {money: reward.money}) : t("album.title.start"))}{have && reward ? " ✓" : ""}</p>
+        {n > 1 && <p className="small">{iconize(t("album.title.effect", {forza: Math.round(authority * 80), orders: Math.round(authority * 50)}))}</p>}
+        {n > 1 && <p className="small muted">{iconize(t("album.title.offers", {from: from + 1, to}))}</p>}
+        <div className="btn-row dialog-actions"><button className="btn primary" onClick={() => setTitlePicked(null)}>{t("common.close")}</button></div>
+      </Modal>
+    );
+  };
+
   const next = [...fresh][0];
   const detail = () => {
     if (!picked) return null;
@@ -173,6 +198,19 @@ export function Album() {
           <strong>{iconize(t("album.progress", {have, total}))}</strong>
           <span className="album-bar"><span style={{width: `${(have / total) * 100}%`}} /></span>
         </div>
+      </Card>
+
+      <Card title={<><Icon name="star" size={18} /> {iconize(t("album.section.titles"))} ({standing.title}/{TITLE_COUNT})</>} actions={toggle("titles")} className="span-2">
+        {!shut.titles && (
+          <div className="album-grid">
+            {MANAGER_TITLES.map((_, i) => i + 1).map((n) => (
+              <button key={n} type="button" className={`album-tile ${n <= standing.title ? "have" : "locked"}`} onClick={() => setTitlePicked(n)} aria-label={t(`mgr.level.${n}` as TKey, {name: game.managerName})}>
+                <span className="album-pic"><span className={MANAGER_TITLES[n - 1].level >= 100 ? "album-medal title-medal wide" : "album-medal title-medal"}><b>{MANAGER_TITLES[n - 1].level}</b></span></span>
+                <span className="album-name">{t(`mgr.level.${n}` as TKey, {name: game.managerName})}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </Card>
 
       <Card title={<><Icon name="trophy" size={18} /> {iconize(t("album.section.trophies"))} ({count(TROPHIES.map((k) => `trophy:${k}`))})</>} actions={toggle("trophies")} className="span-2">
@@ -210,6 +248,7 @@ export function Album() {
         {!shut.packs && <div className="album-grid">{ALBUM_PACKS.map((k) => tile(`pack:${k}`))}</div>}
       </Card>
       {detail()}
+      {titleDetail()}
       {opening && <OpenDialog itemKey={opening} label={nameOf(opening)} onClose={() => setOpening(null)} />}
     </div>
   );

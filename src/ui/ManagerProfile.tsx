@@ -8,6 +8,7 @@ import {leaguePosition} from "../game/league";
 import {useT} from "../i18n";
 import {useGame, useGameState} from "../store";
 import {ManagerAvatar, defaultManagerLook, managerMoodFactors} from "./Avatar";
+import {LevelRing, ManagerTitle} from "./ManagerLevel";
 import {Stepper, stepTo} from "./ManagerEditor";
 import {ManagerEditor} from "./ManagerEditor";
 import {Modal} from "./common";
@@ -102,10 +103,12 @@ export function ManagerProfile({onClose, kit: startKit}: {onClose: () => void; k
       <section className="mgr-section">
       <h3 className="mgr-section-title"><Icon name="user" size={18} /> {iconize(t("mgr.sectionManager"))}</h3>
       <div className="mgr-head">
-        <ManagerAvatar look={look} size={84} tie={kits.home.color} />
+        <LevelRing size={84} ring={false}><ManagerAvatar look={look} size={84} tie={kits.home.color} /></LevelRing>
         <div>
           <h3>{managerName.trim() || game.managerName}</h3>
           <p className="muted">{club.officialName ? `${club.name} (${official})` : club.name}</p>
+          {/* The title, under the club's name, and how far it is to the next. */}
+          <ManagerTitle />
         </div>
       </div>
       {/* Why the manager looks as they do: what lifts or drags the mood, like the chips in a player's profile. */}

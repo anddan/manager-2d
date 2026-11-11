@@ -106,7 +106,7 @@ export function buyGear(state: GameState, item: GearItem, rng?: Rng): string | n
   }
   const bought: GearItem = {...item};
   // Now and then the piece comes with a perk (shown like a kit pack's).
-  if (rng && !bought.perk && rng.next() < BOUGHT_PERK_CHANCE) bought.perk = rollPerk(rng, bought.kind);
+  if (rng && !bought.perk && rng.next() < BOUGHT_PERK_CHANCE) bought.perk = rollPerk(rng, bought.kind, bought.tier);
   (state.gearBag ??= []).push(bought);
   collectGear(state, bought);
   return null;
@@ -173,16 +173,26 @@ export function groupBag(bag: GearItem[]): {item: GearItem; index: number; count
 
 /**
  * The kit pack: a random piece (any kind, mostly common or silver) with a perk on top, an extra
- * on one attribute. Most perks are small; now and then one is big enough to beat a special pair.
+ * on one attribute, up to twice what the piece itself lifts. Most perks are small; now and then one is big enough to beat a special pair.
  */
 export const GEAR_PACK = {price: 60} as const;
 const PACK_TIERS: Record<GearTier, number> = {common: 34, silver: 34, gold: 22, special: 10};
-const PERK_SIZES: [number, number][] = [[1, 30], [2, 24], [3, 16], [4, 11], [5, 8], [7, 5], [10, 3], [14, 2], [20, 1]];
 const PERK_ATTRS: Attribute[] = ["pace", "finishing", "passing", "technique", "defending", "physical", "stamina", "vision"];
+/** The chance that a perk is the very biggest it can be (red on the card). */
+const PERK_TOP_CHANCE = 0.05;
 
-/** A perk for a piece of this kind: an extra on one attribute. */
-function rollPerk(rng: Rng, kind: GearKind): {attr: Attribute; n: number} {
-  const n = rng.weighted(PERK_SIZES, ([, w]) => w)[0];
+/**
+ * The most an extra can give on a piece: twice what the piece lifts each attribute by (a special pair gives +5, so its extra can go up
+ * to +10; gloves give +10 on their one attribute, so up to +20). An extra at its most is shown in red, a smaller one in yellow.
+ */
+export function gearPerkMax(item: Pick<GearItem, "kind" | "tier">): number {
+  return GEAR_BONUS[item.tier] * (GEAR_ATTRS[item.kind].length === 1 ? 2 : 1) * 2;
+}
+
+/** A perk for a piece: an extra on one attribute, from 1 up to the most the piece can carry (mostly small, now and then the very most). */
+function rollPerk(rng: Rng, kind: GearKind, tier: GearTier): {attr: Attribute; n: number} {
+  const max = gearPerkMax({kind, tier});
+  const n = rng.next() < PERK_TOP_CHANCE ? max : Math.min(max, 1 + Math.floor(rng.next() ** 2 * max));
   const attr = kind === "gloves" ? rng.pick<Attribute>(["goalkeeping", "vision", "physical"]) : rng.pick(PERK_ATTRS);
   return {attr, n};
 }
@@ -190,7 +200,7 @@ function rollPerk(rng: Rng, kind: GearKind): {attr: Attribute; n: number} {
 export function rollGearPack(rng: Rng): GearItem {
   const kind = rng.pick([...GEAR_KINDS]);
   const tier = rng.weighted([...GEAR_TIERS], (t) => PACK_TIERS[t]);
-  return {kind, tier, perk: rollPerk(rng, kind)};
+  return {kind, tier, perk: rollPerk(rng, kind, tier)};
 }
 
 /** The chance that a piece bought in the shop turns out to carry a perk. */

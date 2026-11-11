@@ -1,6 +1,7 @@
 // Contract demands and negotiation. Players (via agents) accept, counter or
 // walk away depending on quality, age, form, interest and happiness.
 import {addMessage, book, playerName} from "./helpers";
+import {CONTRACT_XP, addManagerXp} from "./manager";
 import {clubPlayers, deservedRole, expectedWage, overall, wageBill} from "./ratings";
 import {clamp} from "./rng";
 import type {Contract, GameState, Player, SquadRole} from "./types";
@@ -173,6 +174,7 @@ export function signContract(state: GameState, playerId: string, clubId: string,
     p.happiness = clamp(p.happiness + 8, 0, 100);
     p.relation = clamp(p.relation + 4, 0, 100);
     p.wantsToLeave = false;
+    addManagerXp(state, CONTRACT_XP);
     addMessage(state, {
       kind: "player",
       key: "msg.contractSigned",

@@ -359,6 +359,10 @@ export interface Frame {
   foul?: boolean;
   /** A move with the ball: a spin past a defender (the 3D view plays the spin animation). */
   skill?: "spin";
+  /** A pass that is a keeper's throw (by hand, low and short or a long overarm throw); the one in the frame is who it is thrown to. */
+  throw?: boolean;
+  /** A ball cleared by a defender (booted away): the one in the frame is who gets to it. */
+  clear?: boolean;
 }
 
 export interface MatchReport {
@@ -579,6 +583,8 @@ export interface GameState {
   managerName: string;
   /** Missing in older saves; a default look is used then. */
   managerLook?: ManagerLook;
+  /** The manager's XP and the titles whose present has been given (see manager.ts). Missing in older saves (a rookie). */
+  manager?: {xp: number; claimed: number[]};
   /** Who plays in the league: men, women or mixed teams. Missing in older saves (men). */
   playersGender?: PlayersGender;
   userClubId: string;

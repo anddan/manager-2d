@@ -7,14 +7,15 @@ import {unequipGear} from "./gear";
 import {CUP_WEEKS, DIAMONDS_SEASON, ENERGY_COST_MATCH, CARD_FINE, FORMATIONS, SEASON_WEEKS, motmBonusFor} from "./constants";
 import {payPrizeMoney, seasonBoardReview, setSeasonBudgets, weeklyFinances} from "./finance";
 import {assignRoles, createFreeAgents, createPlayer} from "./generate";
-import {finishCupStage, setupCup, userCupResult} from "./cup";
+import {CUP_ROUNDS, finishCupStage, setupCup, userCupResult} from "./cup";
+import {addManagerXp, matchXp, seasonXp} from "./manager";
 import {announceAwards, seasonAwards} from "./awards";
 import {nationalWeek, offerNational} from "./national";
 import {weeklyStadium} from "./stadium";
 import {updateAlbum} from "./album";
 import {taskProgress} from "./daily";
 import {tutorialMatchSeed} from "./tutorial";
-import {addMessage, book, cupFixturesInStage, currentCupStage, currentRound, findFixture, fixturesInRound, fullName, leagueClubs, playerName} from "./helpers";
+import {addMessage, book, cupFixturesInStage, currentCupStage, currentRound, findFixture, fixturesInRound, fullName, isCupFixture, leagueClubs, playerName} from "./helpers";
 import {makeFixtures, standings} from "./league";
 import {pickBestLineup, repairLineup} from "./lineup";
 import {ENGINE, applyMatch, simulateMatch} from "./match";
@@ -111,6 +112,8 @@ export function finishWeek(state: GameState, rng: Rng): MatchReport | undefined 
     const theirs = f.homeId === user.id ? report.awayGoals : report.homeGoals;
     if (ours > theirs) taskProgress(state, "win");
     taskProgress(state, "goals", ours);
+    // The manager's XP for the match (a cup tie counts more).
+    addManagerXp(state, matchXp(ours, theirs, isCupFixture(f) ? "cup" : "league"));
     state.reports.unshift(report);
     if (state.reports.length > 6) state.reports.length = 6;
     updatePromises(state, user.lineup);
@@ -188,6 +191,8 @@ function endSeason(state: GameState, rng: Rng): void {
   const cup = userCupResult(state);
   state.history.push({season: state.season, championId: order[0], userPosition, ...(cup !== undefined ? {cup} : {})});
   if (userPosition === 1) state.celebrations = [...(state.celebrations ?? []), {kind: "league", season: state.season}];
+  // XP for the season: the league (the title, the podium) and the cup.
+  addManagerXp(state, seasonXp(userPosition, cup === CUP_ROUNDS.length));
   // The season's awards (before the stats are cleared and the players a year older).
   announceAwards(state, seasonAwards(state, order));
   // A title (the league or the Champions Cup) may bring an offer to coach a country.

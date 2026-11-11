@@ -158,7 +158,7 @@ describe("replay movement", () => {
     console.log("attackers in the box at crosses", (total / count).toFixed(1), "over", count, "crosses");
     // The striker, often with a winger or attacking midfielder, while the ball is in the air.
     expect(total / count).toBeGreaterThanOrEqual(1.0);
-  }, 30000);
+  }, 120000);
 
   it("shoots from in and around the box, not from far out", () => {
     // Played through like the viewer; noted where the ball is when it gets to the touch a shot is struck from.

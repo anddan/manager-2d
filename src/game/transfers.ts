@@ -11,6 +11,7 @@ import {
   SQUAD_TEMPLATE,
 } from "./constants";
 import {interest} from "./contracts";
+import {addManagerXp, transferXp} from "./manager";
 import {assignRoles} from "./generate";
 import {addMessage, book, leagueClubs, newId, playerName} from "./helpers";
 import {clubPlayers, clubStrength, expectedWage, overall, wageBill} from "./ratings";
@@ -162,6 +163,8 @@ export function completeTransfer(
   }
   if (toClubId === state.userClubId) state.scouted[playerId] = state.absWeek;
   if (fromId === state.userClubId || toClubId === state.userClubId) {
+    // Buying and selling players brings the manager XP (more for a big deal).
+    addManagerXp(state, transferXp(fee));
     addMessage(state, {
       kind: "transfer",
       key: fromId === state.userClubId ? "msg.playerSold" : "msg.playerBought",

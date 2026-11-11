@@ -270,6 +270,61 @@ export function kickoffTargets(ctx: Ctx, t: number, kickerId?: string): Record<s
   return targets;
 }
 
+/** How the scorer shows his joy: with the team round him, running to the corner flag, to the fans behind the goal, or in a knee slide. */
+export type Celebration = "huddle" | "corner" | "fans" | "slide";
+
+export interface CelebrationPlan {
+  kind: Celebration;
+  /** The run and the hug, then back to the kick-off places (not for the huddle, which is as it was). */
+  stages?: FullTimeStage[];
+  duration: number;
+  /** What the 3D view is told, in ms from the goal: a knee slide, arms out like a plane, a jump, a backflip. */
+  moves: {at: number; from: "slide" | "plane" | "hop" | "flip"}[];
+}
+
+/**
+ * The celebration of a goal: one of a few, the same for the same goal. The scorer runs (as fast as he can run), the nearest of his team-mates
+ * run after him to mob him, and the rest go back to their places.
+ */
+export function planCelebration(ctx: Ctx, t: number, side: Side, scorerId: string, bodies: Record<string, Point>, ball: Point, seed: number, kickoff: Record<string, Point>): CelebrationPlan {
+  const roll = seed % 100;
+  const kind: Celebration = roll < 38 ? "huddle" : roll < 68 ? "corner" : roll < 83 ? "fans" : "slide";
+  const sc = bodies[scorerId];
+  if (kind === "huddle" || !sc) {
+    // The old way (everyone round him); now and then a jump or a backflip in the middle of it.
+    const extra = Math.floor(seed / 100) % 100;
+    return {kind: "huddle", duration: GOAL_PAUSE_MS, moves: extra < 30 ? [{at: 350, from: "hop"}] : extra < 52 ? [{at: 250, from: "flip"}] : []};
+  }
+  const goalX = ball.x < 50 ? 0 : 100;
+  const inward = goalX === 0 ? 1 : -1;
+  const clampP = (p: Point): Point => ({x: Math.max(1, Math.min(99, p.x)), y: Math.max(2, Math.min(98, p.y))});
+  let dest: Point;
+  if (kind === "corner") dest = {x: goalX + inward * 2.5, y: sc.y < 50 ? 3.5 : 96.5};
+  else if (kind === "fans") dest = {x: goalX + inward * 1.5, y: 50 + (sc.y - 50) * 0.4};
+  else dest = {x: Math.max(4, Math.min(96, sc.x + (goalX - sc.x) * 0.15)), y: sc.y < 50 ? Math.max(6, sc.y - 10) : Math.min(94, sc.y + 10)};
+  dest = clampP(dest);
+  // How long he runs: the distance over his speed (pitch units a ms, as the players move while play is stopped).
+  const perMs = (topSpeed(ctx, scorerId, t) * 2.2) / MS_PER_MINUTE;
+  const dist = Math.hypot(dest.x - sc.x, dest.y - sc.y);
+  const runMs = Math.max(500, dist / perMs + 150);
+  const hugMs = 1000;
+  // The nearest four of his team-mates run to him; the rest go back to their places.
+  const mates = [...onPitchAt(ctx.report, side, t).values()].filter((id) => id !== scorerId && bodies[id]).sort((a, b) => Math.hypot(bodies[a].x - sc.x, bodies[a].y - sc.y) - Math.hypot(bodies[b].x - sc.x, bodies[b].y - sc.y));
+  const chasers = mates.slice(0, 4);
+  const withHim: Record<string, Point> = {...kickoff, [scorerId]: dest};
+  chasers.forEach((id, i) => {
+    const angle = (i / chasers.length) * Math.PI * 2 + 0.6;
+    withHim[id] = clampP({x: dest.x + Math.cos(angle) * 3.2, y: dest.y + Math.sin(angle) * 4});
+  });
+  const slideAt = kind === "fans" ? 120 : Math.max(0, (Math.max(0, dist - 5) / perMs));
+  return {
+    kind,
+    stages: [{until: runMs + hugMs, targets: withHim}, {until: Infinity, targets: kickoff}],
+    duration: runMs + hugMs + 1300,
+    moves: [{at: slideAt, from: kind === "fans" ? "plane" : "slide"}],
+  };
+}
+
 /**
  * Where everyone stands for a set piece, worked out in the attacking side's
  * view (attacking towards 100) and converted at the end.
@@ -2167,6 +2222,8 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   const stadiumBox = useMemo(() => stadiumView(homeStands), [standsKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const viewBox = turnViewBox(useZoom(zoomedIn, stadiumBox), turn);
   const [replay, setReplay] = useState<GoalReplay | null>(null);
+  /** The scorer's celebration told to the 3D view in time with his run (cleared when the stop ends). */
+  const celebTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   /** Asking whether to leave a live match before the end. */
   const [confirmClose, setConfirmClose] = useState(false);
   const [talking, setTalking] = useState(false);
@@ -2463,7 +2520,15 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
       }
       const kickers = report.frames.find((f) => f.kind === "kickoff" && f.minute > p.time);
       const targets = kickoffTargets(ctx, time, kickers?.playerId);
-      setFreeze({...p, started, duration: GOAL_PAUSE_MS, targets, huddle: {...targets, ...huddle}, scorerId: goal?.playerId, assistId: goal?.otherId});
+      // How the scorer celebrates (the same for the same goal): the team round him, or a run to the corner flag or the fans, or a knee slide.
+      const plan = goal?.playerId ? planCelebration(ctx, time, p.side, goal.playerId, scene.bodies, scene.ball, hashString(`${goal.playerId}-${goal.minute}`), targets) : null;
+      celebTimers.current.forEach(clearTimeout);
+      celebTimers.current = [];
+      if (plan && goal?.playerId) {
+        const who = goal.playerId;
+        celebTimers.current = plan.moves.map((m) => setTimeout(() => { evQueue.current = [...evQueue.current, {k: "celebrate" as const, id: who, from: m.from}].slice(-24); }, m.at));
+      }
+      setFreeze({...p, started, duration: plan?.duration ?? GOAL_PAUSE_MS, targets, huddle: {...targets, ...huddle}, stages: plan?.stages, scorerId: goal?.playerId, assistId: goal?.otherId});
     } else if (p.kind === "halftime") {
       const kickoff = report.frames.find((f) => f.minute > p.time);
       const targets = kickoffTargets(ctx, time, kickoff?.kind === "kickoff" ? kickoff.playerId : undefined);
@@ -2482,6 +2547,8 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   const endFreeze = useCallback(() => {
     const fz = freezeRef.current;
     if (!fz) return;
+    celebTimers.current.forEach(clearTimeout);
+    celebTimers.current = [];
     done.current.add(fz.key);
     // In a live match the minute after a goal or half-time is not played yet when the stop ends: make it now, so that it is known who
     // takes the kick-off and he can stand on the ball.
@@ -3098,7 +3165,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
         const shot = ["goal", "nogoal", "save"].includes(next.kind ?? "") || (next.kind === "out" && progressFor(next.possession, next.x) >= 99.5);
         const res = next.kind === "save" ? "save" : next.kind === "goal" || next.kind === "nogoal" ? "goal" : shot ? "out" : undefined;
         // A cross that is met first time is a header, not a kick.
-        out.push({k: now.flight === "cross" ? "header" : "kick", id: kicker, p: +Math.min(1, dist / 50).toFixed(2), s: shot, a: next.flight === "long" || next.flight === "cross", x: +(next.x * 1.05).toFixed(1), z: +(next.y * 0.68).toFixed(1), to: who(view.reached + 1), from: now.kind, res: shot ? res : undefined});
+        out.push({k: now.flight === "cross" ? "header" : "kick", id: kicker, p: +Math.min(1, dist / 50).toFixed(2), s: shot, a: next.flight === "long" || next.flight === "cross", x: +(next.x * 1.05).toFixed(1), z: +(next.y * 0.68).toFixed(1), to: who(view.reached + 1), from: next.throw ? "throw" : now.kind, res: shot ? res : undefined});
       }
     }
     // A touch reached: a tackle (a slide or on his feet) or a keeper's save.
@@ -3699,8 +3766,9 @@ function NoGoalBanner({reason, style}: {reason?: string; style?: CSSProperties})
 
 /** A comment about a team: two borders in the team's two colours on its side (the home side left, the away side right). */
 function teamBorders(club: {color: string; color2: string}, side: Side): CSSProperties {
-  const edge = side === "home" ? "Left" : "Right";
-  return {[`border${edge}`]: `4px solid ${club.color}`, boxShadow: `inset ${side === "home" ? "" : "-"}4px 0 0 ${club.color2}`};
+  // The team's colours are always on the left of the line, for the home side and the away side alike.
+  void side;
+  return {borderLeft: `4px solid ${club.color}`, boxShadow: `inset 4px 0 0 ${club.color2}`};
 }
 
 /** A see-through dialog over the match, so the pitch stays in view behind it. */

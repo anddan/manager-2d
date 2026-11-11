@@ -18,6 +18,7 @@ import {assignToSlots, isAvailable} from "./lineup";
 import {distance, fromSide, progressFor, teamSpot, type Point} from "./pitch";
 import {FORM_EFFECT, dayFormParts, effectiveRating} from "./ratings";
 import {TickMatch, type SimEvent, type SimPlayer, type SimTeam} from "./tick";
+import {managerAuthority} from "./manager";
 import {Rng, clamp} from "./rng";
 import {
   CORNER_RATE,
@@ -125,6 +126,8 @@ export interface Team {
   manualSubs: boolean;
   /** "Forza!" lifts the team until this minute. */
   forzaUntil: number;
+  /** How much the players listen to their manager, 0..1 (the manager's level, see manager.ts): "Forza!" and the orders bite harder. The computer's managers have none. */
+  authority: number;
 }
 
 /** "Forza!": how much it lifts the whole team, and for how many minutes. */
@@ -144,8 +147,8 @@ export function hashString(s: string): number {
 }
 
 /** The lift from "Forza!" in a minute: the boost while it lasts, otherwise none. */
-export function forzaLift(forzaUntil: number, minute: number): number {
-  return minute < forzaUntil ? FORZA.boost : 1;
+export function forzaLift(forzaUntil: number, minute: number, authority = 0): number {
+  return minute < forzaUntil ? 1 + (FORZA.boost - 1) * (1 + authority * 0.8) : 1;
 }
 
 function buildTeam(state: GameState, club: Club, side: Side): Team {
@@ -169,6 +172,7 @@ function buildTeam(state: GameState, club: Club, side: Side): Team {
     injured: [],
     manualSubs: false,
     forzaUntil: 0,
+    authority: club.id === state.userClubId ? managerAuthority(state) : 0,
   };
 }
 
@@ -193,7 +197,8 @@ function aggression(team: Team): number {
 function effect(team: Team, id: string, pick: (e: (typeof INSTRUCTION_EFFECTS)[InstructionKey]) => number): number {
   let factor = 1;
   for (const [key, lvl] of Object.entries(ordersFor(team, id)) as [InstructionKey, InstructionLevel][]) {
-    const value = pick(INSTRUCTION_EFFECTS[key]);
+    // (A manager the players listen to gets more out of every order.)
+    const value = pick(INSTRUCTION_EFFECTS[key]) ** (1 + team.authority * 0.5);
     if (lvl === 1) factor *= value;
     else if (lvl === -1) factor /= value;
   }
@@ -212,7 +217,7 @@ function lines(state: GameState, team: Team, home: boolean, minute = 0): {def: n
   }
   const m = MENTALITY[team.club.mentality];
   // Home advantage, and the lift from the manager's "Forza!" while it lasts.
-  const h = (home ? HOME_ADVANTAGE : 1) * forzaLift(team.forzaUntil, minute);
+  const h = (home ? HOME_ADVANTAGE : 1) * forzaLift(team.forzaUntil, minute, team.authority);
   return {
     def: (sums[0] / LINE_NORM[0]) * m.def * h,
     mid: (sums[1] / LINE_NORM[1]) * h,
@@ -223,7 +228,7 @@ function lines(state: GameState, team: Team, home: boolean, minute = 0): {def: n
 
 /** A team for the tick engine: what each player can do on the day (attributes with form, fitness and morale counted in) and what the manager asked. */
 function simTeam(state: GameState, team: Team, home: boolean, minute: number): SimTeam {
-  const lift = 1 + ((home ? 1.02 : 1) * forzaLift(team.forzaUntil, minute) - 1) * 0.5;
+  const lift = 1 + ((home ? 1.02 : 1) * forzaLift(team.forzaUntil, minute, team.authority) - 1) * 0.5;
   const mentality = team.club.mentality === "attacking" ? 1 : team.club.mentality === "defensive" ? -1 : 0;
   const players: SimPlayer[] = team.onPitch.map((o) => {
     const p = state.players[o.id];
@@ -1929,7 +1934,8 @@ export function createMatch(
     report.onTarget = [home.onTarget, away.onTarget];
     report.xg = [Math.round(xg.home * 100) / 100, Math.round(xg.away * 100) / 100];
     const st = sim.stats;
-    report.stats = {passes: st.passes, passesOk: st.passesOk, tackles: st.tackles, interceptions: st.interceptions, fouls: st.fouls, offsides: st.offsides, corners: st.corners};
+    report.stats = {passes: st.passes, passesOk: st.passesOk, tackles: st.tackles, interceptions: st.interceptions, fouls: st.fouls, offsides: st.offsides, corners: st.corners,
+      slides: st.slides, slidesWon: st.slidesWon, crosses: st.crosses, takeOns: st.takeOns, takeOnsWon: st.takeOnsWon, clearances: st.clearances, keeperThrows: st.keeperThrows, keeperKicks: st.keeperKicks, claims: st.claims, counters: st.counters};
     return report;
   }
 

@@ -127,7 +127,7 @@ export interface PlayerState {
 
 /** Something that happens in the match that the 3D view acts out (a boot on the ball, a tackle, a save). */
 export interface UnityEvent {
-  k: "kick" | "tackle" | "save" | "receive" | "header" | "fall" | "spin";
+  k: "kick" | "tackle" | "save" | "receive" | "header" | "fall" | "spin" | "celebrate";
   /** Who does it. */
   id: string;
   /** A kick: how hard (0..1). */
@@ -140,7 +140,7 @@ export interface UnityEvent {
   x?: number;
   z?: number;
   to?: string;
-  /** A kick: what the ball is leaving (a pass, a dribble, a tackle won, a free kick or corner, a goal kick, a throw-in, the kick-off, a keeper's save). */
+  /** A kick: what the ball is leaving (a pass, a dribble, a tackle won, a free kick or corner, a goal kick, a throw-in, the kick-off, a keeper's save). For a "celebrate": how the scorer shows his joy (slide, plane, hop, flip). */
   from?: string;
   /** A shot: how it ends (goal, save, out), so the keeper can act it out. */
   res?: "goal" | "save" | "out";

@@ -128,6 +128,15 @@ Den här filen är till för Claude (och dig) så att inget behöver upprepas. L
 - [ ] **3D-repris:** tryck Repris efter ett mål: kameran byter vinkel (sidlinje → bakom spelaren → bakom målet → framför målet), knappen **Fortsätt** syns och avslutar repriset, även i maxläge.
 - [ ] **3D-effekter:** spela flera matcher i 3D och se om du får cykelsparkar, dyknickar, voltar och krysskott med målvakt som kastar sig och missar. Hörnmål kan också ge dyknick/cykelspark. Rättat: sparkhändelsen till Unity kunde utebli live (snabb match, pass + skott mellan två ritningar) men inte i repris; `MatchViewer.tsx` skickar nu en spark även när en ny boll nuddas under pågående flygning. Kolla att samma mål får samma effekt live och i repris.
 
+**Senast (2026-11-11, kräver nytt WebGL-bygge för Unity-delen)**
+- [ ] **Mål i 3D:** bollen ligger kvar i nätet under hela jublet (ingen studs ut), nätet **rasslar** när bollen slår i. Målskytten jublar på olika sätt (samma mål ger samma jubel): **hela laget runt honom** (ibland hopp eller volt), **springer till hörnflaggan och glider på knä**, **springer mot supportrarna med utsträckta armar (flygplan)** eller **glider på knä** en bit in på planen. Hörnflaggs- och knäglidsjublet tar lite längre tid än förut (ca 4 s). Även i 2D rör sig spelarna så (utan knäglidet).
+- [ ] **Kommentarerna** i matchen har alltid lagets färger på vänster sida (förut hemma vänster, borta höger).
+- [ ] **Kitperks:** en extra (perk) på kit kan nu vara upp till **dubbelt så stor som vad delen själv ger** (special +5 → perk upp till +10; guld 6, silver 4, vanlig 2; handskar dubbelt). Perken är **gul**, och **röd** när den är på sitt max. Gamla perks som redan är större än max visas röda.
+- [ ] **Ny matchmotor (tick), spelförståelse och fler händelser** (se avsnitt 13). Spela med "Ny (test)" och titta på: glidtacklingar (även missar och fouls), inlägg (anfallare springer in i rutan: straffpunkt, bortre/främre stolpen och kanten för en nickpassning bakåt), ytterbackar som går förbi vingen, dribblingar (snurra förbi en spelare), rensningar, målvaktens utspel (**kast** med handen, långa sparkar, snabb kontring) och spelare som läser passningar och bryter dem.
+- [ ] Målvaktens kast i 3D: nickklippet "GoalieThrow" spelas med bollen i händerna över huvudet. (Klippet finns i Unity men är inte kontrollerat visuellt.)
+
+- [ ] **Managerns nivå:** ringen runt managerns bild i toppen och i Managern-rutan (nivåsiffra på brickan), titeln under klubbnamnet, Album > Managerns titlar (tryck på en titel för present och effekt). Spela en match/köp en spelare och se XP öka; när en ny titel nås kommer ett meddelande och presenten. Gamla sparfiler börjar på nivå 1.
+
 **Unity (SampleScene, Play)**
 - [ ] Nät på målen, publik rätt väg, frisyrerna (särskilt spiky, ponytail, bun, coils, haaland).
 - [ ] Målvakten tittar upp mot planen efter en miss.
@@ -182,4 +191,40 @@ Fristående prototyp i `src/game/proto/` (`tickSim.ts`, mätning i `tickSim.benc
 - **Mätt/justerad (inte i verkligheten, bara balans):** ungefär 3,4 mål, 28 skott och 22 fouls per match efter justering.
 - **Tester som körs automatiskt** (`tickEngine.test.ts`): rimlig statistik, determinism (samma frö, samma match med och utan bildrutor), en hel match med set pieces, och att en live-match som användaren spelat räknas **exakt som den visades** (testet sätter `live.manualSubs = false`, som appen gör som standard).
 - **Känd skillnad (gäller även gamla motorn):** `LiveMatch` börjar med `manualSubs = true` (användaren byter själv) medan omräkningen i `finishWeek` utgår från att assistenten byter om inga kommandon finns. Appen sätter "auto" som standard (`MatchViewer.tsx`), så det syns bara om man väljer "Själv" och inte gör några byten.
-- **Inte gjort än:** prestandaoptimering (ca 0,6 s per match på dator, mobilen ej mätt), fler beteenden (djupledslöpningar, inlägg/nickar, målvaktens utspel), kontroll i riktiga visningen/Unity.
+- **Inte gjort än:** prestandaoptimering (ca 0,6 s per match på dator, mobilen ej mätt), kontroll i riktiga visningen/Unity.
+
+**Förbättringar 2026-11-11 (matchmotorn blev smartare och mer händelserik):**
+- **Beslut med bollen** (`decide`): skott, **osjälvisk passning** (till en medspelare i klart bättre läge, även en tillbakadragning från byline), inlägg (oftare, fler väntar i rutan), **växling** av spel till andra kanten när det är trångt, **kontring** (efter bollvinst går laget rakare i 7 s), **rensning** för en försvarare under press i egen box, **dribbling** (spelare tar på en motståndare; vinst ger en "spin"-bildruta), passning med motståndarens **passningslinje** och fri yta värderade.
+- **Spel utan boll** (`targets`): spelare **läser passningar** och springer till bollens bana (upp till två bryter, den närmaste pressar mottagaren), **motpress** direkt efter bollförlust, **inläggslöpningar** (straffpunkt, bortre stolpen, främre stolpen, kanten av rutan), **ytterback som går förbi** vingen, **målvakten sveper** upp en boll bakom backlinjen och tar bollar i sin ruta.
+- **Målvakten:** hör till `keeperPlay`: **kast** (kort eller långt kast för kontring), **spark** eller kort passning efter målspark, mer vid ett lag som pressar högt. Efter räddning, fångat inlägg eller bollgrepp håller han bollen i händerna (`hands`).
+- **Glidtacklingar** (`slideTry`): försvarare som springs förbi kastar sig (oftare nära eget mål), vinner bollen, missar (spelaren är förbi) eller gör foul (oftare gult).
+- **Fler bildrutor** i visningen: nya fält `Frame.throw` (målvaktskast) och `Frame.clear` (rensning), `flight: "through"` för bollar i djupled och `flight: "cross"` för nickens bildruta. Unity: `from: "throw"` spelar GoalieThrow.
+- **Mätt** (`tickStats.test.ts`, 16 matcher): mål ca 3,4, skott ca 34, fouls ca 26, gula ca 4, glidtacklingar ca 29, dribblingar ca 63, inlägg ca 55, rensningar ca 22, målvaktskast ca 8, långa målvaktssparkar ca 19; bildrutor ca 650 per match (förut ca 340). Tid per match ca 20 % längre.
+- **Test:** `tickReplay.test.ts` spelar tick-matcher genom visningen (inga bollhopp, bilden hänger med).
+- Skriv `TICK_STATS=fil.json npx vitest run --pool=vmThreads src/game/tickStats.test.ts` för att mäta om.
+
+
+
+## 14. Managerns nivå och titel (byggd 2026-11-11, `src/game/manager.ts`)
+
+Managern har **100 nivåer** och **nio titlar**. Titeln är den första (Nybörjare) från start; en ny titel kommer **var 10:e nivå** (nivå 20, 30, … 80), och sista steget är 20: på **nivå 100 är man "Sir " + sitt namn**. Titlarna låses upp i **Album > Managerns titlar** och ger en **present** direkt (diamanter eller pengar, en gång, med ett meddelande). Nivån syns på **startsidan** som en blå ring runt managerns bild (hur långt till nästa nivå) med nivåsiffran på en blå bricka; i Tränarprofilen finns varken ring eller bricka, där står titel, nivå och XP-stapel under klubbnamnet.
+
+XP per nivå: upp till nivå 20 är det 5 × (nivå−1)² (nivå 13 = 720 XP, nivå 20 = 1 805 XP), därefter brantare (`xpAtLevel`) så att **nivå 100 = 100 000 XP**.
+
+| Titel | Nivå | XP | Present |
+|---|---|---|---|
+| Nybörjare | 1 | 0 | – |
+| Lagledare | 20 | 1 805 | 10 💎 |
+| Assisterande tränare | 30 | ca 5 050 | 500 000 |
+| Huvudtränare | 40 | ca 10 400 | 25 💎 |
+| Taktiker | 50 | ca 18 100 | 1,5 mn |
+| Mästartränare | 60 | ca 28 400 | 50 💎 |
+| Förbundskapten | 70 | ca 41 600 | 100 💎 |
+| Legend | 80 | ca 57 800 | 15 mn |
+| Sir (namn) | 100 | 100 000 | 250 💎 |
+
+- **XP:** match i ligan vinst 40 / lika 15 / förlust 5 (+10 vid 3 måls marginal, +5 hållen nolla); cupmatch ×1,5; landslag turnering ×1,25 och träningsmatch ×0,6; köp/sälj spelare 10 + upp till 40 efter pris; nytt eller förnyat kontrakt 8; säsongen: ligatitel 400, topp 3 120, topp 6 40, cupvinst 300; landslagsturnering guld 800, silver 400, brons 250. Kopplat i `finishWeek`, `endSeason`, `completeTransfer`, `signContract` och `national.ts`.
+- **Effekt:** `managerAuthority` (0–1, nivå 1 till 100) ger i matchen (`Team.authority`, bara för användarens lag) att **Forza** biter upp till 80 % hårdare och **order/instruktioner** upp till 50 % hårdare (båda motorerna).
+- **Landslagserbjudanden:** `offerRange(level)`: en nybörjare får frågan från små länder, en bättre titel från bättre (nivå 10: de fyra bästa). Erbjudandet kommer som förut efter en titel.
+- **Inte gjort:** erbjudanden från andra klubbar (det finns inget byte av klubb i spelet), mer "respekt" hos spelarna utöver Forza/order (t.ex. lagsnack, humör).
+- Test: `manager.test.ts`.

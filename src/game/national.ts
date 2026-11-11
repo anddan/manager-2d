@@ -7,6 +7,7 @@ import {FORMATIONS, SEASON_WEEKS, roleAt, type Slot} from "./constants";
 import {NATIONALITIES} from "./names";
 import {collectTrophy} from "./album";
 import {addMessage, fullName} from "./helpers";
+import {addManagerXp, matchXp, managerLevel, offerRange, tournamentXp} from "./manager";
 import {isAvailable, pickBestLineup} from "./lineup";
 import {effectiveRating, overall} from "./ratings";
 import {Rng} from "./rng";
@@ -190,7 +191,10 @@ function poisson(rng: Rng, lambda: number): number {
 /** The country's offer to the manager (sent after a title; a country they are not already coach of). */
 export function offerNational(state: GameState, rng: Rng): void {
   if (state.national) return;
-  const top = nations(state).slice(0, 10);
+  // A better title is asked by better countries (see manager.ts).
+  const all = nations(state);
+  const [from, to] = offerRange(managerLevel(state));
+  const top = all.slice(Math.min(from, Math.max(0, all.length - 4)), Math.max(to, 4));
   if (top.length === 0) return;
   const country = rng.pick(top).code;
   addMessage(state, {kind: "news", key: "msg.nationalOffer", params: {country: `nat.${country}`}, action: {type: "nationalOffer", country}});
@@ -452,6 +456,7 @@ export function nationalWeek(state: GameState, rng: Rng): void {
     const lost = (r: number) => (t.rounds?.[r] ?? []).some((p) => (p.a === job.country || p.b === job.country) && p.w !== job.country);
     const place = next[0] === job.country ? 1 : lost(rounds - 1) ? 2 : lost(rounds - 2) ? 3 : 0;
     if (place) collectTrophy(state, `${t.comp}${place}`);
+    if (place) addManagerXp(state, tournamentXp(place as 1 | 2 | 3));
     if (place) state.celebrations = [...(state.celebrations ?? []), {kind: "tournament", season: state.season, comp: t.comp, place: place as 1 | 2 | 3, country: job.country}];
     const ours = next[0] === job.country;
     t.alive = false;
@@ -509,6 +514,8 @@ function userMatch(state: GameState, rng: Rng, job: NationalJob, opponent: strin
   const result: NationalResult = {season: state.season, week: state.week, opponent, what, goals: [us, them], ...(pens ? {pens} : {}), scorers};
   job.results.unshift(result);
   if (job.results.length > 30) job.results.length = 30;
+  // XP for the match (a shoot-out win counts as a win).
+  addManagerXp(state, matchXp(us + (pens && won ? 1 : 0), them + (pens && !won ? 1 : 0), what === "friendly" ? "friendly" : "tournament"));
   addMessage(state, {
     kind: "match",
     key: "msg.nationalMatch",
@@ -665,6 +672,7 @@ export function finishNationalMatch(state: GameState, rng: Rng): void {
   const result: NationalResult = {season: state.season, week: state.week, opponent: nm.opponent, what: nm.what, goals: [us, them], ...(pens ? {pens} : {}), scorers};
   job.results.unshift(result);
   if (job.results.length > 30) job.results.length = 30;
+  addManagerXp(state, matchXp(us + (pens && pens[0] > pens[1] ? 1 : 0), them + (pens && pens[0] < pens[1] ? 1 : 0), nm.what === "friendly" ? "friendly" : "tournament"));
   addMessage(state, {
     kind: "match",
     key: "msg.nationalMatch",
