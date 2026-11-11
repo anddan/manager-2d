@@ -41,6 +41,8 @@ Den här filen är till för Claude (och dig) så att inget behöver upprepas. L
 - **Hörnor:** kameran högt över rutan (zonerna syns åtskilda). Markörer (nålar) skickas först när kameran är färdig och poppar upp en och en, placerade ovanför spelarna. Zonindex: 0 nära stolpe, 1 straffpunkt, 2 bortre stolpe, 3 kort hörna. Webben glömmer gamla positioner när en ny situation börjar.
 - **Frisyrer (25 stilar)** ska likna avatarens (`src/ui/Avatar.tsx`, `HAIR_STYLES`). Justerade: ponytail, bun, coils, haaland, spiky. Huvudet är Toonys, så det blir en tolkning.
 - **Tröjnummer** (stort bak, litet fram) på skinnat mesh. Kaptensbindel finns i koden för det nya kroppsläget men inte för Toony.
+- **Roliga effekter (inte statistiskt rätt, bara kul):** vissa mål får en **cykelspark**, en **dyknick** (flyger in med huvudet först) eller ett **skott i krysset** där målvakten kastar sig men missar; målskytten gör ibland en **volt**. Slumpen är densamma för samma händelse (`Roll` i `MatchRoot.cs`). Koden: `PlayerView.Acro.cs` (kroppen vrids kring höfterna), `BallView.Flair` (bollen lyfts över banan), hörnor i `SetPieceStage.CornerShot`.
+- **Mål-repris i 3D:** kameran byter vinkel efter hur nära målet bollen är: längs sidlinjen (långt borta), bakom bollhållaren, bakom målet och tittar tillbaka, framför målet lågt när bollen går i nät (`ReplayCamera` i `MatchRoot.cs`). Knappen heter nu **Fortsätt** och ligger ovanför 3D-bilden (och ovanför play-knapparna i maxläge).
 - **Kontroller i 3D:** play/forward/paus ligger längst ned i mitten i maxläge (z-index över 3D-bilden).
 
 ## 4. Match i 2D och lägen
@@ -118,6 +120,13 @@ Den här filen är till för Claude (och dig) så att inget behöver upprepas. L
 - [ ] 3D-hörna: nickaren och hans försvarare **hoppar och nickar** (nickklippet spelas, kontakt när bollen kommer). Loggat i labbet att klippet startar för båda; själva utseendet är inte kontrollerat från sidan.
 - [ ] Fasta situationer i 3D (straff, frispark, hörna): beskrivningen ("Sikta…", "Välj var…", timing-texten) visas bara **tills du rör skärmen**, sedan döljs den. Tolkat så; säg till om du menade något annat.
 - [ ] Maxläge: zoom +/- ligger uppe till vänster (hörnet), kommentar- och publikraden flyttas åt sidan. Play/paus/framåt är mer genomskinliga. Kolla på stående mobil att inget krockar uppe till vänster.
+
+- Zoner på liggande telefon: den vridna liggande varianten blev inte bra och är borttagen. Zoner-brädet är som det var (stående).
+- [ ] Överblick: zoom-knappen sitter uppe till vänster (som 3D-zoomen). Alla knappar på planen är genomskinliga som play/pause.
+
+- [ ] **Överblick på stående telefon:** planen ritas stående (ditt lag anfaller uppåt), siffror och namn är läsbara. Liggande telefon som förut. Kontrollera zoom, maxläge, mål-/straffbilder och att man kan trycka på sina spelare.
+- [ ] **3D-repris:** tryck Repris efter ett mål: kameran byter vinkel (sidlinje → bakom spelaren → bakom målet → framför målet), knappen **Fortsätt** syns och avslutar repriset, även i maxläge.
+- [ ] **3D-effekter:** spela flera matcher i 3D och se om du får cykelsparkar, dyknickar, voltar och krysskott med målvakt som kastar sig och missar. Hörnmål kan också ge dyknick/cykelspark. Rättat: sparkhändelsen till Unity kunde utebli live (snabb match, pass + skott mellan två ritningar) men inte i repris; `MatchViewer.tsx` skickar nu en spark även när en ny boll nuddas under pågående flygning. Kolla att samma mål får samma effekt live och i repris.
 
 **Unity (SampleScene, Play)**
 - [ ] Nät på målen, publik rätt väg, frisyrerna (särskilt spiky, ponytail, bun, coils, haaland).

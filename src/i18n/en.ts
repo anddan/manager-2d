@@ -1279,7 +1279,7 @@ export const en: Record<keyof typeof sv, string> = {
   "match.engineHint": "Applies to your own match, from the next one you start. The new engine plays every player and the ball step by step (passes, tackles, fouls, offside, crosses and headers). If it does not work well you can switch back.",
   "match.replayGoal": "Replay",
   "match.replayBadge": "REPLAY",
-  "match.replayEnd": "Back to the match",
+  "match.replayEnd": "Continue",
   "match.zoomIn": "Zoom in",
   "match.view3d": "3D view",
   "match.view3dLoading": "Loading 3D … {pct}%",

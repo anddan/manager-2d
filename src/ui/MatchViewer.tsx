@@ -1260,6 +1260,13 @@ function stadiumView(levels: StandLevels): {x: number; y: number; w: number; h: 
 const VIEW_PITCH = {x: -3.5, y: 0, w: 112, h: 68};
 const ZOOM_KEY = "manager2d.zoomedIn";
 
+/** The view box of the pitch seen from the short side: the drawing is turned a quarter (-90: the home team attacks up the screen, 90: the away team does). */
+function turnViewBox(box: string, turn: number): string {
+  if (!turn) return box;
+  const [x, y, w, h] = box.split(" ").map(Number);
+  return turn < 0 ? `${y} ${-(x + w)} ${h} ${w}` : `${-(y + h)} ${x} ${h} ${w}`;
+}
+
 /** Eases the SVG view box between the stadium and pitch views. */
 function useZoom(zoomedIn: boolean, stadium = VIEW_STADIUM): string {
   const target = zoomedIn ? VIEW_PITCH : stadium;
@@ -2136,7 +2143,19 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
     q.addEventListener?.("change", on);
     return () => q.removeEventListener?.("change", on);
   }, []);
+  // Overview (2D): held upright the pitch is seen from the short side too (the manager's own team attacking up the screen, the numbers and names
+  // kept readable); on its side from the long side, as it is drawn.
+  const [phonePortrait, setPhonePortrait] = useState(() => (typeof window !== "undefined" && window.matchMedia ? window.matchMedia("(orientation: portrait) and (max-width: 700px)").matches : false));
+  useEffect(() => {
+    const q = window.matchMedia?.("(orientation: portrait) and (max-width: 700px)");
+    if (!q) return;
+    const on = () => setPhonePortrait(q.matches);
+    on();
+    q.addEventListener?.("change", on);
+    return () => q.removeEventListener?.("change", on);
+  }, []);
   const mySide = live?.userSide ?? "home";
+  const turn = phonePortrait ? (mySide === "away" ? 90 : -90) : 0;
   const side3d = portrait ? (mySide === "away" ? 3 : 1) : mySide === "away" ? 2 : 0;
   // The 3D build is fetched in the background while the match starts, so switching 3D on is quick.
   useEffect(() => {
@@ -2146,7 +2165,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
   const homeStands = game.clubs[report.homeId]?.stadium?.stands ?? NO_STANDS;
   const standsKey = `${homeStands.north}-${homeStands.south}-${homeStands.west}-${homeStands.east}`;
   const stadiumBox = useMemo(() => stadiumView(homeStands), [standsKey]); // eslint-disable-line react-hooks/exhaustive-deps
-  const viewBox = useZoom(zoomedIn, stadiumBox);
+  const viewBox = turnViewBox(useZoom(zoomedIn, stadiumBox), turn);
   const [replay, setReplay] = useState<GoalReplay | null>(null);
   /** Asking whether to leave a live match before the end. */
   const [confirmClose, setConfirmClose] = useState(false);
@@ -2884,6 +2903,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
             ) : (
               <circle r={2.3 * (1 + (air[id]?.lift ?? 0) * 0.4)} fill={club.color} stroke={club.color2} strokeWidth={0.45} className="body" />
             )}
+            <g transform={turn ? `rotate(${-turn})` : undefined}>
             {/* The shirt number inside the circle. */}
             {game.players[id]?.shirt ? <text y={0.75} className="dot-number" fill={inkFor(club.color, club.color2)}>{game.players[id].shirt}</text> : null}
             {/* "Forza!": a glowing ring over the player while it lasts. */}
@@ -2897,6 +2917,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
             {booked.has(id) && <rect x={1.9} y={0.3} width={1.1} height={1.5} rx={0.2} className="booked" />}
             {hurt.has(id) && <text x={-3.4} y={0.8} className="dot-hurt">✚</text>}
             <text y={-3} className="dot-label">{name(id)}</text>
+            </g>
           </g>
         </g>
       );
@@ -3069,7 +3090,8 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
     };
     const out: UnityEvent[] = [];
     // The ball leaving a boot (a run with the ball, a tackle won and a throw-in are not kicks).
-    if (view.flying && !was.flying && now && next && !["dribble", "tackle", "throwin"].includes(next.kind ?? "")) {
+    // (A new touch while it is still flying is a new kick too: at speed, or on a slow frame, a pass and the shot can both happen between two draws.)
+    if (view.flying && (!was.flying || view.reached !== was.reached) && now && next && !["dribble", "tackle", "throwin"].includes(next.kind ?? "")) {
       const kicker = who(view.reached);
       if (kicker) {
         const dist = Math.hypot((next.x - now.x) * 1.05, (next.y - now.y) * 0.68);
@@ -3285,7 +3307,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
 
       {/* During a set piece or a shootout the pitch is only hidden when the 3D view is on: unmounting it would make Unity load all over again. */}
       {(!setPieceOpen || (view3d && unity.available)) && (
-        <div className={`pitch-wrap ${maxed ? "maxed" : ""} ${textOnly ? "text-only" : ""} ${matchView === "zones" ? "zones" : ""}`} ref={pitchRef} style={setPieceOpen && !sp3d ? {display: "none"} : undefined}>
+        <div className={`pitch-wrap ${turn ? "turned" : ""} ${maxed ? "maxed" : ""} ${textOnly ? "text-only" : ""} ${matchView === "zones" ? "zones" : ""}`} ref={pitchRef} style={setPieceOpen && !sp3d ? {display: "none"} : undefined}>
           {matchView === "zones" && (() => {
             // The lineup as in Tactics, the ball's zones behind it and the possession above.
             const side = userSide;
@@ -3350,6 +3372,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
             );
           })()}
           <svg className="pitch" viewBox={viewBox} role="img" aria-label={t("match.pitch")} style={view3d && unity.ready && unity.available ? {visibility: "hidden"} : undefined}>
+            <g transform={turn ? `rotate(${turn})` : undefined}>
             <Stands home={home} away={away} cheering={(freeze?.kind === "goal" || (freeze?.kind === "fulltime" && decided)) && !replay ? freeze.side : null} boards={(userSide === "away" ? away : home).color} fill={report.crowd?.rate ?? 1} />
             {PITCH}
             <Dugouts home={home} away={away} />
@@ -3376,6 +3399,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
                 <rect x={view.ball.x > 50 ? 104 : -1.8} y={30.34} width={2.8} height={7.32} />
               </g>
             )}
+            </g>
           </svg>
 
           {freeze?.kind === "goal" && scoringClub && !replay && (

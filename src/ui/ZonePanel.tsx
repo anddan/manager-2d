@@ -274,21 +274,6 @@ function useSmoothed(target: number[]): number[] {
   return shown;
 }
 
-/** A phone held on its side: the board is laid down (the team attacks to the right) and the shirts are kept upright. */
-function useFlat(): boolean {
-  const query = "(orientation: landscape) and (max-height: 520px)";
-  const [flat, setFlat] = useState(() => (typeof window !== "undefined" && window.matchMedia ? window.matchMedia(query).matches : false));
-  useEffect(() => {
-    const q = window.matchMedia?.(query);
-    if (!q) return;
-    const on = () => setFlat(q.matches);
-    on();
-    q.addEventListener("change", on);
-    return () => q.removeEventListener("change", on);
-  }, []);
-  return flat;
-}
-
 export function ZonePanel({shares, home, away, mine, slots, players, kit, shout, managerLook, onSubOut, onProfile, forza, instructed, pass, leaving, over, still, hold}: {
   /** The first minutes of each half: the lines stand in their own places, and only then begin to move with the play. */
   hold?: boolean;
@@ -321,7 +306,6 @@ export function ZonePanel({shares, home, away, mine, slots, players, kit, shout,
 }) {
   const {t} = useT();
   const [picked, setPicked] = useState<string | null>(null);
-  const flat = useFlat();
   const board = useRef<HTMLDivElement>(null);
   const bar = usePlateBar(board, picked ? `[data-pid="${picked}"] .plate` : null, players);
   // The zones' colours ease towards their share (top: where the team attacks).
@@ -378,7 +362,7 @@ export function ZonePanel({shares, home, away, mine, slots, players, kit, shout,
   ) : null;
   return (
     <figure className="zone-panel">
-      <div className={flat ? "zone-frame flat" : "zone-frame"}>
+      <div className="zone-frame">
         <div ref={board} className="pitch-board zone-board" role="group" aria-label={t("zones.title")} onClick={(e) => e.target === e.currentTarget && setPicked(null)}>
           {/* The three zones as one soft wash: the colour of each at its middle, blending between them. */}
           <div className="zone-wash" style={{background: `linear-gradient(to bottom, ${washStop(bands[0].tone)} 0%, ${washStop(bands[0].tone)} 12%, ${washStop(bands[1].tone)} 50%, ${washStop(bands[2].tone)} 88%, ${washStop(bands[2].tone)} 100%)`}} />
@@ -456,9 +440,8 @@ export function ZonePanel({shares, home, away, mine, slots, players, kit, shout,
             <span className="zone-shout-bubble">{shout}</span>
           </div>
         )}
-        {!flat && actions}
+        {actions}
         </div>
-        {flat && actions}
       </div>
     </figure>
   );

@@ -1268,7 +1268,7 @@ export const it: Record<keyof typeof sv, string> = {
   "match.engineHint": "Vale per la tua partita, dalla prossima che avvii. Il nuovo motore gioca ogni giocatore e il pallone passo per passo (passaggi, contrasti, falli, fuorigioco, cross e colpi di testa). Se non funziona bene puoi tornare indietro.",
   "match.replayGoal": "Rivedi",
   "match.replayBadge": "REPLAY",
-  "match.replayEnd": "Torna alla partita",
+  "match.replayEnd": "Continua",
   "match.zoomIn": "Ingrandisci",
   "match.view3d": "Vista 3D",
   "match.view3dLoading": "Caricamento 3D … {pct}%",

@@ -1268,7 +1268,7 @@ export const fr: Record<keyof typeof sv, string> = {
   "match.engineHint": "Vaut pour ton propre match, dès le prochain que tu lances. Le nouveau moteur joue chaque joueur et le ballon pas à pas (passes, tacles, fautes, hors-jeu, centres et têtes). S'il ne fonctionne pas bien tu peux revenir.",
   "match.replayGoal": "Revoir",
   "match.replayBadge": "RALENTI",
-  "match.replayEnd": "Retour au match",
+  "match.replayEnd": "Continuer",
   "match.zoomIn": "Zoomer",
   "match.view3d": "Vue 3D",
   "match.view3dLoading": "Chargement de la 3D … {pct} %",

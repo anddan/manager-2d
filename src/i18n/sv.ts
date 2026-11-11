@@ -1283,7 +1283,7 @@ export const sv = {
   "match.engineHint": "Gäller din egen match, från nästa match du startar. Den nya motorn spelar upp varje spelare och bollen steg för steg (passningar, tacklingar, fouls, offside, inlägg och nick). Funkar den inte bra kan du byta tillbaka.",
   "match.replayGoal": "Repris",
   "match.replayBadge": "REPRIS",
-  "match.replayEnd": "Tillbaka till matchen",
+  "match.replayEnd": "Fortsätt",
   "match.zoomIn": "Zooma in",
   "match.view3d": "3D-vy",
   "match.view3dLoading": "Laddar 3D … {pct} %",

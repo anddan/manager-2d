@@ -3398,10 +3398,11 @@ body:has(.intro) .modal-backdrop { z-index: 200; }
 .card-head:has(.album-toggle) .hint-btn.in-head + .card-actions, .card-head:has(.album-toggle) .card-actions:has(+ .hint-btn) { margin-left: 0; }
 .card-head:has(.hint-btn.in-head) .card-actions:has(.album-toggle) { margin-left: 0; }
 
-/* A phone on its side: the zones board is laid down (the team attacks to the right) and fills the height; the board itself is turned and
-   everything on it turned back, so the shirts and the writing stand upright. */
-.zone-frame.flat { --zv: clamp(200px, calc(100dvh - 150px), 400px); width: calc(var(--zv) * 1.282); height: var(--zv); justify-self: center; margin-left: auto; margin-right: auto; }
-.zone-frame.flat .zone-board { position: absolute; left: 50%; top: 50%; width: var(--zv); height: calc(var(--zv) * 1.282); max-width: none; aspect-ratio: auto; margin: 0; transform: translate(-50%, -50%) rotate(90deg); }
-.zone-frame.flat .zone-slot, .zone-frame.flat .zone-slot:hover { transform: translate(-50%, 0) rotate(-90deg) scale(0.84); }
-.zone-frame.flat .zone-label { transform: translateY(-50%) rotate(-90deg); }
-.zone-frame.flat .zone-shout { transform: rotate(-90deg); }
+/* Overview on a phone held upright: the pitch is seen from the short side (up the screen), so it is tall and narrow and gets the height. */
+.pitch-wrap.turned { width: fit-content; max-width: 100%; margin-left: auto; margin-right: auto; }
+.pitch-wrap.turned .pitch { width: auto; max-width: 100%; height: min(calc(100dvh - 300px), 150vw); min-height: 320px; }
+
+/* The replay's buttons over the 3D picture (which is drawn after them), so "Continue" can always be pressed. */
+.pitch-wrap .replay-btn, .pitch-wrap .replay-skip, .pitch-wrap .replay-badge { z-index: 5; }
+/* Maximised: "Continue" sits above the play controls, not on them. */
+.pitch-wrap.maxed .replay-skip { bottom: calc(var(--edge-b, 14px) + 52px); }
