@@ -384,6 +384,8 @@ export type DisallowReason = (typeof DISALLOW_REASONS)[number];
 const THROW_IN_CHANCE = 0.55;
 /** How far up (0–100) a move that creates nothing may get before the defence cuts it out. */
 const DANGER_DEPTH = 74;
+/** How often a minute that ends with the ball lost, in the attacking half, ends with a ball in behind to someone offside. */
+const OFFSIDE_CHANCE = 0.9;
 /** A cross or through ball into the box that comes to nothing: how often the keeper claims it. */
 const KEEPER_CLAIM_CHANCE = 0.45;
 
@@ -412,7 +414,7 @@ class Replay {
   private carrier: {id: string; side: Side} | null = null;
   /** After a goal the other side kicks off; after a miss, a goal kick. */
   /** How play starts again next minute; `at` is where a throw-in is taken. */
-  private restart: {side: Side; kind: "kickoff" | "goalKick" | "throwIn" | "keeper"; at?: Point} | null = {side: "home", kind: "kickoff"};
+  private restart: {side: Side; kind: "kickoff" | "goalKick" | "throwIn" | "keeper" | "offside"; at?: Point} | null = {side: "home", kind: "kickoff"};
   /** The minute whose set-piece build-up is already drawn. */
   private ledUp = -1;
   /** The side fired up ("Forza!") this minute, if the side with the ball is: it goes straight at goal. */
@@ -523,6 +525,47 @@ class Replay {
     let to = mates[0].id;
     for (const o of mates) if (distance(this.spot(team, o.id, true), target) < distance(this.spot(team, to, true), target)) to = o.id;
     add("pass", to, this.jitter(target, 3), team.side);
+  }
+
+  /** An offside free kick: the nearest outfield player of the side given the ball takes it where the flag went up, and plays it short. */
+  private offsideKick(team: Team, at: Point, add: AddTouch): void {
+    const outfield = team.onPitch.filter((o) => team.slots[o.slot].pos !== "GK");
+    if (outfield.length === 0) return;
+    this.ball = at;
+    let taker = outfield[0].id;
+    for (const o of outfield) if (distance(this.spot(team, o.id, true), at) < distance(this.spot(team, taker, true), at)) taker = o.id;
+    add("offside", taker, at, team.side);
+    const next = this.receiver(team, taker);
+    if (next) add("pass", next, this.jitter(this.spot(team, next, true), 4), team.side);
+  }
+
+  /**
+   * The attack ends in a ball in behind to a forward who was past the last defender: the flag goes up, and the other side takes a free kick.
+   * Only drawn in a minute that was to end with the ball lost anyway (the match itself is as the minute decided).
+   */
+  private offsideCall(attacking: Team, defending: Team, carrier: string, add: AddTouch): boolean {
+    const side = attacking.side;
+    const here = progressFor(side, this.ball.x);
+    if (here < 38 || here > 86) return false;
+    if (!this.rng.chance(OFFSIDE_CHANCE)) return false;
+    // The last outfield defender's line, in the attacking side's view.
+    let line = 0;
+    for (const d of defending.onPitch) {
+      if (defending.slots[d.slot].pos === "GK") continue;
+      line = Math.max(line, progressFor(side, this.spot(defending, d.id, false).x));
+    }
+    const runners = attacking.onPitch.filter((o) => o.id !== carrier && ["ST", "W", "AM"].includes(attacking.slots[o.slot].pos));
+    if (runners.length === 0) return false;
+    const runner = this.rng.weighted(runners, (o) => this.state.players[o.id].attrs.pace + 20);
+    const depth = clamp(line + this.rng.range(1.5, 4), here + 8, 96);
+    const spot = this.spot(attacking, runner.id, true);
+    const across = clamp((side === "home" ? spot.y : 100 - spot.y) + this.rng.range(-8, 8), 10, 90);
+    const at = fromSide(side, depth, across);
+    if (distance(this.ball, at) < 14) return false;
+    add("pass", runner.id, at, side, "through");
+    this.carrier = null;
+    this.restart = {side: defending.side, kind: "offside", at};
+    return true;
   }
 
   /**
@@ -733,6 +776,8 @@ class Replay {
     const pos = team.slots[o.slot].pos;
     const attacking = progressFor(team.side, this.ball.x) > 50 && (pos === "W" || pos === "AM" || pos === "ST") ? 1.5 : 1;
     const fired = this.fired === team.side ? 2 : 1;
+    // Free, with space ahead: he runs at goal (most of the time) instead of looking for a pass.
+    if (this.isFree(team.side)) return this.rng.chance(0.85);
     return this.rng.chance(clamp((0.08 + (technique + pace - 110) / 300) * told * attacking * fired, 0.02, fired > 1 ? 0.8 : 0.65));
   }
 
@@ -777,6 +822,8 @@ class Replay {
         this.distribute(team, add);
       } else if (this.restart.kind === "goalKick") {
         this.goalKick(team, add);
+      } else if (this.restart.kind === "offside") {
+        this.offsideKick(team, this.restart.at ?? this.ball, add);
       } else {
         this.throwIn(team, this.restart.at ?? this.ball, add);
       }
@@ -851,6 +898,21 @@ class Replay {
       }
     }
     if (sp.kind === "corner") {
+      // A corner comes from something: a cross that a defender gets in the way of, or a shot that is blocked, and the ball goes out behind.
+      const mates = attacking.onPitch.filter((o) => o.id !== carrier && ["ST", "AM", "W", "CM"].includes(attacking.slots[o.slot].pos));
+      if (carrier && mates.length > 0 && this.rng.chance(0.6)) {
+        const to = this.rng.weighted(mates, (o) => (attacking.slots[o.slot].pos === "ST" ? 4 : 1.5));
+        const box = fromSide(side, this.rng.range(84, 92), this.rng.range(38, 62));
+        add("pass", to.id, box, side, "cross");
+        const blocker = this.nearest(defending, box, false);
+        if (blocker) add("tackle", blocker, this.jitter(box, 1.5), defending.side);
+      } else if (carrier) {
+        const across = clamp((spotWidth < 50 ? 1 : -1) * this.rng.range(8, 14) + (side === "home" ? this.ball.y : 100 - this.ball.y), 22, 78);
+        const shotFrom = fromSide(side, this.rng.range(83, 89), across);
+        add("dribble", carrier, shotFrom);
+        const blocker = this.nearest(defending, shotFrom, false);
+        if (blocker) add("tackle", blocker, this.jitter({x: shotFrom.x + (side === "home" ? 2.5 : -2.5), y: shotFrom.y}, 1), defending.side);
+      }
       add("out", undefined, fromSide(side, 99.6, spotWidth < 50 ? this.rng.range(8, 30) : this.rng.range(70, 92)));
     }
     this.flush(minute, touches, 0, LEAD_UP_SHARE);
@@ -961,7 +1023,7 @@ class Replay {
       if (this.dribbles(attacking, carrier)) {
         const progress = progressFor(side, this.ball.x);
         const nowWide = side === "home" ? this.ball.y : 100 - this.ball.y;
-        if (progress > 45 && this.rng.chance(fired ? 0.85 : 0.5)) {
+        if (progress > 45 && !this.isFree(side) && this.rng.chance(fired ? 0.85 : 0.5)) {
           driveOn = true;
           passes++;
           // The feint: a quick shift sideways past the defender before the burst.
@@ -972,10 +1034,14 @@ class Replay {
         }
         // Faster players get further with the ball; a winger out wide often cuts inside.
         const cutIn = this.posOf(attacking, carrier) === "W" && (nowWide < 25 || nowWide > 75) && this.rng.chance(0.4);
-        const depth = progressFor(side, this.ball.x) + this.rng.range(6, 10) + this.state.players[carrier].attrs.pace / 15 + (fired ? 5 : 0);
+        // Free (no opponent near): straight at goal, a long run through everyone, never away from the goal and never out to the side. The
+        // defenders have to follow (the viewer sends the nearest after him). When the minute ends with the ball lost, he runs into the box and shoots.
+        const runFree = this.isFree(side) && this.posOf(attacking, carrier) !== "GK";
+        const depth = progressFor(side, this.ball.x) + this.rng.range(6, 10) + this.state.players[carrier].attrs.pace / 15 + (fired ? 5 : 0) + (runFree ? this.rng.range(6, 12) : 0);
         const here = side === "home" ? this.ball.y : 100 - this.ball.y;
-        const width = cutIn ? here + (here < 50 ? 1 : -1) * this.rng.range(12, 20) : here + this.rng.range(-8, 8);
-        add("dribble", carrier, fromSide(side, clamp(depth, 5, mayEnter ? 88 : DANGER_DEPTH), clamp(width, 5, 95)));
+        const width = runFree ? here + (50 - here) * 0.45 : cutIn ? here + (here < 50 ? 1 : -1) * this.rng.range(12, 20) : here + this.rng.range(-8, 8);
+        const intoTheBox = mayEnter || (runFree && outcome.type === "none" && turnover);
+        add("dribble", carrier, fromSide(side, clamp(depth, 5, intoTheBox ? 88 : DANGER_DEPTH), clamp(width, 5, 95)));
         continue;
       }
       // Give and go: the player who just passed has run on and gets it back further up.
@@ -1023,10 +1089,16 @@ class Replay {
       }
     }
 
+    // In or round the box with the ball and facing goal (it is never played back there): he shoots, instead of working it about or having it
+    // cut out. A shot nothing comes of (the keeper saves it, or it goes wide); the match itself is as the minute decided.
+    if (outcome.type === "none" && turnover && this.inFrontOfGoal(side) && this.shootsFromBox(attacking, defending, carrier, add)) return flush();
+
     // Won off them: near goal the defence (or the keeper) cuts it out, so no
     // attacker is left free in front of goal; elsewhere an interception or a
     // tackle, and now and then the ball goes out for a throw-in.
     if (outcome.type === "none" && turnover && (this.inFrontOfGoal(side) || !this.rng.chance(THROW_IN_CHANCE))) {
+      // A ball in behind to a forward who was offside: the flag goes up, a free kick to the other side (instead of the defence cutting it out).
+      if (this.offsideCall(attacking, defending, carrier, add)) return flush();
       this.cutOut(attacking, defending, touches, add);
       return flush();
     }
@@ -1166,6 +1238,33 @@ class Replay {
       if (planned && lastTouch && ["goal", "nogoal", "save", "out"].includes(lastTouch.kind ?? "")) lastTouch.chance = planned.kind;
     }
     flush();
+  }
+
+  /**
+   * The one with the ball in front of goal takes the shot (most of the time; a finisher more often, and a side fired up nearly always). He
+   * steps on to it and hits it: the keeper gets to it, or it misses. Returns whether a shot was taken.
+   */
+  private shootsFromBox(attacking: Team, defending: Team, carrier: string, add: AddTouch): boolean {
+    const side = attacking.side;
+    if (this.posOf(attacking, carrier) === "GK") return false;
+    const finishing = this.state.players[carrier]?.attrs.finishing ?? 50;
+    const told = level(attacking, carrier, "shooting");
+    if (!this.rng.chance(clamp((0.55 + finishing / 250 - told * 0.15) * (this.fired === side ? 1.3 : 1), 0.2, 0.97))) return false;
+    const here = side === "home" ? this.ball.y : 100 - this.ball.y;
+    // A step on to it, towards the middle and goal, then the shot.
+    add("dribble", carrier, fromSide(side, clamp(progressFor(side, this.ball.x) + this.rng.range(1.5, 4), DANGER_DEPTH + 1, 90), clamp(here + (50 - here) * 0.3, 28, 72)));
+    const farLow = (side === "home" ? this.ball.y : 100 - this.ball.y) > 50;
+    const low = this.rng.chance(0.25) ? !farLow : farLow;
+    const keeper = this.keeper(defending);
+    if (keeper && this.rng.chance(0.6)) {
+      add("save", keeper, fromSide(side, 97, low ? this.rng.range(45.6, 48.2) : this.rng.range(51.8, 54.4)), defending.side);
+      this.restart = {side: defending.side, kind: "keeper"};
+    } else {
+      add("out", undefined, fromSide(side, 100, this.rng.chance(0.5) ? this.rng.range(30, 41) : this.rng.range(59, 70)));
+      this.carrier = null;
+      this.restart = {side: defending.side, kind: "goalKick"};
+    }
+    return true;
   }
 
   /**
@@ -1935,7 +2034,7 @@ export function createMatch(
     report.xg = [Math.round(xg.home * 100) / 100, Math.round(xg.away * 100) / 100];
     const st = sim.stats;
     report.stats = {passes: st.passes, passesOk: st.passesOk, tackles: st.tackles, interceptions: st.interceptions, fouls: st.fouls, offsides: st.offsides, corners: st.corners,
-      slides: st.slides, slidesWon: st.slidesWon, crosses: st.crosses, takeOns: st.takeOns, takeOnsWon: st.takeOnsWon, clearances: st.clearances, keeperThrows: st.keeperThrows, keeperKicks: st.keeperKicks, claims: st.claims, counters: st.counters};
+      slides: st.slides, slidesWon: st.slidesWon, crosses: st.crosses, takeOns: st.takeOns, takeOnsWon: st.takeOnsWon, clearances: st.clearances, keeperThrows: st.keeperThrows, keeperKicks: st.keeperKicks, claims: st.claims, counters: st.counters, freeShots: st.freeShots, freeGoals: st.freeGoals};
     return report;
   }
 

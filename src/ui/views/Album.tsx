@@ -2,10 +2,10 @@
 // it for diamonds, with a blue number in the menu until all are opened); what isn't had is greyed out, and says
 // what it is so it can be hunted down. A few at the end are very rare.
 import {useEffect, useRef, useState, type ReactNode} from "react";
-import {ALBUM_PACKS, RARES, TROPHIES, albumGear, albumGifts, albumProgress, claimable, claimItem, ownedKeys, rewardOf, updateAlbum} from "../../game/album";
+import {ALBUM_PACKS, RARES, TROPHIES, albumGear, albumGifts, albumProgress, albumTitles, claimable, claimItem, ownedKeys, rewardOf, updateAlbum} from "../../game/album";
 import {GEAR_COLOR, GEAR_KINDS, GEAR_PRICE, GEAR_TIERS, type GearKind, type GearTier} from "../../game/gear";
 import {GIFTS, GIFT_VARIANTS} from "../../game/morale";
-import {MANAGER_TITLES, MAX_LEVEL, TITLE_COUNT, managerStanding, offerRange, xpAtLevel} from "../../game/manager";
+import {MANAGER_TITLES, MAX_LEVEL, offerRange, xpAtLevel} from "../../game/manager";
 import {useT, type TKey} from "../../i18n";
 import {useGame, useGameState} from "../../store";
 import {Card, FoldButton, Hint, Modal} from "../common";
@@ -21,6 +21,8 @@ const PACK_BG: Record<string, string> = {bronze: "#b45309", silver: "#94a3b8", g
 const RARE_ICON: Record<string, "trophy" | "star" | "stadium" | "coins" | "user" | "sprout" | "boot" | "sparkle" | "fire"> = {dynasty: "fire", double: "trophy", dream: "stadium", rich: "coins", legend: "user", prodigy: "sprout", cars: "star", wardrobe: "boot", king: "sparkle"};
 
 const kindOf = (key: string) => key.split(":")[0];
+/** The money a title gives (when its present is money, not diamonds). */
+const titleMoney = (key: string): number => (key.startsWith("title:") ? MANAGER_TITLES[Number(key.split(":")[1]) - 1]?.reward?.money ?? 0 : 0);
 const idOf = (key: string) => key.split(":").slice(1).join(":");
 
 /** An item's picture. */
@@ -30,6 +32,7 @@ function Picture({itemKey, size = 1}: {itemKey: string; size?: number}) {
   const [a, b] = id.split(":");
   if (kind === "gift") return <GiftPicture id={a} variant={b} width={Math.round(58 * size)} />;
   if (kind === "gear") return <span className="album-ring" style={{borderColor: GEAR_COLOR[b as GearTier], width: 58 * size, height: 58 * size}}><GearPicture item={{kind: a as GearKind, tier: b as GearTier}} size={Math.round((a === "gloves" ? 40 : 46) * size)} /></span>;
+  if (kind === "title") return <span className={MANAGER_TITLES[Number(id) - 1].level >= 100 ? "album-medal title-medal wide" : "album-medal title-medal"} style={{transform: `scale(${size})`}}><b>{MANAGER_TITLES[Number(id) - 1].level}</b></span>;
   if (kind === "trophy") return <span className="album-medal" style={{color: MEDAL[id] ?? "#a78bfa"}}><Icon name={id.startsWith("award") ? "star" : "trophy"} size={Math.round(38 * size)} /></span>;
   if (kind === "pack") return <span className="album-pack" style={{background: PACK_BG[id], width: 44 * size, height: 56 * size}}><Icon name={id === "diamond" ? "diamond" : id === "kit" ? "boot" : "gift"} size={Math.round(30 * size)} /></span>;
   return <span className="album-medal rare" style={{color: "#f0abfc"}}><Icon name={RARE_ICON[id] ?? "star"} size={Math.round(40 * size)} /></span>;
@@ -83,7 +86,7 @@ function OpenDialog({itemKey, onClose, label}: {itemKey: string; onClose: () => 
               <div className="wheel-win-title">{iconize(t(rare ? "wheel.jackpot" : "wheel.win"))}</div>
               <div ref={prizeRef} className="album-reveal-pic"><Picture itemKey={itemKey} size={2.2} /></div>
               <div className="wheel-win-name">{label}</div>
-              <p className="album-gems">{iconize(t("album.got", {n: reward}))}</p>
+              <p className="album-gems">{iconize(titleMoney(itemKey) ? t("album.title.rewardMoney", {money: titleMoney(itemKey)}) : t("album.got", {n: reward}))}</p>
             </div>
           </div>
         )}
@@ -115,6 +118,7 @@ export function Album() {
     const kind = kindOf(key);
     const id = idOf(key);
     const [a, b] = id.split(":");
+    if (kind === "title") return t(`mgr.level.${id}` as TKey, {name: game.managerName});
     if (kind === "trophy") return t(`album.trophy.${id}` as TKey);
     if (kind === "gift") return b ? `${t(`gift.${a}` as TKey)} · ${t(`gift.v.${b}` as TKey)}` : t(`gift.${a}` as TKey);
     if (kind === "gear") return `${t(`gear.kind.${a}` as TKey)} · ${t(`gear.tier.${b}` as TKey)}`;
@@ -148,13 +152,12 @@ export function Album() {
     );
   };
 
-  const standing = managerStanding(game);
   /** One title: what it is, what it gives and what it needs. */
   const titleDetail = () => {
     if (titlePicked === null) return null;
     const n = titlePicked;
     const lv = MANAGER_TITLES[n - 1].level;
-    const have = n <= standing.title;
+    const have = owned.has(`title:${n}`);
     const authority = (lv - 1) / (MAX_LEVEL - 1);
     const reward = MANAGER_TITLES[n - 1].reward;
     const [from, to] = offerRange(lv);
@@ -162,9 +165,9 @@ export function Album() {
       <Modal compact title={<><Icon name="star" size={20} /> {t(`mgr.level.${n}` as TKey, {name: game.managerName})}</>} onClose={() => setTitlePicked(null)}>
         <div className={have ? "album-big have" : "album-big"}><span className="album-medal title-medal big"><b>{lv}</b></span></div>
         <p className="muted">{iconize(t("mgr.levelN", {n: lv}))} · {have ? t("album.title.have") : t("album.title.needs", {level: lv, xp: xpAtLevel(lv)})}</p>
-        <p className="album-gems small">{iconize(reward?.diamonds ? t("album.title.rewardDiamonds", {n: reward.diamonds}) : reward?.money ? t("album.title.rewardMoney", {money: reward.money}) : t("album.title.start"))}{have && reward ? " ✓" : ""}</p>
-        {n > 1 && <p className="small">{iconize(t("album.title.effect", {forza: Math.round(authority * 80), orders: Math.round(authority * 50)}))}</p>}
-        {n > 1 && <p className="small muted">{iconize(t("album.title.offers", {from: from + 1, to}))}</p>}
+        <p className="album-gems small">{iconize(reward?.diamonds ? t("album.title.rewardDiamonds", {n: reward.diamonds}) : t("album.title.rewardMoney", {money: reward?.money ?? 0}))}{have ? " ✓" : ""}</p>
+        <p className="small">{iconize(t("album.title.effect", {forza: Math.round(authority * 80), orders: Math.round(authority * 50)}))}</p>
+        <p className="small muted">{iconize(t("album.title.offers", {from: from + 1, to}))}</p>
         <div className="btn-row dialog-actions"><button className="btn primary" onClick={() => setTitlePicked(null)}>{t("common.close")}</button></div>
       </Modal>
     );
@@ -200,15 +203,18 @@ export function Album() {
         </div>
       </Card>
 
-      <Card title={<><Icon name="star" size={18} /> {iconize(t("album.section.titles"))} ({standing.title}/{TITLE_COUNT})</>} actions={toggle("titles")} className="span-2">
+      <Card title={<><Icon name="star" size={18} /> {iconize(t("album.section.titles"))} ({count(albumTitles())})</>} actions={toggle("titles")} className="span-2">
         {!shut.titles && (
           <div className="album-grid">
-            {MANAGER_TITLES.map((_, i) => i + 1).map((n) => (
-              <button key={n} type="button" className={`album-tile ${n <= standing.title ? "have" : "locked"}`} onClick={() => setTitlePicked(n)} aria-label={t(`mgr.level.${n}` as TKey, {name: game.managerName})}>
-                <span className="album-pic"><span className={MANAGER_TITLES[n - 1].level >= 100 ? "album-medal title-medal wide" : "album-medal title-medal"}><b>{MANAGER_TITLES[n - 1].level}</b></span></span>
-                <span className="album-name">{t(`mgr.level.${n}` as TKey, {name: game.managerName})}</span>
-              </button>
-            ))}
+            {albumTitles().map((key) => {
+              const n = Number(key.split(":")[1]);
+              const st = stateOf(key);
+              return (
+                <Tile key={key} state={st} label={nameOf(key)} onClick={() => (st === "new" ? setOpening(key) : setTitlePicked(n))}>
+                  <Picture itemKey={key} />
+                </Tile>
+              );
+            })}
           </div>
         )}
       </Card>

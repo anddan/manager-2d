@@ -45,5 +45,9 @@ describe("the tick engine's balance", () => {
     expect(avg.shots).toBeGreaterThan(18);
     expect(avg.passesOk / avg.passes).toBeGreaterThan(0.6);
     expect(avg.passesOk / avg.passes).toBeLessThan(0.93);
+    // A man clear on goal shoots, and scores about three times in ten (more or less by his finishing; few shots per batch, so wide limits).
+    expect(avg.freeShots).toBeGreaterThan(2);
+    expect(avg.freeGoals / avg.freeShots).toBeGreaterThan(0.1);
+    expect(avg.freeGoals / avg.freeShots).toBeLessThan(0.6);
   }, 300000);
 });

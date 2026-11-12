@@ -1,6 +1,5 @@
 // How a match is watched, remembered on this device: the pitch in 2D, the zones the ball has been in (the
 // start), or the match in 3D. Whether the manager takes the set pieces is a choice of its own, in every view.
-import {ENGINE} from "../game/match";
 
 export const MATCH_VIEWS = ["pitch", "zones", "3d"] as const;
 export type MatchView = (typeof MATCH_VIEWS)[number];
@@ -62,25 +61,4 @@ export function readZoneMove(): boolean {
   }
 }
 
-const ENGINE_KEY = "manager2d.engine";
-
-/** Which engine plays the manager's own match: the old one (a minute at a time) or the new one (every player and the ball in small steps). */
-export function readEngine(): "minute" | "tick" {
-  try {
-    return localStorage.getItem(ENGINE_KEY) === "tick" ? "tick" : "minute";
-  } catch {
-    return "minute";
-  }
-}
-
-export function writeEngine(mode: "minute" | "tick"): void {
-  ENGINE.mode = mode;
-  try {
-    localStorage.setItem(ENGINE_KEY, mode);
-  } catch {
-    // Only for now.
-  }
-}
-
-// What was chosen last time holds from the start (a match started now keeps it).
-ENGINE.mode = readEngine();
+// The match is always played by the old engine (a minute at a time): there is no setting for it any more (ENGINE.mode stays "minute").

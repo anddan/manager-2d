@@ -258,6 +258,12 @@ export function useUnity3d(enabled: boolean, home: Club, away: Club, stands?: {n
   // How loading goes (0..1), and why it failed if it did.
   const [progress, setProgress] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // The 3D view stopped (the page inside the frame says so, or its heartbeat is missing): why, and how many times it has been started again.
+  const [crash, setCrash] = useState<string | null>(null);
+  const [epoch, setEpoch] = useState(0);
+  const restarts = useRef(0);
+  /** When Unity last said it was alive (a build that does not send beats is never judged by them). */
+  const beatAt = useRef(0);
 
   useEffect(() => {
     if (!enabled) return;
@@ -286,6 +292,16 @@ export function useUnity3d(enabled: boolean, home: Club, away: Club, stands?: {n
         setLoadError(String(e.data.message ?? "?"));
         return;
       }
+      if (e.data?.src === "forza-unity" && e.data.type === "beat") {
+        beatAt.current = performance.now();
+        return;
+      }
+      if (e.data?.src === "forza-unity" && e.data.type === "crash") {
+        // Stopped for good: the picture is frozen. Not "ready" any more, so that the match waits for the new start.
+        setReady(false);
+        setCrash(String(e.data.message ?? "?"));
+        return;
+      }
       if (e.data?.src === "forza-unity" && e.data.type === "goalRect") {
         setGoalRect(e.data as GoalRect);
         return;
@@ -303,6 +319,42 @@ export function useUnity3d(enabled: boolean, home: Club, away: Club, stands?: {n
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
   }, [enabled, home.color, home.color2, away.color, away.color2]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The heartbeat (once the build sends one): missing for a few seconds while the page is in front means Unity is no longer running.
+  useEffect(() => {
+    if (!enabled || !ready) return;
+    const seen = () => { beatAt.current = performance.now(); };
+    document.addEventListener("visibilitychange", seen);
+    const id = setInterval(() => {
+      if (document.hidden || beatAt.current === 0) return;
+      if (performance.now() - beatAt.current > 6000) {
+        setReady(false);
+        setCrash("no heartbeat");
+      }
+    }, 1000);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", seen);
+    };
+  }, [enabled, ready]);
+
+  // After a stop: Unity is loaded again in a new frame (up to three times; then the error stays and the match goes on without the picture).
+  useEffect(() => {
+    if (!crash) return;
+    if (restarts.current >= 3) {
+      setLoadError(crash);
+      return;
+    }
+    const id = setTimeout(() => {
+      restarts.current++;
+      known.current = new Set();
+      beatAt.current = 0;
+      setProgress(0);
+      setCrash(null);
+      setEpoch((n) => n + 1);
+    }, 1200);
+    return () => clearTimeout(id);
+  }, [crash]);
 
   /** Sends the newest state; players Unity has not seen yet are described first. */
   const lastSent = useRef(0);
@@ -337,5 +389,5 @@ export function useUnity3d(enabled: boolean, home: Club, away: Club, stands?: {n
     frame.current?.contentWindow?.postMessage({src: "forza", ...message}, "*");
   };
 
-  return {frame: frame as RefObject<HTMLIFrameElement>, ready, available, send, post, goalRect, cornerZones, progress, loadError};
+  return {frame: frame as RefObject<HTMLIFrameElement>, ready, available, send, post, goalRect, cornerZones, progress, loadError, crash, epoch};
 }

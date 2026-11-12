@@ -43,7 +43,7 @@ describe("match replay", () => {
         // After a foul the fouled side takes the set piece.
         if (prev.foul && cur.kind === "setpiece") continue;
         if (prev.playerId && cur.playerId && prev.possession !== cur.possession) {
-          expect(["tackle", "save", "kickoff", "pass"]).toContain(cur.kind);
+          expect(["tackle", "save", "kickoff", "pass", "offside"]).toContain(cur.kind);
         }
       }
     }

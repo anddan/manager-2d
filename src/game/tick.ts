@@ -110,7 +110,7 @@ export class TickMatch {
   readonly stats = {
     passes: [0, 0], passesOk: [0, 0], tackles: [0, 0], interceptions: [0, 0], fouls: [0, 0], offsides: [0, 0], corners: [0, 0], possession: [0, 0], goals: [0, 0], shots: [0, 0], onTarget: [0, 0], xg: [0, 0],
     // What makes it fun to watch: slides (and how many came off), crosses, take-ons (and how many came off), clearances, the keeper's throws and kicks.
-    slides: [0, 0], slidesWon: [0, 0], crosses: [0, 0], takeOns: [0, 0], takeOnsWon: [0, 0], clearances: [0, 0], keeperThrows: [0, 0], keeperKicks: [0, 0], claims: [0, 0], counters: [0, 0],
+    slides: [0, 0], slidesWon: [0, 0], crosses: [0, 0], takeOns: [0, 0], takeOnsWon: [0, 0], clearances: [0, 0], keeperThrows: [0, 0], keeperKicks: [0, 0], claims: [0, 0], counters: [0, 0], freeShots: [0, 0], freeGoals: [0, 0],
   } as Record<string, [number, number]>;
   /** True while the caller is dealing with a set piece (the engine waits). */
   waiting = false;
@@ -132,7 +132,7 @@ export class TickMatch {
   private hold = 0;
   private pending: {kind: "kickoff" | "throwin" | "goalkick" | "freekick"; team: 0 | 1; x: number; y: number} | null = null;
   private shotAt = -1;
-  private shot: {team: 0 | 1; shooter: number; result: "goal" | "saved" | "missed" | "blocked"; xg: number; kind: ChanceKind; keeper: number; blocker: number; ty: number; assist?: string} | null = null;
+  private shot: {oneOnOne?: boolean; team: 0 | 1; shooter: number; result: "goal" | "saved" | "missed" | "blocked"; xg: number; kind: ChanceKind; keeper: number; blocker: number; ty: number; assist?: string} | null = null;
   private lastFrameT = -10;
   private lastFrame = {x: L / 2, y: W / 2, idx: -1};
   private lastPassFlight: Frame["flight"] | undefined;
@@ -590,8 +590,10 @@ export class TickMatch {
       // A keeper reaches further (with his hands) for a ball in his own box.
       const ownGoal = m.team === 0 ? 0 : L;
       const keeperBall = m.sk.pos === "GK" && Math.abs(b.x - ownGoal) < BOX_DEPTH && Math.abs(b.y - W / 2) < BOX_HALF;
+      // How high a ball can be played: with the feet (below 0.6 m), the chest and thigh (to 1.6 m), the head (to 2.5 m; a keeper reaches 3.2 m with his
+      // hands). A higher ball goes over everyone, and is played when it has come down (or bounced).
       const reach = keeperBall ? 2.4 : b.z > 0.4 ? 1.9 : 1.15;
-      if (d > reach || b.z > (keeperBall ? 3.2 : 2.7)) continue;
+      if (d > reach || b.z > (keeperBall ? 3.2 : 2.5)) continue;
       const mine = passing && m.team === this.M[this.passTarget]?.team;
       if (passing && mine && i !== this.passTarget) continue;
       if (i === this.passer && this.flightLeft > 0.2) continue;
@@ -606,7 +608,7 @@ export class TickMatch {
     if (best === this.passTarget) {
       // A pass reaches its man: it can be hard to control (hard, from far, with a man on him).
       const pressure = this.pressureOn(best);
-      const ok = this.rng.next() < clamp(0.7 + m.sk.technique * 0.0042 - speed * 0.006 - pressure * 0.1 - (b.z > 0.6 ? 0.08 : 0), 0.3, 0.98);
+      const ok = this.rng.next() < clamp(0.7 + m.sk.technique * 0.0042 - speed * 0.006 - pressure * 0.1 - (b.z > 1.6 ? 0.14 : b.z > 0.6 ? 0.07 : 0), 0.3, 0.98);
       this.stats.passesOk[m.team] += ok ? 1 : 0;
       const from = this.passer >= 0 ? this.M[this.passer] : null;
       if (from) {
@@ -627,7 +629,7 @@ export class TickMatch {
       // A pass worth showing (a keeper's throw, a ball in behind, a long one) is a touch for the match view when it arrives.
       const meta = this.flightMeta;
       if (meta?.show && this.t - this.lastFrameT >= 0.8) {
-        this.frame("pass", m, m.x / 1.05, m.y / 0.68, this.sideOf(m.team), {...(meta.flight ? {flight: meta.flight} : {}), ...(meta.throw ? {throw: true} : {})});
+        this.frame("pass", m, m.x / 1.05, m.y / 0.68, this.sideOf(m.team), {...(meta.flight ? {flight: meta.flight} : {}), ...(meta.throw ? {throw: true} : {}), ...this.airOf()});
         this.lastPassFlight = undefined;
       }
       this.gain(best, true);
@@ -658,8 +660,20 @@ export class TickMatch {
         const from = this.passer >= 0 ? this.M[this.passer] : null;
         if (from) from.perf.passBad++;
       }
+      // A ball booted away (a clearance, a keeper's kick that nobody was aimed at) comes down to whoever gets to it: a touch for the match view,
+      // with the ball in the air, so that it is drawn as a high ball and not along the ground.
+      const kicked = this.flightMeta;
+      if (kicked?.show && this.passTarget < 0 && this.t - this.lastFrameT >= 3) {
+        this.frame(m0.team === this.lastTouchTeam ? "pass" : "tackle", m0, m0.x / 1.05, m0.y / 0.68, this.sideOf(m0.team), {flight: "long", ...this.airOf()});
+        this.lastPassFlight = undefined;
+      }
       this.gain(best, this.passTarget >= 0);
     }
+  }
+
+  /** The height of the ball for a frame (only when it is above the feet). */
+  private airOf(): Partial<Frame> {
+    return this.b.z >= 0.6 ? {air: Math.round(this.b.z * 10) / 10} : {};
   }
 
   /** `best` has the ball. */
@@ -852,6 +866,7 @@ export class TickMatch {
   }
 
   private foul(fouler: number, victim: number, slide?: boolean, reckless = false): void {
+    this.flightMeta = null;
     const f = this.M[fouler];
     const v = this.M[victim];
     f.perf.fouls++;
@@ -898,6 +913,8 @@ export class TickMatch {
     this.think -= this.dt;
     // Carrying on towards the goal (or wherever he is going), and now and then a frame for the match view.
     this.noteProgress(false);
+    // A man who finds himself clear on goal does not wait to look up: he decides at once.
+    if (this.think > 0.25 && this.freeOnGoal(c)) this.think = 0.25;
     if (this.think > 0) return;
     const pressure = this.pressureOn(this.carrier);
     const nearGoal = dist(c.x, c.y, c.team === 0 ? L : 0, W / 2) < 20 ? 0.6 : 1;
@@ -931,6 +948,11 @@ export class TickMatch {
     const inBox = Math.abs(c.x - goalX) < BOX_DEPTH + 2 && Math.abs(c.y - W / 2) < BOX_HALF + 2;
     if (c.sk.pos === "GK") {
       this.keeperPlay(c, pressure);
+      return;
+    }
+    // Clear on goal (nobody between him and the keeper, nobody on his heels): he shoots at once, he does not pass or turn back.
+    if (dGoal < 34 && this.freeOnGoal(c)) {
+      this.takeShot(idx, pressure, "through", true);
       return;
     }
     // The ball has just been won: the other side is out of shape, so go at them. In his own end with men on him a defender thinks of safety.
@@ -1034,6 +1056,31 @@ export class TickMatch {
     c.perf.dribbleWon += 0;
   }
 
+  /**
+   * Clear on goal: within 34 m, nobody (but the keeper) between him and the goal, nobody close on his heels. The chance is then 30 %,
+   * more or less by his finishing against the keeper and how close he is (see takeShot).
+   */
+  private freeOnGoal(c: Mover): boolean {
+    if (c.sk.pos === "GK") return false;
+    const goalX = c.team === 0 ? L : 0;
+    const dir = c.team === 0 ? 1 : -1;
+    const dx = goalX - c.x;
+    const dy = W / 2 - c.y;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    if (d > 30 || d < 5 || dx * dir <= 0) return false;
+    for (const o of this.M) {
+      if (o.team === c.team || o.sk.pos === "GK") continue;
+      const ex = o.x - c.x;
+      const ey = o.y - c.y;
+      if (ex * ex + ey * ey < 2.5 * 2.5) return false;
+      // On the way to goal: how far along it he stands, and how far to the side.
+      const u = (ex * dx + ey * dy) / (d * d);
+      const q = Math.abs(ex * dy - ey * dx) / d;
+      if (u > -0.05 && u < 1 && q < 4.5) return false;
+    }
+    return true;
+  }
+
   /** The nearest opponent right in front of the man with the ball (within 5.5 m, almost on his line): who he may take on. -1 if none. */
   private nearestAhead(c: Mover, dir: number): number {
     let best = -1;
@@ -1128,7 +1175,7 @@ export class TickMatch {
     this.lastPassFlight = "long";
     this.strike(c, tx, ty, 22 + this.rng.next() * 6, 1, "long", 0.18);
     this.passTarget = -1;
-    this.flightMeta = null;
+    this.flightMeta = {show: true, flight: "long"};
   }
 
   /**
@@ -1235,7 +1282,7 @@ export class TickMatch {
     this.strike(c, tx, ty, speed, thrown ? (d0 > 18 ? 0.55 : 0.12) : kind === "long" ? 1 : kind === "through" ? 0.1 : 0, kind, noise);
     this.passTarget = j;
     // A pass worth showing (a throw, a ball in behind, a long ball from the keeper or from far) is a touch for the match view at both ends.
-    const notable = thrown || kind === "through" || (kind === "long" && (c.sk.pos === "GK" || d0 > 32));
+    const notable = thrown || kind === "through" || (kind === "long" && c.sk.pos === "GK");
     this.flightMeta = {show: notable, flight: kind === "through" ? "through" : kind === "long" ? "long" : undefined, throw: thrown || undefined};
     if (notable && this.lastFrame.idx !== i && this.t - this.lastFrameT >= 1.2) this.frame("pass", c, c.x / 1.05, c.y / 0.68, this.sideOf(c.team));
     void risk;
@@ -1333,7 +1380,7 @@ export class TickMatch {
       this.b.vx = away * (9 + this.rng.next() * 6);
       this.b.vy = (this.rng.next() - 0.5) * 12;
       this.b.vz = 4 + this.rng.next() * 3;
-      this.frame("tackle", win.m, win.m.x / 1.05, win.m.y / 0.68, this.sideOf(win.m.team), {clear: true});
+      this.frame("tackle", win.m, win.m.x / 1.05, win.m.y / 0.68, this.sideOf(win.m.team), {clear: true, air: 2.2});
       void goalX;
     }
   }
@@ -1362,7 +1409,7 @@ export class TickMatch {
     return chanceXg(this.shotKind(i, force), depth, width) * (1 - 0.22 * Math.min(1, pressure));
   }
 
-  private takeShot(i: number, pressure: number, force?: ChanceKind): void {
+  private takeShot(i: number, pressure: number, force?: ChanceKind, oneOnOne = false): void {
     const c = this.M[i];
     const team = c.team;
     const dir = team === 0 ? 1 : -1;
@@ -1391,10 +1438,20 @@ export class TickMatch {
     }
     c.perf.shots++;
     this.stats.shots[team]++;
-    const pGoal = clamp(xgBase * duel * 0.8 * (1 + urgency * 0.06), 0.01, 0.92);
+    let pGoal = clamp(xgBase * duel * 0.58 * (1 + urgency * 0.06), 0.01, 0.92);
+    if (oneOnOne) {
+      // Clear on goal: a 30 % chance, more or less by his finishing against the keeper, how close he is and how tired the legs are.
+      const dGoal = dist(c.x, c.y, goalX, W / 2);
+      const skill = clamp(1 + (finishing - (keeper?.sk.keeping ?? 30)) / 100, 0.7, 1.5);
+      pGoal = Math.max(pGoal, clamp(0.28 * skill * (dGoal < 12 ? 1.1 : dGoal > 24 ? 0.85 : 1), 0.12, 0.8));
+    }
     this.stats.xg[team] += pGoal;
     let pOT = clamp(0.2 + xgBase * 1.0 + (finishing - 50) / 300, 0.12, 0.85);
     pOT = Math.max(pOT, Math.min(0.97, pGoal / 0.85));
+    if (oneOnOne) {
+      pOT = Math.max(pOT, 0.78);
+      this.stats.freeShots[team]++;
+    }
     let result: "goal" | "saved" | "missed" | "blocked";
     if (blocker >= 0) result = "blocked";
     else if (this.rng.next() < pOT) {
@@ -1407,14 +1464,14 @@ export class TickMatch {
     const d0 = dist(c.x, c.y, goalX, ty);
     const flight = d0 / (speed * 0.95);
     // A frame for the one who shoots (if he has not had one), then the shot.
-    if (this.lastFrame.idx !== i) this.frame(this.lastAssistT > this.t - 4 ? "pass" : "dribble", c, c.x / 1.05, c.y / 0.68, this.sideOf(team), force === "header" ? {flight: "cross"} : undefined);
+    if (this.lastFrame.idx !== i) this.frame(this.lastAssistT > this.t - 4 ? "pass" : "dribble", c, c.x / 1.05, c.y / 0.68, this.sideOf(team), force === "header" ? {flight: "cross", air: 2.2} : undefined);
     this.lastPassFlight = undefined;
     this.strike(c, goalX, ty, speed, 0.3, "ground", 0.0);
     this.passTarget = -1;
     this.flightLeft = flight;
     this.shotAt = this.t + flight;
     const assist = this.t - this.lastAssistT < 5 && this.lastAssist && this.lastAssist !== c.id ? this.lastAssist : undefined;
-    this.shot = {team, shooter: i, result, xg: pGoal, kind, keeper: keeperIdx, blocker, ty, assist};
+    this.shot = {oneOnOne, team, shooter: i, result, xg: pGoal, kind, keeper: keeperIdx, blocker, ty, assist};
     void dir;
   }
 
@@ -1428,6 +1485,7 @@ export class TickMatch {
     this.events.push({t: "shot", team, shooter: shooter.id, result: s.result, xg: s.xg, kind: s.kind, keeper: this.M[s.keeper]?.id, blocker: this.M[s.blocker]?.id});
     if (s.result === "goal") {
       this.stats.goals[team]++;
+      if (s.oneOnOne) this.stats.freeGoals[team]++;
       this.frame("goal", undefined, xPct, s.ty / 0.68, this.sideOf(team), {chance: s.kind}, 0.8);
       this.events.push({t: "goal", team, scorer: shooter.id, assist: s.assist, xg: s.xg, kind: s.kind});
       this.b.x = goalX + (team === 0 ? 1.5 : -1.5);
@@ -1529,6 +1587,7 @@ export class TickMatch {
     const b = this.b;
     if (b.x >= 0 && b.x <= L && b.y >= 0 && b.y <= W) return false;
     if (this.shot) return false;
+    this.flightMeta = null;
     const by = this.lastTouchTeam;
     if (b.y < 0 || b.y > W) {
       // A throw-in for the other side.
@@ -1562,6 +1621,7 @@ export class TickMatch {
   private afterHold(): void {
     const p = this.pending;
     this.pending = null;
+    this.flightMeta = null;
     if (!p) return;
     if (p.kind === "kickoff") {
       this.kickoff(p.team);

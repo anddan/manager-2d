@@ -19,6 +19,9 @@ describe("a tick-engine match in the viewer", () => {
       let scene = snap(ctx, 0, dyn);
       let jumps = 0;
       let lagMax = 0;
+      let stillFor = 0;
+      let looseSteps = 0;
+      let looseFar = 0;
       let lagSum = 0;
       let lagN = 0;
       const end = report.frames[report.frames.length - 1].minute;
@@ -30,6 +33,23 @@ describe("a tick-engine match in the viewer", () => {
         }
         const before = scene.ball;
         scene = advance(scene, t, ctx, dyn);
+        // A loose ball (lying still, nobody on it, not a restart): how long, and how far the nearest player is while it lies.
+        const held = report.frames[scene.reached];
+        const dead = ["kickoff", "goalkick", "throwin", "setpiece", "goal", "nogoal", "out"].includes(held?.kind ?? "");
+        const carrier = held?.playerId ? scene.bodies[held.playerId] : undefined;
+        const still = Math.hypot(scene.ball.x - before.x, scene.ball.y - before.y) < 0.02;
+        if (!scene.flying && !dead && still && (!carrier || Math.hypot(carrier.x - scene.ball.x, carrier.y - scene.ball.y) > 3)) {
+          stillFor += 0.03;
+          if (stillFor >= 0.1) {
+            let nearest = Infinity;
+            for (const [id, b] of Object.entries(scene.bodies)) {
+              if (ctx.players[id]?.position === "GK") continue;
+              nearest = Math.min(nearest, Math.hypot(b.x - scene.ball.x, b.y - scene.ball.y));
+            }
+            looseSteps++;
+            if (nearest > 5) looseFar++;
+          }
+        } else stillFor = 0;
         if (Math.hypot(scene.ball.x - before.x, scene.ball.y - before.y) > 20) jumps++;
         for (const b of Object.values(scene.bodies)) {
           expect(Number.isFinite(b.x) && Number.isFinite(b.y)).toBe(true);
@@ -45,6 +65,9 @@ describe("a tick-engine match in the viewer", () => {
       }
       console.log(`seed ${seed}: ${report.frames.length} touches, lag max ${lagMax.toFixed(2)} min, mean ${(lagSum / Math.max(1, lagN)).toFixed(3)} min, jumps ${jumps}`);
       expect(jumps).toBe(0);
+      // A ball that lies loose is fought for: the nearest players dash for it (before: nobody within five units in about 4 of 10 steps it lay still).
+      console.log(`seed ${seed}: loose still ${looseSteps} steps, nobody near in ${looseFar}`);
+      expect(looseFar).toBeLessThanOrEqual(Math.ceil(looseSteps * 0.3));
       // The viewer reaches the last touch (it is not left behind for ever).
       expect(scene.reached).toBeGreaterThanOrEqual(report.frames.length - 3);
       // And never falls more than a few match minutes behind (the clock slows meanwhile).

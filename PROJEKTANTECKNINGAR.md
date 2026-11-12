@@ -65,7 +65,7 @@ Den här filen är till för Claude (och dig) så att inget behöver upprepas. L
 - **Kalibrering** (`src/game/engineStats.test.ts`, 240 matcher i två ligor): mål/match 2,5–3,0; skott (öppet spel) 20–21; skott på mål 8; hemmaseger 40–50 %; oavgjort ~25 %; gula 3,5; röda ~0,15; straffar 0,3; hörnor ~6,4 (verkligt ~10, medvetet lägre); 5+ mål 9–16 %.
 - Konstanter: `CHANCE_BASE 0.18`, `CHANCE_POWER 1.2`, `HOME_ADVANTAGE 1.06`, `PENALTY_RATE 0.0038`, `FREEKICK_RATE 0.015`, `CORNER_RATE 0.082`.
 - **Chans-test:** `src/game/chanceReplay.test.ts`.
-- **Det finns två motorer:** den gamla minutmotorn (standard) och den nya tick-motorn (se avsnitt 13). Valet görs i Inställningar > Matchmotor.
+- **Det finns två motorer:** den gamla minutmotorn (standard) och den nya tick-motorn (se avsnitt 13). Inställningen Matchmotor är borttagen: det är alltid den gamla minutmotorn som spelar (tick-motorn finns kvar i koden men kan inte väljas).
 
 ## 6. Bollen och spelarna i visningen (src/ui/MatchViewer.tsx, `advance`)
 
@@ -106,14 +106,13 @@ Den här filen är till för Claude (och dig) så att inget behöver upprepas. L
 - [ ] Album: (x/y), fällknapparna. Träning: rubriken. Roller i laget: knappen på samma ställe. Ekonomi: (i) på rubrikraden (visas när ekonomin är i rött).
 - [ ] Landslagsknappen visar flaggan.
 
-**Ny matchmotor (tick) – testa i Inställningar > Matchmotor > "Ny (test)"** (se avsnitt 13)
+**Ny matchmotor (tick) – avstängd: Inställningar > Matchmotor är borttagen, gamla motorn spelar alltid** (se avsnitt 13)
 - [ ] Spela en hel match i 2D/Överblick med nya motorn: flyter bilden, ser passningar, dueller, offside och rörelser rimliga ut (inga spelare som står stilla, bollen som fastnar eller hoppar)?
 - [ ] Hörnor, frisparkar och straffar: kommer de upp vid rätt plats, kan du ta dem själv, och blir resultatet (mål/räddning/miss) det du ser?
 - [ ] Kort/utvisning, byten och skada fungerar som förut; halvtid stannar.
 - [ ] **Resultatet du ser = resultatet som räknas** (tabellen efter veckan). Testat automatiskt, men titta även själv.
 - [ ] Hur känns det: spelmässigt realistiskt (laget håller formation, press, passningsspel, avslut i rimliga lägen)? Statistiken får vara högre än i verkligheten.
 - [ ] Prestanda på mobil: hur lång tid tar det att spela/hoppa till slutet av en match, och veckans övriga matcher?
-- [ ] Vill du tillbaka: välj "Standard" i Inställningar > Matchmotor, så används gamla motorn igen.
 - [ ] Mobil stående, hörna i 3D: spelarna syns (kameran vinklad). Max zoom i 3D: kameran följer bollhållaren. Maxläge stänger sig själv någon sekund efter slutsignal. Hastighet 1×–3× i Inställningar.
 
 **Nyast (2026-11-10, kräver nytt WebGL-bygge för Unity-delen)**
@@ -132,10 +131,21 @@ Den här filen är till för Claude (och dig) så att inget behöver upprepas. L
 - [ ] **Mål i 3D:** bollen ligger kvar i nätet under hela jublet (ingen studs ut), nätet **rasslar** när bollen slår i. Målskytten jublar på olika sätt (samma mål ger samma jubel): **hela laget runt honom** (ibland hopp eller volt), **springer till hörnflaggan och glider på knä**, **springer mot supportrarna med utsträckta armar (flygplan)** eller **glider på knä** en bit in på planen. Hörnflaggs- och knäglidsjublet tar lite längre tid än förut (ca 4 s). Även i 2D rör sig spelarna så (utan knäglidet).
 - [ ] **Kommentarerna** i matchen har alltid lagets färger på vänster sida (förut hemma vänster, borta höger).
 - [ ] **Kitperks:** en extra (perk) på kit kan nu vara upp till **dubbelt så stor som vad delen själv ger** (special +5 → perk upp till +10; guld 6, silver 4, vanlig 2; handskar dubbelt). Perken är **gul**, och **röd** när den är på sitt max. Gamla perks som redan är större än max visas röda.
-- [ ] **Ny matchmotor (tick), spelförståelse och fler händelser** (se avsnitt 13). Spela med "Ny (test)" och titta på: glidtacklingar (även missar och fouls), inlägg (anfallare springer in i rutan: straffpunkt, bortre/främre stolpen och kanten för en nickpassning bakåt), ytterbackar som går förbi vingen, dribblingar (snurra förbi en spelare), rensningar, målvaktens utspel (**kast** med handen, långa sparkar, snabb kontring) och spelare som läser passningar och bryter dem.
+- [ ] **Ny matchmotor (tick), spelförståelse och fler händelser** (se avsnitt 13). (Kan inte väljas just nu, se avsnitt 13.) Titta på: glidtacklingar (även missar och fouls), inlägg (anfallare springer in i rutan: straffpunkt, bortre/främre stolpen och kanten för en nickpassning bakåt), ytterbackar som går förbi vingen, dribblingar (snurra förbi en spelare), rensningar, målvaktens utspel (**kast** med handen, långa sparkar, snabb kontring) och spelare som läser passningar och bryter dem.
 - [ ] Målvaktens kast i 3D: nickklippet "GoalieThrow" spelas med bollen i händerna över huvudet. (Klippet finns i Unity men är inte kontrollerat visuellt.)
 
 - [ ] **Managerns nivå:** ringen runt managerns bild i toppen och i Managern-rutan (nivåsiffra på brickan), titeln under klubbnamnet, Album > Managerns titlar (tryck på en titel för present och effekt). Spela en match/köp en spelare och se XP öka; när en ny titel nås kommer ett meddelande och presenten. Gamla sparfiler börjar på nivå 1.
+
+- [ ] **Mål i 3D (ny omgång, kräver WebGL-bygge):** bollen **fastnar alltid i nätet** (glider in, ligger kvar minst 2,6 s och så länge jublet pågår, aldrig ut igen); jublet och pausen efter mål är längre (ca 4,6 s, hörnflaggsjublet längre).
+- [ ] **Fri mot mål (tick-motorn):** en spelare som är fri (ingen mellan honom och målvakten, ingen på hälarna, inom 30 m) skjuter direkt i stället för att passa eller vända; målchansen är ca **30 %**, mer eller mindre efter hans avslutning mot målvaktens och avståndet (mätt: ca 31 %, 3,5 sådana skott per match). Totalt ca 3,75 mål och 39 skott per match.
+- [ ] **Repris:** går i **slow motion** (0,18 i stället för 0,4, ca 4–5 s) med mjuk rörelse mellan inspelade bilder, och 3D-kameran följer bollen tätare (snabbare efter, tittar rakt på bollen, mer zoom).
+- [ ] **Nivå upp:** spela tills du går upp i nivå och se effekten (strålar, medalj, present, fanfar); första titeln heter "Ingen titel", Nybörjare kommer på nivå 10.
+
+- [ ] **Bollhöjd (tick-motorn + visningen):** en boll kan spelas med foten under 0,6 m, på bröst/lår till 1,6 m och med huvudet till 2,5 m (målvakten når 3,2 m); högre går den över alla och spelas när den kommit ned eller studsat. Högre bollar är svårare att ta emot. Bildrutorna har nytt fält `air` (bollens höjd, m). **Spelaren hoppar/nickar bara om bollen är på nickhöjd** (≥ 1,6 m; inlägg, eller en boll som tas på väg ned), inte för en lång boll som landar vid fötterna. Rensningar och målvaktssparkar ritas nu som höga bollar (en bildruta när de tas emot). Kolla i 2D/3D att ingen hoppar för en boll på marken och att inlägg fortfarande ger nick.
+
+- [ ] **Fri boll (visningen):** när bollen ligger fri (ingen på den, inte en avspark, inkast, hörna eller i nätet) **kämpar de två närmaste spelarna i varje lag hela tiden** om den: de springer rakt på bollen, 2,2 gånger så snabbt som vanligt springtempo (`LOOSE_RUSH`), i stället för att stanna fyra steg ifrån (förut gjorde bara motståndaren det, och bara en man). Mätt i `tickReplay.test.ts`: tiden bollen ligger still med ingen inom 5 enheter minskade från ca 40 % till ca 20 %. Orsaken till resten: spelarna i visningen styr sig själva och bollen ligger kvar på platsen från motorns bildruta tills mottagaren hunnit dit. Titta i 2D/3D om det känns lagom, annars kan tempot höjas.
+
+- [ ] **XP-effekt:** när du får XP (match, köp/sälj, kontrakt, titel) pulserar ringen runt managern i toppen, nivåbrickan poppar och ringen glider till sin nya längd (själva XP-mängden visas inte) (XP-stapeln i profilen också). Avstängt om effekter är av i Inställningar.
 
 **Unity (SampleScene, Play)**
 - [ ] Nät på målen, publik rätt väg, frisyrerna (särskilt spiky, ponytail, bun, coils, haaland).
@@ -185,8 +195,8 @@ Fristående prototyp i `src/game/proto/` (`tickSim.ts`, mätning i `tickSim.benc
 **Mål (användarens förtydligande):** statistiken (skott, tacklingar, dribblingar, mål) får gärna vara högre än i verkligheten, det är kul för spelaren. Det som ska vara realistiskt är **spelet**: hur spelarna rör sig, passar, pressar, tacklas, hamnar offside och avslutar.
 
 - **Vad den är:** 22 spelare och bollen simuleras i små steg (5 per sekund, i meter) med bollfysik, beslut var 1–4:e sekund (passa, driva, skjuta), passningar som kan brytas, dueller, offside, fouls/kort, målvakt och fasta situationer. Den sänder samma `Frame`-format som gamla motorn, så visningen (2D och 3D) är oförändrad.
-- **Val:** Inställningar > Matchmotor (Standard / Ny (test)). Sparas i `manager2d.engine`, läses till `ENGINE.mode` i `matchView.ts`. Varje match minns sin motor (`LiveMatchState.engine`), så en match som började med en motor räknas om med samma.
-- **Standard är gamla motorn.** Återställa = välj Standard (eller sätt `ENGINE.mode = "minute"`). Vill man ta bort motorn helt: ta bort `tick.ts`, `playTick`/`simTeam` i `match.ts`, valet i `Settings.tsx`/`matchView.ts` och `match.engine*` i språkfilerna.
+- **Val:** ingen längre. Inställningen Matchmotor (och `match.engine*` i språkfilerna, `readEngine/writeEngine` i `matchView.ts`) togs bort på användarens begäran; `ENGINE.mode` är alltid "minute". Varje match minns sin motor (`LiveMatchState.engine`), så en match som började med en motor räknas om med samma.
+- **Standard är gamla motorn.** Vill man använda tick-motorn igen: sätt `ENGINE.mode = "tick"` i `match.ts` (eller lägg tillbaka valet). Vill man ta bort motorn helt: ta bort `tick.ts` och `playTick`/`simTeam` i `match.ts`.
 - **Samma regler som förut:** kommandon, byten, skador, trötthet, halvtid, tilläggstid, betyg, straffar/hörnor/frisparkar som användaren kan ta själv (`takeSetPiece(..., at)` + `drawSetPiece`), samma slumpfrö ger samma match.
 - **Mätt/justerad (inte i verkligheten, bara balans):** ungefär 3,4 mål, 28 skott och 22 fouls per match efter justering.
 - **Tester som körs automatiskt** (`tickEngine.test.ts`): rimlig statistik, determinism (samma frö, samma match med och utan bildrutor), en hel match med set pieces, och att en live-match som användaren spelat räknas **exakt som den visades** (testet sätter `live.manualSubs = false`, som appen gör som standard).
@@ -207,13 +217,14 @@ Fristående prototyp i `src/game/proto/` (`tickSim.ts`, mätning i `tickSim.benc
 
 ## 14. Managerns nivå och titel (byggd 2026-11-11, `src/game/manager.ts`)
 
-Managern har **100 nivåer** och **nio titlar**. Titeln är den första (Nybörjare) från start; en ny titel kommer **var 10:e nivå** (nivå 20, 30, … 80), och sista steget är 20: på **nivå 100 är man "Sir " + sitt namn**. Titlarna låses upp i **Album > Managerns titlar** och ger en **present** direkt (diamanter eller pengar, en gång, med ett meddelande). Nivån syns på **startsidan** som en blå ring runt managerns bild (hur långt till nästa nivå) med nivåsiffran på en blå bricka; i Tränarprofilen finns varken ring eller bricka, där står titel, nivå och XP-stapel under klubbnamnet.
+Managern har **100 nivåer** och **tio titlar**. Första titeln är **"Ingen titel"** (nivå 1); sedan kommer en ny **var 10:e nivå**: Nybörjare på nivå 10, därefter nivå 20, 30, … 80, och sista steget är 20: på **nivå 100 är man "Sir " + sitt namn**. De nio titlarna efter "Ingen titel" är **vanliga saker i Albumet** (`title:2` … `title:10`, kortet "Managerns titlar"): de räknas med i samlandet (**79 saker** nu, förut 70) och i "kungen" (den som kräver allt i albumet, alltså även Sir). När en titel nås blir den en ny sak att öppna (NY!, blått nummer på Album-menyn) och ger då sin **present** (diamanter eller pengar, en gång); ett meddelande kommer också. "Ingen titel" syns inte i Albumet. **Varje nivå** ger dessutom en **slumpad present** (diamanter, pengar, lite energi, ibland 10 diamanter; samma nivå ger samma present) och en **effekt**: en skärm med strålar, blå medalj med nya nivån, presenterna och ev. ny titel, och en fanfar (`TrophyCelebration`, `celebrations` med `kind: "level"`; nivåer som kommer samtidigt visas som en skärm). Nivån syns på **startsidan** som en blå ring runt managerns bild (hur långt till nästa nivå) med nivåsiffran på en blå bricka; i Tränarprofilen finns varken ring eller bricka, där står titel, nivå och XP-stapel under klubbnamnet.
 
 XP per nivå: upp till nivå 20 är det 5 × (nivå−1)² (nivå 13 = 720 XP, nivå 20 = 1 805 XP), därefter brantare (`xpAtLevel`) så att **nivå 100 = 100 000 XP**.
 
 | Titel | Nivå | XP | Present |
 |---|---|---|---|
-| Nybörjare | 1 | 0 | – |
+| Ingen titel | 1 | 0 | – |
+| Nybörjare | 10 | 405 | 5 💎 |
 | Lagledare | 20 | 1 805 | 10 💎 |
 | Assisterande tränare | 30 | ca 5 050 | 500 000 |
 | Huvudtränare | 40 | ca 10 400 | 25 💎 |
@@ -228,3 +239,12 @@ XP per nivå: upp till nivå 20 är det 5 × (nivå−1)² (nivå 13 = 720 XP, n
 - **Landslagserbjudanden:** `offerRange(level)`: en nybörjare får frågan från små länder, en bättre titel från bättre (nivå 10: de fyra bästa). Erbjudandet kommer som förut efter en titel.
 - **Inte gjort:** erbjudanden från andra klubbar (det finns inget byte av klubb i spelet), mer "respekt" hos spelarna utöver Forza/order (t.ex. lagsnack, humör).
 - Test: `manager.test.ts`.
+
+## 15. Ändringar 2026-11-12 (gamla motorn, överblick, level)
+- **Målen i 2D-överblicken** ritas 12 enheter breda (`GOAL_W` i `MatchViewer.tsx`, riktiga mål är 7,32 m). Bara utseende.
+- **Skott från straffområdet (gamla motorn, `Replay.shootsFromBox` i `match.ts`):** i en minut där laget förlorar bollen (`turnover`) och bollföraren står framför mål (över 74 i djup, mitt på) skjuter han i stället för att bli stoppad: ca 55–95 % beroende på avslut, instruktion och Forza. Skottet räddas (60 %) eller går utanför. **Det är bara repriserna:** matchresultat och statistik (skott, räddningar) kommer från minutsimuleringen och ändras inte, så siffrorna i statistiken kan vara lägre än skotten man ser.
+- **Fri spelare springer mot mål:** är bollföraren fri (ingen motståndare inom 11) springer han (85 %) rakt mot mål och inåt mitten, längre än annars, aldrig snett bort eller ut åt sidan, och in i straffområdet om minuten slutar med att laget förlorar bollen (då skjuter han). Ingen finta åt sidan när han är fri. Motståndarna springer efter via den vanliga pressen i visningen (närmaste man pressar).
+- **Level-upp:** ringen i huvudet pulserar först; levelup-skärmen kommer 1,8 s senare (`LEVEL_DELAY_MS` i `TrophyCelebration.tsx`), direkt om effekter är avstängda.
+- **3D, räddning på fasta situationer (Unity, `SetPieceStage.cs`):** vid en räddad hörna, frispark eller straff gick bollen fram till själva mållinjen (innanför stolparna) innan den fösades iväg, så det såg ut som mål fast det stod räddning. Nu stannar en räddad boll framför linjen (målvaktens händer) och fösas ut åt sidan och bakåt. Kollat i labbet (`cornersave`), publicerat till `forza-3d`; kräver nytt WebGL-bygge.
+- **3D-matchen fastnade (två gånger; pause/play gick inte, bara "Klar" fungerade):** orsaken är inte bevisad. Webbkoden (frysningar, repriser, pausar) har inget som kan stå för alltid i 3D; mest troligt är att själva Unity-vyn stannade (WebGL-körningen avbröts: minne eller ett fel i spelkoden, som i WebGL stoppar allt). Då fryser bilden medan sidan lever. **Skydd tillagt (kräver nytt WebGL-bygge för full effekt):** `public/unity3d/index.html` säger till sidan (`crash`) om Unity slutar svara (anrop kastar, eller laddarens felbanner), och Unity skickar ett hjärtslag (`beat`, 1 gång/s, `MatchRoot.Update`). `useUnity3d` (`unity3d.ts`) startar om 3D-vyn i en ny ram (upp till 3 gånger per match; matchen väntar medan den laddar om, texten `match.view3dCrashed` visar orsaken) och efter det blir det kvar som felmeddelande. Hjärtslaget bedöms bara när bygget skickar det (gamla bygget: bara `crash` från index.html). **Läs av orsaken** i rutan "3D-vyn stannade (…)" nästa gång det händer och notera den här.
+- **Offside och hörnor med orsak (gamla motorn, bara i repriserna):** i en minut som ändå slutar med att laget förlorar bollen drar `Replay.offsideCall` (`match.ts`) en djup passning till en forward bortom sista försvararen: ny bildruta `kind: "offside"` (spelaren som tar frisparken åt andra laget; omstart som inkast), 🚩-banderoll `match.offside` och visselpipa i visningen (`isRestart`/`OFFSIDE_PAUSE_MS`). Ca 2,6 offside per match (mätt på 12 matcher, `OFFSIDE_CHANCE`). Inte i statistiken och påverkar inte resultatet. Hörnor börjar nu alltid med en orsak: ett inlägg som en försvarare får i vägen eller ett blockerat skott, och sedan bollen ut över kortlinjen (förut: en dribbling och bollen ut). Straff och frispark hade redan en fällning i uppbyggnaden. Antalet hörnor, straffar och frisparkar är oförändrat (de slumpas fortfarande per minut av matchsimuleringen, nu med en synlig orsak).

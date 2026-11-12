@@ -1,7 +1,8 @@
 // A trophy won: the whole team on the podium, the captain lifting it, and
 // confetti in the club's colours. Shown once per trophy.
 import {Icon, iconize} from "./Icon";
-import {useMemo} from "react";
+import {useEffect, useMemo, useState} from "react";
+import {effectsOn} from "./effects";
 import {useT} from "../i18n";
 import type {TKey} from "../i18n";
 import {useGame, useGameState} from "../store";
@@ -10,6 +11,10 @@ import {Figure} from "./Figure";
 import {Confetti} from "./MatchViewer";
 import {nationalKit, nationalLineup} from "../game/national";
 import {PlayerCard} from "./PlayerCard";
+import {fanfare} from "./sound";
+
+/** How long the level ring has to itself before the level-up screen comes (ms). */
+const LEVEL_DELAY_MS = 1800;
 
 export function TrophyCelebration() {
   const {t} = useT();
@@ -30,8 +35,46 @@ export function TrophyCelebration() {
   }, [club, game.players, tournament]);
   const kit = tournament ? nationalKit(tournament.country) : {color: club.color, color2: club.color2};
   const colors = useMemo(() => [kit.color, kit.color2, "#fde047", "#ffffff"], [kit.color, kit.color2]);
+  // A level up: a fanfare when it appears.
+  const levelUp = next?.kind === "level" ? next.level : 0;
+  const [waited, setWaited] = useState(0);
+  const shown = !!levelUp && (!effectsOn() || waited === levelUp);
+  useEffect(() => {
+    if (!shown) return;
+    try { fanfare(false); } catch { /* no sound */ }
+  }, [shown, levelUp]);
+  // The level ring in the header gets to do its effect first (it pulses and the arc slides): the level-up screen follows a moment later.
+  useEffect(() => {
+    if (!levelUp || !effectsOn()) return;
+    const id = setTimeout(() => setWaited(levelUp), LEVEL_DELAY_MS);
+    return () => clearTimeout(id);
+  }, [levelUp]);
   if (!next) return null;
+  if (next.kind === "level" && effectsOn() && waited !== next.level) return null;
   const done = () => act((g) => { g.celebrations = g.celebrations?.slice(1); });
+  // A level up: a burst, the new level, what it gave (at random) and, now and then, a new title.
+  if (next.kind === "level") {
+    const title = next.title ? t(`mgr.level.${next.title}` as TKey, {name: game.managerName}) : null;
+    return (
+      <div className="trophy-overlay level-overlay" role="dialog" aria-label={t("level.up")}>
+        <Confetti colors={["#38bdf8", "#2563eb", "#fde047", "#ffffff"]} />
+        <div className="level-rays" aria-hidden />
+        <h1 className="trophy-title">{iconize(t("level.up"))}</h1>
+        <div className="level-medal"><b>{next.level}</b></div>
+        <p className="trophy-text">{iconize(t("level.now", {level: next.level}))}</p>
+        {title && <p className="level-title">{iconize(t("level.newTitle", {title}))}</p>}
+        <ul className="level-gifts">
+          {next.gifts.slice(-6).map((g, i) => (
+            <li key={i} className={`level-gift ${g.kind}`} style={{animationDelay: `${0.25 + i * 0.18}s`}}>
+              <Icon name={g.kind === "diamonds" ? "diamond" : g.kind === "money" ? "coins" : "bolt"} size={22} /> {iconize(t(`level.gift.${g.kind}` as TKey, {n: g.n, money: g.n}))}
+            </li>
+          ))}
+        </ul>
+        {next.gifts.length > 6 && <p className="muted small">+{next.gifts.length - 6}</p>}
+        <button className="btn primary big" onClick={done}>{iconize(t("trophy.continue"))} ▶</button>
+      </div>
+    );
+  }
   // An award for one of ours: the winners, lit up, with confetti.
   if (next.kind === "award") {
     return (

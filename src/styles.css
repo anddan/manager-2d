@@ -3429,3 +3429,26 @@ body:has(.intro) .modal-backdrop { z-index: 200; }
 .topbar-manager .lvl-badge { display: block; overflow: visible; white-space: nowrap; }
 
 .title-medal.wide { font-size: 1.1rem; }
+
+/* A level up: a burst of rays behind a blue medal with the new level, and the presents it gave. */
+.level-overlay { background: radial-gradient(circle at 50% 40%, rgb(30 64 175 / 0.55), rgb(2 6 23 / 0.95) 70%); }
+.level-rays { position: absolute; inset: -30%; z-index: 0; background: repeating-conic-gradient(from 0deg, rgb(125 211 252 / 0.22) 0deg 8deg, transparent 8deg 24deg); animation: level-spin 14s linear infinite; mask-image: radial-gradient(circle, #000 0%, transparent 62%); -webkit-mask-image: radial-gradient(circle, #000 0%, transparent 62%); pointer-events: none; }
+@keyframes level-spin { to { transform: rotate(360deg); } }
+.level-overlay > * { position: relative; z-index: 1; }
+.level-overlay > .level-rays { position: absolute; z-index: 0; }
+.level-medal { display: grid; place-items: center; width: 128px; height: 128px; border-radius: 50%; background: radial-gradient(circle at 30% 25%, #93c5fd, #2563eb 70%); color: #fff; font-size: 3.2rem; font-weight: 900; box-shadow: inset 0 0 0 5px rgb(255 255 255 / 0.5), 0 0 40px rgb(56 189 248 / 0.8); animation: level-pop 0.8s cubic-bezier(0.2, 1.5, 0.4, 1) both; }
+@keyframes level-pop { 0% { transform: scale(0.1) rotate(-30deg); opacity: 0; } 100% { transform: none; opacity: 1; } }
+.level-title { margin: 0; font-size: 1.15rem; font-weight: 800; color: #fde047; animation: pop-in 0.6s 0.3s ease-out both; }
+.level-gifts { list-style: none; margin: 4px 0; padding: 0; display: grid; gap: 6px; justify-items: center; }
+.level-gift { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px; background: rgb(255 255 255 / 0.1); border: 1px solid rgb(255 255 255 / 0.22); font-weight: 800; animation: pop-in 0.5s ease-out both; }
+.level-gift.diamonds { color: #7dd3fc; }
+.level-gift.money { color: #fde047; }
+.level-gift.energy { color: #86efac; }
+
+/* XP gained: the ring pulses (the arc itself slides to its new length). The amount is not shown. */
+.lvl-ring.pulse { animation: lvl-pulse 1.1s ease-out 1; border-radius: 50%; }
+@keyframes lvl-pulse { 0% { box-shadow: 0 0 0 0 rgb(56 189 248 / 0.85); } 70% { box-shadow: 0 0 0 14px rgb(56 189 248 / 0); } 100% { box-shadow: 0 0 0 0 rgb(56 189 248 / 0); } }
+.lvl-ring.pulse .lvl-fill { stroke: #e0f2fe; filter: drop-shadow(0 0 6px rgb(186 230 253 / 1)); }
+.lvl-ring.pulse .lvl-badge { animation: lvl-badge-pop 0.6s ease-out 1; }
+@keyframes lvl-badge-pop { 0% { transform: scale(1); } 40% { transform: scale(1.35); } 100% { transform: scale(1); } }
+.mgr-xp > span { transition: width 0.6s ease; }

@@ -5,6 +5,7 @@
 //
 // The higher the level, the more the players listen: "Forza!" and the orders given (and the way the team presses) bite harder. A country's
 // federation offers a better national team to a manager with a higher title.
+import {ENERGY_MAX} from "./constants";
 import {addMessage, book} from "./helpers";
 import type {GameState} from "./types";
 
@@ -17,9 +18,10 @@ export interface TitleReward {
   money?: number;
 }
 
-/** The titles, from the first: the level each is reached at, and its present. (Their names are `mgr.level.1` .. `mgr.level.9`; the last is "Sir" and the manager's name.) */
+/** The titles, from the first: the level each is reached at, and its present. (Their names are `mgr.level.1` .. `mgr.level.10`: the first is "no title", the last is "Sir" and the manager's name.) */
 export const MANAGER_TITLES: {level: number; reward: TitleReward | null}[] = [
   {level: 1, reward: null},
+  {level: 10, reward: {diamonds: 5}},
   {level: 20, reward: {diamonds: 10}},
   {level: 30, reward: {money: 500_000}},
   {level: 40, reward: {diamonds: 25}},
@@ -31,10 +33,9 @@ export const MANAGER_TITLES: {level: number; reward: TitleReward | null}[] = [
 ];
 export const TITLE_COUNT = MANAGER_TITLES.length;
 
-/** What the manager has done: XP, and the titles (by number, 1..9) whose present has been given. */
+/** What the manager has done: XP. (The titles are in the album, where the presents for them are collected.) */
 export interface ManagerProgress {
   xp: number;
-  claimed: number[];
 }
 
 export function managerXp(state: GameState): number {
@@ -65,7 +66,7 @@ export function levelOf(xp: number): number {
   return lo;
 }
 
-/** Which title (1..9) a level has reached. */
+/** Which title (1..10) a level has reached. */
 export function titleOf(level: number): number {
   let n = 1;
   MANAGER_TITLES.forEach((t, i) => { if (level >= t.level) n = i + 1; });
@@ -92,30 +93,66 @@ export function managerAuthority(state: GameState): number {
   return (managerLevel(state) - 1) / (MAX_LEVEL - 1);
 }
 
-/** Gives XP. A new title is a present: diamonds or money, paid at once, and a message about it. */
+/** A small present for every level up: something at random (diamonds most often, money, a little energy, now and then a big one). */
+export type LevelGift = {kind: "diamonds" | "money" | "energy"; n: number};
+
+function mix(a: number, b: number): number {
+  let h = (Math.imul(a ^ 0x9e3779b9, 2654435761) ^ Math.imul(b + 0x85ebca6b, 2246822519)) >>> 0;
+  h ^= h >>> 15;
+  h = Math.imul(h, 2246822519) >>> 0;
+  h ^= h >>> 13;
+  return h >>> 0;
+}
+
+/** The present for reaching a level: the same for the same level and manager (a seed from the name). */
+export function levelGift(level: number, seed: number): LevelGift {
+  const r = mix(level, seed) % 100;
+  const q = mix(seed, level * 7 + 1);
+  if (r < 45) return {kind: "diamonds", n: 1 + (q % 5)};
+  if (r < 80) return {kind: "money", n: Math.round(((50_000 + level * 10_000) * (1 + (q % 4))) / 10_000) * 10_000};
+  if (r < 95) return {kind: "energy", n: 2 + (q % 3)};
+  return {kind: "diamonds", n: 10};
+}
+
+/** Gives XP. A new level is a small present (random) and a nice effect; a new title has a bigger present, collected in the album, and a message about it. */
 export function addManagerXp(state: GameState, amount: number): void {
   const xp = Math.round(amount);
   if (!(xp > 0)) return;
-  const m = (state.manager ??= {xp: 0, claimed: []});
-  const before = titleOf(levelOf(m.xp));
+  const m = (state.manager ??= {xp: 0});
+  const levelBefore = levelOf(m.xp);
+  const titleBefore = titleOf(levelBefore);
   m.xp += xp;
-  const after = titleOf(levelOf(m.xp));
-  for (let n = before + 1; n <= after; n++) grantTitle(state, n);
+  const levelAfter = levelOf(m.xp);
+  const titleAfter = titleOf(levelAfter);
+  for (let n = titleBefore + 1; n <= titleAfter; n++) announceTitle(state, n);
+  if (levelAfter <= levelBefore) return;
+  // Every level up has its own present, and the screen says so (levels that come together are shown as one).
+  let seed = 7;
+  for (const c of state.managerName) seed = (seed * 31 + c.charCodeAt(0)) >>> 0;
+  const gifts: LevelGift[] = [];
+  for (let lv = levelBefore + 1; lv <= levelAfter; lv++) gifts.push(levelGift(lv, seed));
+  for (const g of gifts) {
+    if (g.kind === "diamonds") state.monetization.diamonds += g.n;
+    else if (g.kind === "money") book(state, state.userClubId, "reward", g.n);
+    else state.monetization.energy = Math.min(ENERGY_MAX, state.monetization.energy + g.n);
+  }
+  const queue = (state.celebrations ??= []);
+  const last = queue[queue.length - 1];
+  const title = titleAfter > titleBefore ? titleAfter : undefined;
+  if (last?.kind === "level") {
+    last.level = levelAfter;
+    last.gifts.push(...gifts);
+    if (title) last.title = title;
+  } else queue.push({kind: "level", level: levelAfter, gifts, ...(title ? {title} : {})});
 }
 
-function grantTitle(state: GameState, title: number): void {
-  const m = (state.manager ??= {xp: 0, claimed: []});
-  if (m.claimed.includes(title)) return;
-  m.claimed.push(title);
-  const entry = MANAGER_TITLES[title - 1];
-  const reward = entry.reward;
-  if (reward?.diamonds) state.monetization.diamonds += reward.diamonds;
-  if (reward?.money) book(state, state.userClubId, "reward", reward.money);
+/** A new title is reached: a message (the present is collected in the album). */
+function announceTitle(state: GameState, title: number): void {
   addMessage(state, {
     kind: "news",
     // (The very top title is "Sir" and the manager's name.)
-    key: title === TITLE_COUNT ? "msg.managerTitleSir" : reward?.money ? "msg.managerTitleMoney" : "msg.managerTitle",
-    params: {title: `mgr.level.${title}`, name: state.managerName, level: entry.level, diamonds: reward?.diamonds ?? 0, money: reward?.money ?? 0},
+    key: title === TITLE_COUNT ? "msg.managerTitleSir" : "msg.managerTitle",
+    params: {title: `mgr.level.${title}`, name: state.managerName, level: MANAGER_TITLES[title - 1].level},
     highlight: true,
   });
 }

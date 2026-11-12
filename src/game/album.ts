@@ -7,7 +7,9 @@
 import type {GearItem} from "./gear";
 import {GEAR_KINDS, GEAR_TIERS} from "./gear";
 import {LEGEND_ID, THEO_ID} from "./legend";
+import {book} from "./helpers";
 import {GIFT_VARIANTS, parseGift} from "./morale";
+import {MANAGER_TITLES, managerLevel, titleOf} from "./manager";
 import {overall} from "./ratings";
 import {partLevel, partMax, type StadiumPart} from "./stadium";
 import type {GameState} from "./types";
@@ -44,8 +46,12 @@ export const albumGifts = (): string[] => [...Object.entries(GIFT_VARIANTS).flat
 /** Every piece of kit there is: each kind in each tier. */
 export const albumGear = (): string[] => GEAR_KINDS.flatMap((kind) => GEAR_TIERS.map((tier) => `${kind}:${tier}`));
 
+/** The manager's titles to reach, from Rookie (the first, "no title", is not one of them): "title:2" .. "title:10". */
+export const albumTitles = (): string[] => MANAGER_TITLES.slice(1).map((_, i) => `title:${i + 2}`);
+
 /** Every item in the album, by key. */
 export const albumKeys = (): string[] => [
+  ...albumTitles(),
   ...TROPHIES.map((k) => `trophy:${k}`),
   ...albumGifts().map((k) => `gift:${k}`),
   ...albumGear().map((k) => `gear:${k}`),
@@ -125,9 +131,10 @@ function rareReached(state: GameState, key: RareKey): boolean {
   return rest.every((k) => hasKey(state, o, k));
 }
 
-function hasKey(_state: GameState, o: ReturnType<typeof albumOwned>, key: string): boolean {
+function hasKey(state: GameState, o: ReturnType<typeof albumOwned>, key: string): boolean {
   const [kind, ...rest] = key.split(":");
   const id = rest.join(":");
+  if (kind === "title") return titleOf(managerLevel(state)) >= Number(id);
   return kind === "gift" ? o.gifts.has(id) : kind === "gear" ? o.gear.has(id) : kind === "trophy" ? (o.trophies[id] ?? 0) > 0 : kind === "pack" ? (o.packs[id] ?? 0) > 0 : o.rare.has(id);
 }
 
@@ -156,6 +163,8 @@ export function claimable(state: GameState): string[] {
 /** The diamonds an item gives when it is opened. */
 export function rewardOf(key: string): number {
   const [kind, a, b] = key.split(":");
+  // A title's present is its own (diamonds, or money: no diamonds then).
+  if (kind === "title") return MANAGER_TITLES[Number(a) - 1]?.reward?.diamonds ?? 0;
   if (kind === "trophy") {
     const R: Record<string, number> = {league: 30, cup: 50, wc1: 100, ec1: 80, copa1: 80, gold1: 80, afcon1: 80, asia1: 80, wc2: 50, ec2: 40, wc3: 30, ec3: 25};
     return R[a] ?? 25;
@@ -174,6 +183,9 @@ export function claimItem(state: GameState, key: string): number {
   a.claimed.push(key);
   const n = rewardOf(key);
   state.monetization.diamonds += n;
+  // A title can give money instead.
+  const money = key.startsWith("title:") ? MANAGER_TITLES[Number(key.split(":")[1]) - 1]?.reward?.money ?? 0 : 0;
+  if (money) book(state, state.userClubId, "reward", money);
   return n;
 }
 

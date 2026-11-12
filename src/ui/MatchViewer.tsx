@@ -90,7 +90,9 @@ const NET_DEPTH = 101.8;
 /** How far ahead of a dribbling player's feet the ball runs. */
 const BALL_LEAD = 1.1;
 /** How much faster a player runs when the ball is waiting on them. */
-const CATCH_UP = 1.7;/** How fast the ball is brought to the spot for a set piece or restart. */
+const CATCH_UP = 1.7;/** How much faster than a jog the nearest players dash for a loose ball. */
+const LOOSE_RUSH = 2.2;
+/** How fast the ball is brought to the spot for a set piece or restart. */
 const BALL_PLACE_SPEED = 90;
 /** How fast a loose ball rolls in to the player who is on it (per match minute): a little faster than a quick player runs. */
 const BALL_GLIDE = 80;
@@ -98,13 +100,15 @@ const BALL_GLIDE = 80;
 const BALL_TOP_SPEED = 550;
 /** How quickly players reach the speed they want (per match minute). */
 const ACCEL = 14;
-const GOAL_PAUSE_MS = 2800;
+const GOAL_PAUSE_MS = 4600;
 /** A ruled-out goal: "GOAL!" first, then the referee's decision. */
 const NO_GOAL_PAUSE_MS = 3200;
 const SETUP_PAUSE_MS = 1700;
 /** Teams take up positions for a goal kick; a throw-in is quicker. */
 const GOAL_KICK_PAUSE_MS = 1400;
 const THROW_IN_PAUSE_MS = 700;
+/** The flag is up and the free kick is set: long enough to see the flag and the line-up. */
+const OFFSIDE_PAUSE_MS = 1500;
 const HALFTIME_REPLAY_MS = 3000;
 const SHOUT_MS = 3200;
 const SET_PIECES_KEY = "manager2d.manualSetPieces";
@@ -307,7 +311,7 @@ export function planCelebration(ctx: Ctx, t: number, side: Side, scorerId: strin
   const perMs = (topSpeed(ctx, scorerId, t) * 2.2) / MS_PER_MINUTE;
   const dist = Math.hypot(dest.x - sc.x, dest.y - sc.y);
   const runMs = Math.max(500, dist / perMs + 150);
-  const hugMs = 1000;
+  const hugMs = 1400;
   // The nearest four of his team-mates run to him; the rest go back to their places.
   const mates = [...onPitchAt(ctx.report, side, t).values()].filter((id) => id !== scorerId && bodies[id]).sort((a, b) => Math.hypot(bodies[a].x - sc.x, bodies[a].y - sc.y) - Math.hypot(bodies[b].x - sc.x, bodies[b].y - sc.y));
   const chasers = mates.slice(0, 4);
@@ -320,7 +324,7 @@ export function planCelebration(ctx: Ctx, t: number, side: Side, scorerId: strin
   return {
     kind,
     stages: [{until: runMs + hugMs, targets: withHim}, {until: Infinity, targets: kickoff}],
-    duration: runMs + hugMs + 1300,
+    duration: runMs + hugMs + 1600,
     moves: [{at: slideAt, from: kind === "fans" ? "plane" : "slide"}],
   };
 }
@@ -433,7 +437,7 @@ function isShotSetup(frames: Frame[], k: number): boolean {
 }
 
 /** Restart touches play stops for while everyone takes up position. */
-const isRestart = (f: Frame) => f.kind === "goalkick" || f.kind === "throwin";
+const isRestart = (f: Frame) => f.kind === "goalkick" || f.kind === "throwin" || f.kind === "offside";
 
 /**
  * Where everyone stands for a goal kick or throw-in, from the restarting
@@ -652,7 +656,7 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
       }
       // Placed balls go to the spot. Everything else, dribbles included (carried
       // at the player's feet), goes to the player.
-      const toSpot = ["setpiece", "kickoff", "goalkick", "throwin"].includes(f.kind ?? "");
+      const toSpot = ["setpiece", "kickoff", "goalkick", "throwin", "offside"].includes(f.kind ?? "");
       // A pass goes to the spot it was aimed at, a fixed point, and the receiver runs to the same spot: the ball does not bend
       // towards whoever it is for as he moves (that looks like a magnet). A carried ball or a tackle still goes to the player.
       // It never changes its aim on the way. If he cannot get to the spot in time, it is played to the nearest place he can (worked out
@@ -863,6 +867,11 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
     const onBall = carrierId ?? (travelling && heading.kind === "dribble" && heading.playerId === held?.playerId ? heading.playerId : undefined);
     const keeperHolds = !!onBall && (["home", "away"] as const).some((s) => [...sides[s]].some(([slot, id]) => id === onBall && cs[s][slot].pos === "GK"));
 
+    // A loose ball: lying where it was left or rolling on, with nobody on it (not a restart, not in the net, not out of play). The nearest two of
+    // each side fight for it all the time, right onto it, instead of standing off until the next touch is due.
+    const dead = ["kickoff", "goalkick", "throwin", "offside", "setpiece", "goal", "nogoal", "out"].includes(held?.kind ?? "");
+    const looseBall = !travelling && !override && !keeperHolds && !dead && reached >= 0 && ball.x > 0.5 && ball.x < 99.5 && ball.y > 0.5 && ball.y < 99.5 && (!carrierId || !bodies[carrierId] || distance(bodies[carrierId], ball) > 3);
+
     for (const side of ["home", "away"] as const) {
       const other: Side = side === "home" ? "away" : "home";
       const onPitch = sides[side];
@@ -874,6 +883,12 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
       const ballDepth = progressFor(side, ball.x);
       const ballWidth = side === "home" ? ball.y : 100 - ball.y;
 
+      // The two of this side nearest a loose ball (within 35 units) go for it.
+      const fight = new Set<string>();
+      if (looseBall) {
+        const nearest = outfield.filter((id) => bodies[id]).map((id) => ({id, d: distance(bodies[id], ball)})).sort((a, b) => a.d - b.d).slice(0, 2);
+        for (const n of nearest) if (n.d < 35) fight.add(n.id);
+      }
       // Without the ball: the nearest presses, the next covers.
       let presser: string | undefined;
       let cover: string | undefined;
@@ -964,6 +979,12 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
         } else if (override?.targets[id]) {
           target = override.targets[id];
           sprint = distance(body, target) > 6;
+        } else if (looseBall && fight.has(id)) {
+          // A fight for the loose ball: right onto it (a stride to the side of it, so two of them do not stand on the same spot).
+          const gap = distance(body, ball);
+          target = gap > 1.4 ? {x: ball.x + ((body.x - ball.x) / gap) * 1.0, y: ball.y + ((body.y - ball.y) / gap) * 1.0} : {x: ball.x, y: ball.y};
+          sprint = gap > 2.5;
+          hurry = true;
         } else if (upcoming.has(id) && carrierId !== id) {
           // Reads the play: heads for where they'll get the ball next.
           const f = upcoming.get(id)!;
@@ -977,7 +998,7 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
           // At their feet with nothing recorded for a while: carry on up the pitch, round whoever is close,
           // instead of standing still in the middle of the defenders until the next touch. (Not the keeper.)
           // (Not the one taking a kick-off, throw-in or goal kick: they stand over the ball until it is played.)
-          const restartHeld = held?.playerId === id && ["kickoff", "goalkick", "throwin", "setpiece"].includes(held.kind ?? "");
+          const restartHeld = held?.playerId === id && ["kickoff", "goalkick", "throwin", "offside", "setpiece"].includes(held.kind ?? "");
           if (pos !== "GK" && !restartHeld && distance(body, ball) <= 1.5) {
             const up = progressFor(side, body.x) < 88 ? (side === "home" ? 1 : -1) * 6 : 0;
             let tx = body.x + up;
@@ -1162,6 +1183,9 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
           // A keeper gets across the goal quickly: as fast as it takes to be there on time.
           const need = distance(body, saveAhead) / Math.max(0.05, saveAhead.minute - t);
           top = Math.min(top * 5, Math.max(top, need));
+        } else if (looseBall && fight.has(id)) {
+          // A loose ball: they dash for it (a free ball is not left lying).
+          top *= LOOSE_RUSH;
         } else if (late && (id === carrierId || upcoming.has(id))) {
           // The ball is waiting on them.
           top *= CATCH_UP;
@@ -1208,6 +1232,16 @@ export function advance(prev: Scene, t1: number, ctx: Ctx, dyn: Dyn = NO_DYN): S
   return {time: t1, ball, bodies, reached, flying, subs, reachedAt, aimLock, roll};
 }
 
+/** Two recorded pictures of the match blended (k 0 is the first, 1 the second): where everyone and the ball are in between. */
+function blendScenes(a: Scene, b: Scene, k: number): Scene {
+  const bodies: Record<string, Body> = {};
+  for (const [id, x] of Object.entries(a.bodies)) {
+    const y = b.bodies[id];
+    bodies[id] = y ? {x: x.x + (y.x - x.x) * k, y: x.y + (y.y - x.y) * k, vx: x.vx + (y.vx - x.vx) * k, vy: x.vy + (y.vy - x.vy) * k, sprint: x.sprint} : x;
+  }
+  return {...a, time: a.time + (b.time - a.time) * k, ball: {x: a.ball.x + (b.ball.x - a.ball.x) * k, y: a.ball.y + (b.ball.y - a.ball.y) * k}, bodies};
+}
+
 /** While play is stopped: everyone jogs (or sprints) to their target spots. */
 function regroup(prev: Scene, dt: number, ctx: Ctx, targets: Record<string, Point>): Scene {
   const bodies: Record<string, Body> = {};
@@ -1230,6 +1264,10 @@ function regroup(prev: Scene, dt: number, ctx: Ctx, targets: Record<string, Poin
 }
 
 /** Grass, markings and goals. Never changes, so it's built once rather than every frame. */
+/** The goal as drawn in the 2D overview: its width and where it starts (centred on the pitch's 34). Wider than the real 7.32 m on purpose. */
+const GOAL_W = 12;
+const GOAL_TOP = 34 - GOAL_W / 2;
+
 const PITCH = (
   <g>
     <rect x={-3.5} y={-1} width={112} height={70} className="pitch-surround" />
@@ -1250,15 +1288,15 @@ const PITCH = (
       <circle cx={93} cy={34} r={0.5} className="spot" />
       <path d="M17.5 27.5 A9.15 9.15 0 0 1 17.5 40.5 M87.5 27.5 A9.15 9.15 0 0 0 87.5 40.5" fill="none" />
     </g>
-    {/* Goals: 7.32 m wide on the goal line, net behind. */}
+    {/* Goals: drawn wider than the real 7.32 m so that they read at a glance in the overview; net behind. */}
     {[{x: -1.8, line: 1}, {x: 104, line: 104}].map((g) => (
       <g key={g.x} className="pitch-goal">
-        <rect x={g.x} y={30.34} width={2.8} height={7.32} className="goal-net" />
-        {[31.8, 33.3, 34.7, 36.2].map((y) => <line key={y} x1={g.x} y1={y} x2={g.x + 2.8} y2={y} className="goal-mesh" />)}
-        <line x1={g.x + 1.4} y1={30.34} x2={g.x + 1.4} y2={37.66} className="goal-mesh" />
-        <path d={g.line === 1 ? `M1 30.34 H${g.x} V37.66 H1` : `M104 30.34 H${g.x + 2.8} V37.66 H104`} className="goal-frame" />
-        <circle cx={g.line} cy={30.34} r={0.45} className="goal-post" />
-        <circle cx={g.line} cy={37.66} r={0.45} className="goal-post" />
+        <rect x={g.x} y={GOAL_TOP} width={2.8} height={GOAL_W} className="goal-net" />
+        {[0.2, 0.4, 0.6, 0.8].map((f) => <line key={f} x1={g.x} y1={GOAL_TOP + GOAL_W * f} x2={g.x + 2.8} y2={GOAL_TOP + GOAL_W * f} className="goal-mesh" />)}
+        <line x1={g.x + 1.4} y1={GOAL_TOP} x2={g.x + 1.4} y2={GOAL_TOP + GOAL_W} className="goal-mesh" />
+        <path d={g.line === 1 ? `M1 ${GOAL_TOP} H${g.x} V${GOAL_TOP + GOAL_W} H1` : `M104 ${GOAL_TOP} H${g.x + 2.8} V${GOAL_TOP + GOAL_W} H104`} className="goal-frame" />
+        <circle cx={g.line} cy={GOAL_TOP} r={0.55} className="goal-post" />
+        <circle cx={g.line} cy={GOAL_TOP + GOAL_W} r={0.55} className="goal-post" />
       </g>
     ))}
   </g>
@@ -2122,9 +2160,9 @@ interface GoalReplay {
   recorded: boolean;
 }
 /** Replays start this many match minutes before the goal. */
-const REPLAY_LEAD = 0.9;
+const REPLAY_LEAD = 0.7;
 /** Slow motion: share of normal speed. */
-const REPLAY_SPEED = 0.4;
+const REPLAY_SPEED = 0.18;
 const REPLAY_LINGER_MS = 900;
 /** How much play is kept for replays, in match minutes. */
 const REPLAY_KEEP = 2.5;
@@ -2393,10 +2431,15 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
       setReplay((r) => {
         if (!r) return r;
         if (r.recorded) {
+          // From what was shown, in slow motion: between two recorded pictures the players and the ball glide (it is slower than they were
+          // recorded at, so they would step otherwise).
           const h = history.current;
-          let pick = h[0];
-          for (const s of h) if (s.time <= at) pick = s;
-          return pick === r.scene ? r : {...r, scene: pick};
+          let i = 0;
+          for (let k = 0; k < h.length; k++) if (h[k].time <= at) i = k;
+          const a = h[i];
+          const b = h[i + 1];
+          const pick = b && b.time > a.time ? blendScenes(a, b, Math.max(0, Math.min(1, (at - a.time) / (b.time - a.time)))) : a;
+          return {...r, scene: pick};
         }
         return at > r.scene.time ? {...r, scene: advance(r.scene, at, ctx, dynRef.current)} : r;
       });
@@ -2534,7 +2577,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
       const targets = kickoffTargets(ctx, time, kickoff?.kind === "kickoff" ? kickoff.playerId : undefined);
       setFreeze({...p, started, duration: live ? Infinity : HALFTIME_REPLAY_MS, targets});
     } else if (p.kind === "restart" && p.restart) {
-      const duration = p.restart.kind === "goalkick" ? GOAL_KICK_PAUSE_MS : THROW_IN_PAUSE_MS;
+      const duration = p.restart.kind === "goalkick" ? GOAL_KICK_PAUSE_MS : p.restart.kind === "offside" ? OFFSIDE_PAUSE_MS : THROW_IN_PAUSE_MS;
       setFreeze({...p, started, duration, targets: restartTargets(ctx, p.restart, time)});
     } else if (p.kind === "injury") {
       setFreeze({...p, started, duration: Infinity, targets: {}});
@@ -2724,7 +2767,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
       crowd("goal");
       const id = setTimeout(() => whistle("short"), 1100);
       return () => clearTimeout(id);
-    } else if (freeze.kind === "setup") whistle("short");
+    } else if (freeze.kind === "setup" || (freeze.kind === "restart" && freeze.restart?.kind === "offside")) whistle("short");
     else if (freeze.kind === "halftime" || freeze.kind === "fulltime") whistle("end");
     return undefined;
   }, [freeze?.key]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -3101,7 +3144,9 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
     const who = view.subs?.[view.reached] ?? lastTouch.playerId;
     const pop = Math.sin((sinceTouch / 0.12) * Math.PI);
     const prev = report.frames[view.reached - 1];
-    const highBall = (lastTouch.flight === "cross" || lastTouch.flight === "long") && !!prev && distance(prev, lastTouch) > 15;
+    // Up for a header only when the ball is at head height: the engine says how high it was (from 1.6 m); older matches: a cross. A long
+    // ball that is taken at the feet or on the chest is not jumped for.
+    const highBall = lastTouch.air !== undefined ? lastTouch.air >= 1.6 : lastTouch.flight === "cross" && !!prev && distance(prev, lastTouch) > 15;
     if (highBall && view.bodies[who]) {
       air[who] = {lift: pop};
       // The nearest opponent goes up with them.
@@ -3158,7 +3203,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
     const out: UnityEvent[] = [];
     // The ball leaving a boot (a run with the ball, a tackle won and a throw-in are not kicks).
     // (A new touch while it is still flying is a new kick too: at speed, or on a slow frame, a pass and the shot can both happen between two draws.)
-    if (view.flying && (!was.flying || view.reached !== was.reached) && now && next && !["dribble", "tackle", "throwin"].includes(next.kind ?? "")) {
+    if (view.flying && (!was.flying || view.reached !== was.reached) && now && next && !["dribble", "tackle", "throwin", "offside"].includes(next.kind ?? "")) {
       const kicker = who(view.reached);
       if (kicker) {
         const dist = Math.hypot((next.x - now.x) * 1.05, (next.y - now.y) * 0.68);
@@ -3463,7 +3508,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
             {/* The net bulges with the goal. */}
             {freeze?.kind === "goal" && !replay && (
               <g key={freeze.key} className={`net-hit ${view.ball.x > 50 ? "right" : "left"}`}>
-                <rect x={view.ball.x > 50 ? 104 : -1.8} y={30.34} width={2.8} height={7.32} />
+                <rect x={view.ball.x > 50 ? 104 : -1.8} y={GOAL_TOP} width={2.8} height={GOAL_W} />
               </g>
             )}
             </g>
@@ -3520,10 +3565,10 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
               </button>
             </div>
           )}
-          {view3d && !textOnly && unity.available && <iframe ref={unity.frame} className={`unity-frame${unity.ready ? " ready" : ""}`} src={frameUrl} title="3D" allow="autoplay" />}
+          {view3d && !textOnly && unity.available && <iframe key={unity.epoch} ref={unity.frame} className={`unity-frame${unity.ready ? " ready" : ""}`} src={frameUrl} title="3D" allow="autoplay" />}
           {view3d && !textOnly && unity.available && !unity.ready && (
             <div className="unity-loading" role="status">
-              {unity.loadError ? t("match.view3dError", {why: unity.loadError.slice(0, 80)}) : t("match.view3dLoading", {pct: Math.round(unity.progress * 100)})}
+              {unity.loadError ? t("match.view3dError", {why: unity.loadError.slice(0, 80)}) : unity.crash ? t("match.view3dCrashed", {why: unity.crash.slice(0, 80)}) : t("match.view3dLoading", {pct: Math.round(unity.progress * 100)})}
             </div>
           )}
           {view3d && !textOnly && unity.available === false && <div className="unity-missing" role="status">{t("match.view3dMissing")}</div>}
@@ -3540,7 +3585,7 @@ export function MatchScreen({report, live, onClose, onFinish}: ScreenProps) {
           {freeze?.kind === "nogoal" && !replay && <NoGoalBanner key={freeze.key} style={sideBorder(freeze.side)} reason={report.events.find((e) => e.type === "disallowed" && e.side === freeze.side && e.minute === Math.ceil(freeze.time))?.note} />}
           {freeze?.kind === "restart" && freeze.restart && !replay && (
             <div className="setup-banner" style={sideBorder(freeze.side)}>
-              {freeze.restart.kind === "goalkick" ? "🥅" : "🤾"} {iconize(t(freeze.restart.kind === "goalkick" ? "match.goalKick" : "match.throwIn", {team: (freeze.side === "home" ? home : away).short, player: name(freeze.restart.playerId)}))}
+              {freeze.restart.kind === "goalkick" ? "🥅" : freeze.restart.kind === "offside" ? "🚩" : "🤾"} {iconize(t(freeze.restart.kind === "goalkick" ? "match.goalKick" : freeze.restart.kind === "offside" ? "match.offside" : "match.throwIn", {team: (freeze.side === "home" ? home : away).short, player: name(freeze.restart.playerId)}))}
             </div>
           )}
           {freeze?.kind === "setup" && freeze.sp && (

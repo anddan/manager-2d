@@ -49,6 +49,11 @@ describe("the tick engine", () => {
       expect(f.x).toBeLessThanOrEqual(100);
       expect(f.y).toBeGreaterThanOrEqual(0);
       expect(f.y).toBeLessThanOrEqual(100);
+      // A ball is only played up to head height (and a header is not at the feet).
+      if (f.air !== undefined) {
+        expect(f.air).toBeGreaterThanOrEqual(0.6);
+        expect(f.air).toBeLessThanOrEqual(2.5);
+      }
     }
     // A goal is followed by a kick-off.
     r.frames.forEach((f, i) => {
